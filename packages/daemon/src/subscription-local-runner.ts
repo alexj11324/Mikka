@@ -96,7 +96,7 @@ export function createLocalSubscriptionRunner(host: LocalSubscriptionHost) {
           async *events() {
             try { yield* session.events() } finally { finish() }
           },
-          send: text => session.send(text),
+          send: (text, mode) => session.send(text, mode),
           cancel: async () => { try { await session.cancel() } finally { finish() } },
         }
       } catch (error) {

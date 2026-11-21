@@ -14,9 +14,9 @@ export function homeLive(home: Home | null) {
   return {
     minIntervalMs: 2_000,
     refs: [
-      // Each bot's latest line, working and pin; the 线程 counts (both owner-wide, on the person's home channel).
+      // Bot chats use the owner's home channel. Run counts follow the selected workspace.
       listRef('bot_chat_list', own),
-      listRef('thread_list', own),
+      listRef('thread_list', open),
       // The open workspace's bots, and its name and the workspace list.
       listRef('bot_list', open),
       listRef('workspace_settings', open),

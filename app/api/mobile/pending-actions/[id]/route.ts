@@ -5,7 +5,6 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { decidePendingAction } from '@/lib/pending-actions'
 import { pendingActionsOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
 

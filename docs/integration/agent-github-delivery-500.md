@@ -1,8 +1,11 @@
 # Agent-owned GitHub delivery (#500)
 
-Coding agents own commit, push, PR creation and CI repair. CI webhooks do not
-resume an ended agent. The agent stays in its existing run, waits with
-`gh pr checks --watch`, reads failures and repeats until its final commit passes.
+Coding agents own commit, push, PR creation and CI repair. A live coding
+Agent can still use native `gh pr checks --watch` in its run to read and
+repair failing checks. A verified GitHub `check_suite.completed` event can
+now wake the already bound bot's Coordinator after the original run ended,
+without keeping a sandbox alive to poll. **This does not automatically resume
+the ended native CLI session** or certify that all required checks passed.
 
 ## Credentials
 
@@ -50,6 +53,42 @@ Read-only receipt work uses daemon-private configuration, not executable files
 or configuration from the agent-writable run directory. Normal local sandbox
 and hosted native execution retain their existing filesystem, network, lease
 and subscription boundaries.
+
+## GitHub CI completion wakeup (#2064)
+
+The existing signature-verified GitHub App webhook accepts completed
+`check_suite` events only. Per-job `check_run` and `workflow_run` do not
+generate additional Agent wakeups; the existing per-check and commit-status
+UI projections remain independent. A suite identifies only a current published
+PR head for a source-bound repository and an already finished Agent run.
+Unknown, closed, cross-repository, unbound and unsigned inputs never
+create a Coordinator message. When a suite lists PRs, its
+`pull_requests[].head.sha` is checked against the stored PR head when
+provided; `check_suite.head_sha` may be a synthetic merge commit and must
+not be equated with the PR head. With a listed PR but no head SHA, the signal
+is a hint only and the Agent must re-read the live PR before acting. Suites
+lacking PR numbers (for example, fork checkouts) are matched by their exact
+suite SHA and repository within already published PRs, never by a broad
+GitHub search.
+
+A successful match creates a `run_report` in the existing deduplicated
+Coordinator outbox, bound to the run's user, bot and task. The Coordinator
+rechecks the stored source key and the visible, finished run, then marks it a
+`result` transport event without an extra model-tier classification call.
+This lets the existing Eve conversation receive the new event even after the
+original coding run ends. The webhook does
+not trust its reported success as the final status: the next Agent decision
+must fetch current GitHub checks, required check names, head SHA, reviews and
+merge policy under the normal owner credentials. Neither success nor failure
+is direct authorization to merge, publish or increase an Agent's grants.
+The outbox entry is persisted before acknowledging the inbound webhook, so
+a delivery failure can be retried without duplicate downstream turns.
+
+**Subscription requirement:** the GitHub App must subscribe to
+`check_suite` and `status`; new self-hosted manifests include these.
+The existing hosted App is *not* reconfigured by the source-code change.
+Until its real subscriptions, deployment, and signed delivery are verified,
+this is implementation evidence, **not** production proof.
 
 ## Evidence boundaries
 

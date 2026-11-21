@@ -18,9 +18,10 @@ export function ReviewSummaryRow({ summary, onPress, compact, short }: { summary
       style={({ pressed }) => [styles.row, compact && styles.compact, pressed && { opacity: 0.6 }]}>
       {summary.pr ? (merged ? <GitMerge size={16} color={colors.merged} strokeWidth={2} /> : <GitPullRequest size={16} color={colors.prOpen} strokeWidth={2} />) : null}
       <View style={styles.words}>
+        {!p.pr && !p.files && !p.additions && !p.status && <Text style={styles.text}>审阅</Text>}
         {p.pr ? <><Text style={styles.text}>{p.pr}</Text><Text style={styles.dot}>·</Text></> : null}
         {p.files ? <Text style={styles.text}>{p.files}</Text> : null}
-        <Text style={[styles.text, { color: colors.success }]}>{p.additions}</Text>
+        {p.additions !== null && <Text style={[styles.text, { color: colors.success }]}>{p.additions}</Text>}
         {summary.deletions ? <Text style={[styles.text, { color: colors.danger }]}>{p.deletions}</Text> : null}
         {p.status ? (
           <>

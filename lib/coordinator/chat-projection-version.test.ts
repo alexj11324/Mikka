@@ -40,12 +40,12 @@ const database = drizzle(async (query, params) => {
   if (query.includes('"chat_messages"')) {
     const after = query.match(/"coordinator_messages"\."position" > \$(\d+)/)
     const rows = messages.filter(row => !after || row.position > Number(params[Number(after[1]) - 1])).toReversed()
-    // Column order follows the store's select: five session lease fields, then
-    // the fold summary and its cursor, then the rows and the waiting inbox.
-    return { rows: [[null, null, null, null, null, null, null, rows, []]] }
+    // Native pending is false for this historical fixture, followed by five
+    // session fields, the fold summary/cursor, rows and waiting inbox.
+    return { rows: [[false, null, null, null, null, null, null, null, rows, []]] }
   }
   if (query.includes('"latest"')) {
-    return { rows: [[null, null, null, null, null, 4, storedHash, 'assistant', 'latest:0', createdAt, []]] }
+    return { rows: [[false, null, null, null, null, null, 4, storedHash, 'assistant', 'latest:0', createdAt, []]] }
   }
   throw new Error('unexpected_projection_version_query')
 })
@@ -98,6 +98,8 @@ test('unchanged rows invalidate the pre-projection chat version while current re
   const legacyVersion = createHash('sha256').update(`200|${storedHash}||`).digest('hex').slice(0, 32)
   const current = await store.chatVersionState(owner, 200, botId)
   assert.notEqual(current.version, legacyVersion, 'an old known version must trigger a body read')
+  const joinedTurnsVersion = createHash('sha256').update(`coordinator-chat:3|200|${storedHash}||`).digest('hex').slice(0, 32)
+  assert.notEqual(current.version, joinedTurnsVersion, 'a client that cached joined Eve turns must read the corrected body')
   assert.equal((await store.chatVersionState(owner, 200, botId)).version, current.version)
 })
 

@@ -33,7 +33,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   const { Pool } = await import('pg')
   const connection = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool } = await import('@/lib/db'), { workspacePool } = await import('@/lib/workspace-db')
-  const { createPersonalAccessToken } = await import('@/lib/tokens/store')
+  const { createLegacyPersonalAccessToken } = await import('@/lib/tokens/store')
   const { recordProjectDecision } = await import('./decisions')
   const { resolveProjectScope, resolveProjectReadScope } = await import('./scope')
   const { collectMapFacts } = await import('./read-store')
@@ -84,8 +84,8 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     selectedOptionId: 'versioned', sources: [{ role: 'evidence', source: { type: 'bot_message', id: messageId } },
       { role: 'branch_work', optionId: 'versioned', source: { type: 'run', id: runId } }],
   })
-  const token = await createPersonalAccessToken(owner, home.id, { name: 'Map HTTP fixture' })
-  const otherToken = await createPersonalAccessToken(peer, other.id, { name: 'Foreign map fixture' })
+  const token = await createLegacyPersonalAccessToken(owner, home.id, { name: 'Map HTTP fixture' })
+  const otherToken = await createLegacyPersonalAccessToken(peer, other.id, { name: 'Foreign map fixture' })
   const server = createServer(async (incoming, outgoing) => {
     try {
       const request = new Request('http://127.0.0.1' + incoming.url, { headers: Object.fromEntries(Object.entries(incoming.headers)
@@ -325,7 +325,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
     await seedProjectTasks(connection, sharedProject, [sharedIssue])
     const sharedBot = await seedBot(connection, shared.id, owner)
     const sharedRun = await seedRun(connection, { userId: owner, agentId, botId: sharedBot, issueId: sharedIssue })
-    const memberToken = await createPersonalAccessToken(peer, shared.id, { name: 'Shared map fixture' })
+    const memberToken = await createLegacyPersonalAccessToken(peer, shared.id, { name: 'Shared map fixture' })
     const target = '/mikka/api/projects/' + sharedProject + '/map'
     const result = await get('', memberToken.token, target, shared.id); assert.equal(result.status, 200)
     const body = await result.json(); assert.ok(body.nodes.some((node: { id: string }) => node.id === 'run:' + sharedRun))

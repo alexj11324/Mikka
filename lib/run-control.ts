@@ -66,7 +66,7 @@ export async function sendOwnedRunMessageInTransaction(tx: RunMessageWriter, use
  * stopRequestedAt, so it cannot pick it up). Returns true when this call ended the run;
  * the caller then runs afterRunEnded after commit.
  */
-export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string): Promise<boolean> {
+export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string, explicitStopRequested = false): Promise<boolean> {
   let ended = false
   let wake: string | null = null
   await database.transaction(async tx => {
@@ -90,7 +90,7 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
       return true
     }
     if (run.stopRequestedAt) return false
-    await tx.update(agentRuns).set({ stopRequestedAt: now, updatedAt: now })
+    await tx.update(agentRuns).set({ stopRequestedAt: now, explicitStopRequested, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
     await runListChanged(tx, runId)
     wake = run.deviceId

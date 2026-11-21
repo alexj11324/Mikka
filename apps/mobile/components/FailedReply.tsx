@@ -9,7 +9,7 @@ import { useHome } from '@/lib/home'
 import type { ChatFailure } from '@/lib/types'
 import { openCloudBilling, openOnWeb, webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
-import messages from '../../../messages/zh-CN.json'
+import { mobileMessages } from '@/lib/messages'
 
 /**
  * A reply that did not come: why, in the web's words, with 重试 (the same turn
@@ -59,9 +59,9 @@ export function FailedReply({ failure, botId, onQueued, modelChoice }: { failure
       {failure.raw && details ? <Text selectable style={styles.details}>{failure.raw}</Text> : null}
       <View style={styles.failedActions}>
         {line.retry ? <GlassButton label="重试" busy={busy} onPress={() => void retry()} /> : null}
-        {line.recovery === 'cloudBilling' ? <GlassButton label={messages.Settings.cloud.topUp} busy={busy} onPress={() => void cloudBilling()} /> : null}
+        {line.recovery === 'cloudBilling' ? <GlassButton label={mobileMessages.Settings.cloud.topUp} busy={busy} onPress={() => void cloudBilling()} /> : null}
         {line.recovery === 'model' ? Platform.OS === 'ios' && modelChoice ? modelChoice : <GlassButton label="聊天模型" disabled={!modelPath} onPress={() => { if (modelPath) void openOnWeb(modelPath) }} /> : null}
-        {line.recovery === 'models' || line.recovery === 'billing' ? <GlassButton label={line.recovery === 'models' ? '模型与订阅' : '账单'} disabled={!settingsPath} onPress={() => { if (settingsPath) void openOnWeb(settingsPath) }} /> : null}
+        {line.recovery === 'models' || line.recovery === 'billing' ? <GlassButton label={line.recovery === 'models' ? mobileMessages.Coordinator.subscriptionRefusal.open : mobileMessages.Settings.sections.billing.title} disabled={!settingsPath} onPress={() => { if (settingsPath) void openOnWeb(settingsPath) }} /> : null}
       </View>
     </View>
   )

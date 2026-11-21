@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { repositorySchema } from '@/lib/github/repository-input'
 import { auth } from '@/lib/auth'
 import { GitHubAccessError, listAuthorizedRepositories } from '@/lib/github/user-access'
 import { readRepositorySettings, saveRepositoryVerifyCommand } from '@/lib/device-repositories'
@@ -6,8 +7,6 @@ import { withRequestLog } from '@/lib/request-log'
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
 const headers = { 'Cache-Control': 'private, no-store' }
-const repositorySchema = z.string().max(201).regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/)
-  .refine(value => value.split('/').every(part => part !== '.' && part !== '..' && !part.startsWith('-')))
 const updateSchema = z.object({ repository: repositorySchema, verifyCommand: z.string().trim().max(2000).nullable() }).strict()
 
 async function handle(request: Request) {

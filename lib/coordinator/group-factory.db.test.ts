@@ -1,11 +1,12 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
+import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupMessageAgent, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
 import { initializeGroupDecisionTrace, recordGroupDecisionRoute, type GroupDecisionTrace } from './group-decision-trace'
 import { groupTraceObservation } from './group-decision-eval'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -21,14 +22,16 @@ if (process.env.REQUIRE_DB==='1' && !url) throw Error('REQUIRE_DB requires isola
 
 test('PG: group delegation has one Task/Thread, requester scope, replay receipt, latest epoch, status/stop and one reporter', {skip:!url},async()=>{
   const outer=new Pool({connectionString:url})
+  const authority=new Pool({connectionString:process.env.DATABASE_URL ?? url})
   const schema=`group_factory_${randomUUID().replaceAll('-','')}`
   await outer.query(`CREATE SCHEMA "${schema}"`)
-  const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`})
+  const pool=new Pool({connectionString:url,options:`-c search_path=${schema},public`})
   const client=await pool.connect()
   try {
     await client.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await client.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
-    await client.query(`CREATE TABLE bots (id uuid PRIMARY KEY); CREATE TABLE issues(id uuid PRIMARY KEY,title text,"userId" text);
+    await client.query(`CREATE TABLE bots (id uuid PRIMARY KEY); CREATE TABLE issues(id uuid PRIMARY KEY,title text,"userId" text,"workspaceId" uuid,"ownershipState" text DEFAULT 'bound',content jsonb);
       CREATE TABLE attention_settings("userId" text PRIMARY KEY,locale text);
       CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,"runId" uuid,kind text,"dedupeKey" text,payload jsonb,tier text,"deliveredAt" timestamptz);
       CREATE TABLE factory_tasks(id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,"attemptId" uuid,status text,stage text,revision integer,"sourceEventId" uuid,"createdAt" timestamptz DEFAULT now());
@@ -40,12 +43,14 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
       CREATE TABLE artifact_versions("artifactId" uuid,version integer,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE test_runs(id uuid PRIMARY KEY,"issueId" uuid,"threadId" uuid,"userId" text,"botId" uuid);
       CREATE VIEW agent_runs AS SELECT id,"issueId","userId" FROM test_runs;`)
-    await client.query('ALTER TABLE factory_tasks ADD COLUMN "candidateId" uuid')
+    await client.query('ALTER TABLE factory_tasks ADD COLUMN "candidateId" uuid, ADD COLUMN "workspaceId" uuid')
     await client.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261103220201_group_factory.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261103220201_group_factory.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261103220300_group_decision_quality.sql',import.meta.url),'utf8'))
+    await client.query(await readFile(new URL('../../drizzle/20261113180454_standalone_bot_conversations.sql',import.meta.url),'utf8'))
     const conversationId=randomUUID(),workspaceId=randomUUID(),reporter=randomUUID(),executionBot=randomUUID()
+    await seedFixtureWorkspace(authority,'requester','team',workspaceId)
     await client.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy") VALUES($1,$2,'group','Group fixture','requester')`,[conversationId,workspaceId])
     await client.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES($1,'user','requester','owner'),($1,'bot',$2,'member')`,[conversationId,reporter])
     let position=0
@@ -66,7 +71,9 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
         const event=(await client.query('SELECT * FROM coordinator_events WHERE id=$1',[eventId])).rows[0]
         assert.equal(event.userId,userId);assert.equal(event.botId,executionBot);assert.equal(event.kind,'user_message')
         if(event.issueId)return event.issueId
-        const issueId=randomUUID();await client.query('INSERT INTO issues VALUES($1,$2,$3)',[issueId,title,userId]);await client.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=$1',[eventId,issueId]);return issueId
+        const issueId=randomUUID();await client.query('INSERT INTO issues(id,title,"userId","workspaceId") VALUES($1,$2,$3,$4)',[issueId,title,userId,workspaceId])
+        await outer.query(`INSERT INTO resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
+          VALUES('task',$1,$2,$3,'private','created')`, [issueId,workspaceId,userId]);await client.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=$1',[eventId,issueId]);return issueId
       },
       async dispatch(userId,input,botId){
         dispatches++;assert.equal(userId,'requester');assert.equal(botId,executionBot);assert.equal(input.repo,undefined,'standalone work must not invent a repository')
@@ -75,7 +82,7 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
         const current=(await client.query('SELECT * FROM factory_tasks WHERE "issueId"=$1',[input.issueId])).rows[0]
         if(current){const run=(await client.query('SELECT "runId" FROM factory_attempts WHERE id=$1',[current.attemptId])).rows[0];return{runId:run.runId,thread:'message',status:'messageSent'}}
         const taskId=randomUUID(),attemptId=randomUUID(),runId=randomUUID()
-        await client.query('INSERT INTO factory_tasks(id,"userId","botId","issueId","attemptId",status,stage,revision,"sourceEventId","createdAt") VALUES($1,$2,$3,$4,$5,\'running\',\'execute\',1,$6,now())',[taskId,userId,botId,input.issueId,attemptId,input.sourceEventId])
+        await client.query('INSERT INTO factory_tasks(id,"userId","botId","issueId","attemptId",status,stage,revision,"sourceEventId","createdAt","workspaceId") VALUES($1,$2,$3,$4,$5,\'running\',\'execute\',1,$6,now(),$7)',[taskId,userId,botId,input.issueId,attemptId,input.sourceEventId,workspaceId])
         await client.query('INSERT INTO factory_attempts(id,"taskId","runId",output) VALUES($1,$2,$3,$4)',[attemptId,taskId,runId,JSON.stringify({requestEpoch:input.sourceEventId})]);await client.query('INSERT INTO test_runs VALUES($1,$2,$1,$3,$4)',[runId,input.issueId,userId,botId]);return{runId,thread:'new',status:'queued'}
       },
       async latest(userId,issueId){return(await client.query('SELECT id FROM test_runs WHERE "issueId"=$1 AND "userId"=$2',[issueId,userId])).rows[0]??null},
@@ -88,8 +95,8 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
     assert.deepEqual(await delegateGroupTask(client,first,adapters),response)
     assert.equal(dispatches,1)
     assert.equal((await trace(first.messageId)).events.filter(event=>event.type==='delegate' && event.outcome==='succeeded').length,1,'a receipt replay must not count another delegation')
-    const refs=await groupTaskReferences(client,{userId:'requester',conversationId});assert.equal(refs.length,1);assert.equal(refs[0].reporterId,reporter)
-    assert.deepEqual(await groupTaskReferences(client,{userId:'reporter-owner',conversationId}),[])
+    const refs=await groupTaskReferences(client,{userId:'requester',workspaceId,conversationId});assert.equal(refs.length,1);assert.equal(refs[0].reporterId,reporter)
+    assert.deepEqual(await groupTaskReferences(client,{userId:'reporter-owner',workspaceId,conversationId}),[])
     const binding=(await client.query('SELECT * FROM group_task_bindings')).rows[0]
     assert.equal(binding.userId,'requester');assert.equal(binding.reporterOwnerId,'reporter-owner');assert.equal(binding.executionBotId,executionBot)
     const follow=await scope('continue',refs[0].issueId)
@@ -150,7 +157,17 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
     allowed=false;await assert.rejects(delegateGroupTask(client,first,adapters),/revoked/)
     assert.ok(authorizations>5)
     console.log(`Retained isolated group Factory bridge schema ${schema}; source/dispatch adapters synthetic, PG persistence real`)
-  } finally {client.release();await pool.end();await outer.end()}
+  } finally {client.release();await pool.end();await outer.end();await authority.end()}
+})
+
+test('a group task names its Agent in the message; none or both names none, and agentRequired says how to fix it',()=>{
+  // Decision 2026-11-17-1800: every dispatch names its Agent; nothing picks a default.
+  assert.equal(groupMessageAgent('@bot 用 Codex 修一下登录'),'codex')
+  assert.equal(groupMessageAgent('@bot let Claude Code fix the login'),'claude_code')
+  assert.equal(groupMessageAgent('@bot fix the login'),undefined)
+  assert.equal(groupMessageAgent('@bot Claude Code or Codex, fix it'),undefined)
+  assert.match(groupExecutionRemedy('agentRequired','zh-CN'),/Claude Code 或 Codex/)
+  assert.match(groupExecutionRemedy('agentRequired','en'),/Claude Code or Codex/)
 })
 
 test('server reports do not claim work passed merely because execute passed',()=>{
@@ -219,9 +236,11 @@ for(const flowVersion of [2,1] as const)for(const kind of ['deliverable','reposi
         state=await store.apply(userId,binding(state.task),randomUUID(),{action:'candidate',runId,candidate:kind==='deliverable'?{kind,sha:null,repository:'none',environment:'fixture-deliverable',scope:'standalone file'}:{sha:sha!,repository:'fixture/repository',environment:'fixture-deliverable',scope:'repository changes'}})
       }
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"finishedAt"=clock_timestamp(),report=$2 WHERE id=$1`,[runId,JSON.stringify({summary:'Synthetic upstream evidence; no real Harness run',sourceCommit:'a'.repeat(40),publish:{commit:sha},verify:{status:'passed'}})])
+      if(stage==='execute')await addFactoryVisualEvidence(pool,runId)
       const recordedAt=(await pool.query("SELECT clock_timestamp()+interval '1 second' AS at")).rows[0].at.toISOString()
       const evidence:FactoryEvidence={artifact:`run-report:${runId}`,kind:'report',runId,sessionId,candidateId:state.task.candidateId,sha,environment:'fixture-deliverable',recordedAt}
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'finish',status:'passed',reason:'Synthetic independent upstream evidence',evidence:[evidence],output:{}})
+      if(stage==='execute'&&kind==='repository')await addFactoryPublicationEvidence(pool,state.task.id,{url:'https://github.com/fixture/repository/pull/1'})
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'advance',stage:stage==='execute'?'review':stage==='review'&&flowVersion===1?'verify':'approval',reason:'Proceed through real store'})
     }
     assert.equal(state.attempts.filter(attempt=>attempt.stage==='review').length,1)
@@ -249,7 +268,6 @@ for(const flowVersion of [2,1] as const)for(const kind of ['deliverable','reposi
     const pending=(await pool.query(`SELECT body FROM conversation_messages WHERE "authorType"='bot'`)).rows[0]
     assert.match(pending.body,locale==='en'?/required human acceptance/:/仍需/);assert.doesNotMatch(pending.body,/任务已完成|Task completed:/)
     await assert.rejects(store.apply(userId,binding(state.task),randomUUID(),{action:'finish',status:'passed',reason:'Forged acceptance must not pass',evidence:state.attempts.flatMap(attempt=>attempt.evidence) as FactoryEvidence[],output:{deliverableAcceptanceId:randomUUID()}}),/factoryConsumerGateRequired/)
-    if(kind==='repository')await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey","pullRequest") VALUES($1,$2,$3,'https://github.com/fixture/repository','fixture/repository',$4)`,[producerRun,userId,issueId,JSON.stringify({url:'https://github.com/fixture/repository/pull/1',state:'open'})])
     let mergeCalls=0
     const merges=createFactoryMerges(pool,authorize,store,{pullRequest:async()=>{assert.equal(kind,'repository');return{state:'open',merged:false,headSha:sha!,mergeableState:'clean',mergeCommitSha:null}},mergeMethods:async()=>['squash'],merge:async()=>{assert.equal(kind,'repository');mergeCalls++;return{merged:true,mergeCommitSha:'b'.repeat(40)}}})
     const request={binding:binding(state.task),eventId:randomUUID()}
@@ -282,8 +300,10 @@ test('PG: production group Factory authorization uses typed Bot membership and r
   const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`})
   try {
     await pool.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261113180454_standalone_bot_conversations.sql',import.meta.url),'utf8'))
     await pool.query(`CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
       CREATE TABLE workspace_members("userId" text,"workspaceId" uuid,status text,PRIMARY KEY("userId","workspaceId"))`)
     const workspaceId=randomUUID(),otherWorkspaceId=randomUUID(),conversationId=randomUUID(),botId=randomUUID()

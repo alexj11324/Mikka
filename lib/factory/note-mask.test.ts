@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { maskFactoryNote } from "./note-mask";
+import type { Masker } from '@/lib/secrets/mask';
 
 test("note masker hides secret values in their encoded forms and token patterns", () => {
   const value = "e2b_synthetic_value_123";
@@ -42,4 +43,27 @@ test("control endpoint masks the human reason before the store sees it", async (
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   assert.deepEqual(seen, [{ action: "retry", reason: "retry with GITHUB_TOKEN=[REDACTED]" }]);
+});
+
+test("a workspace masker masks a saved secret without an explicit list", () => {
+  // The workspace's saved secret has no recognisable prefix, so only the
+  // workspace masker can catch it — the built-in token patterns cannot.
+  const value = "sup3rs3cr3t-db-password";
+  const mask = ((text: string) => text.replaceAll(value, "[secret]")) as Masker;
+  assert.equal(maskFactoryNote(`deploy failed: ${value}`, mask), "deploy failed: [secret]");
+});
+
+test("a workspace masker composes with the built-in pipeline instead of replacing it", () => {
+  // A Masker never reads process.env, so the deployment's own E2B_API_KEY in its
+  // base64 form is only matched by the built-in pass. If a supplied Masker
+  // short-circuited the pipeline, this value would survive.
+  const value = "deploy-only-e2b-key-value";
+  process.env.E2B_API_KEY = value;
+  try {
+    const base64 = Buffer.from(value, "utf8").toString("base64");
+    const identity = ((text: string) => text) as Masker;
+    assert.equal(maskFactoryNote(`key ${base64}`, identity), "key [secret]", "the built-in server-secret pass still runs");
+    // The NAME_KEY=value rule is also part of that pass.
+    assert.equal(maskFactoryNote("E2B_API_KEY=" + value, identity), "E2B_API_KEY=[REDACTED]");
+  } finally { delete process.env.E2B_API_KEY }
 });

@@ -1,15 +1,16 @@
 import { runChanged } from './live/panels'
+import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import 'server-only'
 import { runListChanged } from './live/lists'
-import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
+import { rebindExecutionDevice } from './execution-identity'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
-import { afterJob } from '@/lib/background'
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
-import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
+import { wakeCoordinatorAfterCommit } from '@/lib/coordinator/wake-after-commit'
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import type { RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, issues } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -21,7 +22,7 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
 import { tiptapToText } from '@/lib/tiptap-text'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceSessionOpen } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 import { readmitLostLocalRun, type AdmittedTakeover, type CloudRecoverySource } from './run-repository-retry'
 import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
@@ -29,20 +30,17 @@ import { serverRunFailure } from './run-failure-details'
 import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
 import type { RunReport } from '@mikka/protocol/run'
 import messages from '@/messages/zh-CN.json'
-import { armDueTimerSoon } from '@/lib/due-timer'
-import { withTaskWorkspace } from '@/lib/task-workspace'
-import { ActionFailureError } from '@/lib/action-error'
+import { resolveRunOrigin } from '@/lib/run-origin'
 import { withRunWorkspace } from './run-completion'
 import { withProjectResourceLease } from './project-resources/store'
 import { assertRunProjectResources, isProjectExecutionRefusal } from './project-resources/run-lease'
 
-const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Run leases on the server (ADR 0012). The heartbeat renews the lease of each
-// run the device reports; a run left out is not renewed, and the daemon stops
-// it once its lease runs out. The independent minute sweep runs `reclaimLostRuns`
-// for each owner, so recovery does not depend on an open app/device (and no
-// app or device poll does it again).
+// Run leases on the server (ADR 0012, decision 2026-11-17-2215). A claim's
+// lease lasts as long as the device session that claimed it: `connected`
+// extends live leases, `disconnected` ends them (lib/device-session.ts). The
+// run-recovery sweep runs `reclaimLostRuns` for each owner, so recovery does
+// not depend on an open app/device (and no app or device poll does it again).
 
 /** A bounded cron pass over persisted work, without relying on owner polling. */
 export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners: number; failed: number }> {
@@ -50,68 +48,19 @@ export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners:
     .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(or(
       and(inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)),
-      and(eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
-        or(isNull(devices.lastSeenAt), gt(devices.lastSeenAt, now), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)))),
+      and(eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf), sql`NOT ${deviceSessionOpen}`),
     ))
     .orderBy(agentRuns.userId).limit(100)
   let failed = 0
   for (const owner of owners) {
+    // A reclaim that fails for this owner leaves that owner's lost runs
+    // unrecovered until the next sweep, so record which owner failed. The
+    // error goes in as a cause, logged by name and code only: never the raw
+    // driver error and never the owner id in the message.
     try { await reclaimLostRuns(owner.userId, now) }
-    catch { failed++ }
+    catch (error) { failed++; logCodedError(new CodedError('run_lease_reclaim_failed', { cause: error }), { owner: owner.userId }) }
   }
   return { owners: owners.length, failed }
-}
-
-/**
- * Renews the leases of the device's claimed runs it still reports. Reported
- * runs it no longer holds come back as `revoked`, so the daemon stops them
- * before a retry of the same run starts.
- */
-export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
-  if (!runIds.length) return { leases: {} }
-  // Protocol IDs can be short strings, but agent_runs.id is a UUID. Such an ID
-  // cannot be held here; revoke it without making PostgreSQL reject the whole beat.
-  const validRunIds = runIds.filter(id => RUN_UUID.test(id))
-  const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
-  const candidates = validRunIds.length ? await db.select().from(agentRuns).where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, validRunIds), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))) : []
-  const renewed: string[] = []
-  for (const run of candidates) {
-    try {
-      // Historical runs may lack a frozen resource identity. That never
-      // exempts their persisted tenant from current membership checks.
-      if (!run.workspaceId || (run.agentDefinition?.executionIdentity?.workspaceId
-        && run.agentDefinition.executionIdentity.workspaceId !== run.workspaceId)) throw new ExecutionIdentityError()
-      const held = await withTaskWorkspace(run.userId, run.workspaceId, async () => {
-        await revalidateExecutionIdentity(pool, run)
-        // Membership stays pinned until this atomic application write finishes.
-        // Recheck mutable task deletion and Bot provenance in that same write.
-        return db.update(agentRuns).set({ leaseExpiresAt, updatedAt: now }).where(and(
-          eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId),
-          eq(agentRuns.workspaceId, run.workspaceId!), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt),
-          sql`(${agentRuns.issueId} IS NULL OR EXISTS (SELECT 1 FROM issues task WHERE task.id=${agentRuns.issueId}
-            AND task."workspaceId"=${agentRuns.workspaceId} AND task."ownershipState"='bound'
-            AND coalesce(task.content->'attrs'->'mikka',task.content->'attrs'->'orvilo')->>'deletedAt' IS NULL))`,
-          sql`(${agentRuns.botId} IS NULL OR EXISTS (SELECT 1 FROM bots bot WHERE bot.id=${agentRuns.botId}
-            AND bot."workspaceId"=${agentRuns.workspaceId} AND bot."archivedAt" IS NULL))`,
-        )).returning({ id: agentRuns.id })
-      })
-      renewed.push(...held.map(row => row.id))
-    }
-    catch (error) {
-      if (!(error instanceof ExecutionIdentityError) && !(error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')) throw error
-    }
-  }
-  const held = new Set(renewed)
-  const rejected = candidates.filter(run => !held.has(run.id)).map(run => run.id)
-  // The heartbeat tells the daemon to remove credentials and ends any live
-  // lease, including a legacy run whose membership was removed.
-  const stopped = rejected.length ? await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now })
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, rejected), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt)))
-    .returning({ id: agentRuns.id }) : []
-  for (const run of stopped) { await runListChanged(db, run.id); await runChanged(db, run.id) }
-  if (stopped.length) armDueTimerSoon('run-recovery')
-  const revoked = runIds.filter(id => !held.has(id))
-  return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}) }
 }
 
 /**
@@ -129,23 +78,19 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
 
   // Retries still waiting for a device that is offline go to another
   // machine as soon as one can take them; after a while, to the person.
-  const stranded = await db.select({ run: agentRuns, lastSeenAt: devices.lastSeenAt }).from(agentRuns)
+  const stranded = await db.select({ run: agentRuns }).from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(
       eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
-      or(isNull(devices.lastSeenAt), gt(devices.lastSeenAt, now), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))),
+      sql`NOT ${deviceSessionOpen}`,
     ))
     .limit(20)
-  // Lease decisions retain the sweep snapshot, but presence is observed after
-  // the query: a heartbeat committed while it waited is not a future heartbeat.
-  const presence = await deviceOnlineStates(stranded.flatMap(({ run, lastSeenAt }) => run.deviceId ? [{ id: run.deviceId, lastSeenAt }] : []))
   for (const { run } of stranded) {
     if (run.stopRequestedAt) {
       const ended = await endRun(run.id, ['queued'], { status: 'stopped', error: null }, now)
       if (ended) await announceEnd({ ...run, status: 'stopped' })
       continue
     }
-    if (run.deviceId && presence.get(run.deviceId)) continue
     try {
     await withRetryProjectResources(run, async () => {
     // Nothing waits on an offline device (设备离线时 is gone): another device takes it, else the person gets the card.
@@ -207,13 +152,12 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
       where a."runId"=${run.id} and t."userId"=${run.userId} limit 1`)
     if (!factory.rows.length) return null
   }
-  const available = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType, lastSeenAt: devices.lastSeenAt })
+  // Only online devices with 参与调度 on (enabled, decision 2026-11-02-1400); servers first.
+  const available = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType })
     .from(devices)
-    .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), isNull(devices.removedAt), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`))
-    .orderBy(desc(devices.lastSeenAt))
-  // Only devices with 参与调度 on (enabled, decision 2026-11-02-1400); servers first.
-  const presence = await deviceOnlineStates(available.map(device => ({ id: device.deviceId, lastSeenAt: device.lastSeenAt })))
-  let candidates = available.filter(device => presence.get(device.deviceId)).sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
+    .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), isNull(devices.removedAt), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`, deviceSessionOpen))
+    .orderBy(desc(devices.sessionOpenedAt))
+  let candidates = available.sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
   const harness = run.agentDefinition?.harness ?? agent.harness
   // A fresh local admission needs B's real registered Agent; the old Agent
   // remains provenance through retryOf, not a forged Agent/device pairing.
@@ -329,8 +273,13 @@ async function reclaimAuthorizedLostRun(run: Run, outcome: Extract<ReturnType<ty
     await runListChanged(tx, run.id)
     await runChanged(tx, run.id)
     if (cloud) return true
+    // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+    scheduleThreadTitle(tx, retryId, run.userId, 'created')
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
+      // A device retry continues the same entry; a legacy source keeps the
+      // host's automatic recovery as its origin rather than guessing 'web'.
+      ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
       agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, recovery.prompt),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
       prompt: recovery.prompt, promptTaskStart: recovery.promptTaskStart, promptTaskLength: recovery.promptTaskLength, attempt: outcome.attempt, retryOf: run.id,
@@ -410,6 +359,9 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
+      // Moving the lost run to the cloud keeps its entry; a legacy run keeps
+      // the host's automatic recovery as its origin rather than guessing 'web'.
+      ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
       executionNote: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
@@ -500,7 +452,7 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
       stopReason: 'device_lost', failureDetails: serverRunFailure(runId, now), error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
       .where(eq(agentRuns.id, runId)).returning()
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
-    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
+    await recordTerminalEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
     // The terminal row changed even when its durable completion event already exists.
     await runListChanged(tx, ended.id)
     await runChanged(tx, ended.id)
@@ -513,13 +465,20 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
   // Admission may have failed before any machine row existed, so do not rely
   // on cleanup to reconcile the committed failure. This hook is idempotent.
   await afterRunEnded(actor.userId, runId)
-  await wakeCoordinator(actor.userId).catch(() => undefined)
   return true
 }
 
 /** The card of what the person can do when no machine can continue a run. */
 async function noMachineCard() {
   return (await import('@/lib/rule-dispatch')).machineUnavailableCard()
+}
+
+/** A terminal state change can find its old completion event already stored.
+ * Register its owner wake on the same transaction: a new event uses the same
+ * commit key, and a real rollback discards both registrations. */
+async function recordTerminalEvent(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], event: ReturnType<typeof runFinishedEvent>) {
+  await recordCoordinatorEvent(tx, event)
+  wakeCoordinatorAfterCommit(tx, event.userId)
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
@@ -534,7 +493,7 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
     if (!ended) return false
     // A worker ending after this commit cannot lose the failure notification.
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
-    await recordCoordinatorEvent(tx, noMachine ? { ...event, payload: { ...event.payload, noMachine } } : event)
+    await recordTerminalEvent(tx, noMachine ? { ...event, payload: { ...event.payload, noMachine } } : event)
     return true
   })
 }
@@ -551,7 +510,7 @@ export async function failRunForDaemonUpgrade(runId: string, deviceId: string, u
       .returning()
     if (!run) return null
     const event = runFinishedEvent({ ...run, stopReason: 'error', report: null })
-    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, daemonUpgradeRequired: true } })
+    await recordTerminalEvent(tx, { ...event, payload: { ...event.payload, daemonUpgradeRequired: true } })
     return run
   })
   if (!ended) return false
@@ -585,7 +544,7 @@ export async function failQueuedSubscriptionRuntime(runId: string, deviceId: str
           AND ${agentRuns.agentDefinition}->'subscription'->>'bindingId'=${expected.bindingId}))`))
       .returning()
     if (!run) return null
-    await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: 'error', report }))
+    await recordTerminalEvent(tx, runFinishedEvent({ ...run, stopReason: 'error', report }))
     await runListChanged(tx, run.id)
     await runChanged(tx, run.id)
     return { run, error }
@@ -604,5 +563,4 @@ async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
   stopRecordingsAfter([run.id])
   await afterRunEnded(run.userId, run.id)
-  afterJob('after:coordinator-wake', () => wakeCoordinator(run.userId))
 }

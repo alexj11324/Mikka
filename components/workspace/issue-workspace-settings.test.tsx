@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { ComputerThread } from '@/components/computer/computer-agents'
 import type { SettingsFrameProps } from '@/components/slots/settings-frame-contract'
+import { browserAddressRequest, consumeBrowserAddress, openBrowserAddress } from '@/lib/browser/navigation'
+import { useConversationPanels as useThreadPanelContext } from '@/components/coordinator/conversation-panels-context'
 
 const nothing = () => {}
 const empty = () => null
@@ -18,33 +20,86 @@ const refreshed = async () => {}
 const browser = new Window({ url: 'https://fixture.example/?workspace=workspace-one' })
 let user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
 let workspaceId = 'workspace-one'
+let workspaceReady = true
+let switcherReady = true
+let workspaceError: Error | undefined
+let groupList: { id: string; title: string; workspaceId: string }[] = []
+let groupListError: Error | undefined
+let groupListRetries = 0
+const teamIssuesId = '8055a7ae-204f-4045-8780-66b9c93ce229'
+const projectReads = { projects: 0, links: 0 }
+let projectsFailed = false
+let projectsPending = false
+let projectTeamsFailed = false
+let projectTeamsPending = false
+let teamDirectoryError = false
+let teamDirectoryPending = false
+let teamDirectoryRetries = 0
+let scopedTeamFixture = false
+let workspaceTasksPending = false
+let workspaceTasksFailed = false
+let workspaceTasksCached = true
+let refreshGlobalTasks = refreshed
+let scopedTasksPending = false
+let scopedTeamPageMutations = 0
+let probeEmbeddedAck = false
+let acknowledgeNewTask: ((id: string) => void) | null = null
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
-const botList = { data: { items: [bot] } }
+const botList = { items: [bot] }
+let rosterPending = false
+let rosterError: Error | undefined
+let rosterRetries = 0
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
-mock.module('next-intl', { namedExports: { useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }) } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
-mock.module('@/i18n/navigation', { namedExports: { usePathname: () => browser.location.pathname, useRouter: () => router } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
+mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
+mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
-mock.module('swr', { defaultExport: (key: unknown) => ({ data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } } : [], mutate: refreshed }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
+mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
+  data: key === '/api/workspace/switcher' ? (switcherReady ? { ...workspace(), live: { ownerId: user.id } } : undefined)
+    : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
+    : Array.isArray(key) && key[0] === 'team-home' ? { members: [], taskCount: 0 }
+    : Array.isArray(key) && key[0] === 'projects' ? [{ id: 'known-project', name: 'Known project', summary: '' }]
+    : key === 'project-teams' ? [{ projectId: 'known-project', teamId: teamIssuesId }]
+    : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
+    : [],
+  error: ((key === 'teams' && teamDirectoryError) || (key === 'project-teams' && projectTeamsFailed) || (Array.isArray(key) && key[0] === 'projects' && projectsFailed)) ? new Error('unavailable') : undefined,
+  isLoading: key === 'teams' ? teamDirectoryPending : key === 'project-teams' ? projectTeamsPending : Array.isArray(key) && key[0] === 'projects' ? projectsPending : Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
+  mutate: key === 'teams' ? async () => { teamDirectoryRetries++ } : key === 'project-teams' ? async () => { projectReads.links++ }
+    : Array.isArray(key) && key[0] === 'projects' ? async () => { projectReads.projects++ }
+    : Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
+}), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
-mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { useSession: () => ({ data: null }) } } })
-mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
+mock.module('./project-workspace.tsx', { namedExports: {
+  ProjectWorkspace: ({ loading, error }: { loading: boolean; error: boolean }) =>
+    <section data-project-list-state={error ? 'failed' : loading ? 'pending' : 'ready'} />,
+} })
+mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
+mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed, fetchTeamHome: refreshed, teamHomeKey: (actor: string, team: string) => ['team-home', actor, team], settingsReadOptions: {} } })
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
-mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace() }) } })
+mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspaceReady ? workspace() : undefined, error: workspaceError, mutate: async () => { workspaceError = undefined; workspaceReady = true } }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
-mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing } })
+mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
-  useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
-  useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({ data: [] }),
+  useLiveIssueList: () => ({ data: workspaceTasksCached ? emptyList.data : undefined, error: workspaceTasksFailed ? new Error('unavailable') : undefined, isLoading: workspaceTasksPending, mutate: refreshGlobalTasks }), useLiveThreadList: () => emptyList,
+  useLiveBotRoster: () => ({
+    data: rosterPending ? undefined : botList,
+    error: rosterError,
+    mutate: async () => { rosterRetries++; rosterPending = false; rosterError = undefined },
+  }), useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
+    data: groupList,
+    error: groupListError,
+    mutate: async () => { groupListRetries++; groupListError = undefined },
+  }),
 } })
 for (const [file, names] of [
-  ['../../app/actions/projects.ts', ['listProjects']], ['../../app/actions/teams.ts', ['listTeams']],
+  ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
+  ['../../app/actions/bots.ts', ['listBots', 'listBotsForWorkspace', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['listAgents', 'getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately
@@ -52,37 +107,79 @@ for (const [file, names] of [
 let chunkReady: Promise<void>
 let releaseChunk: () => void
 const delayedDynamic: typeof dynamic = (loader, options) => dynamic(async () => { await chunkReady; return loader() }, options)
-mock.module('next/dynamic', { defaultExport: delayedDynamic })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
-  ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
-  ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],
-  ['../nav/context-panel.tsx', ['ContextPanel']],
+  ['../onboarding/onboarding.tsx', ['Onboarding']],
+  ['./issue-list.tsx', ['IssueList']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
-  ['../nav/group-avatar.tsx', ['GroupPillAvatar']], ['../browser/browser-pane.tsx', ['BrowserPane']],
-  ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
-  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh']],
+  ['../nav/group-avatar.tsx', ['GroupPillAvatar']],
+  ['./task-column.tsx', ['TaskColumn']],
+  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
-  ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
-] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, empty])) })
-mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
+] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+// 概览 is the right column this page owns; it renders a marker so a test can see the column is there at all,
+// which is what #2835 broke by gating it on `isConversation`.
+mock.module(new URL('../nav/context-panel.tsx', import.meta.url).href, { namedExports: {
+  ContextPanel: ({ conversation }: { conversation?: { name: string } }) => <aside data-context-panel={conversation?.name ?? 'coordinator'} />,
+} })
+// A thread opened in the centre (#2835) is still a conversation: it must keep the same right column, and hand its
+// work area up when the frame owns the panel. The hook is read from its own leaf module, so this stub does not
+// depend on the dynamically imported conversation-panels.tsx below.
+let reportedPanels: import('@/components/slots/thread-contract').ThreadScreenProps['panels']
+mock.module(new URL('./thread-column.tsx', import.meta.url).href, { namedExports: {
+  ThreadColumn: ({ main }: { main?: boolean }) => {
+    reportedPanels = useThreadPanelContext()
+    return <section data-main-thread={main ? '' : undefined} />
+  },
+} })
+mock.module(new URL('./board-page.tsx', import.meta.url).href, { namedExports: {
+  BoardPage: ({ onUpdated, onBusyChange }: { onUpdated: () => Promise<unknown>; onBusyChange: (busy: boolean) => void }) => <section data-team-board-visible="">
+    {probeEmbeddedAck && <EmbeddedSaveProbe />}
+    <Button data-board-write-start="" onClick={() => onBusyChange(true)}>start board change</Button>
+    <Button data-board-write-ack="" onClick={() => { onBusyChange(false); void onUpdated() }}>save board change</Button>
+  </section>,
+} })
+// The Team detail fixture exercises acknowledged save/delete callbacks, not a fake list mutation.
+mock.module(new URL('./task-detail.tsx', import.meta.url).href, { namedExports: {
+  TaskDetail: ({ id, onSaved, onDeleted }: { id: string; onSaved: (id: string) => void; onDeleted: () => void }) =>
+    <section data-team-task-detail=""><Button data-detail-save="" onClick={() => onSaved(id)}>save task</Button><Button data-detail-delete="" onClick={onDeleted}>delete task</Button></section>,
+} })
+mock.module('./group-chat-view', { namedExports: {
+  GroupChatView: ({ group }: { group: { id: string } }) => <section data-open-group={group.id} />,
+} })
+mock.module('../browser/browser-pane', { namedExports: { BrowserPane: () => <section data-browser-pane="" /> } })
+mock.module('@/components/nav/new-group-dialog', { namedExports: {
+  NewGroupDialog: ({ open, workspaceId }: { open: boolean; workspaceId: string }) => open ? <div data-create-group={workspaceId} /> : null,
+} })
+mock.module('@/components/nav/bot-list', { namedExports: { BotList: () => <div data-retired-bot-list="" />, useChatNav: () => ({ entries: [], referenceGroups: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
-mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty, waitingCount: () => 0 } })
-mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => true, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
-mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
+mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty } })
+let browserFits = true
+mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => browserFits, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
+mock.module('@/components/ui/sheet', { namedExports: { Sheet: ({ open, children }: { open?: boolean; children?: ReactNode }) => open ? <aside data-panel-sheet="">{children}</aside> : null, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
 mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
-mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open }: { open: boolean }) => open ? <div data-new-task-open="" /> : null } })
+mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open, onCreated }: { open: boolean; onCreated: (id: string) => void }) => {
+  acknowledgeNewTask = onCreated
+  return open ? <div data-new-task-open="" /> : null
+} } })
 let railMounts = 0
-mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSettings, onNavigate }: { onSettings: () => void; onNavigate: (destination: 'chats') => void }) => {
+mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSettings, onNavigate, chats }: { onSettings: () => void; onNavigate: (destination: 'chats') => void; chats?: { onNewGroup: () => void } }) => {
   useEffect(() => { railMounts++ }, [])
-  return <div role="navigation" aria-label="Main navigation"><Button onClick={() => onSettings()}>settings</Button><Button onClick={() => onNavigate('chats')}>chats</Button></div>
+  return <div role="navigation" aria-label="Main navigation"><Button onClick={() => onSettings()}>settings</Button><Button onClick={() => onNavigate('chats')}>chats</Button>{chats && <Button onClick={chats.onNewGroup}>new group</Button>}</div>
 } } })
 
 let useBrowserNotes: typeof import('../browser/browser-notes')['useBrowserNotes']
 let useBrowserNotesComposer: typeof import('../browser/browser-notes')['useBrowserNotesComposer']
+let useConversationPanels: typeof import('../coordinator/conversation-panels')['useConversationPanels']
+let EmbeddedTaskLifecycleContext: typeof import('../coordinator/conversation-panels')['EmbeddedTaskLifecycle']
+function EmbeddedSaveProbe() {
+  const lifecycle = React.useContext(EmbeddedTaskLifecycleContext)
+  return <Button data-embedded-save-ack="" onClick={() => lifecycle?.onSaved('8055a7ae-204f-4045-8780-66b9c93ce232')}>save embedded Task</Button>
+}
 let notes: ReturnType<typeof useBrowserNotes>
 let ComputerConversation: typeof import('../computer/computer-agents')['ComputerConversation']
 let useConversationThread: typeof import('../computer/computer-agents')['useConversationThread']
@@ -97,28 +194,33 @@ function RegisterComputerThread() {
 }
 let editDraft: (value: string) => void
 let composerMounts = 0, composerUnmounts = 0
+let reportWorkTask: ((taskId: string | null) => void) | undefined
 function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }) {
+  const panels = useConversationPanels()
+  reportWorkTask = panels?.onActiveTask
   notes = useBrowserNotesComposer(true)
   computerThread = useConversationThread(conversationId)
   const [draft, setDraft] = useViewState(`settings-fixture:${activeBot?.id ?? 'coordinator'}:draft`, '')
   editDraft = setDraft
   useEffect(() => { composerMounts++; return () => { composerUnmounts++ } }, [])
-  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} /></>
+  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<p>Cached conversation</p><Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} />{panels?.revealId === 'browser' && panels.tabs.find(tab => tab.id === 'browser')?.content}</>
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
-mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
+mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, workspaceId: id, inviteInitially, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; workspaceId?: string; inviteInitially?: boolean; onRail: (destination: 'chats') => void }) => {
   notes = useBrowserNotes()
   computerThread = useConversationThread(conversationId)
-  return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId}><Button onClick={() => onRail('chats')}>leave settings</Button>{children}</main>
+  return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId} data-workspace={id} data-invite={inviteInitially}><Button onClick={() => onRail('chats')}>leave settings</Button></main>
 } } })
-mock.module('@/components/teams/team-directory', { namedExports: { TeamDirectory: ({ workspaceId: id }: { workspaceId: string }) => <div data-team-workspace={id} /> } })
-mock.module('@/components/workspace/members-settings', { namedExports: { MembersSettings: ({ workspaceId: id, inviteInitially }: { workspaceId: string; inviteInitially: boolean }) => <div data-members-workspace={id} data-invite={inviteInitially} /> } })
 
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let IssueWorkspace: typeof import('./issue-workspace')['IssueWorkspace']
 let HostedIssueWorkspace: typeof IssueWorkspace
+let OfficialIssueWorkspace: typeof IssueWorkspace
 let SettingsShell: typeof import('../settings/settings-shell')['SettingsShell']
+let closeReview: typeof import('@/hooks/code-review/use-review-page')['closeReview']
+mock.module(new URL('../slots/review-summary.tsx', import.meta.url).href, { namedExports: { REVIEW_ENABLED: true, ReviewSummaryLine: empty } })
+mock.module(new URL('../slots/review-page.tsx', import.meta.url).href, { namedExports: { ReviewPage: ({ taskId }: { taskId: string }) => <p data-review-task={taskId}>Review</p> } })
 before(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'ResizeObserver', 'navigator'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
   Object.defineProperty(globalThis, 'getComputedStyle', { configurable: true, value: browser.getComputedStyle.bind(browser) })
@@ -127,6 +229,8 @@ before(async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useBrowserNotes, useBrowserNotesComposer } = await import('../browser/browser-notes'))
+  ;({ useConversationPanels, EmbeddedTaskLifecycle: EmbeddedTaskLifecycleContext } = await import('../coordinator/conversation-panels'))
+  ;({ closeReview } = await import('@/hooks/code-review/use-review-page'))
   ;({ ComputerConversation, useConversationThread, useRegisterComputerThread } = await import('../computer/computer-agents'))
   ;({ IssueWorkspace } = await import('./issue-workspace'))
   ;({ SettingsShell } = await import('../settings/settings-shell'))
@@ -138,12 +242,33 @@ before(async () => {
   } })
   const hostedModule = new URL('./issue-workspace.tsx?hosted-provider-test', import.meta.url).href
   ;({ IssueWorkspace: HostedIssueWorkspace } = await import(hostedModule))
+  const shell = await import('../app-shell')
+  mock.module('../app-shell', { namedExports: { ...shell, FRAME_OWNS_PANEL: true, FRAME_LISTS_CHATS: undefined } })
+  ;({ IssueWorkspace: OfficialIssueWorkspace } = await import(new URL('./issue-workspace.tsx?browser-panel-test', import.meta.url).href))
 })
 beforeEach(() => {
+  closeReview(); reportWorkTask = undefined
+  const pendingAddress = browserAddressRequest()
+  if (pendingAddress) consumeBrowserAddress(pendingAddress)
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
+  workspaceReady = true
+  switcherReady = true
+  rosterPending = false; rosterError = undefined; rosterRetries = 0
+  workspaceError = undefined
+  refreshGlobalTasks = refreshed
+  workspaceTasksFailed = false
+  workspaceTasksCached = true
+  groupList = []
+  groupListError = undefined
+  groupListRetries = 0
+  projectTeamsFailed = false; projectTeamsPending = false; projectsFailed = false; projectsPending = false
+  projectReads.projects = 0; projectReads.links = 0
+  teamDirectoryError = false; teamDirectoryPending = false; teamDirectoryRetries = 0
+  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null; probeEmbeddedAck = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
+  browserFits = true
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
   registerComputer = false; computerThread = null
   chunkReady = new Promise(resolve => { releaseChunk = resolve })
@@ -153,7 +278,109 @@ beforeEach(() => {
 afterEach(async () => { releaseChunk(); await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 
+test('a valid browser request from a board clears only competing columns and opens the existing browser', async () => {
+  const selectedRun = '00000000-0000-4000-8000-000000000021'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&section=all-issues&thread=${selectedRun}&task=${selectedRun}&threads=all`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  const params = new URL(browser.location.href).searchParams
+  assert.equal(params.get('section'), 'all-issues')
+  assert.equal(params.get('workspace'), 'workspace-one')
+  assert.equal(params.get('account'), 'active')
+  for (const key of ['task', 'thread', 'threads']) assert.equal(params.has(key), false)
+})
+
+test('a narrow board opens an explicitly requested preview in the existing browser sheet', async () => {
+  browserFits = false
+  browser.localStorage.setItem('mikka:browser', '1')
+  browser.history.replaceState({}, '', '/?section=all-issues&workspace=workspace-one')
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0, 'a saved desktop column leaves the phone unobstructed')
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
+})
+
+test('a thread opened in the centre keeps the right column', async () => {
+  // #2835 made a Bot's sidebar thread open in the centre (`?mainThread=`), and gated `isConversation` on the
+  // absence of one: every column below is gated on that single value, so the thread lost 概览 entirely.
+  // The open-source frame draws that column itself (FRAME_OWNS_PANEL false), which is what this asserts.
+  const runId = '00000000-0000-4000-8000-000000000031'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&mainThread=${runId}`)
+  await act(async () => root.render(<IssueWorkspace user={user} />))
+  assert.ok(container.querySelector('[data-main-thread]'), 'the thread is the centre page')
+  assert.ok(container.querySelector('[data-context-panel]'), 'and the right column is still beside it')
+})
+
+test('a thread opened in the centre hands its work area to a frame that owns the panel', async () => {
+  // The hosted shell draws the Overview as a tab of the conversation's own work area (FRAME_OWNS_PANEL). That tab
+  // reaches the thread through the panels context, so the thread's branch has to provide it too.
+  const runId = '00000000-0000-4000-8000-000000000032'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&mainThread=${runId}`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.ok(container.querySelector('[data-main-thread]'), 'the thread is the centre page')
+  assert.ok(reportedPanels, 'and the frame was handed the Overview tab')
+  assert.deepEqual(reportedPanels?.tabs.map(tab => tab.id), ['overview', 'browser'])
+})
+
+test('an explicit Bot mounts only its own composer after its roster resolves', async () => {
+  rosterPending = true
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&bot=${bot.id}`)
+  const render = () => act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  await render()
+  assert.equal(Boolean(container.querySelector('[data-chat]')), false)
+  assert.equal(composerMounts, 0)
+  assert.ok(container.querySelector('[role="status"]'))
+
+  rosterError = new Error('roster unavailable')
+  await render()
+  const retry = container.querySelector<HTMLButtonElement>('[role="alert"] button')
+  assert.ok(retry)
+  assert.equal(Boolean(container.querySelector('[data-chat]')), false)
+  await act(async () => retry.click())
+  await render()
+  assert.equal(rosterRetries, 1)
+  assert.equal(container.querySelector('[data-chat]')?.getAttribute('data-chat'), bot.name)
+  assert.equal(composerMounts, 1)
+  assert.equal(new URL(browser.location.href).searchParams.get('bot'), bot.id)
+})
+
+test('a valid browser request reveals the conversation browser tab without changing the selected Bot', async () => {
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&bot=${bot.id}`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0)
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  const params = new URL(browser.location.href).searchParams
+  assert.equal(params.get('bot'), bot.id)
+  assert.equal(params.get('workspace'), 'workspace-one')
+  assert.equal(params.get('account'), 'active')
+})
+
+test('an invalid browser address does not reveal or create a browser pane', async () => {
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  await act(async () => assert.equal(openBrowserAddress('javascript:alert(1)'), false))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0)
+})
+
 const render = async (props: Partial<Parameters<typeof IssueWorkspace>[0]> = {}) => { await act(async () => root.render(<IssueWorkspace user={user} {...props} />)) }
+for (const value of ['false', 'undefined']) test(`a frame with FRAME_LISTS_CHATS ${value} keeps one chat navigation and group command`, async () => {
+  if (value === 'false') {
+    const { FRAME_LISTS_CHATS } = await import('../slots/app-frame')
+    assert.equal(FRAME_LISTS_CHATS, false)
+    await render()
+  } else {
+    await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  }
+  assert.ok(container.querySelector('[aria-label="Main navigation"]'))
+  assert.equal(Boolean(container.querySelector('[data-retired-bot-list]')), false)
+  const createGroup = [...container.querySelectorAll('button')].find(button => button.textContent === 'new group')
+  assert.ok(createGroup)
+  await act(async () => createGroup.click())
+  assert.equal(container.querySelector('[data-create-group]')?.getAttribute('data-create-group'), workspaceId)
+})
+
 const renderHosted = async () => { await act(async () => root.render(<HostedIssueWorkspace user={user} />)) }
 const frame = () => container.querySelector('[data-slot="app-frame-content"]')
 const bar = () => container.querySelector('[data-slot="window-bar"]')
@@ -164,6 +391,277 @@ async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
 }
+async function popTo(href: string, renderFrame = render) {
+  browser.history.replaceState({}, '', href)
+  await act(async () => { browser.dispatchEvent(new browser.PopStateEvent('popstate')) })
+  await renderFrame()
+}
+
+test('Team Projects distinguishes unavailable associations from an empty list and keeps Workspace Projects independent', async () => {
+  scopedTeamFixture = true
+  projectTeamsPending = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-projects`)
+  await act(async () => { releaseChunk(); await chunkReady })
+  await render({ initialSection: 'team-projects' })
+  assert.ok(container.querySelector('[data-project-list-state="pending"]'))
+  projectTeamsPending = false
+  projectTeamsFailed = true
+  await render({ initialSection: 'team-projects' })
+  assert.ok(container.querySelector('[data-project-list-state="failed"]'))
+
+  await act(async () => { root.render(null) })
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&section=projects`)
+  await render({ initialSection: 'projects' })
+  assert.ok(container.querySelector('[data-project-list-state="ready"]'))
+})
+
+test('Team Home distinguishes either pending or failed project read from its last known count and retries both', async () => {
+  scopedTeamFixture = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-home`)
+  await act(async () => { releaseChunk(); await chunkReady })
+  const show = () => render({ initialSection: 'team-home' })
+  const projects = () => container.querySelector('section[aria-labelledby="team-resources-heading"]')!
+  const shortcut = () => [...container.querySelectorAll('aside button')].find(button => button.textContent?.includes('Projects.title'))!
+  await show()
+  assert.match(projects().textContent!, /Known project/)
+  assert.match(shortcut().textContent!, /1$/)
+  for (const source of ['projects', 'links']) {
+    projectsPending = source === 'projects'; projectTeamsPending = source === 'links'
+    await show()
+    assert.ok(projects().querySelector('[data-slot="skeleton"]'))
+    assert.doesNotMatch(projects().textContent!, /Known project|FeatureCopy.c_174759ae/)
+    assert.match(shortcut().textContent!, /—$/)
+    projectsPending = false; projectTeamsPending = false
+    projectsFailed = source === 'projects'; projectTeamsFailed = source === 'links'
+    await show()
+    assert.doesNotMatch(projects().textContent!, /Known project|FeatureCopy.c_174759ae/)
+    assert.match(shortcut().textContent!, /—$/)
+    const retry = projects().querySelector<HTMLButtonElement>('[role="alert"] button')
+    assert.ok(retry)
+    await act(async () => { retry.click() })
+    projectsFailed = false; projectTeamsFailed = false
+    await show()
+    assert.match(projects().textContent!, /Known project/)
+    assert.match(shortcut().textContent!, /1$/)
+  }
+  assert.deepEqual(projectReads, { projects: 2, links: 2 })
+})
+
+for (const section of ['team-home', 'team-projects', 'team-issues'] as const) {
+  test(`${section} requires its own team directory and can retry a failed or missing team`, async () => {
+    browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=${section}`)
+    await act(async () => { releaseChunk(); await chunkReady })
+    const show = () => render({ initialSection: section })
+    const pageSelector = { 'team-home': '#team-resources-heading', 'team-projects': '[data-project-list-state]', 'team-issues': '[data-team-board-visible]' }[section]
+    teamDirectoryPending = true
+    await show()
+    assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
+    assert.equal(container.querySelector(pageSelector), null)
+    teamDirectoryPending = false
+    teamDirectoryError = true
+    scopedTeamFixture = true // SWR can still hold the previous Team after failing to refresh it.
+    await show()
+    const alert = () => container.querySelector('[role="alert"]')
+    assert.match(alert()?.textContent ?? '', /FeatureCopy.c_f4ae1a97/)
+    assert.equal(container.querySelector(pageSelector), null)
+    await act(async () => { alert()!.querySelector('button')!.click() })
+    assert.equal(teamDirectoryRetries, 1)
+    teamDirectoryError = false; scopedTeamFixture = false
+    await show()
+    assert.match(alert()?.textContent ?? '', /FeatureCopy.c_19b23b31/)
+    assert.equal(container.querySelector(pageSelector), null)
+    scopedTeamFixture = true
+    await show()
+    assert.equal(alert(), null)
+    assert.ok(container.querySelector(pageSelector))
+  })
+}
+
+for (const cached of [false, true]) {
+  test(`the workspace Board withdraws a ${cached ? 'cached' : 'never loaded'} list on read failure and retries its own reader`, async () => {
+    workspaceTasksCached = cached
+    workspaceTasksFailed = true
+    let retries = 0
+    refreshGlobalTasks = async () => { retries++; workspaceTasksFailed = false; workspaceTasksCached = true }
+    const show = () => render({ initialSection: 'all-issues' })
+    await show()
+    const alert = container.querySelector('[role="alert"]')
+    assert.ok(alert)
+    assert.ok(alert.textContent?.includes('Workspace.listError'))
+    assert.equal(container.querySelector('[data-team-board-visible]'), null)
+    const retry = alert.querySelector('button')
+    assert.ok(retry)
+    await act(async () => retry.click())
+    await show()
+    assert.equal(retries, 1)
+    assert.equal(scopedTeamPageMutations, 0)
+    assert.equal(container.querySelector('[role="alert"]'), null)
+    assert.ok(container.querySelector('[data-team-board-visible]'))
+  })
+}
+
+test('Team Issues first-page readiness is independent of the unrelated workspace-wide list', async () => {
+  scopedTeamFixture = true
+  workspaceTasksPending = true // The large global page is slow; the authorized Team page is ready.
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  assert.ok(container.querySelector('[data-team-board-visible]'), 'the ready Team list must be reachable without waiting for global pagination')
+  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loading"]'), null)
+
+  scopedTasksPending = true // The Team-scoped read itself remains a real loading gate.
+  await render({ initialSection: 'team-issues' })
+  assert.equal(container.querySelector('[data-team-board-visible]'), null)
+  // The board's own frame stands while its first page reads; it is a page placeholder, not a task editor.
+  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
+})
+
+test('a Team board write refreshes its visible page while the workspace refresh is pending', async () => {
+  scopedTeamFixture = true
+  const globalRefresh = Promise.withResolvers<void>()
+  refreshGlobalTasks = () => globalRefresh.promise
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  const start = container.querySelector<HTMLButtonElement>('[data-board-write-start]')
+  const save = container.querySelector<HTMLButtonElement>('[data-board-write-ack]')
+  assert.ok(start && save)
+  await act(async () => { start.click() })
+  try {
+    await act(async () => { save.click() })
+    assert.equal(scopedTeamPageMutations, 1, 'the visible Team page must not wait for the global read')
+  } finally {
+    globalRefresh.resolve()
+  }
+})
+
+test('a Team detail ACK refreshes its own authorized list after save and deletion', async () => {
+  scopedTeamFixture = true
+  const issueId = '8055a7ae-204f-4045-8780-66b9c93ce230'
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues&issue=${issueId}`)
+  await render({ initialSection: 'team-issues', initialSelected: issueId })
+  await act(async () => { releaseChunk(); await Promise.resolve() })
+  const save = container.querySelector<HTMLButtonElement>('[data-detail-save]')
+  assert.ok(save, 'the Task detail must be reachable in the Team view')
+  await act(async () => { save.click() })
+  assert.equal(scopedTeamPageMutations, 1, 'the separate Team first page must be invalidated on a successful save')
+  const remove = container.querySelector<HTMLButtonElement>('[data-detail-delete]')
+  assert.ok(remove)
+  await act(async () => { remove.click() })
+  assert.equal(scopedTeamPageMutations, 2, 'an acknowledged deletion must retire the Team page too')
+})
+
+test('an embedded Task save ACK invalidates the same Team page as the full Task detail', async () => {
+  scopedTeamFixture = true
+  probeEmbeddedAck = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  const save = container.querySelector<HTMLButtonElement>('[data-embedded-save-ack]')
+  assert.ok(save, 'the embedded Task lifecycle must remain reachable from the official Team frame')
+  await act(async () => { save.click() })
+  assert.equal(scopedTeamPageMutations, 1, 'a successful embedded Task save must invalidate the authorized Team page')
+})
+
+test('a new Team task ACK invalidates the scoped first page before opening its detail', async () => {
+  scopedTeamFixture = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  const acknowledged = acknowledgeNewTask
+  assert.ok(acknowledged, 'the authorized Team creation dialog must be wired')
+  assert.equal(scopedTeamPageMutations, 0)
+  await act(async () => { acknowledged('8055a7ae-204f-4045-8780-66b9c93ce231') })
+  assert.equal(scopedTeamPageMutations, 1, 'a confirmed Team Task creation must invalidate the authorized Team page')
+})
+
+test('a group absent from stale rows offers retry until a successful membership read', async () => {
+  const id = '8055a7ae-204f-4045-8780-66b9c93ce228'
+  groupList = [{ id: 'other-group', title: 'Another group', workspaceId }]
+  groupListError = new Error('offline during the reload after creation')
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&group=${id}`)
+  await render()
+
+  const alert = container.querySelector('[role="alert"]')
+  assert.ok(alert)
+  assert.ok(alert.textContent?.includes('GroupChat.loadError'))
+  assert.doesNotMatch(container.textContent ?? '', /GroupChat\.notFound/)
+  const retry = alert.querySelector('button')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  assert.equal(groupListRetries, 1)
+  await render()
+  assert.match(container.textContent ?? '', /GroupChat\.notFound/)
+  assert.equal(container.querySelector('[data-open-group]'), null)
+
+  groupList = [...groupList, { id, title: 'New group', workspaceId }]
+  groupListError = new Error('a subsequent refresh failed')
+  await render()
+  assert.equal(container.querySelector('[data-open-group]')?.getAttribute('data-open-group'), id)
+  assert.doesNotMatch(container.textContent ?? '', /GroupChat\.loadError/)
+})
+
+test('a cached conversation cannot accept a draft before its authenticated workspace scope resolves', async () => {
+  workspaceReady = false
+  switcherReady = false
+  await render()
+  assert.equal(Boolean(container.querySelector('textarea')), false, 'a cached transcript must not expose an editable loading-scope draft')
+  assert.ok(container.querySelector('[data-loading-placeholder]'))
+  assert.equal(composerMounts, 0)
+
+  workspaceReady = true
+  switcherReady = true
+  await render()
+  assert.ok(container.textContent?.includes('Cached conversation'))
+  await act(async () => editDraft('Lifecycle readiness draft'))
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Lifecycle readiness draft')
+
+  workspaceId = 'workspace-two'
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, '', 'another workspace must not inherit the startup draft')
+  await act(async () => editDraft('another workspace draft'))
+  user = { ...user, id: 'owner-two' }
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, '', 'another account must not inherit a workspace draft')
+  user = { ...user, id: 'owner-one' }
+  workspaceId = 'workspace-one'
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Lifecycle readiness draft')
+})
+
+test('a failed workspace read keeps editing unavailable and offers the normal read retry', async () => {
+  workspaceReady = false
+  switcherReady = false
+  workspaceError = new Error('unavailable fixture workspace')
+  await render()
+  assert.equal(Boolean(container.querySelector('textarea')), false)
+  assert.equal(Boolean(container.querySelector('[data-loading-placeholder]')), false, 'a failed read must not remain a perpetual loader')
+  assert.ok(container.querySelector('[role="alert"]'))
+  const retry = button('Common.retry')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  await render()
+  assert.ok(container.querySelector('textarea'))
+  await act(async () => editDraft('draft after retry'))
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'draft after retry')
+})
+
+test('a confirmed workspace opens its composer while the full settings read is pending', async () => {
+  workspaceReady = false
+  await render()
+  assert.ok(container.querySelector('textarea'))
+  assert.equal(container.querySelector('[data-loading-placeholder]'), null)
+  await act(async () => editDraft('Draft while settings load'))
+
+  workspaceReady = true
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Draft while settings load')
+  assert.equal(composerMounts, 1)
+
+  workspaceReady = false
+  workspaceError = Object.assign(new Error('Access denied'), { status: 403 })
+  await render()
+  assert.equal(container.querySelector('textarea'), null)
+  assert.ok(container.querySelector('[role="alert"]'))
+})
 
 test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft', async () => {
   await render()
@@ -187,13 +685,13 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.equal(railMounts, 1)
   await go('/settings/teams?workspace=workspace-one&team=team-one')
-  assert.equal(container.querySelector('[data-team-workspace]')?.getAttribute('data-team-workspace'), workspaceId)
+  assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-team'), 'team-one')
   await go('/settings/members?workspace=workspace-one&invite=1')
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
 
-  await act(async () => button('chats').click())
-  await render()
+  // The Chats rail button opens the conversation directory; browser Back returns to the prior chat.
+  await popTo('/?workspace=workspace-one')
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
@@ -209,7 +707,7 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   assert.equal(railMounts, 1)
 })
 
-test('legacy Settings also loads inside the frame and keeps it when returning to chat', async () => {
+test('legacy Settings also loads inside the frame and the Chats rail opens the conversation directory', async () => {
   await render({ initialSettingsSection: 'account' })
   const original = { frame: frame(), bar: bar(), rail: rail() }
   assert.ok(original.frame && original.bar && original.rail, 'legacy Settings must retain the real shell while its chunk loads')
@@ -218,7 +716,8 @@ test('legacy Settings also loads inside the frame and keeps it when returning to
   assert.ok(container.querySelector('[data-settings-section="account"]'))
   await act(async () => button('chats').click())
   await render()
-  assert.ok(container.querySelector('textarea'))
+  assert.equal(new URLSearchParams(browser.location.search).get('section'), 'conversations')
+  assert.equal(container.querySelector('textarea'), null, 'the conversation directory is not an active composer')
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
@@ -247,8 +746,8 @@ test('hosted Settings preserves pending browser notes and the computer registry 
   await act(async () => { releaseChunk(); await chunkReady })
   const duringSettings = { notes: notes?.notes.length ?? null, hasComposer: notes?.hasComposer ?? null, computerRun: computerThread?.runId ?? null }
 
-  await act(async () => button('hosted chats').click())
-  await renderHosted()
+  // The Chats rail opens the directory; return with browser Back to the prior chat.
+  await popTo('/?workspace=workspace-one', renderHosted)
   const after = { draft: container.querySelector('textarea')?.value, notes: notes?.notes.map(note => [note.n, note.note]), computerRun: computerThread?.runId ?? null }
   t.diagnostic(JSON.stringify({ duringSettings, after }))
   assert.deepEqual(after, { draft: 'hosted unsent draft', notes: [[1, 'keep hosted annotation']], computerRun: registeredComputerThread.runId })
@@ -380,6 +879,48 @@ test('a standalone Settings shell still provides its frame and route-specific me
   assert.equal(container.querySelectorAll('[data-slot="app-frame-content"]').length, 1)
   assert.ok(bar() && rail())
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-settings-section'), 'members')
-  assert.equal(container.querySelector('[data-members-workspace]')?.getAttribute('data-members-workspace'), workspaceId)
+  assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
+})
+
+const taskOne = '00000000-0000-4000-8000-000000000041'
+const taskTwo = '00000000-0000-4000-8000-000000000042'
+const reviewShortcut = () => browser.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'B', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+const reviewedTask = () => container.querySelector<HTMLElement>('[data-review-task]')?.dataset.reviewTask
+
+test('Review keyboard targets the actual active work task after its URL was consumed and clears on a non-task tab', async () => {
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.ok(reportWorkTask, 'the current conversation exposes its active-task boundary')
+  assert.equal(new URLSearchParams(browser.location.search).has('task'), false)
+  await act(async () => reportWorkTask!(taskOne))
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskOne)
+  await act(async () => { closeReview(); reportWorkTask!(taskTwo) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskTwo)
+  await act(async () => { closeReview(); reportWorkTask!(null) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined, 'Browser, New and closed tabs cannot reuse the last task')
+})
+
+test('an old workarea callback cannot replace the active task after the workspace or account changes', async () => {
+  const renderOwner = () => root.render(<OfficialIssueWorkspace user={user} />)
+  await act(async () => renderOwner())
+  const oldWorkspace = reportWorkTask!
+  assert.ok(oldWorkspace)
+  await act(async () => oldWorkspace(taskOne))
+  workspaceId = 'workspace-two'
+  await act(async () => renderOwner())
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined)
+  const newWorkspace = reportWorkTask!
+  await act(async () => { newWorkspace(taskTwo); oldWorkspace(taskOne) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskTwo)
+  await act(async () => closeReview())
+  user = { ...user, id: 'owner-two' }
+  await act(async () => renderOwner())
+  await act(async () => { newWorkspace(taskTwo); oldWorkspace(taskOne) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined, 'a new account has no review target from the previous account')
 })

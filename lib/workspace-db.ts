@@ -8,6 +8,7 @@ import { sampleClient } from '@/lib/db/egress-sample'
 import { samplePoolTransport } from '@/lib/db/transport-sample'
 import { manageDatabasePool } from '@/lib/db/pool-lifecycle'
 import { COMMIT_EXECUTOR, observePoolCommits } from '@/lib/db/commit-effects'
+import { currentTransactionBoundary } from '@/lib/db/transaction-boundary'
 
 // Workspace tables live in the Marketplace database; existing auth and tasks stay in MIKKA_DATABASE_URL.
 const globalDb = globalThis as unknown as { workspacePool?: Pool }
@@ -22,11 +23,22 @@ pool.on('connect', client => sampleClient(client))
 samplePoolTransport(pool, 'workspace')
 const database = drizzle(pool, { schema })
 type Transaction = Parameters<Parameters<typeof database.transaction>[0]>[0]
-type HeldWorkspace = { client: PoolClient; transaction: Transaction; lease: { active: boolean } }
+type HeldWorkspace = { client: PoolClient; transaction: Transaction; lease: { active: boolean }; boundary: object | undefined }
 const heldWorkspace = new AsyncLocalStorage<HeldWorkspace>()
+/** A job started by an APP commit can run before the outer Workspace writer
+ * releases its connection. Start that job with its own Workspace checkout. */
+export function withoutWorkspaceClient<T>(work: () => T): T {
+  return heldWorkspace.exit(work)
+}
+
 const currentWorkspace = () => {
   const held = heldWorkspace.getStore()
-  return held?.lease.active ? held : undefined
+  return held?.lease.active && held.boundary === currentTransactionBoundary() ? held : undefined
+}
+
+/** Deferred work keeps its database configuration, but owns a fresh transaction. */
+export function withoutWorkspaceTransaction<T>(work: () => T): T {
+  return heldWorkspace.exit(work)
 }
 
 /** Opaque identity of this active top-level Workspace transaction. Nested
@@ -44,7 +56,7 @@ async function transaction<T>(work: (tx: Transaction) => Promise<T>, config?: Pa
   const client = await pool.connect()
   const lease = { active: true }
   try {
-    return await drizzle(client, { schema }).transaction(tx => heldWorkspace.run({ client, transaction: tx, lease }, async () => {
+    return await drizzle(client, { schema }).transaction(tx => heldWorkspace.run({ client, transaction: tx, lease, boundary: currentTransactionBoundary() }, async () => {
       try { return await work(tx) }
       // Commit observers run before Drizzle resolves transaction(). An effect
       // starting another transaction must not issue SAVEPOINT after COMMIT.

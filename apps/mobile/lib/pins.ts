@@ -1,5 +1,5 @@
 /**
- * 对话's pinned row: the bots the person pinned, the Coordinator first among
+ * 线程's pinned row: the bots the person pinned, the Coordinator first among
  * them; every other row stays in the list. The star marks a pin, the same for
  * every bot (Alex): the Coordinator has it while pinned and loses it when not.
  */

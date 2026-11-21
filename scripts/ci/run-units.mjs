@@ -8,8 +8,11 @@ import tasks from './tasks.json' with { type: 'json' }
 export const unitEnvironment = env => ({ ...env, FORCE_COLOR: '0', NX_CACHE_PROJECT_GRAPH: 'false', NX_DAEMON: 'false', NX_ISOLATE_PLUGINS: 'false', NX_NO_CLOUD: 'true' })
 export function main(kind, env = process.env, run = spawnSync) {
   if (!['core', 'integration'].includes(kind)) throw Error('unitKindRequired')
-  const selected = JSON.parse(env.CI_UNITS || 'null')
-  if (!Array.isArray(selected) || !selected.length) throw Error('unitSelectionRequired')
+  const input = JSON.parse(env.CI_UNITS || 'null')
+  if (!Array.isArray(input) || !input.length) throw Error('unitSelectionRequired')
+  // A PR or main push can still receive the older trusted selector's standalone
+  // docs classifier target. Its tests now run inside the mandatory UI policy suite.
+  const selected = [...new Set(input.map(key => key === 'ci-core-6' ? 'ci-core-7' : key))]
   const all = Object.entries(tasks).filter(([, task]) => task.kind === kind).map(([key]) => `ci-${key}`)
   const names = selected.includes('*') ? all : selected.filter(key => all.includes(key))
   if (!names.length || selected.some(key => key !== '*' && !Object.hasOwn(tasks, key.replace(/^ci-/, '')))) throw Error('invalidUnitSelection')

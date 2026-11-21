@@ -9,6 +9,7 @@ import base64
 import hashlib
 import hmac
 import json
+import socket
 import time
 from pathlib import Path
 from aiohttp import web, WSMsgType
@@ -98,7 +99,12 @@ def main():
     app = web.Application()
     app.router.add_get('/vnc', viewer)
     # URL contains a bearer grant: access logging must stay disabled.
-    web.run_app(app, host='0.0.0.0', port=6080, access_log=None, print=None)
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 0x4D4B5056)
+    listener.bind(('0.0.0.0', 6080))
+    listener.listen(128)
+    web.run_app(app, sock=listener, access_log=None, print=None)
 
 if __name__ == '__main__':
     main()

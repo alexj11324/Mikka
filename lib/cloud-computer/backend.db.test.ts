@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { bindFixtureWorkspaceDatabase, createFixtureWorkspaceTables } from '../../tests/helpers/workspace-database'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
-import { observePoolCommits } from '@/lib/db/commit-effects'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { SubagentStore } from './subagents'
 import { wakeTokens, wakeTransport } from '@/lib/workflow-wake'
@@ -37,7 +36,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   // Like the app's pool (lib/db/request-scope.ts): wakes and live notices run after COMMIT.
-  observePoolCommits(pool)
   const alice = { userId: 'alice', workspaceId: randomUUID() }
   const bob = { ...alice, userId: 'bob' }
   const stranger = { ...alice, workspaceId: randomUUID() }
@@ -68,6 +66,9 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query(computeMigration); await pool.query(computeMigration)
     const lifecycleMigration = await readFile(new URL('../../drizzle/20261107120000_thread_machine_lifecycle.sql', import.meta.url), 'utf8')
     await pool.query(lifecycleMigration); await pool.query(lifecycleMigration)
+    // The snapshot migration's columns; this fixture applies only the history it exercises.
+    await pool.query(`ALTER TABLE thread_machines ADD COLUMN "filesystemSnapshotId" text, ADD COLUMN "snapshotOperationId" uuid,
+      ADD COLUMN "snapshotTakenAt" timestamptz, ADD COLUMN "snapshotState" text NOT NULL DEFAULT 'none', ADD COLUMN "restoreStartedAt" timestamptz`)
     await pool.query(`ALTER TABLE suggestions ADD COLUMN "userId" text, ADD COLUMN shown boolean DEFAULT true, ADD COLUMN "dismissedAt" timestamptz, ADD COLUMN source text, ADD COLUMN actor text, ADD COLUMN url text, ADD COLUMN title text, ADD COLUMN action text, ADD COLUMN "actionTitle" text;
       CREATE TABLE coordinator_messages(id uuid PRIMARY KEY,"userId" text,"botId" uuid,position integer,message jsonb,UNIQUE NULLS NOT DISTINCT("userId","botId",position));
       CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text,"botId" uuid,kind text,"dedupeKey" text UNIQUE,payload jsonb);

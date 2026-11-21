@@ -8,7 +8,6 @@ import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
-export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
 

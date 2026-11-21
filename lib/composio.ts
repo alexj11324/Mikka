@@ -1,29 +1,22 @@
 import 'server-only'
 import { Composio } from '@composio/core'
 import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult, type ComposioDispatchGate } from '@/lib/composio-actions'
-import { COMPOSIO_TOOLKIT_IDS, disconnectAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioToolkitId } from '@/lib/composio-accounts'
+import { disconnectAndForgetAccount, providerAnswer, providerIdentity, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId } from '@/lib/composio-accounts'
 import { chosenComposioDefault, forgetComposioAccount } from '@/lib/composio-account-store'
-
-export const COMPOSIO_TOOLKITS = COMPOSIO_TOOLKIT_IDS
-export type ComposioToolkit = ComposioToolkitId
 
 export function getComposio() {
   const apiKey = process.env.COMPOSIO_API_KEY
   return apiKey ? new Composio({ apiKey }) : null
 }
 
-export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string, gate?: ComposioDispatchGate): Promise<ComposioActionResult> {
-  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId, gate)
+export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string, gate?: ComposioDispatchGate, signal?:AbortSignal): Promise<ComposioActionResult> {
+  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId, gate, signal)
 }
 
 export async function resolveActionAccount(userId: string, action: ComposioActionName, accountId?: string) {
   const composio = getComposio()
   if (!composio) return { accountId: null, accounts: [] }
   return resolveComposioAccount(userId, COMPOSIO_ACTIONS[action].toolkit, composio, toolkit => chosenComposioDefault(userId, toolkit), accountId)
-}
-
-export function isComposioToolkit(value: string): value is ComposioToolkit {
-  return (COMPOSIO_TOOLKITS as readonly string[]).includes(value)
 }
 
 type ComposioClient = NonNullable<ReturnType<typeof getComposio>>
@@ -45,9 +38,9 @@ export async function renameComposioAccount(composio: ComposioClient, id: string
  * address is returned.
  */
 export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: string, accountId: string, timeoutMs = 8_000): Promise<string | null> {
-  // Only the apps below say who the account is; any other toolkit has no email to read.
-  if (!Object.hasOwn(PROVIDER_IDENTITY, toolkit)) return null
-  const identity = PROVIDER_IDENTITY[toolkit as ComposioToolkitId]
+  // Only some apps have an identity lookup (PROVIDER_IDENTITY); any other toolkit has no email to read.
+  const identity = providerIdentity(toolkit)
+  if (!identity) return null
   const signal = AbortSignal.timeout(timeoutMs)
   const call = async (endpoint: string, parameters: { in: 'query' | 'header'; name: string; value: string }[] = []) => {
     const response = await composio.tools.proxyExecute({ endpoint, method: 'GET', connectedAccountId: accountId, userId, parameters }, { signal })

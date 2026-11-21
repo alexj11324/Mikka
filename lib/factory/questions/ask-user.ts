@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { FactoryError } from "../contract";
 import { maskFactoryNote } from "../note-mask";
+import { PENDING_QUESTION_STATUSES } from "./schema";
 
-/** Statuses a user can still act on (same set as `pending`). */
-export const PENDING_QUESTION_STATUSES = ["open", "waiting_user", "resuming", "blocked"] as const;
+export { PENDING_QUESTION_STATUSES };
 
 /** Claude Code AskUserQuestion `header` is a short chip label (max 12 chars). */
 const HEADERS: Record<string, string> = { context: "Context", decision: "Decision", permission: "Permission", external: "External" };
@@ -12,6 +12,7 @@ type QuestionView = {
   id: string; kind: string; question: string; context?: string | null; options: string[] | null;
   status: string; taskId: string; originRunId: string; continuationRunId?: string | null;
   reference: unknown; createdAt?: Date | string;
+  answerId?: string | null; answerSource?: string | null; answer?: unknown;
 };
 
 /** One pending Factory question in AskUserQuestion shape plus Mikka metadata.
@@ -20,7 +21,11 @@ type QuestionView = {
  * `value` is the option's stable identifier: it currently equals `label` and
  * switches to a real option id if options get one later. */
 export function toAskUserQuestion(q: QuestionView) {
+  const stored = q.answerSource === "human" && q.answerId && q.continuationRunId
+    ? z.object({ source: z.literal("human"), input: z.object({ answerId: z.literal(q.answerId), text: z.string().min(1) }) }).safeParse(q.answer)
+    : undefined;
   return {
+    ...(stored?.success ? { recordedAnswer: maskFactoryNote(stored.data.input.text) } : {}),
     questionId: q.id,
     taskId: q.taskId,
     runId: q.originRunId,
@@ -43,7 +48,7 @@ const query = z.union([
 ]);
 
 export async function handleFactoryQuestionList(
-  service: { pending(userId: string, runId?: string, readScope?: "bot" | "user"): Promise<unknown[]>; list(userId: string, taskId: string, readScope?: "bot" | "user"): Promise<unknown[]> },
+  service: { pending(userId: string, runId?: string, readScope?: "bot" | "user"): Promise<unknown[]>; list(userId: string, taskId: string, readScope?: "bot" | "user", view?: "history" | "pending"): Promise<unknown[]> },
   request: { actor: { userId: string } | null; authorization: string | null; method: string; url: string },
 ) {
   if (!request.actor || request.authorization) return { status: 401, body: { error: "authRequired" } };
@@ -54,7 +59,7 @@ export async function handleFactoryQuestionList(
   const { taskId, runId } = parsed.data;
   try {
     // This authenticated collection is user-wide; model/runtime readers keep their default Bot scope.
-    const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase(), "user") : await service.pending(request.actor.userId, runId?.toLowerCase(), "user")) as QuestionView[];
+    const rows = (taskId ? await service.list(request.actor.userId, taskId.toLowerCase(), "user", "pending") : await service.pending(request.actor.userId, runId?.toLowerCase(), "user")) as QuestionView[];
     // runId (origin or continuation) is filtered in SQL by `pending`, before its 50-row cap.
     const questions = rows
       .filter((q) => (PENDING_QUESTION_STATUSES as readonly string[]).includes(q.status))

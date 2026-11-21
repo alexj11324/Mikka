@@ -286,7 +286,7 @@ run attempt. The unique release artifact, archive digest, published templates,
 computed worker hash and public Web build must agree. An unrelated release does
 not start model tasks, and an incomplete publication cannot supply guessed pins.
 
-The native cases use the existing smoke account and fixed Claude Code/Codex
+The ordinary native cases use the existing smoke account and fixed Claude Code/Codex
 subscriptions. Each owns one uniquely named branch and draft PR in
 `alexj11324/Mikka-handoff`, then verifies closure and branch deletion without
 merging. A separate disposable E2B fixture holds independent random test keys
@@ -318,12 +318,70 @@ also require the explicit `factory_acceptance` input.
 
 Read the native and Factory reports together. The native report's remaining
 evidence list identifies coverage outside that driver; a separate Factory
-receipt can satisfy that item. Neither report certifies production-store
-canaries, PostHog absence, or arbitrary screenshots/checkpoints/templates.
-The production-canary option currently returns a concrete change/cleanup plan
-before account access and is blocked pending the review required by #1712 for
-production credential changes. No production Secret Store write is hidden in
-these acceptance jobs.
+receipt can satisfy that item. Ordinary mode does not certify production-store
+canaries. Neither mode certifies PostHog absence or arbitrary screenshots,
+checkpoints, and templates.
+
+### Run the production-store canary
+
+Use this mode to test a newly generated private Secret through the deployed
+store, actual task claim, and inherited `MIKKA_SECRET_ENDPOINTS` bridge. It
+changes one synthetic entry owned by the normal smoke account. Effective
+personal Secret changes stop that owner's active runs across all workspaces,
+so the shared account needs an exclusive acceptance window.
+
+Before starting, review the exact source and record the source, owner lane,
+start, and expiry of that window in an issue #1752 comment. The existing
+Infisical workload must be able to read `MIKKA_DATABASE_URL` from `prod:/vercel`.
+The driver uses that binding only for `READ ONLY` transactions. Existing use of
+the identity elsewhere does not replace checking this job's actual credential
+read result.
+
+1. Select the workflow's manual `execute` mode with the exact application,
+   worker, worker-source, and official-template pins. Keep each selected
+   subscription on its fixed small model.
+2. Set `production_canary` to `true`. Supply `canary_window` as a JSON object
+   with `comment` containing the exact issue #1752 comment URL and `expiresAt`
+   containing the UTC ISO timestamp with milliseconds. The window must end
+   within 45 minutes of execution starting. Automatic release-triggered runs
+   never select this mode or read the database credential.
+3. Check the job's full-owner idle proof. Before each Secret mutation, the
+   driver reads every unfinished run for the signed-in owner, without a
+   workspace, date, or row limit. Only the exact active run being deliberately
+   revoked can be present during rotation. Other writes require no unfinished
+   owner run. A mismatched identity, unknown status, timeout, expired window,
+   or foreign active run blocks the write. This read is not atomic with the
+   following human API mutation; the reserved window remains necessary.
+4. Review both phases for each available subscription. The first task uses
+   its inherited bridge to make an authenticated synthetic upstream request.
+   The runner rotates only its recorded private Secret, then requires an
+   expired lease and a stopped native run within 90 seconds. A second task
+   must claim the rotated value and complete ordinary Git/gh cleanup, the
+   installed SDK request, HTTP policy negatives, bounded canary scans, and a
+   tool result followed by a reply. The fixture cannot mint grants for these
+   production-claim cases. A failed subscription remains a separate result.
+5. Confirm the cleanup receipt. The runner first stops and retires its own
+   task fixtures, deletes only the newly created Secret ID, and verifies its
+   metadata is absent. It also tears down the disposable upstream VM, archives
+   its Profiles, restores the prior workspace, and signs out.
+
+`production-task-secrets-report/canary-journal.json` records the fixture ID,
+source, private entry ID and name, mutation acknowledgements, and idle proofs.
+It contains no value, database URL, session, or capability. A lost create reply
+is reconciled only against this invocation's unique metadata and pre-existing
+ID inventory. If cleanup encounters another active task, a changed entry, or
+an expired window, it retains the exact target as deferred. Reserve another
+window and verify that target before completing cleanup; do not stop other
+tasks or delete entries selected only by a broad name prefix. An interrupted
+job's journal is a recovery record, not a successful cleanup receipt.
+
+The report distinguishes the production claim and rotation evidence from
+remaining checks: raw capability replay after expiry, cross-owner/workspace/
+repository claims, actual local and self-hosted claims, PostHog and image/
+checkpoint inspection, the separate Factory receipt, and complete RPC/SQL
+census with same-version native startup distributions. Ten paired HTTP samples
+compare the protected path to the same fixture's public route; they do not
+measure native-model startup or a production vendor's latency.
 
 ## Evidence required before completion
 

@@ -1,29 +1,32 @@
 # Self-hosting Mikka
 
+Self-hosting is community-maintained. Mikka ended dedicated compatibility testing and automatic self-hosted image releases on November 20, 2026.
+
 Deploy the community server, then connect the official app to that server. It runs on your own database and does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
 
-The image is a backend by default: API, realtime, the daemon gateway, scheduling, migrations and BYOK remain enabled. Mikka has one UI: the official apps, which connect to this server ([decision](design/decisions/2026-11-08-2133-one-ui.md)). An older built-in workspace UI is opt-in (below). Screenshots of the official apps are not copied into this public image.
+The image provides the server: API, realtime, daemon gateway, scheduling, migrations and BYOK. **Mikka has one official UI**, whose Web, Desktop and iOS clients connect to this server ([active One UI decision](design/decisions/2026-11-08-2133-one-ui.md)). The old built-in community workspace was retired; `MIKKA_COMMUNITY_UI=1` no longer re-enables it. The public image still serves server status, sign-in and account handoff pages, not a second workbench. Official UI screenshots are not copied into the public server image.
 
 ## Start the server
 
-Use a Linux host with Docker Engine and Docker Compose 2.24 or newer. The first published image targets `linux/amd64`. Start with 2 CPU cores and 4 GB RAM for the application and PostgreSQL; running coding agents on this same host needs additional resources. The application listens on port 3000 and is served at `/mikka`. This version supports a configurable origin; the `/mikka` path is fixed in the compiled web application.
+Use a Linux host with Docker Engine and Docker Compose 2.24 or newer. The first published image targets `linux/amd64`. Start with 2 CPU cores and 4 GB RAM for the application, PostgreSQL and LiteLLM; running coding agents on this same host needs additional resources. The application listens on port 3000 and is served at `/mikka`. This version supports a configurable origin; the `/mikka` path is fixed in the compiled web application.
 
-Download `docker-compose.yml` from the release you plan to run. In the same directory, create a `.env` file:
+Download `docker-compose.yml` and `deploy/litellm/Dockerfile` plus `deploy/litellm/config.yaml` and `deploy/litellm/start.sh` from the release you plan to run, preserving those paths. Configure the model aliases and upstream credentials in LiteLLM before starting the application; see [model configuration](self-hosting-byok.md#必需的-litellm-模型出口). In the same directory, create a `.env` file:
 
 ```dotenv
 POSTGRES_PASSWORD=replace-with-a-random-hex-password
+MIKKA_LITELLM_MASTER_KEY=replace-with-a-random-hex-key
 BETTER_AUTH_URL=http://localhost:3000
 # Pin a published commit SHA or release tag for repeatable upgrades.
 MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
 ```
 
-Generate the database password with `openssl rand -hex 32`. Do not use a sample password. Keep `.env` private (`chmod 600 .env`); it is not part of the image or source control.
+Generate separate database and LiteLLM keys with `openssl rand -hex 32`. Do not use a sample password. Keep `.env` private (`chmod 600 .env`); it is not part of the image or source control.
 
 ```sh
 docker compose up -d --wait
 ```
 
-Open `http://localhost:3000/mikka` for server information. Compose starts only the app and PostgreSQL. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
+Open `http://localhost:3000/mikka` for server information. Compose starts the app, PostgreSQL and the mandatory LiteLLM service. LiteLLM has no exposed host port; the app uses `http://litellm:4000` and the configured master key. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
 
 The app port binds to `127.0.0.1` by default. For remote access, put a TLS reverse proxy on the host and set `BETTER_AUTH_URL=https://mikka.example.com`. The value is an **origin**, without `/mikka`, credentials, a query, or a fragment. Forward `Host` unchanged, support WebSocket upgrades, and forward the original HTTPS scheme. The server rejects conflicting forwarded hosts or schemes. HTTP is accepted only for a configured loopback origin; use HTTPS for a network deployment.
 
@@ -35,23 +38,104 @@ If you publish a different host port, set both `MIKKA_PORT` and the port in `BET
 docker compose up -d --force-recreate app
 ```
 
+
+## Managed PostgreSQL: Neon (recommended)
+
+For operators who want a managed database rather than maintaining PostgreSQL on
+their own Linux host, we **recommend [Neon](https://neon.com/)**. It provides
+standard PostgreSQL with managed operations, connection pooling, database
+branching, and recovery options. Mikka does **not** require Neon or a Neon
+account: the bundled PostgreSQL Compose file above and other compatible
+PostgreSQL providers remain supported. This recommendation covers the database,
+not hosted Mikka compute, model credits, or access to any Mikka account.
+
+Use the independent [`docker-compose.neon.yml`](../docker-compose.neon.yml)
+from the **same Mikka release** as the application image. Unlike the default
+Compose file, it launches **the Mikka app and LiteLLM** and does not create a local
+PostgreSQL service. Keep the same `deploy/litellm` files beside it. This is a fresh-installation procedure; changing an existing
+installation's database URL does not migrate its data.
+
+1. [Create a Neon project](https://console.neon.tech/) and choose a region close
+   to your Linux host. Use a dedicated database/role for this deployment.
+2. In the Neon **Connect** dialog, select the same branch, database and role
+   twice. First copy the **pooled** connection string (the host includes
+   `-pooler`); disable *Connection pooling* to copy the **direct** string.
+   Keep the SSL parameters supplied by Neon. See [Neon's connection
+   guide](https://neon.com/docs/connect/connect-from-any-app) and
+   [pooled vs direct requirements](https://neon.com/docs/connect/connection-pooling).
+3. Alongside `docker-compose.neon.yml`, create a private `.env` file.
+   The values below are **placeholders**, not runnable credentials:
+
+   ```dotenv
+   BETTER_AUTH_URL=http://localhost:3000
+   MIKKA_LITELLM_MASTER_KEY=REPLACE_WITH_A_RANDOM_HEX_KEY
+   MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
+   MIKKA_DATABASE_URL=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID-pooler.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
+   MIKKA_DATABASE_URL_UNPOOLED=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
+   ```
+
+   Copy **both complete URLs** directly from your Neon console, including any
+   additional TLS parameters it supplies. They must address the **same**
+   database and role. The deployment maps `DATABASE_URL` to the pooled
+   `MIKKA_DATABASE_URL`, as the bundled Compose deployment does. Never add
+   either connection URL to source control, support messages or screenshots;
+   run `chmod 600 .env`. Be aware that `docker compose config` expands
+   variables and may print the credentials.
+4. Configure the LiteLLM aliases and upstream secrets, then start the app and LiteLLM:
+
+   ```sh
+   docker compose -f docker-compose.neon.yml up -d --wait
+   curl --fail-with-body http://localhost:3000/mikka/api/server
+   ```
+
+   A remote deployment still needs the HTTPS reverse proxy, `BETTER_AUTH_URL`,
+   and WebSocket forwarding described above. Configure an email sender or
+   your own OAuth provider before creating the first account. Continue with
+   [server entry and initial account](#server-entry-and-initial-account).
+
+**Why two connection URLs?** Regular requests can use Neon's PgBouncer
+transaction pool; persistent `LISTEN` sessions and session-level advisory
+locks **cannot**. Mikka's built-in realtime/device transport uses dedicated
+direct PostgreSQL sessions, so `MIKKA_DATABASE_URL_UNPOOLED` must be the
+non-pooler URL. The migration code also uses a direct connection. These are
+ordinary PostgreSQL features, not Neon-specific services.
+See [realtime and replica guidance](self-hosting-realtime.md).
+
+**Operations and recovery:** Neon stores your database; the Compose `app-data`
+volume still stores local encryption keys and Workflow state. Back up **both**
+the managed database (using an independently verified recovery/export plan)
+and the application volume. Neon branching/history retention is useful for
+recovery but is not a substitute for your separate application-key backup.
+Pin a published image revision before upgrades; run `docker compose -f
+docker-compose.neon.yml pull` and `docker compose -f docker-compose.neon.yml
+up -d --wait` after the backup. Never use `down --volumes` for an upgrade.
+For an existing local installation, first plan an explicit PostgreSQL
+`pg_dump`/`pg_restore` using **direct** connections and a stopped writer;
+this guide does not perform data migration automatically.
+
+Image CI checks the external Compose configuration offline, then starts the
+published Compose file with a private environment file against an independent
+PostgreSQL 17 database. The query role has no DDL privileges. The direct role
+runs migrations, and the server API reads the migrated database using the
+query role. The bundled PostgreSQL quickstart also runs the real daemon and
+packaged desktop tests. These checks use isolated PostgreSQL. On a live Neon
+deployment, also verify its TLS and pooler settings, signup, bot chat,
+WebSocket updates and daemon work on your own origin.
+
+
 ## Server entry and initial account
 
-`GET /mikka/api/server` is the public server-info contract. In this backend delivery, the default root entry returns the same JSON viewmodel; the minimal HTML layout is supplied by the UI owner using this contract. It includes the configured name/address, running version, client entry links, initial-account state and login-method configuration. A healthy response means the configured origin is valid and the auth-user existence query succeeded; it does not claim to have checked external providers, workers or every subsystem. A failed query returns HTTP 503 and `setup.state: unavailable`, never an empty-installation state.
+`GET /mikka/api/server` is the public server-info contract. Opening the server in a browser shows its status, server address, and official client links. JSON clients receive the same public installation information. It includes the configured name/address, running version, client entry links, initial-account state and login-method configuration. A healthy response means the configured origin is valid and the auth-user existence query succeeded; it does not claim to have checked external providers, workers or every subsystem. A failed query returns HTTP 503 and `setup.state: unavailable`, never an empty-installation state.
 
 On an empty database, `setup.state` is `required`. Configure SMTP/Resend or your own OAuth client, then use `setup.signUpUrl` to create the initial account. Registration uses the existing authentication flow and creates that person's workspace with the `admin` membership. There is no installation-wide administrator role and no special access to other people's workspaces. Existing installations report `ready`; upgrading does not assign a new administrator or alter existing accounts. Email/password being enabled is separate from the `emailDeliveryConfigured` flag, which reports configuration presence rather than a successful delivery test.
 
-The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry, so authentication does not accidentally open the older built-in workspace UI.
+The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry.
 
-### Optional older built-in UI
+### Connect an official client
 
-For compatibility, add `MIKKA_COMMUNITY_UI=1` to your private Compose configuration and recreate the app:
+Open the official Web app and choose **Change** on the sign-in screen or under account settings. Select **Self-hosted server**, enter the HTTPS address from `/mikka/api/server`, and continue to sign in on your server. The app lists saved accounts with their server addresses. Choose **Mikka Cloud** to return to the Cloud account. Official Desktop and iOS clients also accept a server address.
 
-```sh
-MIKKA_COMMUNITY_UI=1 docker compose up -d --force-recreate app
-```
-
-Unset the variable or set it to `0`, then recreate the app to restore server mode. Only the exact value `1` enables the older built-in UI; cloud deployments keep the official app regardless of this setting. This is a presentation switch, not an API authorization rule. It does not change your data, credentials, migrations, scheduler or gateway. The public UI source and its compilation stay in the repository; BoardUI/affectUI source and bundles do not enter the public image.
+The public image contains the API, daemon integration, and the pages needed for sign-in, password recovery, invitations, consent, and app handoffs. Upgrading uses the existing database and installation keys. Remove `MIKKA_COMMUNITY_UI` from older Compose configurations.
 
 ## Installation secrets and backups
 
@@ -70,6 +154,8 @@ MIKKA_EMAIL_FROM=Mikka <mikka@example.com>
 SMTP_URL=smtps://username:password@smtp.example.com:465
 ```
 
+Organization invitation links remain available for manual sharing by default. Only enable best-effort invitation email with `MIKKA_ORG_INVITE_EMAIL_ENABLED=true` after configuring the sender and the canonical application origin, and after approving mail usage. This does not send invitations to an attached Workspace or Project, does not guarantee mailbox delivery, and does not replace the one-time copyable link.
+
 Use your own Google or GitHub OAuth clients. Register callbacks on your exact origin:
 
 | Provider | Environment | Callback |
@@ -81,7 +167,7 @@ Use your own Google or GitHub OAuth clients. Register callbacks on your exact or
 
 ## Connect an official app
 
-Use a release with server selection and enter your server address from `GET /mikka/api/server`. The backend and shared connection contract are delivered independently from the official connection UI.
+Use a client with server selection. Enter the address shown on the server status page or returned by `GET /mikka/api/server`. The client checks protocol and minimum version compatibility before sign-in.
 
 | Client | Entry and address requirement |
 | --- | --- |
@@ -153,7 +239,8 @@ fails startup with `SELF_HOSTED_ORIGIN_INVALID` before database migration.
 
 Realtime updates use the server's built-in gateway. Allow WebSocket upgrades
 for `/mikka/v1/live/<channel>/socket` and the device gateway paths through your
-reverse proxy. Authenticated `/api/live/ticket` responses contain the actual
+reverse proxy. A device works only while it holds its gateway socket: a server
+without a device gateway has no devices, and there is no polling fallback. Authenticated `/api/live/ticket` responses contain the actual
 socket address; keep the base path when validating or opening it. See
 [self-hosted realtime and scheduling](self-hosting-realtime.md) for replica and
 external-Worker configuration.
@@ -217,9 +304,9 @@ and account so a notification cannot route into a different saved account.
 
 In **Settings → Models and subscriptions**, add your own provider API key, or connect your own Claude or ChatGPT subscription after configuring the subscription backend below. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.
 
-To supply the server's default OpenAI-compatible model, set `MIKKA_DEFAULT_MODEL_BASE_URL`, `MIKKA_DEFAULT_MODEL_API_KEY`, and `MIKKA_DEFAULT_MODEL_ID`. Use the provider's API base, including its version path where required. Provider charges go to your account. Without a configured default model, choose one of your own available models.
+Configure `MIKKA_LITELLM_URL` and `MIKKA_LITELLM_MASTER_KEY` for all managed model calls. The bundled Compose files set the internal URL and require a master key. Set default/title/Decision/Planning aliases and upstream credentials in LiteLLM; personal API keys also go through it. There is no direct-provider fallback. See [model configuration and migration](self-hosting-byok.md#必需的-litellm-模型出口).
 
-Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation.
+Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation. A daemon too old to hold a device session is refused on every device route (`426 daemonUpgradeRequired`); update it and sign in again ([decision 2026-11-17-2215](design/decisions/2026-11-17-2215-device-session-no-heartbeat.md)).
 
 For an E2B cloud computer, save your own E2B key in your account. This does not buy Mikka-hosted compute and does not charge Mikka credits.
 
@@ -267,7 +354,7 @@ To use your newly stored App for GitHub sign-in too, set `GITHUB_SIGN_IN_USE_APP
 
 Subscription connections use your own Infisical project or self-hosted Infisical instance to hold provider OAuth grants. PostgreSQL stores their metadata and references. A Mikka account or connection to Mikka cloud services is not required. The `CREDENTIAL_MASTER_KEY` used by the password vault does not configure subscription storage, and an existing Claude Code or Codex login on a machine is not imported into the server.
 
-The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:app` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
+The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:server` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
 
 Configure these server-only variables with values from **your own** Infisical installation. The standard two-identity configuration is:
 
@@ -298,7 +385,7 @@ The image acceptance check executes both packaged binaries and verifies their bu
 
 `MIKKA_EDITION` is read at runtime through `lib/edition.ts`. Its default is `community`; the only other accepted value is `cloud`. Invalid values fail configuration rather than silently choosing a billing mode. The same image can be used with a new origin without rebuilding its browser assets.
 
-Official Mikka production must explicitly set the non-secret `MIKKA_EDITION=cloud` selector in both the release build environment and Vercel Production before this default reaches production. The release job declares its build value and verifies the matching Vercel value; credentials still come from Infisical. Its Stripe checks, trial limits, reservation/settlement, and existing providers remain enabled. The previous domain redirect is separately configured with `MIKKA_LEGACY_APP_HOST`; it grants no authenticated access through the old host.
+Official Mikka Cloud production must explicitly set the non-secret `MIKKA_EDITION=cloud` selector in the trusted release build and deployed runtime. The legacy Vercel deployment retains the corresponding Vercel Production value while it still serves; the target Cloudflare release uses its own verified container and secret bindings instead. The release job declares its build value and verifies the matching Vercel value; credentials still come from Infisical. Its Stripe checks, trial limits, reservation/settlement, and existing providers remain enabled. The previous domain redirect is separately configured with `MIKKA_LEGACY_APP_HOST`; it grants no authenticated access through the old host.
 
 Optional Mikka cloud services are a separate connection. The community edition remains usable without connecting them. The hosted-compute resale option is not included; its pricing decision is tracked separately in #1569.
 
@@ -314,7 +401,7 @@ node scripts/self-hosted-smoke.mjs
 
 The build uses the pinned pnpm lockfile, Vite frontend, Nitro Node server, and Node 24. It does not run migrations at image build time and does not require production credentials. `.dockerignore` excludes local environment files and private hosted UI. The runtime image contains the traced server dependencies and public assets, runs as an unprivileged user, and starts from its standalone output directory.
 
-The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 17 database, checks migrations/startup health, verifies public configuration and static assets, and restarts the same persisted installation. A successful main build publishes `ghcr.io/alexj11324/mikka:<commit-sha>` and updates `latest`; release tags publish matching tags. Pin the SHA or release tag in `.env` before an upgrade, back up the two volumes, then run `docker compose pull` and `docker compose up -d --wait`.
+Choose a published image and its matching Compose file. Pin the image digest or published release tag in `.env`. Back up the two volumes before you run `docker compose pull` and `docker compose up -d --wait`. For existing stable releases, see the [host-side upgrade guide](self-hosted-updates.md).
 
 `/mikka/api/version` reports the compiled revision. `docker compose ps` reports health. Startup logs include migration names and bounded error codes, never generated installation keys.
 
@@ -323,3 +410,5 @@ The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 1
 The server works without a Mikka account. For optional official GitHub, iOS push and hosted models, set `MIKKA_SERVER_ADMIN_USER_IDS` to the explicit local administrator IDs and use Settings → Mikka Cloud. Each person binds their own cloud account under Settings → Account, or the administrator supplies a team server key. The account settings show which credits apply. See [the public API contract](cloud-services-api.md).
 
 See [BYOK services](self-hosting-byok.md) for SMTP, S3, local vault and default-model configuration, and [builtin realtime](self-hosting-realtime.md) for multi-instance operation.
+
+A public checkout selects the server-only renderer for `pnpm build`, `pnpm build:app` and `pnpm --filter @mikka/frontend build`. Official Web and Desktop builds require a separate private Git checkout and its matching revision. Public CI explicitly requests `--public-test-fixture` for the unlicensed renderer used by the existing loopback and package tests. Its manifest identifies it as a test fixture.

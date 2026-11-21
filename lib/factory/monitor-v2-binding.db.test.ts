@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { createVercelPublicationAdapter, MIKKA_VERCEL } from "./vercel-publication";
+import { createVercelPublicationAdapter, MIKKA_VERCEL } from "../../tests/helpers/factory-vercel-publication";
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
 import { createFactoryMonitorConsumers } from "./monitor-lifecycle";

@@ -7,6 +7,7 @@ import {
 } from '@mikka/protocol/coding-workspace'
 import { maskDeep, type Masker } from '../secrets/mask'
 import { validateDiffReceipt } from './diff/receipt'
+import { isWorkspaceGitRequest, validateGitReceipt } from './git/receipt'
 
 /** Validate in memory and return only the public result. Checking the complete
  * source prevents reconstructing a multiline secret through separate ranges.
@@ -17,6 +18,7 @@ export function validateWorkspaceReceipt(request: WorkspaceReadRequest, identity
   if (!parsed.success) return null
   const { result, files } = parsed.data
   if (!matchesWorkspaceResponse(request, identity, result)) return null
+  if (isWorkspaceGitRequest(request)) return validateGitReceipt(request, parsed.data, mask)
   if (request.kind === 'diff_snapshot' || request.kind === 'diff_file') return validateDiffReceipt(request, parsed.data, mask)
   if (parsed.data.blobs?.length) return null
   const textFiles = !result.ok ? [] : result.kind === 'file' ? (result.format === 'text' ? [result] : [])

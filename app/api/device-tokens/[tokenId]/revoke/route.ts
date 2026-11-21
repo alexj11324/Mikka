@@ -1,11 +1,10 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { revokeDeviceCredential } from '@/lib/device-revocation'
 
-export const dynamic = 'force-dynamic'
 
 /** Only the owner's normal application session can revoke a credential. */
 async function POSTBody(request: Request, { params }: { params: Promise<{ tokenId: string }> }) {

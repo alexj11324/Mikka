@@ -16,9 +16,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, Languages, LogOutIcon, Moon, Settings, Sun } from "lucide-react"
+import { ChevronsUpDown, Languages, LogOut, Moon, Settings, Sun } from "@/components/icons"
 import { useTheme } from 'next-themes'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 
 import { usePathname, useRouter } from '@/i18n/navigation'
 
@@ -54,7 +54,7 @@ export function NavUser({
               <span className="truncate font-medium">{user.name}</span>
               <span className="truncate text-xs">{user.email}</span>
             </div>
-            <ChevronsUpDownIcon className="ml-auto" />
+            <ChevronsUpDown className="ml-auto" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="min-w-56"
@@ -86,7 +86,7 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onSignOut} disabled={signingOut}>
-                <LogOutIcon />{signingOut ? t('signingOut') : t('signOut')}
+                <LogOut />{signingOut ? t('signingOut') : t('signOut')}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

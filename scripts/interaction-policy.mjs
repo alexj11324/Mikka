@@ -1,13 +1,35 @@
+import { existsSync, readFileSync } from 'node:fs'
 import ts from 'typescript'
 
 const actionControls = /^(?:button|Button|SidebarMenu(?:Sub)?Button|SidebarMenu(?:Sub)?Action|InputGroupButton|DropdownMenuItem|ContextMenuItem|MenubarItem|CommandItem|NavigationMenuLink)$/
 const behaviorControls = /^(?:MorphPopoverTrigger|(?:Dialog|AlertDialog|Sheet|Drawer)(?:Trigger|Close|Cancel)|(?:DropdownMenu|ContextMenu|Menubar|Popover|HoverCard|Collapsible|Accordion|Select|Combobox|NavigationMenu)(?:Trigger|SubTrigger)|(?:Tabs|ToggleGroup|RadioGroup)(?:Trigger|Item)|Toggle|SidebarTrigger|SidebarRail|KanbanItemHandle)$/
 const ignoredCalls = /^(?:console\.(?:log|info|debug|warn|error)|(?:[\w.]+\.)?(?:preventDefault|stopPropagation|stopImmediatePropagation))$/
+// A toast or native alert conveys feedback; on its own it never performs the button's command.
+// A handler that mutates state and then reports its result remains a valid action.
+const notificationOnlyCalls = /^(?:(?:window\.)?alert|toast(?:\.(?:info|success|warning|warn|error|loading|message|custom))?)$/
 const placeholderText = /(?:coming\s+soon|not\s+implemented|待实现|尚未实现|敬请期待|功能开发中)/i
 
-export function auditInteractions(file, text) {
+export const busyMessage = '按钮的点击会 await 异步结果，必须传 `busy`：等待中显示正在处理，且不再接受第二次点击。'
+// 菜单项、链接这些控件不收 `busy`，让它们传一个不存在的属性只会变成类型错误。
+export const busyElsewhereMessage = '这个控件的点击会 await 异步结果，但它没有 `busy` 可传；改用 `Button` 并传 `busy`，让等待中的状态看得见。'
+
+// 今天已有的债务，按文件计数，只减不增：多了失败，少了也失败，逼着随修随降。
+// 拿掉一处就把它改小（0 处就删掉这一行），别让 baseline 变成冻结的名单。
+export const asyncPressBaseline = JSON.parse(readFileSync(new URL('./interaction-busy-baseline.json', import.meta.url), 'utf8'))
+
+export function auditInteractions(file, text, baseline = asyncPressBaseline) {
+  return audit(file, text, false, baseline)
+}
+
+// Platform adapters and paid blocks retain their own controls and presentation.
+export function auditActionBindings(file, text) {
+  return audit(file, text, true, {})
+}
+
+function audit(file, text, bindingsOnly, baseline) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), iconImports = new Set(), declarations = new Map(), forms = new Map()
+  const nativePressables = new Set(), nativeAlerts = new Set(), expoLinks = new Set(), busyPresses = []
   const opening = node => node && (ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null)
   const attr = (node, name) => node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === name)
   const expression = attribute => attribute?.initializer && (ts.isJsxExpression(attribute.initializer) ? attribute.initializer.expression : attribute.initializer)
@@ -20,8 +42,13 @@ export function auditInteractions(file, text) {
   function index(node) {
     if (ts.isImportDeclaration(node) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
       for (const spec of node.importClause.namedBindings.elements) {
-        imports.set(spec.name.text, spec.propertyName?.text ?? spec.name.text)
-        if (ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'lucide-react') iconImports.add(spec.name.text)
+        const original = spec.propertyName?.text ?? spec.name.text
+        imports.set(spec.name.text, original)
+        if (node.moduleSpecifier.text === 'react-native' && /^(?:Button|Pressable|TouchableOpacity|TouchableHighlight)$/.test(original)) nativePressables.add(spec.name.text)
+        if (node.moduleSpecifier.text === 'react-native' && original === 'Alert') nativeAlerts.add(spec.name.text)
+        if (node.moduleSpecifier.text === 'expo-router' && original === 'Link') expoLinks.add(spec.name.text)
+        // Mikka's own glyphs (2026-11-18-1900) and a task's status icon are both drawn as icons.
+        if (ts.isStringLiteral(node.moduleSpecifier) && ['lucide-react', '@/components/icons'].includes(node.moduleSpecifier.text)) iconImports.add(spec.name.text)
       }
     }
     if ((ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) || ts.isFunctionDeclaration(node) && node.name) {
@@ -49,6 +76,36 @@ export function auditInteractions(file, text) {
     while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isNonNullExpression(node))) node = node.expression
     return node
   }
+  // 异步按压：按钮已经交出答案之前，得让人看见它在做事。
+  function awaits(node) {
+    if (!node) return false
+    if (ts.isAwaitExpression(node)) return true
+    let found = false
+    ts.forEachChild(node, child => { if (awaits(child)) found = true })
+    return found
+  }
+  function isAsyncFunction(node) {
+    return !!node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword) || awaits(node.body)
+  }
+  function isAsyncPress(node, seen = new Set()) {
+    node = unwrap(node)
+    if (!node) return false
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return isAsyncFunction(node)
+    if (!ts.isIdentifier(node)) return false
+    const entry = binding(node)
+    if (!entry || seen.has(entry)) return false
+    const visited = new Set([...seen, entry])
+    if (ts.isFunctionDeclaration(entry)) return isAsyncFunction(entry)
+    return ts.isVariableDeclaration(entry) && isAsyncPress(entry.initializer, visited)
+  }
+  // 展开的属性可能带着 `busy`，看不见就不算漏。
+  function suppliesBusy(node) {
+    return node.attributes.properties.some(property => ts.isJsxSpreadAttribute(property) || ts.isJsxAttribute(property) && property.name.getText(source) === 'busy')
+  }
+  // 带 render/asChild 的宿主把按压交给它渲染出来的那个元素：busy 落在谁身上由调用方决定，这里不猜。
+  function delegatesPress(node) {
+    return ['render', 'asChild'].some(name => !!attr(node, name))
+  }
   function hasEffects(node, seen) {
     node = unwrap(node)
     if (!node || ts.isIdentifier(node) || ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isThrowStatement(node)) return false
@@ -72,6 +129,15 @@ export function auditInteractions(file, text) {
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return hasEffects(node.body, seen)
     if (ts.isCallExpression(node)) {
       const call = node.expression.getText(source)
+      const nativeNotice = ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'alert'
+        && nativeAlerts.has(node.expression.expression.getText(source)) && node.arguments.length < 3
+      if (notificationOnlyCalls.test(call) || nativeNotice) {
+        // A localized label is feedback. An awaited command can supply the text after completing its action.
+        return node.arguments.some(argument => {
+          const value = unwrap(argument)
+          return ts.isAwaitExpression(value) && hasEffects(value.expression, seen)
+        })
+      }
       if (ignoredCalls.test(call) || /^Promise\.(?:resolve|reject)$/.test(call) && !node.arguments.some(arg => hasEffects(arg, seen))) return false
       if (node.arguments.some(arg => ts.isStringLiteralLike(arg) && placeholderText.test(arg.text))) return false
       if (ts.isIdentifier(node.expression) && binding(node.expression)) return meaningful(node.expression, seen)
@@ -141,9 +207,32 @@ export function auditInteractions(file, text) {
     const host = opening(unwrap(expression(attr(node, 'render'))))
     return !!host && (realHref(host) || hasAction(host))
   }
+  function checkAdapterBindings(tag) {
+    const name = nameOf(tag)
+    // A non-action DOM container may absorb clicks, for example inside a portal.
+    if (/^[a-z]/.test(name) && !['button', 'a', 'input', 'select'].includes(name)
+      && !['button', 'link', 'menuitem'].includes(literal(expression(attr(tag, 'role'))))) return
+    const parents = surrounding(tag)
+    const native = nativePressables.has(tag.tagName.getText(source))
+    const isLinkChild = parents.some(parent => expoLinks.has(parent.tagName.getText(source)) && attr(parent, 'asChild') && realHref(parent))
+    const inTrigger = parents.some(parent => behaviorControls.test(nameOf(parent)))
+    const handlers = ['onClick', 'onSelect', 'onPress', 'onLongPress'].map(key => attr(tag, key)).filter(Boolean)
+    for (const handler of handlers) {
+      if (!meaningful(expression(handler)) && !isLinkChild && !inTrigger) {
+        add(handler, 'interaction/no-placeholder-action', '操作回调仅反馈或没有可执行动作。')
+      }
+    }
+    // An Expo Link or forwarded PressableProps can own the native action.
+    const button = name === 'Button' || literal(expression(attr(tag, 'accessibilityRole'))) === 'button'
+    if (native && button && !attr(tag, 'onPress') && !attr(tag, 'onLongPress') && !isLinkChild && !tag.attributes.properties.some(ts.isJsxSpreadAttribute)
+      && !['onPressIn', 'onPressOut'].some(key => meaningful(expression(attr(tag, key))))) {
+      add(tag, 'interaction/no-dead-control', '原生按钮没有按压、手势或导航操作。')
+    }
+  }
   function visit(node) {
     const tag = opening(node)
-    if (tag) {
+    if (tag && bindingsOnly) checkAdapterBindings(tag)
+    else if (tag) {
       const name = nameOf(tag), parents = surrounding(tag)
       const role = literal(expression(attr(tag, 'role')))
       const intrinsic = /^[a-z]/.test(name)
@@ -161,6 +250,8 @@ export function auditInteractions(file, text) {
         const renderParent = tag.parent && ts.isJsxExpression(tag.parent) && ts.isJsxAttribute(tag.parent.parent) && tag.parent.parent.name.getText(source) === 'render' ? tag.parent.parent.parent.parent : null
         const composed = !!renderParent && hasAction(renderParent) || parents.some(parent => behaviorControls.test(nameOf(parent)) || nameOf(parent) === 'Slot' && hasAction(parent))
         for (const handler of handlers) if (!meaningful(expression(handler)) && !composed) add(handler, 'interaction/no-placeholder-action', '按钮动作为空、仅日志/拦截事件或占位提示；必须接入实际功能。')
+        // 动作由外层 render 宿主或触发组件承担时，按压不在这里，busy 也不该记在这里。
+        if (!composed && !delegatesPress(tag) && !suppliesBusy(tag) && handlers.some(handler => isAsyncPress(expression(handler)))) busyPresses.push(tag)
         const navigation = realHref(tag) || renderedNavigation(tag)
         const unavailable = !!attr(tag, 'disabled') && (literal(expression(attr(tag, 'data-feature-flag'))) ?? '').startsWith('mikka-upcoming-') && expression(attr(tag, 'data-feature-implemented'))?.kind === ts.SyntaxKind.FalseKeyword && !!attr(tag, 'aria-describedby') && !!attr(tag, 'title')
         if (!hasAction(tag) && !behaviorControls.test(name) && !composed && !formAction && !(type === 'reset' && form) && !navigation && !unavailable) {
@@ -173,5 +264,35 @@ export function auditInteractions(file, text) {
     ts.forEachChild(node, visit)
   }
   visit(source)
+  // baseline 里记的就是这个文件今天还能有几处：多了报新增的，少了要求把数字降下来。
+  if (!bindingsOnly) {
+    const allowed = baseline[file] ?? 0
+    if (busyPresses.length > allowed) {
+      for (const node of busyPresses.slice(allowed)) {
+        const message = nameOf(node) === 'Button' ? busyMessage : busyElsewhereMessage
+        add(node, 'interaction/async-press-needs-busy', `${message}（baseline 只允许这个文件 ${allowed} 处，现在 ${busyPresses.length} 处）`)
+      }
+    } else if (busyPresses.length < allowed) {
+      add(source, 'interaction/async-press-needs-busy', `baseline 记着这个文件有 ${allowed} 处异步按压还没传 \`busy\`，实际只剩 ${busyPresses.length} 处；请把 scripts/interaction-busy-baseline.json 里的这一行改成 ${busyPresses.length}${busyPresses.length ? '' : '（0 处就删掉这一行）'}，让这笔债只减不冻。`)
+    }
+  }
   return diagnostics
+}
+
+/**
+ * baseline 的每一行都得还对得上：文件还在、还在审、数目也还是那个数。
+ * 只在被审到的文件里比较，删掉或搬走的文件就没人问了，所以这条单独走一遍。
+ */
+export function staleBaselineEntries(baseline = asyncPressBaseline) {
+  const stale = []
+  for (const [file, allowed] of Object.entries(baseline)) {
+    if (!Number.isInteger(allowed) || allowed < 1) { stale.push(`${file}: baseline 的计数是大于 0 的整数；把这一行删掉`); continue }
+    if (/^components\/(?:ui|reui)\//.test(file)) { stale.push(`${file}: 已经不在这条策略的检查范围内；删掉这一行`); continue }
+    if (!existsSync(file)) { stale.push(`${file}: 文件不在了；删掉这一行`); continue }
+    const found = auditInteractions(file, readFileSync(file, 'utf8'), {}).length
+    if (found === 0) stale.push(`${file}: 一处都不剩了；删掉这一行`)
+    else if (found < allowed) stale.push(`${file}: 现在 ${found} 处，baseline 记着 ${allowed} 处；把它改成 ${found}`)
+    else if (found > allowed) stale.push(`${file}: 现在 ${found} 处，baseline 只记了 ${allowed} 处；先修掉多出来的再改数字`)
+  }
+  return stale
 }

@@ -1,7 +1,6 @@
 import { ARTIFACT_CONTENT_TYPES, artifactFileName } from '@/lib/artifacts/limits'
 import { routeArtifact } from '@/lib/artifacts/route'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/artifacts/:id/versions/:n/download`: the file as it was handed over. */
 export async function GET(request: Request, { params }: { params: Promise<{ artifactId: string; version: string }> }) {

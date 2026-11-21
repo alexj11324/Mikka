@@ -7,7 +7,7 @@ import { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps } from '
 export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
 
 /** Expo Web: the same list without the keyboard controller, which has no browser counterpart. A short chat still sits against the composer. */
-function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, onScrollUnderBar, anchorIndex, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
+function ChatMessageListInner<T>({ data, extraData, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, onScrollUnderBar, anchorIndex, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
   const list = useRef<LegendListRef>(null)
   // The anchored space counts the rows after the anchor but not the footer (the waiting line, notices): the anchor
   // sits that much lower so the footer does not push it above the top.
@@ -27,6 +27,7 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
       ref={list}
       style={styles.fill}
       data={data}
+      extraData={extraData}
       keyExtractor={keyOf}
       renderItem={({ item, index }) => <View style={styles.row}>{renderItem(item, index)}</View>}
       recycleItems={false}

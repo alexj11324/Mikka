@@ -1,4 +1,5 @@
 import { runChanged } from './live/panels'
+import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import { serverRunFailure } from './run-failure-details'
 import { CodedError } from '@mikka/protocol/coded-error'
 import 'server-only'
@@ -25,6 +26,7 @@ import { quotaContinuationNote, quotaContinuationPrompt } from '@/lib/run-retry'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { RunApiKey } from '@/lib/run-credential-source'
 import { runListChanged } from '@/lib/live/lists'
+import { resolveRunOrigin } from '@/lib/run-origin'
 
 // A subscription's quota ran out mid-run: the daemon or hosted runner reports
 // `quota_exhausted` (packages/daemon/src/runs/quota-exhausted.ts). When
@@ -172,8 +174,13 @@ async function queueDeviceContinuation(tx: Tx, query: Query, run: Run, key: RunA
   const id = crypto.randomUUID()
   const copied = quotaContinuationPrompt(run)
   const { prompt } = copied
+  // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+  scheduleThreadTitle(tx, id, run.userId, 'created')
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
+    // The continuation keeps the paused run's entry; a legacy run keeps the
+    // host's automatic recovery as its origin rather than guessing 'web'.
+    ...resolveRunOrigin({ sourceRun: run, defaultOrigin: run.source === 'mcp' ? 'api' : 'automation' }),
     agentDefinition: await continuationDefinition(run, prompt, key), deviceId: run.deviceId, deviceRepoId: run.deviceRepoId,
     status: 'queued', kind: run.kind, baseBranch: run.baseBranch, ...copied, attempt: run.attempt, retryOf: run.id,
   })
@@ -220,6 +227,9 @@ export async function queueCloudQuotaContinuation(hint: Run, cloud: CloudBinding
         if (!target) throw new ActionFailureError('runInvalid')
         const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl, client)).id : target.repoId
         const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
+          // The quota continuation keeps the paused run's entry; a legacy run
+          // keeps the host's automatic recovery as its origin, never 'web'.
+          ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
           allowLocalRecovery: run.agentDefinition?.allowLocalRecovery, sourceEventId: run.agentDefinition?.allowLocalRecovery ? request?.sourceEventId : undefined,
           executionNote: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
           // Preserve the selected model and credential; tenant admission grants neither.
@@ -347,7 +357,6 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
       const key = mode === 'apiKey' ? await quotaKey(client, run, scope) ?? null : null
       if (mode === 'apiKey' && !key) throw new ActionFailureError('apiKeyNotFound')
       if (scope.cloud) { cloud = { run, plan: scope, key }; return }
-      await assertRunProjectResources(client, run)
       if (!await endPausedRun(tx, run.id, userId, workspaceId)) throw new ActionFailureError('runNotActive')
       const retryRunId = await queueDeviceContinuation(tx, client, run, key)
       if (key) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, scope.from, key, retryRunId, run.quotaResetsAt?.toISOString() ?? null))
@@ -361,7 +370,10 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
   if (!pending) throw new ActionFailureError('runNotActive')
   let retryRunId: string
   try { retryRunId = await queueCloudQuotaContinuation(pending.run, pending.plan.cloud!, pending.key) }
-  catch (error) { if (error instanceof ActionFailureError) throw error; throw new ActionFailureError('runInvalid') }
+  catch (cause) {
+    if (cause instanceof ActionFailureError) throw cause
+    throw new ActionFailureError('runInvalid', undefined, undefined, { cause })
+  }
   await db.transaction(async tx => {
     const ended = await endPausedRun(tx, pending.run.id, userId, workspaceId)
     if (ended && pending.key)

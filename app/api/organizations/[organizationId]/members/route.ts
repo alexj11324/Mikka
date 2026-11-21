@@ -1,11 +1,16 @@
 import { z } from 'zod'
 import { freshSessionRoute } from '@/lib/fresh-session'
-import { addOrganizationMember, updateOrganizationMember, removeOrganizationMember } from '@/lib/governance/organizations'
+import { listOrganizationMembers, addOrganizationMember, updateOrganizationMember, removeOrganizationMember } from '@/lib/governance/organizations'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { organizationSession } from '@/lib/enterprise/http'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
+export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
+  const { organizationId } = await context.params
+  const session = await organizationSession(request, organizationId)
+  const includeDisabled = z.enum(['true', 'false']).nullable().parse(new URL(request.url).searchParams.get('includeDisabled'))
+  return listOrganizationMembers(organizationId, session.user.id, includeDisabled === 'true')
+}))
 export const POST = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const { organizationId } = await context.params
   const session = await organizationSession(request, organizationId)

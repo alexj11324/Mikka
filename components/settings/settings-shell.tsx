@@ -1,8 +1,8 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { useSWRConfig } from 'swr'
 import { endSession } from '@/lib/auth-client'
@@ -11,8 +11,6 @@ import { SettingsFrame } from '@ui-slot/settings-frame'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { SettingsView } from './settings-view'
 import { resolveSettingsSection } from '@/lib/settings-sections'
-import { TeamDirectory } from '@/components/teams/team-directory'
-import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory, requestShellBrowser, requestShellSearch } from '@/lib/settings-navigation'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 
@@ -21,7 +19,7 @@ export { SettingsFrame }
 
 /** Where a rail item lands when it is chosen from Settings. */
 export function railHref(destination: RailDestination) {
-  return workspaceLink({ section: destination === 'chats' ? 'coordinator' : destination === 'board' ? 'all-issues' : destination })
+  return workspaceLink({ section: destination === 'chats' ? 'conversations' : destination === 'board' ? 'all-issues' : destination })
 }
 
 /**
@@ -38,7 +36,7 @@ export function SettingsRouteContent({ user, defaultWorkspaceId, googleEnabled =
   const params = useSearchParams()
   const workspaceId = params.get('workspace') ?? defaultWorkspaceId
   const section = resolveSettingsSection(pathname, params.get('section'))
-  return <SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} selectedTeamId={params.get('team') ?? undefined} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} accountError={accountError}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} embedded />}</SettingsView>
+  return <SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} selectedTeamId={params.get('team') ?? undefined} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} accountError={accountError} />
 }
 
 export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false, onRail: onRailOverride, onSearch: onSearchOverride, onBrowser: onBrowserOverride }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; googleEnabled?: boolean; onRail?: (destination: RailDestination) => void; onSearch?: () => void; onBrowser?: () => void }) {

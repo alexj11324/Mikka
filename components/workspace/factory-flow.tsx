@@ -2,8 +2,8 @@
 
 import { useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
+import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type IconGlyph } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemDescription } from '@/components/ui/item'
@@ -40,7 +40,7 @@ export function useFactoryFlow(taskId: string, detail: AcceptanceDetail | undefi
   return { ...result, flow: enabled ? readFlow(result.data) : null }
 }
 
-const NEEDS_YOU_ICONS: Record<NeedsYouKind, LucideIcon> = {
+const NEEDS_YOU_ICONS: Record<NeedsYouKind, IconGlyph> = {
   spec_review: ClipboardList, question: MessageCircleQuestion, pr_review: GitPullRequest, blocked: CircleAlert, failed: CircleX,
 }
 
@@ -162,7 +162,7 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
             {shownError?.kind === 'unknown' ? t('card.retryApprove') : t('card.approveSpec')}
           </Button>
         </>}
-        {kind === 'question' && flow.botId && <Button size="sm" onClick={() => navigate({ section: 'coordinator', bot: flow.botId, issue: null })}><MessageCircleQuestion data-icon="inline-start" aria-hidden="true" />{t('card.answer')}</Button>}
+        {kind === 'question' && <Button size="sm" onClick={() => navigate({ section: 'coordinator', bot: flow.botId, issue: null })}><MessageCircleQuestion data-icon="inline-start" aria-hidden="true" />{t('card.answer')}</Button>}
         {flow.acceptance
           // E2 (decision 2026-11-06-1615): a PR's report opens as the PR it reviews, 「查看 PR #1288」.
           ? <Button size="sm" onClick={() => openArtifact(flow.acceptance!.artifactId)}>{prNumber ? t('card.viewPullRequest', { number: prNumber }) : <><FileCheck data-icon="inline-start" aria-hidden="true" />{t('card.openAcceptance')}</>}</Button>

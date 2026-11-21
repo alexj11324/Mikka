@@ -3,7 +3,7 @@ import { test, expect, register } from './fixtures'
 
 // R-35 (decision 2026-11-01-1240): rail items are icons only; each name is a
 // tooltip on hover and the button's accessible name. #747 brought labels back once.
-const NAMES = ['主页', '建议', '看板', '插件', 'Artifact'] as const
+const NAMES = ['主页', '建议', '任务', '插件', 'Artifact'] as const
 
 async function shoot(page: Page, testInfo: TestInfo, name: string) {
   const box = (await page.getByRole('navigation', { name: '主导航', exact: true }).boundingBox())!
@@ -35,8 +35,8 @@ test('左侧导航只显示图标，名字在 hover 时以提示出现', async (
     await page.mouse.move(800, 450)
     await expect(tooltip).toHaveCount(0)
     await shoot(page, testInfo, `rail-default-${scheme}`)
-    await rail.getByRole('button', { name: '看板', exact: true }).hover()
-    await expect(tooltip).toHaveText('看板')
+    await rail.getByRole('button', { name: '任务', exact: true }).hover()
+    await expect(tooltip).toHaveText('任务')
     await shoot(page, testInfo, `rail-hover-${scheme}`)
   }
 })

@@ -31,7 +31,7 @@ const define = {
 
 await rm(outdir, { recursive: true, force: true })
 await mkdir(outdir, { recursive: true })
-await buildRenderer({ outdir: resolve(outdir, 'renderer') })
+await buildRenderer({ outdir: resolve(outdir, 'renderer'), publicTestFixture: process.argv.includes('--public-test-fixture') })
 
 const common = {
   bundle: true,

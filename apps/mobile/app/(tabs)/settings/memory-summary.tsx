@@ -9,7 +9,7 @@ import { ArrowUp } from 'lucide-react-native'
 import { Markdown } from '@/components/Markdown'
 import { SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
-import { api } from '@/lib/api'
+import { eveChatClient } from '@/lib/eve-client'
 import { openChat } from '@/lib/navigate'
 import { useSettings } from '@/lib/settings'
 import { colors, font, lift } from '@/lib/theme'
@@ -37,7 +37,8 @@ export default function MemorySummaryScreen() {
     sending.current = true; setBusy(true); setFailed(false)
     // A retry reuses one submission identity when the response was lost.
     try {
-      await api('/api/mobile/chat', { method: 'POST', body: { text: `关于你记住的事：${value}`, submissionId: submission.current.id } })
+      const { session } = await eveChatClient().sessions.create()
+      await session.send(`关于你记住的事：${value}`, { headers: { 'x-mikka-submission-id': submission.current.id } })
       apiCache.commit(context, () => {
         if (!mounted.current) return
         setText(current => current.trim() === value ? '' : current)

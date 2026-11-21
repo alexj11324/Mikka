@@ -56,6 +56,25 @@ dbTest('one read of a device\'s runs finds its stops, messages and queued runs',
     ])
     assert.deepEqual((await deviceWork(device, [], { queued: false })).queuedRuns, [], 'a device with scheduling off is offered no runs')
     assert.deepEqual(await deviceWork(other, [ids.elsewhere], { queued: true }), { commands: [], queuedRuns: [] })
+
+    // Taken back by the server (decision 2026-11-17-2215): a session close ended the lease,
+    // or recovery reclaimed the run as lost. A daemon that reconnects learns it here.
+    const ended = randomUUID(), reclaimed = randomUUID(), longAgo = randomUUID()
+    await run(ended, other, 'running'); await run(reclaimed, other, 'failed'); await run(longAgo, other, 'failed')
+    await pool.query(`update agent_runs set "leaseExpiresAt"=now()-interval '1 second' where id=$1`, [ended])
+    await pool.query(`update agent_runs set "leaseExpiresAt"=now()-interval '2 seconds',"stopReason"='device_lost' where id=$1`, [reclaimed])
+    await pool.query(`update agent_runs set "leaseExpiresAt"=now()-interval '1 hour',"stopReason"='device_lost' where id=$1`, [longAgo])
+    const back = await deviceWork(other, [ids.elsewhere], { queued: true })
+    assert.deepEqual(new Set(back.commands), new Set([{ kind: 'stop', runId: ended }, { kind: 'stop', runId: reclaimed }]))
+    assert.deepEqual(back.commands.map(command => command.runId).sort(), [ended, reclaimed].sort(), 'only recent lease ends; nothing else for the taken-back runs')
+
+    // A stop that ends the lease at once (a policy change, a revocation) is
+    // still delivered once, although the run is both stopped and taken back.
+    const policyStopped = randomUUID()
+    await run(policyStopped, other, 'running', true)
+    await pool.query(`update agent_runs set "leaseExpiresAt"=now() where id=$1`, [policyStopped])
+    const stopped = await deviceWork(other, [ids.elsewhere, ended, reclaimed], { queued: true })
+    assert.deepEqual(stopped.commands, [{ kind: 'stop', runId: policyStopped }])
   })
 })
 
@@ -99,6 +118,11 @@ dbTest('the idle check answers in one statement, finds the same work and pending
     await pool.query(`update run_messages set "deliveredAt"=now() where "runId"=$1`, [run])
     await pool.query(`update agent_runs set "stopRequestedAt"=now() where id=$1`, [run])
     assert.equal(await check(), true, 'a stop to deliver')
+    await pool.query(`update agent_runs set "stopRequestedAt"=NULL,status='failed',"stopReason"='device_lost',"leaseExpiresAt"=now()-interval '1 second' where id=$1`, [run])
+    assert.equal(await check(), true, 'a run taken back from the device is a stop to deliver')
+    await pool.query(`update agent_runs set "leaseExpiresAt"=now()-interval '1 hour' where id=$1`, [run])
+    assert.equal(await check(), false, 'an old lease end is not repeated forever')
+    await pool.query(`update agent_runs set status='running',"stopRequestedAt"=now(),"stopReason"=NULL,"leaseExpiresAt"=now()+interval '1 minute' where id=$1`, [run])
 
     const update = randomUUID(), restart = randomUUID()
     assert.equal((await idle({ skipDeviceCommands: [] })).deviceCommand, null, 'no device command pending')

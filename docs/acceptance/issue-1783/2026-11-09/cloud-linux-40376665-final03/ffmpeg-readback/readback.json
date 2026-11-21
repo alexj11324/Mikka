@@ -1,0 +1,163 @@
+{
+  "kind": "synthetic-real-ffmpeg-regression",
+  "source": {
+    "size": 100004592,
+    "sha256": "a89b678158a3cfe4951b3603f3554cbbd578ad32ad3705ce02dd3bae753208c6"
+  },
+  "output": {
+    "size": 3780,
+    "sha256": "2b00d582dbcce67936cb465a913a9249a245072a1058fe0de66bd8a020c62ccb"
+  },
+  "sourceProbe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 160,
+        "height": 120,
+        "nb_frames": "200"
+      }
+    ],
+    "format": {
+      "duration": "20.000000",
+      "size": "100004592"
+    }
+  },
+  "outputProbe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 160,
+        "height": 120,
+        "nb_frames": "83"
+      }
+    ],
+    "format": {
+      "duration": "5.533333",
+      "size": "3780"
+    }
+  },
+  "processing": {
+    "durationMs": 5533,
+    "size": 3780,
+    "steps": [
+      {
+        "atMs": 1500,
+        "label": "First action",
+        "source": "action",
+        "durationMs": 1000
+      },
+      {
+        "atMs": 5000,
+        "label": "Final action",
+        "source": "action",
+        "durationMs": 1000
+      }
+    ],
+    "processing": {
+      "version": 1,
+      "originalDurationMs": 20000,
+      "originalSize": 100004592,
+      "originalSha256": "a89b678158a3cfe4951b3603f3554cbbd578ad32ad3705ce02dd3bae753208c6",
+      "trimmedMs": 14500,
+      "retainedMs": 5500,
+      "windows": [
+        {
+          "startMs": 0,
+          "endMs": 3000
+        },
+        {
+          "startMs": 17500,
+          "endMs": 20000
+        }
+      ],
+      "width": 160,
+      "height": 120
+    }
+  },
+  "fullInputDecode": true,
+  "fullOutputDecode": true,
+  "firstPixel": [
+    254,
+    0,
+    0
+  ],
+  "lastPixel": [
+    0,
+    0,
+    255
+  ],
+  "productToolchain": {
+    "id": "ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8",
+    "version": "7.0.2-static",
+    "binaries": {
+      "ffmpeg": "/opt/mikka/runtime/capture-tools/ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8/ffmpeg",
+      "ffprobe": "/opt/mikka/runtime/capture-tools/ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8/ffprobe"
+    },
+    "systemPathAvailable": false
+  },
+  "copiedHelper": {
+    "size": 3780,
+    "sha256": "2b00d582dbcce67936cb465a913a9249a245072a1058fe0de66bd8a020c62ccb",
+    "processing": {
+      "durationMs": 5533,
+      "size": 3780,
+      "steps": [
+        {
+          "atMs": 1500,
+          "label": "First action",
+          "source": "action",
+          "durationMs": 1000
+        },
+        {
+          "atMs": 5000,
+          "label": "Final action",
+          "source": "action",
+          "durationMs": 1000
+        }
+      ],
+      "processing": {
+        "version": 1,
+        "originalDurationMs": 20000,
+        "originalSize": 100004592,
+        "originalSha256": "a89b678158a3cfe4951b3603f3554cbbd578ad32ad3705ce02dd3bae753208c6",
+        "trimmedMs": 14500,
+        "retainedMs": 5500,
+        "windows": [
+          {
+            "startMs": 0,
+            "endMs": 3000
+          },
+          {
+            "startMs": 17500,
+            "endMs": 20000
+          }
+        ],
+        "width": 160,
+        "height": 120
+      }
+    },
+    "probe": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 160,
+          "height": 120,
+          "nb_frames": "83"
+        }
+      ],
+      "format": {
+        "duration": "5.533333",
+        "size": "3780"
+      }
+    },
+    "fullOutputDecode": true,
+    "sameBytesAsDaemon": true,
+    "systemPathAvailable": false
+  }
+}

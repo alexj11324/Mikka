@@ -3,8 +3,21 @@ import { CLOUD_ERROR_CODES, CloudServiceError } from './cloud-services/errors'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { chatFailure, failureMessageKey } from './chat-failure'
+
+test('native admission and quiet completion require an explicit native failure',()=>{
+  const items=[{from:'person',native:true as const}]
+  assert.equal(chatFailure({working:false,error:null,items}),null)
+  assert.equal(chatFailure({working:true,error:'turn_failed',items}),null)
+  assert.equal(chatFailure({working:false,error:'turn_failed',items})?.kind,'failed')
+  assert.equal(chatFailure({working:false,error:null,items:[{from:'person'}]})?.kind,'failed','historical legacy failures retain their existing presentation')
+})
 import { chatBalanceRefusal } from './chat-balance'
 import { failureLine } from '../apps/mobile/lib/chat-failure'
+import { mobileMessages } from '../apps/mobile/lib/messages'
+
+// The line is read from the phone's catalog, not repeated here: the test then holds
+// under any device locale instead of only under zh-CN.
+const copy = mobileMessages.MobileCore.failure
 
 const person = { from: 'person' }, reply = { from: 'coordinator' }, event = { from: 'event' }
 const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)'
@@ -13,7 +26,7 @@ test('exhausted tool recovery has a stable friendly failure and retry',()=>{
   const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
   assert.deepEqual(failure,{kind:'failed',reason:'tools',raw:'model_tool_unavailable'})
   assert.deepEqual(failureMessageKey(failure),{namespace:'Coordinator',key:'replyToolUnavailable'})
-  assert.deepEqual(failureLine(failure),{text:'回复未完成，请重试',retry:true,recovery:null})
+  assert.deepEqual(failureLine(failure),{text:copy.replyIncomplete,retry:true,recovery:null})
   assert.equal(chatFailure({working:true,error:'model_tool_unavailable'}),null)
 })
 
@@ -21,7 +34,7 @@ test('the observed model streaming balance refusal has safe copy and a model rec
   const failure = chatFailure({ working: false, error: balance })!
   assert.deepEqual(failure, { kind: 'failed', reason: 'balance' })
   assert.deepEqual(failureMessageKey(failure), { namespace: 'Coordinator', key: 'apiBalance' })
-  assert.deepEqual(failureLine(failure), { text: 'API 余额不足', retry: false, recovery: 'model' })
+  assert.deepEqual(failureLine(failure), { text: copy.apiBalance, retry: false, recovery: 'model' })
   assert.doesNotMatch(JSON.stringify(failure), /request_id|11111111|doStreamStep/)
   assert.equal(chatFailure({ working: true, error: balance }), null)
 })

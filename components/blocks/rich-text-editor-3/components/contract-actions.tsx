@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { TOAST_ERROR_ICON } from "./icons"
 import { resolveChanges } from "./rich-text-changes"
-import { CheckIcon, MoreHorizontalIcon, CodeIcon, FileTextIcon, CopyIcon } from "lucide-react"
+import { Check, MoreHorizontal, Code, FileText, Copy } from "@/components/icons"
 
 type CopyFormat = "html" | "final" | "original"
 
@@ -41,7 +41,7 @@ function resolvedText(editor: Editor, resolution: "accept" | "reject") {
 }
 
 const COPIED_ICON = (
-  <CheckIcon aria-hidden="true" />
+  <Check aria-hidden="true" />
 )
 
 /** Export behind one menu; a copy confirms in place, only a failure toasts. */
@@ -77,7 +77,7 @@ export function ContractActions({ editor }: { editor: Editor | null }) {
           />
         }
       >
-        <MoreHorizontalIcon aria-hidden="true" />
+        <MoreHorizontal aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuGroup>
@@ -91,7 +91,7 @@ export function ContractActions({ editor }: { editor: Editor | null }) {
             {copied === "html" ? (
               COPIED_ICON
             ) : (
-              <CodeIcon aria-hidden="true" />
+              <Code aria-hidden="true" />
             )}
             {copied === "html" ? "Copied" : "Copy Redline HTML"}
           </DropdownMenuItem>
@@ -103,7 +103,7 @@ export function ContractActions({ editor }: { editor: Editor | null }) {
             {copied === "final" ? (
               COPIED_ICON
             ) : (
-              <FileTextIcon aria-hidden="true" />
+              <FileText aria-hidden="true" />
             )}
             {copied === "final" ? "Copied" : "Copy Final Text"}
           </DropdownMenuItem>
@@ -115,7 +115,7 @@ export function ContractActions({ editor }: { editor: Editor | null }) {
             {copied === "original" ? (
               COPIED_ICON
             ) : (
-              <CopyIcon aria-hidden="true" />
+              <Copy aria-hidden="true" />
             )}
             {copied === "original" ? "Copied" : "Copy Original Text"}
           </DropdownMenuItem>

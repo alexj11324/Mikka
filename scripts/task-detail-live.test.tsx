@@ -8,6 +8,8 @@ import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import type { IssueView } from '../app/actions/issues'
 import type { ActivityVersion } from '../lib/issue-activity'
+import { ISSUE_STATUS_CODES } from '../lib/issue-meta'
+import { taskPresentation } from '../lib/task-presentation'
 import { PersistentReadCache } from '../lib/swr/persistent-cache'
 import { ReadResponseError } from '../lib/swr/retry'
 import type { ReadStorage, StoredRead } from '../lib/swr/indexed-db'
@@ -27,7 +29,7 @@ mock.module('sonner', { namedExports: { toast: {
   error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: {
   useTranslations: (namespace = '') => {
     if (!translators.has(namespace)) translators.set(namespace, Object.assign((key: string, values?: Record<string, unknown>) => `${namespace}.${key}${values ? ` ${Object.values(values).join(' ')}` : ''}`, { has: () => true }))
     return translators.get(namespace)!
@@ -35,24 +37,45 @@ mock.module('next-intl', { namedExports: {
   useLocale: () => 'en', useFormatter: () => format, useNow: () => new Date('2026-11-05T08:08:00Z'),
 } })
 
+let joinedReads = 0, serveJoined = false
 let stored: IssueView
 let versions: ActivityVersion[]
 let issueReads = 0, versionReads = 0, fullVersionReads = 0, documentReads = 0
 let readOverride: (() => Promise<IssueView>) | null = null
+let deletedTask: { id: string; title: string; deletedAt: string; canRestore?: boolean } | null = null
+let restoreOverride: (() => Promise<{ error: string }>) | null = null
 let readFailure: string | null = null
 let readViewerId = owner
 let knownVersions: (string | undefined)[]
 let documentHold: Promise<void> | null = null
 let documentWaits = 0
+let latestDocumentUpdate: string | undefined
+let projectionReads = 0
+mock.module(at('app/actions/task-domain.ts'), { namedExports: {
+  getTaskPresentations: async ({ workspaceId, issueIds }: { workspaceId: string; issueIds: string[] }) => {
+    projectionReads++
+    const status = ISSUE_STATUS_CODES.find(code => code === stored.status)
+    assert.ok(status)
+    const view = taskPresentation({ status, metadata: { pullRequests: [] } },
+      { runId: 'active-run', status: 'running', outcome: null }, null, () => false)
+    return { version: 1, workspaceId, items: Object.fromEntries(issueIds.map(id => [id, view])) }
+  },
+} })
+let afterCommit: (() => void) | undefined
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
-mock.module(at('app/actions/issues.ts'), { namedExports: {
-  pollIssue: async (id: string, known?: string) => {
+async function readFixtureIssue(id: string, known?: string, cursor?: object) {
     assert.equal(id, issueId); issueReads++; knownVersions.push(known)
     const issue = readOverride ? await readOverride() : structuredClone(stored)
     if (readFailure) return { error: readFailure }
     const version = String(issue.revision).padStart(32, '0')
-    return known === version ? { viewerId: readViewerId, version, unchanged: true } : { viewerId: readViewerId, issue, version }
-  },
+    const document = known === version ? { viewerId: readViewerId, version, unchanged: true } : { viewerId: readViewerId, issue, version }
+    if (!serveJoined || !cursor) return document
+    joinedReads++
+    return { ...document, taskWork: { live: { workspaceId }, viewerId: readViewerId, work: null, connections: [], threads: [], activity: { version, items: structuredClone(versions) } } }
+  }
+mock.module(at('app/actions/agents.ts'), { namedExports: { pollTaskDetail: readFixtureIssue } })
+mock.module(at('app/actions/issues.ts'), { namedExports: {
+  pollIssue: readFixtureIssue,
   pollIssueVersionSummaries: async (id: string) => {
     assert.equal(id, issueId); versionReads++
     return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions) } }
@@ -62,39 +85,65 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
     writes.push(structuredClone(input))
     if (input.revision !== stored.revision) return { error: 'issueStale' }
     stored = { ...stored, title: input.title, status: input.status, priority: input.priority, revision: stored.revision + 1 }
+    afterCommit?.()
     return { issue: structuredClone(stored) }
   },
 } })
 mock.module(at('app/actions/collaboration.ts'), { namedExports: {
-  exchangeDocument: async (input: { id: string; seed: string; known?: string }) => {
+  exchangeDocument: async (input: { id: string; seed: string; known?: string; update?: string }) => {
     assert.equal(input.id, issueId)
     documentReads++
+    if (input.update) latestDocumentUpdate = input.update
     if (documentHold) { documentWaits++; await documentHold }
     return { ...(!input.known ? { update: input.seed } : {}), version: 'fixture-document', workspaceId }
   },
 } })
 mock.module(at('app/actions/issue-operations.ts'), { namedExports: {
-  getDeletedIssue: async () => null, listIssueConnections: async () => [], setIssueDeleted: async () => { throw new Error('no deletion in this fixture') },
+  getDeletedIssue: async () => deletedTask,
+  listIssueConnections: async () => [],
+  setIssueDeleted: async (input: { id: string; restore: boolean }) => {
+    if (!restoreOverride) throw new Error('no deletion in this fixture')
+    assert.deepEqual(input, { id: issueId, restore: true })
+    return restoreOverride()
+  },
 } })
 const none = () => null
 for (const [file, names] of [
-  ['issue-description-history', ['IssueDescriptionHistory']],
   ['issue-relations', ['IssueRelations']], ['issue-members', ['IssueMembers']], ['issue-thread-panel', ['IssueThreadPanel']],
   ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']],
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
-mock.module(at('components/workspace/issue-detail-actions.tsx'), { namedExports: { IssueDetailActions: ({ onHistory, disabled }: { onHistory: () => void; disabled: boolean }) => <button disabled={disabled} data-history="" onClick={onHistory}>History</button> } })
+mock.module(at('components/workspace/issue-description-history.tsx'), { namedExports: {
+  IssueDescriptionHistory: ({ open, onRestore }: import('react').ComponentProps<typeof import('../components/workspace/issue-description-history').IssueDescriptionHistory>) =>
+    open ? <output data-restore-available={String(Boolean(onRestore))} /> : null,
+} })
 const emptyThreads = { data: [] }
-mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useAgentActivity: () => ({ rows: [], error: null }) } })
-// The layer-drawn page (task-detail slot) is not under test here; its hooks read actions these mocks leave out.
-mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: { FramedTask: () => null } })
-mock.module(at('components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ actions }: { actions: ReactNode }) => <header>Task{actions}</header> } })
-mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExports: { IssueDetailProperties: ({ status, priority, task }: { status: string; priority: string; task: IssueView }) =>
-  <output data-properties="" data-revision={task.revision}>{status}:{priority}</output> } })
+mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useTaskWork: (_id: string, _open: () => void, _enabled: boolean, _viewer: string, joined?: { data: { history: { items: ActivityVersion[] } }; refresh: () => Promise<unknown> }) => ({ rows: [], error: null, history: joined && { rows: joined.data.history.items, refresh: joined.refresh } }) } })
+// The controller is mounted with a minimal renderer for the official frame contract.
+const { IssueActivityFeed } = await import('../components/workspace/issue-activity-feed')
+mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
+  FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) => {
+    const { rootRef, onKeyDown, preview, status, priority, titleField, onHistory, task } = props
+    return <div ref={rootRef} onKeyDown={onKeyDown} role="region" aria-busy={preview}>
+      <textarea id="task-title" value={titleField.value} readOnly={titleField.readOnly}
+        onChange={event => titleField.onChange(event.currentTarget.value)} onBlur={titleField.onBlur}
+        onCompositionStart={titleField.onCompositionStart} onCompositionEnd={titleField.onCompositionEnd} onKeyDown={titleField.onKeyDown} />
+      <button data-history="" disabled={preview} onClick={onHistory}>History</button>
+      {props.saveError && <button data-retry-save="" onClick={props.saveError.onRetry}>Retry autosave</button>}
+      <button data-complete="" onClick={() => props.onStatus('done')}>Done</button>
+      <button data-reopen="" onClick={() => props.onStatus('todo')}>Reopen</button>
+      <button data-priority="" onClick={() => props.onPriority('high')}>High</button>
+      <output data-properties="" data-revision={task.revision}>{status}:{priority}</output>
+      {props.editor(null, () => null)}
+      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} />}</section>
+      {props.panel}{props.dialogs}
+    </div>
+  },
+} })
 mock.module(at('components/workspace/issue-editor.tsx'), { namedExports: {
   // An empty valid Yjs seed keeps the real DocumentSync lifecycle in this test.
   createDocumentSeed: () => new Uint8Array([0, 0]),
-  IssueEditor: ({ content, disabled, onChange, activity, afterDescription }: { content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
-    <><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
+  IssueEditor: ({ content, sharedDoc, disabled, onChange, activity, afterDescription }: { sharedDoc?: import('yjs').Doc; content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
+    <><button data-discussion-write="" disabled={disabled} onClick={() => sharedDoc?.getMap('threads').set('fixture-comment', 'Only a discussion changed')}>Comment</button><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}{activity}</>,
 } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
@@ -146,7 +195,11 @@ beforeEach(() => {
   notices.clear(); dirty = false
   stored = { id: issueId, userId: owner, title: 'Accepted report', content: body('Original description'), status: 'review', priority: 'normal', revision: 1,
     identifier: 'ALEX-60', metadata: {}, createdAt: new Date('2026-11-05T08:00:00Z'), updatedAt: new Date('2026-11-05T08:00:00Z') } as IssueView
-  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; flush = null; cache = new Map(); sockets.length = 0
+  deletedTask = null
+  restoreOverride = null
+  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; latestDocumentUpdate = undefined; flush = null; cache = new Map(); sockets.length = 0
+  joinedReads = 0; serveJoined = false
+  afterCommit = undefined
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (input, options) => {
@@ -175,14 +228,15 @@ function HydrateFixtureCache() {
   }, [cache, mutate])
   return null
 }
-async function renderDetail(visible: boolean) {
+async function renderDetail(visible: boolean, origin = 'Tasks', siblings?: ReactNode, live = true) {
   // Keep the provider mounted when a task closes: SWR retains both completed
   // and pending reads across a quick reopen, with its default dedupe interval.
+  const detail = <>{siblings}{visible && <TaskDetail id={issueId} thread={null} origin={origin}
+    user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
+    onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</>
   await act(async () => root.render(<SWRConfig value={{ ...(cache instanceof PersistentReadCache ? swrDefaults : {}), provider: () => cache, shouldRetryOnError: false }}>
     {cache instanceof PersistentReadCache && <HydrateFixtureCache />}
-    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin="Tasks"
-      user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
-      onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
+    {live ? <LiveProvider ownerId={owner} workspaceId={workspaceId}>{detail}</LiveProvider> : detail}
   </SWRConfig>))
 }
 async function mount(ready = true) {
@@ -394,6 +448,148 @@ for (const refusal of ['workspaceAccessDenied', 'foreign-viewer'] as const) test
   } finally { release() }
 })
 
+test('a comment-only Yjs change flushes without a title or body edit', async () => {
+  await mount()
+  await act(async () => document.querySelector<HTMLButtonElement>('[data-discussion-write]')!.click())
+  await until(() => Boolean(latestDocumentUpdate && Buffer.from(latestDocumentUpdate, 'base64').includes(Buffer.from('Only a discussion changed'))), 'the discussion reached the document writer')
+  assert.equal(writes.length, 0, 'saving a discussion cannot create a task revision')
+})
+
+test('a confirmed read-only grant shows activity without enabling title, body or document writes', async () => {
+  stored = { ...stored, workspaceId, canSteer: false, readOnlyDiscussions: [] }
+  await mount()
+  assert.equal(title().readOnly, true)
+  assert.equal(description().readOnly, true)
+  assert.equal(documentReads, 0)
+  await input(title(), 'Must not save')
+  await act(async () => { assert.equal(await flush!(), true) })
+  assert.equal(writes.length, 0)
+  assert.equal(title().value, stored.title)
+  accepted()
+  await emit()
+  await until(() => properties().textContent === 'done:normal', 'a read grant continues to observe the task')
+  assert.equal(documentReads, 0)
+})
+
+test('a confirmed read grant opens description history without a restore command or document exchange', async () => {
+  stored = { ...stored, workspaceId, canSteer: false, readOnlyDiscussions: [] }
+  await mount()
+  const history = container.querySelector<HTMLButtonElement>('[data-history]')!
+  await act(async () => history.click())
+  await until(() => fullVersionReads === 1, 'a reader can fetch historical bodies')
+  assert.equal(container.querySelector('[data-restore-available]')?.getAttribute('data-restore-available'), 'false')
+  assert.equal(documentReads, 0)
+  assert.deepEqual(writes, [])
+})
+
+test('a lost Task save response is recovered by an authorized read without losing a newer local edit or concurrent remote fields', async () => {
+  await mount()
+  await input(title(), 'First rename')
+  let release!: () => void
+  const hold = new Promise<void>(resolve => { release = resolve })
+  let reading = false
+  afterCommit = () => {
+    afterCommit = undefined
+    stored = { ...stored, priority: 'high', revision: stored.revision + 1 }
+    readOverride = async () => { reading = true; await hold; return structuredClone(stored) }
+    throw new TypeError('Connection closed after commit')
+  }
+  let saving!: Promise<boolean>
+  try {
+    await act(async () => { saving = flush!() })
+    await until(() => reading, 'lost reply starts a read, not another write')
+    await input(title(), 'Next rename')
+    release()
+    await act(async () => { assert.equal(await saving, true) })
+    assert.deepEqual(writes.map(write => [write.revision, write.title, write.priority]),
+      [[1, 'First rename', 'normal'], [3, 'Next rename', 'high']])
+    assert.equal(stored.revision, 4)
+    assert.equal(properties().textContent, 'review:high')
+  } finally { release() }
+})
+
+test('a lost response followed by a competing Task edit preserves both the remote value and the local draft', async () => {
+  await mount()
+  await input(title(), 'My draft')
+  afterCommit = () => {
+    afterCommit = undefined
+    stored = { ...stored, title: 'Their newer title', revision: stored.revision + 1 }
+    throw new TypeError('Connection closed after commit')
+  }
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(stored.revision, 3)
+  assert.equal(stored.title, 'Their newer title')
+  assert.equal(title().value, 'My draft')
+  assert.deepEqual(writes.map(write => write.revision), [1])
+  // The live transport can recover and notify SWR before the user chooses to retry.
+  await emit()
+  await until(() => properties().getAttribute('data-revision') === '3', 'the reconnect delivers the competing value')
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(stored.title, 'Their newer title')
+  assert.equal(title().value, 'My draft')
+  assert.deepEqual(writes.map(write => write.revision), [1])
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-retry-save]')!.click())
+  await until(() => stored.title === 'My draft', 'the explicit retry uses the refreshed revision')
+  assert.deepEqual(writes.map(write => write.revision), [1, 3])
+})
+
+test('a lost Task save response cannot be confirmed by the next signed-in account', async () => {
+  await mount()
+  await input(title(), 'My draft')
+  afterCommit = () => { afterCommit = undefined; readViewerId = 'different-viewer'; throw new TypeError('Connection closed') }
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(stored.revision, 2)
+  assert.deepEqual(writes.map(write => write.revision), [1])
+})
+
+test('a lost response to a body save checks the persisted description before accepting a revision', async () => {
+  await mount()
+  await input(description(), 'Edited body')
+  afterCommit = () => {
+    afterCommit = undefined
+    stored = { ...stored, content: body('Different persisted body') }
+    throw new TypeError('Connection closed')
+  }
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(bodyText(stored.content), 'Different persisted body')
+  assert.equal(description().value, 'Edited body')
+  assert.deepEqual(writes.map(write => write.revision), [1])
+})
+
+test('a confirmed status write refreshes only this viewer’s Task projections without a live event', async () => {
+  const { useWorkspaceTaskPresentations } = await import('../hooks/use-task-collection')
+  const { useSelectedTaskPresentation } = await import('../hooks/use-selected-task-presentation')
+  const { TaskCardDataProvider, useTaskCards } = await import('../hooks/use-task-cards')
+  stored = { ...stored, workspaceId, status: 'todo' }
+  projectionReads = 0
+  function Card() {
+    const cards = useTaskCards([issueId])
+    return <output data-card="">{cards[issueId]?.state}</output>
+  }
+  function Projections() {
+    const collection = useWorkspaceTaskPresentations(owner, workspaceId, null, [{ id: issueId, workspaceId }], true)
+    const detail = useSelectedTaskPresentation(owner, workspaceId, issueId)
+    const otherViewer = useSelectedTaskPresentation('another-viewer', workspaceId, issueId)
+    const otherWorkspace = useSelectedTaskPresentation(owner, 'other-workspace', issueId)
+    const otherTask = useSelectedTaskPresentation(owner, workspaceId, 'other-task')
+    return <><output data-projections="">{[collection.items[issueId]?.state, detail.data?.state].join('/')}</output>
+      <output data-unrelated="">{[otherViewer, otherWorkspace, otherTask].map(read => read.data?.state).join('/')}</output>
+      <TaskCardDataProvider ownerId={owner} workspaceId={workspaceId}><Card /></TaskCardDataProvider></>
+  }
+  await renderDetail(true, 'Tasks', <Projections />, false)
+  const state = (attribute: string) => container.querySelector(`[data-${attribute}]`)?.textContent
+  await until(() => state('card') === 'running' && state('unrelated') === 'running/running/running' && !!description(), 'six scoped reads mounted')
+  const initialReads = projectionReads
+  for (const [control, status, projected] of [['complete', 'done', 'done'], ['reopen', 'todo', 'running']]) {
+    await act(async () => container.querySelector<HTMLButtonElement>(`[data-${control}]`)!.click())
+    await until(() => stored.status === status && state('card') === projected && state('projections') === [projected, projected].join('/'), 'the authorized state catches up without push')
+    assert.equal(state('unrelated'), 'running/running/running')
+  }
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-priority]')!.click())
+  await until(() => stored.priority === 'high', 'priority save committed')
+  assert.equal(projectionReads - initialReads, 6, 'only the three matching keys revalidated after each status change')
+})
+
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {
   await mount()
   assert.equal(properties().textContent, 'review:normal')
@@ -402,10 +598,41 @@ test('a committed acceptance event refreshes the mounted task status and activit
   await emit('10000000-0000-4000-8000-000000000002'); await wait(100)
   assert.deepEqual({ issueReads, versionReads }, before, 'another issue cannot refresh this task')
   await emit()
-  await until(() => properties().textContent === 'done:normal' && activity().includes('changedStatus Issue.status.done'), 'accepted status and human activity refresh together')
+  await until(() => properties().textContent === 'done:normal' && /moved(Task)? .*Issue\.status\.done/.test(activity()), 'accepted status and human activity refresh together')
   assert.equal(properties().getAttribute('data-revision'), '2')
   assert.ok(issueReads > before.issueReads && versionReads > before.versionReads)
   assert.equal(writes.length, 0, 'a committed live read performs no save')
+})
+
+test('every Task entry revalidates the shared saved value and withholds its editor on denial', { timeout: 40_000 }, async () => {
+  await mount()
+  await input(title(), 'Shared title from Tasks')
+  await act(async () => { assert.equal(await flush!(), true) })
+  for (const origin of ['Board', 'Project', 'Team', 'Search', 'Notifications', 'Inbox', 'Coordinator']) {
+    await renderDetail(false)
+    let allowRead!: () => void
+    const pending = new Promise<void>(resolve => { allowRead = resolve })
+    readOverride = async () => { await pending; return structuredClone(stored) }
+    try {
+      await renderDetail(true, origin)
+      await until(() => title()?.value === 'Shared title from Tasks', origin + ' sees the saved Task')
+      assert.ok(title().readOnly, origin + ' cannot write through cached data')
+    } finally { allowRead() }
+    await until(() => title()?.readOnly === false, origin + ' rechecks the current grant')
+    assert.equal(writes.length, 1, origin + ' opening an entry never replays the edit')
+  }
+  readFailure = 'workspaceAccessDenied'
+  await emit()
+  await until(() => container.textContent?.includes('unavailableTitle') === true, 'a revoked grant removes the refreshed editor')
+  assert.equal(flush, null)
+  for (const origin of ['Notifications', 'Project', 'Search']) {
+    await renderDetail(false)
+    await renderDetail(true, origin)
+    await until(() => container.textContent?.includes('unavailableTitle') === true, origin + ' cannot restore a denied edit')
+    assert.equal(title(), null)
+    assert.equal(flush, null)
+  }
+  assert.equal(writes.length, 1)
 })
 
 test('a background transport failure keeps the authorized editor, unsaved text and selection through retry', { timeout: 10_000 }, async () => {
@@ -477,7 +704,7 @@ test('a live acceptance keeps unsaved title and description, then saves them aga
   await input(bodyElement, 'Unsent description')
   titleElement.setSelectionRange(4, 12)
   accepted(); await emit()
-  await until(() => properties().textContent === 'done:normal' && activity().includes('changedStatus Issue.status.done'), 'external status and activity are adopted while text is dirty')
+  await until(() => properties().textContent === 'done:normal' && /moved(Task)? .*Issue\.status\.done/.test(activity()), 'external status and activity are adopted while text is dirty')
   assert.equal(title(), titleElement, 'the task is not remounted')
   assert.equal(description(), bodyElement)
   assert.equal(title().value, 'Unsent title while composing')
@@ -485,7 +712,7 @@ test('a live acceptance keeps unsaved title and description, then saves them aga
   assert.equal(document.activeElement, titleElement)
   assert.deepEqual([titleElement.selectionStart, titleElement.selectionEnd], [4, 12])
   assert.equal(writes.length, 0, 'composition does not autosave or get interrupted by acceptance')
-  assert.match(activity(), /changedStatus Issue\.status\.done/)
+  assert.match(activity(), /movedTask Issue\.status\.done/)
   await act(async () => { titleElement.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); assert.equal(await flush!(), true) })
   assert.equal(writes.length, 1)
   assert.deepEqual({ revision: writes[0].revision, title: writes[0].title, status: writes[0].status, description: bodyText(writes[0].content) },
@@ -524,4 +751,97 @@ test('acceptance during a pending document flush cannot pair the newer revision 
     release()
     await act(async () => { await pending?.catch(() => false) })
   }
+})
+
+test('discussion draft ACK clears only its submitted edit, keeps the original operation for retry, and respects Task changes', async () => {
+  const { useActivityDrafts } = await import('../components/workspace/issue-activity')
+  const { ViewStateProvider } = await import('../lib/hooks/view-state')
+  const acknowledgements: (() => void)[] = []
+  const commands: { task: string; body: string; id: string }[] = []
+  let retries = 0
+  let draft: ReturnType<typeof useActivityDrafts>
+  function Composer({ task, reader = false }: { task: string; reader?: boolean }) {
+    draft = useActivityDrafts(task, () => false, (_thread, body, id) => {
+      if (reader) return false
+      commands.push({ task, body, id })
+    }, { afterAcknowledged: ack => acknowledgements.push(ack), retry: () => { retries++ } })
+    return null
+  }
+  const open = (task: string, reader = false) => act(async () => {
+    root.render(<ViewStateProvider scope="discussion-test"><Composer key={task + reader} task={task} reader={reader} /></ViewStateProvider>)
+  })
+  await open('first')
+  await act(async () => { draft.setReplyTo('thread'); draft.setReply('original') })
+  await act(async () => { draft.sendReply('thread'); draft.sendReply('thread') })
+  assert.equal(commands.length, 1)
+  assert.equal(retries, 1)
+  assert.equal(draft!.reply, 'original')
+  await act(async () => { draft.setReply('later edit') })
+  await act(async () => { acknowledgements.shift()!() })
+  assert.equal(draft!.reply, 'later edit')
+  await act(async () => { draft.sendReply('thread') })
+  assert.notEqual(commands[0].id, commands[1].id)
+  await open('second')
+  await act(async () => { draft.setReplyTo('other-thread'); draft.setReply('other Task') })
+  await act(async () => { acknowledgements.shift()!() })
+  assert.equal(draft!.reply, 'other Task')
+  await open('first', true)
+  await act(async () => { draft.sendReply('thread') })
+  assert.equal(commands.length, 2)
+  await open('first')
+  assert.equal(draft!.reply, 'later edit')
+  await act(async () => { draft.sendReply('thread') })
+  assert.equal(commands[1].id, commands[2].id, 'a reopened draft reuses its Yjs operation identity')
+  await act(async () => { acknowledgements.shift()!() })
+  assert.equal(draft!.reply, '')
+})
+
+test('expired deleted Task explains its restore window without offering an impossible action', async () => {
+  readFailure = 'issueNotFound'
+  deletedTask = { id: issueId, title: 'Old task', deletedAt: '2020-01-01T00:00:00.000Z' }
+  await mount(false)
+  await until(() => container.textContent?.includes('deletedTitle') === true, 'owner sees the deleted Task')
+  assert.match(container.textContent ?? '', /Errors\.issueRestoreWindow/)
+  assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.(restoreTask|deletedDescription)/)
+})
+
+test('a recoverable deleted Task withdraws Restore when its open page passes the deadline', async () => {
+  readFailure = 'issueNotFound'
+  const deadline = Date.now() + 1500
+  deletedTask = { id: issueId, title: 'Recent task', deletedAt: new Date(deadline - 30 * 86_400_000).toISOString(), canRestore: true }
+  await mount(false)
+  await until(() => container.textContent?.includes('restoreTask') === true, 'recoverable Task offers Restore')
+  await until(() => container.textContent?.includes('Errors.issueRestoreWindow') === true, 'an open page crosses the deadline')
+  assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.(restoreTask|deletedDescription)/)
+})
+
+test('the server restore decision wins even when the client clock says a Task is still recoverable', async () => {
+  readFailure = 'issueNotFound'
+  deletedTask = { id: issueId, title: 'Clock-skewed task', deletedAt: new Date().toISOString(), canRestore: true }
+  let writes = 0
+  restoreOverride = async () => { writes++; return { error: 'issueRestoreWindow' } }
+  await mount(false)
+  const restoreButton = () => [...container.querySelectorAll('button')].find(button => button.textContent === 'IssueDetail.restoreTask')
+  await until(() => !!restoreButton(), 'the initial owner read allowed Restore')
+  await act(async () => restoreButton()!.click())
+  await until(() => container.textContent?.includes('Errors.issueRestoreWindow') === true, 'writer returned the authoritative expiry')
+  assert.equal(writes, 1)
+  assert.equal(restoreButton(), undefined)
+  assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.deletedDescription/)
+})
+
+test('the mounted task receives its body, activity and Work in one authorized read and one refresh', async () => {
+  serveJoined = true
+  await renderDetail(true, 'Tasks', undefined, false)
+  await until(() => activity().includes('createdTask'), 'initial activity came with the document')
+  assert.equal(issueReads, 1)
+  assert.equal(joinedReads, 1)
+  assert.equal(versionReads, 0)
+  stored = { ...stored, revision: stored.revision + 1, status: 'done' }
+  versions.push(version(stored))
+  await renderDetail(false, 'Tasks', undefined, false)
+  await renderDetail(true, 'Tasks', undefined, false)
+  await until(() => properties().textContent === 'done:normal', 'reopening refreshed the joined document')
+  assert.equal(joinedReads, 2)
+  assert.equal(versionReads, 0)
 })

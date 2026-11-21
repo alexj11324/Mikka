@@ -6,9 +6,10 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { refreshPublishedPullRequest } from './publication-webhook'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { readFactoryFlow } from '../factory/public-flow'
 import type { FactoryTask } from '../factory/store'
+import type { CoordinatorEventInput } from '../coordinator-events'
 import { afterDatabaseCommit, captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
 
 const base = process.env.E2E_DATABASE_URL
@@ -29,11 +30,11 @@ const event = (lines: { additions?: number; deletions?: number }, state: 'open' 
 })
 const content = (pullRequests: unknown[]) => JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body stays' }] }] })
 
-test('a PR webhook records its line counts on the delivery and on the tasks it belongs to, as a versioned system change', { skip: !base, timeout: 120_000 }, async () => {
+test('a PR webhook records its line counts on the delivery and on the tasks it belongs to, as a versioned system change', { skip: !base, timeout: 120_000 }, async t => {
   const admin = guarded(base!)
   const name = `prw_${randomUUID().replaceAll('-', '')}_e2e`
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 })
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(adminPool, name, 'template0')
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
   // The race clients are real transaction executors, just like the application
@@ -54,6 +55,34 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
       [runId, delivered, JSON.stringify({ url, state: 'open' })])
     const task = async (id: string) => (await pool.query<{ content: { attrs: { mikka: { pullRequests: Record<string, unknown>[] } }; content: unknown[] }; revision: number }>('SELECT content, revision FROM issues WHERE id=$1', [id])).rows[0]
     const versions = async (id: string) => (await pool.query<{ actor_type: string; actor_id: string; revision: number }>('SELECT actor_type, actor_id, revision FROM issue_versions WHERE "issueId"=$1 ORDER BY revision', [id])).rows
+
+    await t.test('the same GitHub repository preserves publication identity when the owner changes its capitalization', async () => {
+      const original = event({ additions: 12, deletions: 3 })
+      const renamed = { ...original, repository: { full_name: 'O/R' }, pull_request: { ...original.pull_request, html_url: 'https://github.com/O/R/pull/7' } }
+      const fixture = await pool.connect()
+      try {
+        await fixture.query('BEGIN')
+        await refreshPublishedPullRequest('pull_request', renamed, fixture)
+        const result = await fixture.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
+        assert.equal(result.rows[0].pullRequest.additions, 12)
+        assert.equal(result.rows[0].pullRequest.url, url, 'retain the exact recorded public URL')
+        const savedTask = await fixture.query('SELECT content,revision FROM issues WHERE id=$1', [delivered])
+        assert.equal(savedTask.rows[0].content.attrs.mikka.pullRequests[1].deletions, 3)
+        assert.equal(savedTask.rows[0].revision, 2)
+        await refreshPublishedPullRequest('pull_request', renamed, fixture)
+        const replay = await fixture.query('SELECT revision FROM issues WHERE id=$1', [delivered])
+        assert.equal(replay.rows[0].revision, 2)
+        const mismatch = { ...renamed, pull_request: { ...renamed.pull_request, additions: 99, html_url: 'https://github.com/different/r/pull/7' } }
+        await refreshPublishedPullRequest('pull_request', mismatch, fixture)
+        const same = await fixture.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
+        assert.equal(same.rows[0].pullRequest.additions, 12, 'a different repository cannot change this delivery')
+        const untouched = await fixture.query('SELECT revision FROM issues WHERE id=$1', [unrelated])
+        assert.equal(untouched.rows[0].revision, 1)
+      } finally {
+        await fixture.query('ROLLBACK')
+        fixture.release()
+      }
+    })
 
     await refreshPublishedPullRequest('pull_request', event({ additions: 18, deletions: 4 }, 'closed', true), pool)
     const saved = await task(delivered)
@@ -198,6 +227,58 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     } finally { resume(); await delayed.catch(() => {}) }
     await pool.query('UPDATE run_publications SET "pullRequest"=NULL WHERE "runId"=$1', [runId])
     assert.equal((await flow()).review, null, 'a task without a PR returns empty review metadata')
+
+    // One matching delivery belongs to this owner, workspace, issue and run.
+    const { recordWorkflowResult } = await import('./workflow-result-store')
+    const ciBot = randomUUID(), ciRun = randomUUID()
+    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'CI fixture')`, [ciBot, workspaceId])
+    await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","workspaceId","botId","agentId",status,prompt)
+      VALUES($1,'owner',$2,$3,$4,$5,'succeeded','CI fixture')`, [ciRun, delivered, workspaceId, ciBot, agentId])
+    await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,status,"pullRequest")
+      VALUES($1,'owner',$2,'https://github.com/o/r','v2/github.com/o/r','mikka/ci-7','published',$3)`,
+      [ciRun, delivered, JSON.stringify({ url, headSha: newHead })])
+    await pool.query(`INSERT INTO github_repository_installations("userId","remoteKey","githubAccountId","installationId","repositoryId")
+      VALUES('owner','v2/github.com/o/r','12',11,22)`)
+    const target = { runId: ciRun, issueId: delivered, ownerId: 'owner', workspaceId, botId: ciBot, previous: null }
+    const result = { version: 1 as const, deliveryId: 'first-delivery', installationId: 11, repositoryId: 22, repository: 'o/r',
+      workflowId: 33, workflowRunId: 44, attempt: 1, headSha: newHead, branch: 'mikka/ci-7', conclusion: 'failure' as const }
+    for (const wrong of [{ installationId: 12 },{ repositoryId: 23 },{ repository: 'other/r' },{ branch: 'mikka/ci-8' },{ headSha }])
+      assert.equal(await recordWorkflowResult(pool, target, { ...result, ...wrong }), null)
+    for (const wrong of [{ownerId: 'other'}, {workspaceId: randomUUID()}, {botId: randomUUID()}, {runId: randomUUID()}])
+      assert.equal(await recordWorkflowResult(pool, { ...target, ...wrong }, result), null)
+    const [idA, idB] = await Promise.all([recordWorkflowResult(pool, target, result), recordWorkflowResult(pool, target, { ...result, deliveryId: 'redelivery' })])
+    assert.ok(idA)
+    assert.equal(idB, idA, 'redelivery while Eve acknowledgement is pending reuses the same event')
+    assert.equal(await recordWorkflowResult(pool, target, { ...result, conclusion: 'success' }), null, 'conflicting outcome for identical attempt')
+    await pool.query('UPDATE coordinator_events SET "deliveredAt"=now() WHERE id=$1', [idA])
+    assert.equal(await recordWorkflowResult(pool, target, result), null)
+    const secondId = await recordWorkflowResult(pool, target, { ...result, attempt: 2, conclusion: 'success' })
+    assert.ok(secondId && secondId !== idA)
+    assert.equal(await recordWorkflowResult(pool, target, result), null, 'old attempt cannot overwrite the later conclusion')
+    await t.test('a completed GitHub check suite selects the ended publication with the matching PR head', async () => {
+      const { wakeLinkedCiSuite } = await import('./ci-suite-wake')
+      const sent: CoordinatorEventInput[] = []
+      const dependencies = {
+        query: (statement: string, params: unknown[]) => pool.query(statement, params),
+        send: async (event: CoordinatorEventInput) => { sent.push(event) },
+      }
+      const suite = { installationId: 11, repositoryId: 22, repository: 'o/r', suiteId: 97,
+        headSha: '9'.repeat(40), conclusion: 'failure', numbers: [7], heads: { '7': newHead } }
+      await pool.query(`UPDATE run_publications SET "pullRequest"="pullRequest" || '{"state":"open"}'::jsonb WHERE "runId"=$1`, [ciRun])
+      assert.equal(await wakeLinkedCiSuite(suite, dependencies), 0, 'unfinished runs stay asleep')
+      await pool.query('UPDATE agent_runs SET "finishedAt"=now() WHERE id=$1', [ciRun])
+      assert.equal(await wakeLinkedCiSuite({ ...suite, heads: { '7': headSha } }, dependencies), 0, 'stale PR head')
+      assert.equal(await wakeLinkedCiSuite({ ...suite, repository: 'another/repository' }, dependencies), 0, 'foreign repository')
+      assert.equal(await wakeLinkedCiSuite(suite, dependencies), 1)
+      assert.deepEqual(sent.map(event => [
+        event.userId, event.botId, event.issueId, event.runId, event.kind, event.dedupeKey, event.payload.source,
+      ]), [['owner', ciBot, delivered, ciRun, 'run_report',
+        `github_ci_suite:${ciRun}:o/r:${suite.headSha}:97:failure`, 'github_ci_suite']])
+    })
+    const { rows: [counts] } = await pool.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "runId"=$1 AND "botId"=$2`, [ciRun, ciBot])
+    assert.equal(counts.n, 2)
+    await pool.query('DELETE FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2', ['owner','v2/github.com/o/r'])
+    assert.equal(await recordWorkflowResult(pool, target, { ...result, attempt: 3 }), null, 'revocation after receipt suppresses a queued result')
   } finally {
     // Only after every client of this test's own database has closed (#913).
     await dropTestDatabase(adminPool, name, pool)

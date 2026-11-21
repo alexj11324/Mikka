@@ -1,16 +1,8 @@
 # Vercel publication receipt V2
 
-> Update: since #528 the Vercel publication adapter is not registered.
-> `configuredVercelPublicationAdapters` in `lib/factory/vercel-publication.ts`
-> has no production caller; preview deployments come from the repository's own
-> Vercel integration and are evidence only (`warp-aligned-factory.md`). The
-> switches are now `mikka-factory-vercel-publication` and
-> `mikka-factory-vercel-production` in `lib/deployment-switches.ts`; the
-> `FACTORY_VERCEL_*` variables are read only as a legacy override.
+Factory code candidates are accepted through the person's GitHub merge (#528). The production approval service registers Skill activation. Historical Vercel publication receipts remain readable, and the configured V2 monitor verifies them with GET requests. The old write protocol is exercised only by a loopback test fixture.
 
-This adds a publisher implementation to the frozen Factory stage contract. It
-does not change stages, create another orchestrator, rename migrations or change
-review/verify/monitor validators. Existing publication JSON stores the checkpoint.
+This document records the historical publication format and its authorization conditions.
 
 ## Destination and authorization
 
@@ -112,29 +104,9 @@ For real-user production acceptance, #195 must additionally establish that the
 current production domain/alias routes to this deployment; probing only its
 immutable deployment URL does not establish the shared production domain's state.
 
-## Runtime enablement and acceptance boundary
+## Historical protocol verification
 
-`FACTORY_VERCEL_PUBLICATION=1` registers the Preview adapter; additionally
-`FACTORY_VERCEL_PRODUCTION=1` registers Production. Registration requires the
-existing secret-managed `VERCEL_TOKEN` runtime binding. No account file is read,
-token created or env file written. The connected inspection app is not implicitly
-a runtime credential. Missing delivery fails closed and needs the existing cloud
-secret delivery owner; this code does not create new credentials or access.
-
-The deployment API and configured project were inspected read-only. Local tests
-exercise actual HTTP, PG17, reservation/reconnect, queued-to-ready, accepted POST
-with lost response, SQL rollback, identity mismatches and revoked/expired/stale
-grants. Their provider is an explicitly named loopback protocol substitute, not
-a cloud deployment. These tests do not establish real Harness evidence, human
-OAuth acceptance, production health or a user's end-to-end workflow.
-
-The next real execution scope is one human-approved exact candidate, action and
-destination on the fixed existing project: project GET, one deployment POST and
-GET/list reconciliation, followed by #195 probe and real user acceptance/video.
-No credential creation, IAM, project/domain mutation, paid resource purchase or
-frontend change is included. A production action includes assignment of the
-project's existing production aliases. This implementation itself executes none
-of those provider writes.
+The loopback HTTP fixture in `tests/helpers/factory-vercel-publication.ts` exercises the old receipt format, reservation and recovery against disposable test data. It accepts an explicit loopback origin. The application uses the deployment switches and its existing credential for historical read-only observation as documented in [Factory monitor V2](195-vercel-monitor-v2.md). The application’s current build, promotion and rollback owners are documented in the [build source of truth](../operations/build-source-of-truth.md).
 
 API references: [create deployment](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment),
 [get deployment](https://vercel.com/docs/rest-api/deployments/get-a-deployment-by-id-or-url),

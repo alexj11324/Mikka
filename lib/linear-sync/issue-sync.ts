@@ -1,6 +1,6 @@
-import { defaultModelAvailable } from '@/lib/default-model'
 import 'server-only'
 import { issueListChanged } from '../live/lists'
+import { reviewTaskChanged } from '../coding-workspace/review-sessions'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { z } from 'zod'
@@ -23,6 +23,7 @@ import { linearDescriptionChanged, shouldApplyLinearSnapshot } from './sync-guar
 import { reserveLinearPublication, requireCurrentPublication, withCurrentPublication, withPublicationWriter, RetiredPublicationError, type Publication, type OutboxFence } from './publication'
 import { systemActor } from '@/lib/activity-actor'
 import { withTaskWorkspace, type TaskWorkspace } from '@/lib/task-workspace'
+import { registerTaskResourceAccess } from '@/lib/task-resource-registration'
 import { taskAssignees } from '@/lib/task-identifier-server'
 
 type IssueRow = typeof issues.$inferSelect
@@ -123,12 +124,11 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   if (JSON.stringify(incomingContent).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
   if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
   const nextPriority = issuePriorityForLinear(remote.priority)
-  let statusEvent = false
   // A status change from Linear is recorded for its owner's Coordinator (triage decides whether it matters); its bot row
   // is resolved here, before the transaction. A Linear team sync belongs to its owner: the personal workspace's Coordinator.
   const coordinator = link.issue.status !== issueStatusForLinearType(remote.state?.type ?? '', link.issue.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name)
     ? (await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(team.ownerId, team.workspaceId, { backfill: false })).botId : null
-  const saved = await withTaskWorkspace(team.ownerId, team.workspaceId, async (workspace, workspaceTx) => {
+  return withTaskWorkspace(team.ownerId, team.workspaceId, async (workspace, workspaceTx) => {
     const candidate = await localAssigneeForRemote(team.ownerId, workspace, remote, workspaceTx)
     return db.transaction(async tx => {
       await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
@@ -152,11 +152,9 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
       title: remote.title, content: latestIncoming, status: nextStatus, priority: nextPriority,
       revision: nextRevision, updatedAt: new Date(),
     }).where(eq(issues.id, latest.id)).returning()
+    reviewTaskChanged(tx, latest, saved)
     const changeEvent = saved && coordinator && issueStatusEvent(latest, saved, coordinator)
-    if (changeEvent) {
-      await recordCoordinatorEvent(tx, changeEvent)
-      statusEvent = true
-    }
+    if (changeEvent) await recordCoordinatorEvent(tx, changeEvent)
 
     if (descriptionChanged) {
       const [stored] = await tx.select({ state: issueDocuments.state }).from(issueDocuments).where(eq(issueDocuments.issueId, latest.id)).for('update').limit(1)
@@ -176,11 +174,6 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     return saved
     })
   })
-  if (statusEvent && await defaultModelAvailable(team.ownerId)) {
-    const { wakeCoordinator } = await import('@/lib/coordinator/wake')
-    await wakeCoordinator(team.ownerId)
-  }
-  return saved
 }
 
 export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssueSnapshot) {
@@ -251,6 +244,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
         status: issueStatusForLinearType(remote.state?.type ?? '', 'todo', remote.state?.name), priority: issuePriorityForLinear(remote.priority),
         revision: 1, createdAt: now, updatedAt: now,
       }).returning()
+      await registerTaskResourceAccess(tx, { id, ownerId: team.ownerId, workspaceId: workspace.id, workspaceKind: workspace.kind })
       const doc = loadIssueDocument(null, content)
       try {
         const state = encodedIssueDocument(doc)

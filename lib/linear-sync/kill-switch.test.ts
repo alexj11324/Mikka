@@ -13,6 +13,8 @@ let finished = 0
 let revocations = 0
 let failRevocation = false
 let scheduled: Array<() => Promise<void>> = []
+// 自动化 Linear triggers are not sync: a signed delivery reaches them while sync is off (decision 2026-11-15-1930).
+const automationDeliveries: string[] = []
 const unexpected = () => { reads++; throw new Error('Unexpected database, authentication or provider access') }
 let worker: typeof import('./worker')
 let dispatch: typeof import('./dispatch')
@@ -28,8 +30,9 @@ before(async () => {
     linearSyncState: async () => unavailable ? 'unavailable' : enabled ? 'enabled' : 'disabled',
     linearSyncDisabledResponse: () => Response.json({ disabled: true }, { status: 503, headers: { 'retry-after': '60' } }),
   } })
-  mock.module('next/server', { namedExports: { after: (fn: () => Promise<void>) => { scheduled.push(fn) }, NextResponse: { redirect: unexpected } } })
-  mock.module('next/headers', { namedExports: { cookies: unexpected } })
+  mock.module('@/lib/server-runtime/server', { namedExports: { after: (fn: () => Promise<void>) => { scheduled.push(fn) }, NextResponse: { redirect: unexpected } } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { cookies: unexpected } })
+  mock.module('@/lib/schedules/runtime', { namedExports: { fireLinearAutomations: async (deliveryId: string) => { automationDeliveries.push(deliveryId); return 0 } } })
   mock.module('@/lib/db', { namedExports: {
     db: { select: unexpected, insert: unexpected, update: () => {
       if (!finishClaimed) return unexpected()
@@ -146,9 +149,11 @@ test('Next routes authenticate before returning disabled without queuing, draini
   }
   const ordinary = { action: 'update', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue' } }
   assert.equal((await webhook.POST(makeRequest(ordinary, 'Issue', '0'.repeat(64)))).status, 401)
+  assert.deepEqual(automationDeliveries, [], 'an unsigned delivery reaches no automation')
   const response = await webhook.POST(makeRequest(ordinary, 'Issue'))
   assert.equal(response.status, 200)
   assert.deepEqual(await response.json(), { disabled: true })
+  assert.deepEqual(automationDeliveries, ['delivery'], 'a signed delivery reaches automations with sync off')
   assert.equal(revocations, 0)
 
   const revoked = { action: 'remove', type: 'OAuthAuthorization', organizationId: 'org', webhookTimestamp: Date.now(), data: { userId: 'linear-user' } }

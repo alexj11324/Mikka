@@ -1,8 +1,8 @@
 'use client'
 
 import { useRef, useState, type ChangeEvent } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
-import { Ellipsis, EyeIcon, EyeOffIcon, FileUp, Plus } from 'lucide-react'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
+import { Ellipsis, Eye, EyeOff, FileUp, Plus } from '@/components/icons'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { SECRET_NOTE_MAX } from '@/lib/secrets/format'
 import type { UserSecretView } from '@/lib/secrets/user-store'
 import { relativeTime } from '@/lib/relative-time'
@@ -34,6 +34,7 @@ type Saved = { notice: string | null } | null
  */
 export function PersonalSecretsSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.secrets')
+  const common = useTranslations('Common')
   const locale = useLocale()
   const list = useMySecrets(workspaceId)
   const [editing, setEditing] = useState<Editing | null>(null)
@@ -49,7 +50,7 @@ export function PersonalSecretsSettings({ workspaceId, workspaceName }: { worksp
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'new' })}>{t('add')}</Button>
     </> : undefined}>
       {list.loading && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {list.error && <FieldError className="px-5 py-4">{list.error}</FieldError>}
+      {list.error && <SettingsSaveError message={list.error} retryLabel={common('retry')} onRetry={list.reload} />}
       {secrets?.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
         <div className="flex gap-2">
@@ -131,7 +132,7 @@ function MySecretSheet({ workspaceId, workspaceName, secret, onClose, open = tru
             <InputGroup>
               <InputGroupInput id="my-secret-value" type={reveal ? 'text' : 'password'} value={value} autoComplete="new-password" spellCheck={false} aria-invalid={error ? true : undefined} disabled={pending !== null} onChange={event => { setValue(event.target.value); setError(null) }} />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(on => !on)}>{reveal ? <EyeOffIcon /> : <EyeIcon />}</InputGroupButton>
+                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(on => !on)}>{reveal ? <EyeOff /> : <Eye />}</InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
             {error && <FieldError>{error}</FieldError>}
@@ -159,7 +160,7 @@ function MySecretSheet({ workspaceId, workspaceName, secret, onClose, open = tru
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
           {confirm === 'delete'
             ? <AlertDialogAction variant="destructive" onClick={() => void remove()}>{commonT('delete')}</AlertDialogAction>
-            : <AlertDialogAction onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>}
+            : <AlertDialogAction variant="default" onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -238,7 +239,7 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
         <AlertDialogHeader><AlertDialogTitle>{t('shadowConfirmMany', { workspace: workspaceName ?? t('workspaceGroup'), names: (shadowed ?? []).join('、') })}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>
+          <AlertDialogAction variant="default" onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCoordinatorSubmitter, readActionOutcome, readOutcome } from './coordinator-client-submission'
+import { createCoordinatorSubmitter, readActionOutcome, readOutcome } from '@/tests/support/legacy-coordinator-submission'
 
 test('server-action rejections preserve public error codes and hide unknown errors', () => {
   for (const error of ['issueToolsDisabled', 'deviceNotFound', 'messageRequired', 'messageTooLong', 'validationGeneric']) {

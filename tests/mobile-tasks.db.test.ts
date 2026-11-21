@@ -1,12 +1,13 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
+import { SpanKind, context as traceContext, trace } from '@opentelemetry/api'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { measured, readMetrics } from './helpers/read-metrics'
 
-type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string }
+type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string; headers?: Record<string, string> }
 
 const sqlState = (error: unknown): string | undefined => {
   if (!error || typeof error !== 'object') return undefined
@@ -55,9 +56,9 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const context = await import('../apps/api/src/context')
   // The ordinary API framework adapters supply request-local headers, cookies,
   // translations and after-work. Authentication and authorization stay real.
-  mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') })
-  mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') })
-  mock.module('next/server', { namedExports: await import('../apps/api/compat/server') })
+  mock.module('@/lib/server-runtime/headers', { namedExports: await import('../lib/server-runtime/headers') })
+  mock.module('@/lib/intl/i18n-server', { namedExports: await import('../lib/intl/i18n-server') })
+  mock.module('@/lib/server-runtime/server', { namedExports: await import('../lib/server-runtime/server') })
   const { auth } = await import('../lib/auth')
   const { GET } = await import('../app/api/mobile/tasks/[id]/route')
   const { GET: list } = await import('../app/api/mobile/tasks/route')
@@ -106,8 +107,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const peer = await authContext.internalAdapter.createSession(other); assert.ok(peer)
   const signature = createHmac('sha256', authContext.secret).update(native.token).digest('base64')
   const cookie = authContext.authCookies.sessionToken.name + '=' + encodeURIComponent(native.token + '.' + signature)
-  const { createPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
-  const pat = await createPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
+  const { createLegacyPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
+  const pat = await createLegacyPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
   const teamSelection = { workspaceId: teamWorkspace.id }
   const run = async <T>(path: string, handler: (request: Request) => Promise<T>, options: ReadOptions = {}) => {
     const bearer = options.bearer === undefined ? native.token : options.bearer
@@ -115,6 +116,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const req = new Request(origin + '/mikka' + path, { headers: {
       'x-mikka-locale': 'en', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}),
       ...(selection ? { 'x-mikka-workspace-id': selection } : {}), ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...options.headers,
     } })
     const scope = context.createRequestScope(req)
     try { return await context.runRequestScope(scope, () => handler(req)) }
@@ -122,19 +124,253 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   }
   const request = (id: string, options?: ReadOptions) => run('/api/mobile/tasks/' + id, req => GET(req, { params: Promise.resolve({ id }) }), options)
   const listRequest = (options?: ReadOptions) => run('/api/mobile/tasks', list, options)
+  const { GET: readThreadArtifacts } = await import('../app/api/mobile/threads/[id]/artifacts/route')
+  const threadArtifacts = (id: string, options?: ReadOptions) => run('/api/mobile/threads/' + id + '/artifacts', req => readThreadArtifacts(req, { params: Promise.resolve({ id }) }), options)
   const persisted = async () => (await pool.query(`select
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","ownershipState",status,title) order by id),'[]') from issues where "userId"=$1) as tasks,
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","botId",status) order by id),'[]') from agent_runs where "userId"=$1) as runs,
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","runId") order by id),'[]') from artifacts where "userId"=$1) as artifacts,
     (select coalesce(jsonb_agg(jsonb_build_array(id,workspace_id,status,next_at) order by id),'[]') from user_schedules where owner_id=$1) as schedules`, [owner])).rows[0]
 
+  await t.test('an authorized task owner label follows its member or admitted Agent, with no private run access for the teammate', async () => {
+    const task = await workspaceTask()
+    const delegate = { kind: 'agent', id: randomUUID(), name: 'Builder', image: null }
+    const member = { kind: 'member', id: owner, name: 'Task owner', image: null }
+    async function setOwner(assignee: typeof member | null) {
+      const content = { type: 'doc', attrs: { mikka: { delegate, assignee } } }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [task, JSON.stringify(content)])
+    }
+    try {
+      await setOwner(null)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.deepEqual((await (await request(task, { bearer: peer.token, workspaceId: teamWorkspace.id })).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.equal((await request(task, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+      await setOwner(member)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'member', name: 'Task owner' })
+    } finally {
+      await pool.query('DELETE FROM issues WHERE id=$1', [task])
+    }
+  })
+
+  await t.test('the versioned work request returns task state, readable PRs and chat links in one owner-authorized detail', async () => {
+    const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+    const child = await workspaceTask()
+    const foreign = await workspaceTask(secondWorkspace.id, false)
+    const childContent = { type: 'doc', attrs: { mikka: { parentId: issueId } } }
+    await pool.query('update issues set content=$1 where id=any($2::uuid[])', [childContent, [child, foreign]])
+    const response = await load()
+    assert.equal(response.status, 200)
+    const detail = await response.json()
+    assert.equal(detail.work.version, 1)
+    assert.deepEqual(detail.work.pullRequests, [{ url: 'https://github.com/acme/app/pull/1', state: 'open' }])
+    assert.deepEqual(detail.work.linkedChats, [])
+    assert.deepEqual(detail.work.connections.map((row: { id: string; kinds: string[] }) => [row.id, row.kinds]), [[child, ['child']]])
+    const ownedThread = detail.work.conversations.find((row: { id: string }) => row.id === latest)
+    assert.ok(ownedThread?.detail?.name)
+    assert.equal(ownedThread.detail.observedModel, null, 'a requested model must not stand in for the observed model')
+    const teammate = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+    assert.equal(teammate.status, 200)
+    const peerWork = (await teammate.json()).work
+    assert.ok(peerWork.conversations.some((row: { id: string }) => row.id === latest))
+    assert.ok(peerWork.conversations.every((row: { detail: unknown }) => row.detail === null), 'teammates see only the shared status')
+    assert.equal(detail.task.id, issueId)
+    assert.ok(Array.isArray(detail.timeline))
+    assert.equal((await load({ bearer: null })).status, 401)
+    assert.equal((await load({ bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+    await pool.query('delete from issues where id=any($1::uuid[])', [[child, foreign]])
+  })
+  await t.test('native archive days persist across settings and Bot rows for the authenticated owner only', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const { GET: preference, PATCH: update } = await import('../app/api/mobile/preferences/route')
+    const { readPreferences } = await import('../lib/preferences')
+    const pref = '/api/mobile/preferences'
+    const selected = teamWorkspace.id
+    const readPreference = (options?: ReadOptions) => run(pref, preference, options)
+    const setDays = (days: number, options?: ReadOptions) => run(pref, request => update(new Request(request, {
+      method: 'PATCH', headers: { ...Object.fromEntries(request.headers), 'content-type': 'application/json' },
+      body: JSON.stringify({ archiveIdleAfterDays: days }),
+    })), options)
+    const rows = (archived: boolean, botId: string = bot, options?: ReadOptions) => run(
+      '/api/mobile/conversations?' + new URLSearchParams({ workspaceId: selected, archived: String(archived), botId }),
+      directory, { workspaceId: selected, ...options },
+    )
+    const ids = async (archived: boolean, botId: string = bot, options?: ReadOptions) => {
+      const response = await rows(archived, botId, options)
+      assert.equal(response.status, 200)
+      return (await response.json()).items.map((row: { id: string }) => row.id)
+    }
+    const idle = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: selected, botId: bot, status: 'succeeded' })
+    await pool.query(`UPDATE agent_runs SET "createdAt"=now()-interval '9 days',"updatedAt"=now()-interval '9 days' WHERE id=$1`, [idle])
+    const ownDays = (await (await readPreference()).json()).archiveIdleAfterDays
+    const otherDays = (await (await readPreference({ bearer: peer.token })).json()).archiveIdleAfterDays
+    assert.equal(ownDays, 30)
+    assert.equal(otherDays, 30)
+    assert.equal((await readPreference({ bearer: null })).status, 401)
+    try {
+      assert.equal((await setDays(7)).status, 200)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 7)
+      assert.equal((await pool.query(`SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"=$1`, [owner])).rows[0].archiveIdleAfterDays, 7)
+      assert.equal((await readPreferences(owner)).archiveIdleAfterDays, 7)
+      assert.ok((await ids(true)).includes(idle))
+      assert.ok(!(await ids(false)).includes(idle))
+      assert.ok(!(await ids(true, secondBot)).includes(idle))
+      assert.ok(!(await ids(true, bot, { bearer: peer.token })).includes(idle))
+      assert.equal((await (await readPreference({ bearer: peer.token })).json()).archiveIdleAfterDays, otherDays)
+      assert.equal((await rows(true, bot, { workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await setDays(7, { bearer: null })).status, 401)
+      assert.equal((await setDays(1)).status, 400)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 7)
+      assert.equal((await setDays(0)).status, 200)
+      assert.equal((await readPreferences(owner)).archiveIdleAfterDays, 0)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 0)
+      assert.ok((await ids(false)).includes(idle))
+      assert.ok(!(await ids(true)).includes(idle))
+    } finally {
+      assert.equal((await setDays(ownDays)).status, 200)
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [idle])
+    }
+  })
+  await t.test('the native Bot detail ranks eight of fifty conversations, distinguishes overflow and enforces the workspace and owner', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const childBot = await seedBot(pool, teamWorkspace.id, owner)
+    const ids = Array.from({ length: 50 }, () => randomUUID())
+    await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","botId",status,title,"titleSource","createdAt","updatedAt","conversationPinnedAt","conversationArchivedAt")
+      SELECT id,$2,$3,$4,$5,CASE n WHEN 7 THEN 'waiting_input' WHEN 3 THEN 'running' ELSE 'succeeded' END,
+        'Bot conversation '||n,'manual',now()-n*interval '1 hour',now()-n*interval '1 hour',
+        CASE WHEN n=48 THEN now() END,CASE WHEN n=1 THEN now() END
+      FROM unnest($1::uuid[]) WITH ORDINALITY input(id,n)`, [ids, owner, teamWorkspace.id, agent, childBot])
+    const read = (options?: ReadOptions, id: string = childBot) => run('/api/mobile/conversations?' + new URLSearchParams({
+      view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
+    }), directory, { workspaceId: teamWorkspace.id, ...options })
+    try {
+      const { changeThreadRead } = await import('../lib/thread-reads')
+      // Eleven marked roots include one archived row and several outside the visible eight.
+      for (const runId of ids.slice(0, 11)) {
+        assert.equal(await changeThreadRead(owner, teamWorkspace.id, { action: 'unread', runId }), true)
+      }
+      const response = await read()
+      assert.equal(response.status, 200)
+      const group = await response.json()
+      assert.equal(group.unreadCount, 10)
+      const { GET: home } = await import('../app/api/mobile/home/route')
+      const homeResponse = await run('/api/mobile/home', home, { workspaceId: teamWorkspace.id })
+      assert.equal(homeResponse.status, 200)
+      const homeData = await homeResponse.json()
+      assert.equal(homeData.workspace.id, teamWorkspace.id)
+      assert.equal(homeData.bots.find((entry: { id: string }) => entry.id === childBot)?.unreadCount, 10)
+      assert.equal(group.workspaceId, teamWorkspace.id)
+      assert.equal(group.botId, childBot)
+      assert.equal(group.more, true)
+      assert.deepEqual(group.items.map((row: { id: string }) => row.id), [47, 6, 2, 1, 3, 4, 5, 7].map(index => ids[index]))
+      const memberGroup = await (await read({ bearer: peer.token })).json()
+      assert.deepEqual(memberGroup.items, [])
+      assert.equal(memberGroup.unreadCount, 0)
+      assert.deepEqual((await (await read({}, secondBot)).json()).items, [])
+      assert.equal((await read({ workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await read({ bearer: null })).status, 401)
+      assert.equal((await read({}, 'invalid')).status, 422)
+      await pool.query('UPDATE agent_runs SET "conversationArchivedAt"=now() WHERE id=ANY($1::uuid[])', [ids.slice(3)])
+      const remainder = await (await read()).json()
+      assert.equal(remainder.more, false)
+      assert.equal(remainder.unreadCount, 2)
+      assert.deepEqual(remainder.items.map((row: { id: string }) => row.id), [ids[2], ids[1]])
+    } finally {
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids])
+      await pool.query('DELETE FROM bots WHERE id=$1', [childBot])
+    }
+  })
+  await t.test('the native PR directory filters canonical publications with the requested workspace and authenticated reader', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const read = (space: string, filter: string, options?: ReadOptions) =>
+      run(`/api/mobile/conversations?workspaceId=${space}&archived=any&pullState=${filter}`, directory, { workspaceId: space, ...options })
+    const allowed = await read(teamWorkspace.id, 'open')
+    assert.equal(allowed.status, 200)
+    const page = await allowed.json()
+    assert.ok(page.items.some((row: { id: string; pulls: { url: string }[] }) =>
+      row.id === latest && row.pulls.some(pull => pull.url === 'https://github.com/acme/app/pull/42')))
+    const closed = await read(teamWorkspace.id, 'closed')
+    assert.equal(closed.status, 200)
+    assert.deepEqual((await closed.json()).items, [])
+    const member = await read(teamWorkspace.id, 'linked', { bearer: peer.token })
+    assert.equal(member.status, 200)
+    assert.deepEqual((await member.json()).items, [])
+    assert.equal((await read(teamWorkspace.id, 'invented')).status, 422)
+    assert.equal((await read(teamWorkspace.id, 'linked', { bearer: null })).status, 401)
+    assert.equal((await read(teamWorkspace.id, 'linked', { workspaceId: secondWorkspace.id })).status, 403)
+  })
+  await t.test('a verified Factory PR identifies its conversation for the owner while a teammate sees only the shared work', async () => {
+    const factoryId = randomUUID(), attempt = randomUUID(), source = randomUUID()
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Native pull request fixture"}')`, [source, owner, bot, issueId])
+      await tx.query(`INSERT INTO factory_tasks(id,"userId","botId","issueId","sourceEventId","scopeVersion",route,stage,status,"attemptId",reason)
+        SELECT $1,$2,$3,$4,$5,"scopeVersion",'{}','execute','passed',$6,'Native work fixture' FROM issues WHERE id=$4`, [factoryId, owner, bot, issueId, source, attempt])
+      await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason)
+        VALUES($1,$2,'execute',1,1,'passed',$3,'Native work fixture')`, [attempt, factoryId, latest])
+      await tx.query('COMMIT')
+    } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    try {
+      const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+      const response = await load()
+      assert.equal(response.status, 200)
+      const ownerWork = (await response.json()).work
+      assert.equal(ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/42'))?.sourceConversationId, latest)
+      assert.ok(!('sourceConversationId' in ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/1'))))
+      const peerResponse = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+      assert.equal(peerResponse.status, 200)
+      const peerWork = (await peerResponse.json()).work
+      assert.ok(peerWork.pullRequests.every((pull: { sourceConversationId?: string }) => !pull.sourceConversationId))
+      // The thread's Artifact segment on iOS: the task's conversation lists the whole Factory task's PRs and its own documents.
+      const shown = await threadArtifacts(latest, { workspaceId: teamWorkspace.id })
+      assert.equal(shown.status, 200)
+      const groups = (await shown.json()).groups
+      assert.deepEqual(groups.pullRequests.map((pull: { url: string }) => pull.url).sort(), ['https://github.com/acme/app/pull/1', 'https://github.com/acme/app/pull/42'])
+      assert.deepEqual(groups.reports.map((item: { artifactId: string; kind: string }) => [item.artifactId, item.kind]), [[artifactIds[1], 'html']])
+      assert.equal((await threadArtifacts(latest, { bearer: peer.token, workspaceId: teamWorkspace.id })).status, 404, 'another person never reads the thread\'s Artifacts')
+      assert.equal((await threadArtifacts(latest, { workspaceId: secondWorkspace.id })).status, 404, 'another workspace reads nothing')
+    } finally {
+      await pool.query('DELETE FROM factory_tasks WHERE id=$1 AND "userId"=$2', [factoryId, owner])
+      await pool.query('DELETE FROM coordinator_events WHERE id=$1 AND "userId"=$2', [source, owner])
+    }
+  })
+  await t.test('a thread without a task lists its own runs\' evidence for its owner only, in its own workspace', async () => {
+    const thread = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: teamWorkspace.id, botId: bot })
+    const capture = randomUUID(), document = randomUUID()
+    await pool.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,size,"inlineContent","storageKey",sha256)
+      VALUES($1,$2,$3,'image','image/png','local','ready','Preview',4,$4,$5,'0')`, [capture, owner, thread, Buffer.from('PNG!'), 'fixture/' + capture])
+    await pool.query(`insert into artifacts(id,"userId","workspaceId",kind,title,"runId") values($1,$2,$3,'markdown','Thread report',$4)`, [document, owner, teamWorkspace.id, thread])
+    try {
+      // The app names its workspace; without it the request reads the default (Personal) one, where this thread is not.
+      assert.equal((await threadArtifacts(thread)).status, 404)
+      const response = await threadArtifacts(thread, { workspaceId: teamWorkspace.id })
+      assert.equal(response.status, 200)
+      const body = await response.json()
+      assert.equal(body.count, 2)
+      assert.deepEqual(body.groups.captures.map((item: { captureId: string; kind: string; webPath: string | null }) => [item.captureId, item.kind, item.webPath]), [[capture, 'image', null]])
+      assert.deepEqual(body.groups.reports.map((item: { artifactId: string; kind: string; version: number }) => [item.artifactId, item.kind, item.version]), [[document, 'markdown', 1]])
+      assert.deepEqual([body.groups.plans, body.groups.pullRequests], [[], []])
+      assert.equal((await threadArtifacts(thread, { bearer: peer.token, workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(thread, { workspaceId: secondWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(secondRun, { workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(randomUUID(), { workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(thread, { bearer: null, workspaceId: teamWorkspace.id })).status, 401)
+    } finally {
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [capture])
+      await pool.query('DELETE FROM artifacts WHERE id=$1', [document])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [thread])
+    }
+  })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
     const response = await request(issueId)
     assert.equal(response.status, 200)
     assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
     const body = await response.json()
-    assert.deepEqual(Object.keys(body).sort(), ['activity', 'live', 'task'])
-    assert.equal(body.task.title, 'Short title')
+    assert.deepEqual(Object.keys(body).sort(), ['activity', 'live', 'task', 'timeline'])
+    // A task's own title, as a person or an Agent gave it; an old stored short title is not shown.
+    assert.equal(body.task.title, 'Full title')
+    assert.equal(body.task.replyRunId, latest)
     assert.equal(body.task.description, 'Description')
     assert.equal(body.task.group, 'pending', 'PR metadata wins over idle')
     assert.deepEqual([body.task.state, body.task.reason, body.task.blockedBy], ['waiting', 'pr_review', null])
@@ -142,7 +378,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(body.task.agent, { harness: 'codex', model: 'fixture-model' })
     assert.deepEqual(body.task.place, { kind: 'cloud', name: 'Cloud' })
     assert.equal(body.task.schedule, null)
-    assert.deepEqual(body.live, { workspaceId: teamWorkspace.id })
+    assert.deepEqual(body.live, { workspaceId: teamWorkspace.id, factoryActivityVersion: 1 })
     assert.deepEqual(body.activity.map((row: { kind: string }) => row.kind), ['attempt', 'replaced', 'attempt', 'created'])
     assert.deepEqual(body.activity.filter((row: { kind: string }) => row.kind === 'attempt').map((row: { runId: string; n: number }) => [row.runId, row.n]), [[latest, 2], [first, 1]])
     assert.equal(body.activity[0].state, 'done')
@@ -153,6 +389,48 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(body.activity[0].createdAt, body.activity[1].createdAt)
     assert.equal(body.activity.at(-1).by, 'owner')
     assert.doesNotMatch(JSON.stringify(body), /PRIVATE_RAW_ERROR|failureDetails|"error"/)
+  })
+  await t.test('authorized task history, comments and replies retain their source identity and chronological order', async () => {
+    const id = await workspaceTask()
+    const v1 = randomUUID(), v2 = randomUUID(), threadId = 'discussion-' + randomUUID()
+    const first = '2026-01-01T12:00:00.000Z', changed = '2026-01-01T12:01:00.000Z', replied = '2026-01-01T12:02:00.000Z'
+    const { loadIssueDocument, upsertLinearComment, encodedIssueDocument } = await import('../lib/linear-sync/document')
+    const doc = loadIssueDocument(null, { type: 'doc' })
+    try {
+      upsertLinearComment(doc, { threadId, messageId: 'c1', author: 'owner', authorUserId: owner, body: 'Root discussion', at: first })
+      upsertLinearComment(doc, { threadId, messageId: 'c2', author: 'owner', authorUserId: owner, body: 'A reply', at: replied })
+      await pool.query('insert into issue_documents ("issueId","userId",state) values ($1,$2,$3)', [id, owner, encodedIssueDocument(doc)])
+      await pool.query(`insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id,"createdAt")
+        values ($1,$3,$4,1,'Before','{"type":"doc"}','todo','normal','user',$4,$5),($2,$3,$4,2,'After','{"type":"doc"}','todo','normal','user',$4,$6)`, [v1, v2, id, owner, first, changed])
+      const data = await (await request(id)).json()
+      assert.deepEqual(data.timeline.map((row: { id: string }) => row.id), [
+        `discussion:${threadId}:c1`, `history:created-${v1}`, `history:title-${v2}`, `discussion:${threadId}:c2`,
+      ])
+      assert.deepEqual(data.timeline[2].event.source, { kind: 'revision', id: v2, revision: 2 })
+      assert.equal(data.timeline[2].event.actor.id, owner)
+      assert.equal(data.timeline[3].kind, 'reply')
+      assert.equal(data.timeline[3].threadId, threadId)
+      assert.equal(data.timeline[3].authorId, owner)
+      assert.equal(data.task.replyRunId, null, 'a discussion does not create a runnable conversation')
+      const denied = await request(id, { bearer: peer.token, workspaceId: secondWorkspace.id })
+      assert.equal(denied.status, 404)
+      assert.doesNotMatch(await denied.text(), /Root discussion|A reply|Before|After/)
+    } finally {
+      doc.destroy()
+      await pool.query('delete from issue_documents where "issueId"=$1', [id])
+      await pool.query('delete from issue_versions where "issueId"=$1', [id])
+    }
+  })
+  await t.test('conversation reads keep control runs as evidence and route replies only to the latest authorized conversation', async () => {
+    await pool.query("update agent_runs set kind='review' where id=$1", [latest])
+    try {
+      const detail = await (await request(issueId)).json()
+      assert.ok(detail.activity.some((row: { runId?: string }) => row.runId === latest))
+      assert.equal(detail.task.replyRunId, first)
+      assert.equal((await (await request(noRun)).json()).task.replyRunId, null)
+      const teammate = await (await request(issueId, { ...teamSelection, bearer: peer.token })).json()
+      assert.equal(teammate.task.replyRunId, null)
+    } finally { await pool.query("update agent_runs set kind='implement' where id=$1", [latest]) }
   })
   await t.test('list decorations share one batched read, cover no-thread schedules and preserve blocked', async () => {
     const measurement = await measured(() => newestTaskRuns(owner, [issueId, noRun], teamWorkspace.id))
@@ -170,6 +448,60 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const closed = await (await listRequest(teamSelection)).json()
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
+  })
+  await t.test('one versioned list response includes canonical state and keeps the selected workspace boundary', async () => {
+    const path = '/api/mobile/tasks?presentation=1'
+    const response = await run(path, list, teamSelection)
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.presentationVersion, 1)
+    assert.equal(body.workspaceId, teamWorkspace.id)
+    assert.equal(body.next, null)
+    const visible = body.tasks.find((item: { id: string }) => item.id === issueId)
+    assert.deepEqual([visible.status, visible.group, visible.bot.id], ['done', 'done', bot])
+    assert.ok(body.tasks.every((item: { id: string }) => item.id !== secondTask && item.id !== personalTask))
+    const first = body.tasks[0]
+    const cursor = new URLSearchParams({ workspaceId: teamWorkspace.id, after: first.id, updatedAt: first.updatedAt })
+    const continuation = await run(path + '&' + cursor, list, teamSelection)
+    assert.equal(continuation.status, 200)
+    assert.deepEqual(await continuation.json(), { ...body, tasks: body.tasks.slice(1) })
+    assert.equal((await run(path, list, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 403)
+    assert.equal((await (await listRequest(teamSelection)).json()).presentationVersion, undefined)
+  })
+  await t.test('a recovered native read exports only the validated past failure in a retained error span', async () => {
+    const { createTracerProvider, SafeExporter } = await import('../lib/tracing/node')
+    const memory = new InMemorySpanExporter()
+    const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 0.000001, environment: 'dev' })
+    provider.register()
+    try {
+      const failedTraceId = '6abe308341a942df9b952484f9179a9b'
+      const report = { stage: 'list', reason: 'timeout', traceId: failedTraceId }
+      const path = '/api/mobile/tasks?presentation=1'
+      const send = (value: unknown, bearer?: string | null) => provider.getTracer('mobile-test').startActiveSpan('GET /api/mobile/tasks', { kind: SpanKind.SERVER }, async span => {
+        try {
+          return await run(path, list, { ...teamSelection, bearer, headers: {
+            'x-mikka-client-kind': 'mobile', 'x-mikka-app-version': '1.0.0',
+            'x-mikka-task-refresh-failure': JSON.stringify(value),
+          } })
+        } finally { span.end() }
+      })
+      assert.equal((await send(report)).status, 200)
+      assert.equal((await send({ ...report, error: 'private response text' })).status, 200)
+      assert.equal((await send(report, null)).status, 401)
+      await provider.forceFlush()
+      const failures = memory.getFinishedSpans().filter(span => span.name === 'mobile.tasks.refresh.failure')
+      assert.equal(failures.length, 1)
+      const { attributes } = failures[0]!
+      assert.equal(attributes['mikka.task_refresh.client_stage'], 'list')
+      assert.equal(attributes['mikka.task_refresh.reason'], 'timeout')
+      assert.equal(attributes['mikka.task_refresh.failed_trace_id'], failedTraceId)
+      assert.equal(attributes['mikka.app.version'], '1.0.0')
+      assert.doesNotMatch(JSON.stringify(attributes), /private response text/)
+    } finally {
+      await provider.shutdown()
+      trace.disable()
+      traceContext.disable()
+    }
   })
   await t.test('without a thread, flags and dependencies preserve todo with matching reasons and visible identifiers', async () => {
     await pool.query(`update user_schedules set status='cancelled',next_at=null where id=$1`, [schedule])
@@ -230,7 +562,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       return response.json()
     })
     assert.equal(unlinkedRead.value.task.identifier, original.issuedIdentifier)
-    assert.deepEqual(unlinkedRead.value.live, { workspaceId: teamWorkspace.id }, 'an absent Team link retains Shared ownership')
+    assert.equal(unlinkedRead.value.live.workspaceId, teamWorkspace.id, 'an absent Team link retains Shared ownership')
     assert.ok(unlinkedRead.statements <= personalRead.statements,
       'the same owner and absent Team link need no extra naming statement in a Shared Workspace')
     assert.equal((await request(id, { workspaceId: own.id })).status, 404, 'removing a Team does not move the Task to Personal')
@@ -242,7 +574,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(relinked.status, 200)
     const relinkedBody = await relinked.json()
     assert.equal(relinkedBody.task.identifier, original.issuedIdentifier, 'reattaching a Team cannot reissue the number')
-    assert.deepEqual(relinkedBody.live, { workspaceId: teamWorkspace.id }, 'relinking keeps the persisted Shared workspace')
+    assert.equal(relinkedBody.live.workspaceId, teamWorkspace.id, 'relinking keeps the persisted Shared workspace')
     assert.equal((await request(id, { workspaceId: own.id })).status, 404, 'a prior negative Team lookup cannot move the Task to Personal')
     assert.equal((await request(id, { workspaceId: secondWorkspace.id })).status, 404)
     const { rows: [retained] } = await pool.query('select "issuedIdentifier","workspaceId","ownershipState",scope from issues where id=$1', [id])
@@ -290,7 +622,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       for (const value of [task, row]) assert.deepEqual([value.state, value.reason], [state, reason])
     }
     await compare('blocked', 'offline')
-    await pool.query('update devices set "lastSeenAt"=now() where id=$1', [device])
+    await pool.query('update devices set "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL where id=$1', [device])
     await compare('queued', null)
     await pool.query('update devices set enabled=false where id=$1', [device])
     await compare('blocked', 'offline')
@@ -325,7 +657,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const body = await detail.json()
     assert.equal(body.task.bot.id, personalBot)
     assert.equal(body.task.schedule.label, 'Every day at 10:00')
-    assert.deepEqual(body.live, { workspaceId: own.id })
+    assert.equal(body.live.workspaceId, own.id)
     assert.deepEqual(row.bot, body.task.bot)
     assert.deepEqual(row.schedule, body.task.schedule)
 
@@ -338,15 +670,15 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(unselectedTeam.status, 200, 'a native session reads the task in its persisted Workspace, independent of the Personal default')
     const teamBody = await unselectedTeam.json()
     assert.equal(teamBody.task.bot.id, bot)
-    assert.deepEqual(teamBody.live, { workspaceId: teamWorkspace.id })
+    assert.equal(teamBody.live.workspaceId, teamWorkspace.id)
     const unselectedSchedule = await request(noRun, unselected)
     assert.equal(unselectedSchedule.status, 200)
     const scheduleBody = await unselectedSchedule.json()
     assert.equal(scheduleBody.task.schedule.label, 'Every day at 09:00')
-    assert.deepEqual(scheduleBody.live, { workspaceId: teamWorkspace.id })
+    assert.equal(scheduleBody.live.workspaceId, teamWorkspace.id)
     const selectedTeam = await request(issueId, { workspaceId: teamWorkspace.id })
     assert.equal(selectedTeam.status, 200)
-    assert.deepEqual((await selectedTeam.json()).live, { workspaceId: teamWorkspace.id })
+    assert.equal((await selectedTeam.json()).live.workspaceId, teamWorkspace.id)
 
     const savedTeam = { workspaceId: null, cookie: 'mikka-workspace=' + teamWorkspace.id }
     const savedContext = await run('/api/workspace', () => loadWorkspaceContext(), savedTeam)
@@ -356,13 +688,13 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(personalFromTeamCookie.status, 200, 'a normal session cookie is a preference, not an authentication pin')
     const personalBody = await personalFromTeamCookie.json()
     assert.equal(personalBody.task.bot.id, personalBot)
-    assert.deepEqual(personalBody.live, { workspaceId: own.id })
+    assert.equal(personalBody.live.workspaceId, own.id)
     const savedPersonal = { bearer: null, workspaceId: null, cookie: cookie + '; mikka-workspace=' + own.id }
     const teamFromPersonalCookie = await request(issueId, savedPersonal)
     assert.equal(teamFromPersonalCookie.status, 200)
     const cookieTeamBody = await teamFromPersonalCookie.json()
     assert.equal(cookieTeamBody.task.bot.id, bot)
-    assert.deepEqual(cookieTeamBody.live, { workspaceId: teamWorkspace.id })
+    assert.equal(cookieTeamBody.live.workspaceId, teamWorkspace.id)
     const scheduleFromPersonalCookie = await request(noRun, savedPersonal)
     assert.equal(scheduleFromPersonalCookie.status, 200)
     assert.equal((await scheduleFromPersonalCookie.json()).task.schedule.label, 'Every day at 09:00')
@@ -387,7 +719,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   })
 
   await t.test('explicit workspace selections return 404 across tenants, and workspace tokens stay scoped', async () => {
-    const personalPat = await createPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
+    const personalPat = await createLegacyPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
     const ownerMember = (await workspace.query('select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])).rows[0]
     assert.ok(ownerMember)
     try {
@@ -437,7 +769,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       assert.equal(detail.status, 200)
       const value = await detail.json()
       assert.equal(value.task.id, example.taskId)
-      assert.deepEqual(value.live, { workspaceId: example.workspaceId })
+      assert.equal(value.live.workspaceId, example.workspaceId)
       assert.deepEqual(value.activity.filter((row: { kind: string }) => row.kind === 'attempt').map((row: { runId: string }) => row.runId), example.runIds)
       const browser = await request(example.taskId, { bearer: null, workspaceId: null, cookie: cookie + '; mikka-workspace=' + example.workspaceId })
       assert.equal(browser.status, 200, 'the native signed cookie reaches the same selected tenant')
@@ -533,7 +865,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       const waitBlockedBy = async () => {
         for (let attempt = 0; attempt < 300; attempt++) {
           const { rows } = await pool.query<{ query: string }>(`select query from pg_stat_activity
-            where datname=current_database() and $1::int=any(pg_blocking_pids(pid))`, [pid])
+            where datname=current_database() and state='active' and wait_event_type='Lock'
+              and query ilike '%mikka_workspace_members%for share%' and $1::int=any(pg_blocking_pids(pid))`, [pid])
           if (rows.length) return rows[0]
           await new Promise(resolve => setTimeout(resolve, 10))
         }

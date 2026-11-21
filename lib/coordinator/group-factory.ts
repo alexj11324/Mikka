@@ -2,9 +2,12 @@ import type { Pool, PoolClient } from 'pg'
 import { createHash } from 'node:crypto'
 import { groupListChanged } from '@/lib/live/lists'
 import { groupChatChanged } from '@/lib/live/groups'
+import { connectForCommitEffects } from '@/lib/db/commit-effects'
 import { factoryEventId } from '@/lib/factory/event-id'
 import type { GroupRuntime, GroupReply } from './group-turns'
 import type { GroupTaskReference } from './group-routing'
+import { withConversationWorkspace } from '../conversation-workspace'
+import { decisionTaskReferences } from '../group-task-links'
 import { recordGroupTraceEvent } from './group-decision-trace'
 import { recordGroupFeedback } from './group-decision-feedback'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
@@ -40,13 +43,9 @@ const mergedCandidateSql=`(t.stage='publish' AND t.status='passed' AND EXISTS (
 const taskSucceeded=(task:TaskState)=>task.status==='passed' && (task.stage==='monitor' || task.acceptedDeliverable===true || task.mergedCandidate===true)
 
 /** Only tasks previously bound by this authenticated participant enter the model's allowlist. */
-export async function groupTaskReferences(client:Query, scope:{userId:string;conversationId:string}):Promise<GroupTaskReference[]> {
-  return (await client.query<GroupTaskReference>(`SELECT b."issueId",b."reporterId",i.title,t.id AS "taskId",
-    COALESCE(t.status,'pending') AS status,a."runId",t."sourceEventId" AS "requestEpoch"
-    FROM group_task_bindings b JOIN issues i ON i.id=b."issueId"
-    LEFT JOIN LATERAL (SELECT * FROM factory_tasks WHERE "issueId"=b."issueId" AND "userId"=b."userId" AND "botId"=b."executionBotId" ORDER BY "createdAt" DESC LIMIT 1) t ON true
-    LEFT JOIN factory_attempts a ON a.id=t."attemptId"
-    WHERE b."conversationId"=$1 AND b."userId"=$2 ORDER BY b."createdAt" DESC LIMIT 20`,[scope.conversationId,scope.userId])).rows
+export async function groupTaskReferences(client: Query, scope: { userId: string; conversationId: string; workspaceId: string }): Promise<GroupTaskReference[]> {
+  return await withConversationWorkspace(scope.userId, scope.workspaceId,
+    () => decisionTaskReferences(client, scope.userId, scope.workspaceId, scope.conversationId)) ?? []
 }
 
 export function groupTaskReport(task:TaskState, prefix?:string, locale:GroupLocale='zh-CN'):GroupReply {
@@ -68,6 +67,7 @@ export function groupExecutionRemedy(reason:string,locale:GroupLocale='zh-CN'):s
   if (['repositoryRequired','agentRepoMissing','repositoryNotFound'].includes(reason)) return copy.repositoryRemedy
   if (['noDevice','machineUnavailable','deviceOffline','agentNoDevice','cloudComputerUnavailable','cloudNotConfigured','cloudTemporarilyUnavailable'].includes(reason)) return copy.runtimeRemedy
   if (reason==='task_tool_disabled') return copy.toolRemedy
+  if (reason==='agentRequired') return copy.agentRemedy
   return copy.authorizationRemedy
 }
 
@@ -75,7 +75,7 @@ export type GroupFactoryAdapters = {
   authorize(scope:Scope):Promise<void>
   executionBot(scope:Scope):Promise<{botId:string;reporterOwnerId:string;repository:string|null}>
   create(userId:string,eventId:string,title:string):Promise<string>
-  dispatch(userId:string,input:{issueId:string;repo?:string;note:string;requestKey:string;sourceEventId:string},botId:string):Promise<{runId?:string;thread?:string;status?:string;error?:string}>
+  dispatch(userId:string,input:{issueId:string;repo?:string;note:string;requestKey:string;sourceEventId:string;agent?:'claude_code'|'codex'},botId:string):Promise<{runId?:string;thread?:string;status?:string;error?:string}>
   latest(userId:string,issueId:string):Promise<{id:string}|null>
   continuation(userId:string,runId:string,text:string,eventId:string):Promise<unknown>
   stop(userId:string,task:TaskState,botId:string,eventId:string):Promise<void>
@@ -157,7 +157,8 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
   // Replay reads it instead of injecting another message into the same thread.
   if (!(task.requestEpoch===eventId && task.runId)) {
     await runtime.authorize(scope)
-    const result=await runtime.dispatch(scope.userId,{issueId,...(repository?{repo:repository}:{}),note:scope.text,requestKey:`group:${scope.messageId}`,sourceEventId:eventId},botId)
+    const agent=groupMessageAgent(scope.text)
+    const result=await runtime.dispatch(scope.userId,{issueId,...(repository?{repo:repository}:{}),note:scope.text,requestKey:`group:${scope.messageId}`,sourceEventId:eventId,...(agent?{agent}:{})},botId)
     if (result.error) {
       task=await readTask(client,scope.userId,issueId,botId);await reported()
       return finish({...groupTaskReport(task,copy.newRunNotStarted.replace('{remedy}',groupExecutionRemedy(result.error,locale)),locale),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:'blocked',reportTiming:'now'}})
@@ -208,7 +209,8 @@ export async function authorizeGroupFactoryActor(client:Query,scope:Pick<Scope,'
     return (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId,workspaceId)
   }):Promise<void> {
   await authorizeWorkspace(scope.userId,scope.workspaceId)
-  const {rows:[member]}=await client.query(`SELECT b."ownerId" FROM conversations c JOIN conversation_members u ON u."conversationId"=c.id AND u."memberType"='user' AND u."memberId"=$2 AND u."leftAt" IS NULL JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='bot' AND m."memberId"=$3 AND m."leftAt" IS NULL JOIN bots b ON b.id::text=m."memberId" AND b."workspaceId"=c."workspaceId" AND b."archivedAt" IS NULL WHERE c.id=$1 AND c."workspaceId"=$4`,[scope.conversationId,scope.userId,scope.reporter.id,scope.workspaceId])
+  const {rows:[member]}=await client.query(`SELECT b."ownerId" FROM conversations c JOIN conversation_members u ON u."conversationId"=c.id AND u."memberType"='user' AND u."memberId"=$2 AND u."leftAt" IS NULL JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='bot' AND m."memberId"=$3 AND m."leftAt" IS NULL JOIN bots b ON b.id::text=m."memberId" AND b."workspaceId"=c."workspaceId" AND b."archivedAt" IS NULL WHERE c.id=$1 AND c."workspaceId"=$4
+    AND (c."creationPurpose"='group' OR c."createdBy"=$2)`,[scope.conversationId,scope.userId,scope.reporter.id,scope.workspaceId])
   if (!member?.ownerId) throw Error('group_task_not_authorized')
   await authorizeWorkspace(member.ownerId,scope.workspaceId)
 }
@@ -218,18 +220,19 @@ async function productionAdapters():Promise<GroupFactoryAdapters> {
   return {
     authorize:scope=>authorizeGroupFactoryActor(pool,scope),
     async executionBot(scope) {
-      const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
+      const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository,"environmentId" FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
       if (!bot) throw Error('group_task_not_authorized')
       // A shared Bot is the reporter. Execution stays on the requester's own
       // Coordinator/resources, never impersonating the reporter's owner.
       const botId=bot.ownerId===scope.userId ? bot.id : await (await import('./coordinator-bot')).chatBotId(scope.userId,null,scope.workspaceId)
-      return {botId,reporterOwnerId:bot.ownerId,repository:bot.repository}
+      return {botId,reporterOwnerId:bot.ownerId,repository:await (await import('@/lib/bot-environment')).botRepository({workspaceId:scope.workspaceId,environmentId:bot.environmentId,repository:bot.repository})}
     },
     async create(userId,sourceEventId,title) { return (await (await import('./issue-create')).createIssueFromRequest(userId,{sourceEventId,title})).issueId },
     async dispatch(userId,input,botId) {
       const {latestTaskRun}=await import('@/lib/thread-dispatch')
       const previous=await latestTaskRun(pool,userId,input.issueId)
-      if (input.repo || previous?.remoteUrl) return (await import('@/workflows/coordinator/steps')).dispatchRun(userId,{...input,repo:input.repo ?? previous!.remoteUrl!},undefined,botId)
+      const {agent,...request}=input
+      if (input.repo || previous?.remoteUrl) return (await import('@/workflows/coordinator/steps')).dispatchRun(userId,{...request,repo:input.repo ?? previous!.remoteUrl!,...(agent && !previous?{model:{harness:agent}}:{})},undefined,botId)
       return dispatchStandaloneTask(userId,input,botId)
     },
     async latest(userId,issueId) { return (await import('@/lib/thread-dispatch')).latestTaskRun(pool,userId,issueId) },
@@ -262,7 +265,9 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
     const {latestThreadRunModel}=await import('@/lib/computer/run-model')
     const kept=previous ? await latestThreadRunModel(pool,userId,input.issueId,previous.agentId) : null
     if (previous && !kept) return {error:'threadModelUnavailable' as const}
-    const choice=previous ? null : await resolveAgentProfileDispatch(pool,{ownerId:userId,workspaceId,botId},{issueId:input.issueId,stage:'execute',note,location:'cloud',cloudPurpose:'desktop'})
+    // A new thread runs on the Agent the message names; nothing picks one (decision 2026-11-17-1800).
+    if (!previous && !input.agent) return {error:'agentRequired' as const}
+    const choice=previous ? null : await resolveAgentProfileDispatch(pool,{ownerId:userId,workspaceId,botId},{issueId:input.issueId,stage:'execute',note,location:'cloud',cloudPurpose:'desktop',asked:{harness:input.agent!}})
     const target=choice?.target
     if (target && target.kind!=='cloud') return {error:'machineUnavailable' as const}
     const harness=previous?.harness ?? (target?.kind==='cloud' ? target.harness : null)
@@ -271,11 +276,17 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
     if (!runtime) return {error:'cloudComputerUnavailable' as const}
     const source=target?.kind==='cloud' ? target.entry.source : null
     const subscriptionBindingId=source?.kind==='subscription' && target?.kind==='cloud' ? await bindAgentToConnection(pool,{ownerId:userId,workspaceId},runtime.agentId,harness,source.connectionId,target.model) : undefined
-    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,agentProfile:choice?.agentProfile,modelDispatch:{mode:choice?.selectionMode ?? 'preference',location:'cloud',entry:target.entry,...(target.routing?{routing:target.routing}:{})},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
+    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,agentProfile:choice?.agentProfile,modelDispatch:{mode:choice?.selectionMode ?? 'preference',location:'cloud',entry:target.entry},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
     if (!selection) return {error:'threadModelUnavailable' as const}
     const {dispatchComputerTask}=await import('@/workflows/coordinator/steps')
     return dispatchComputerTask(userId,{botId,issueId:input.issueId,harness,note,...selection,sourceEventId:input.sourceEventId,factoryBotId:botId,...(previous?{threadRunId:previous.id}:{}),...(previous?.readOnly?{readOnly:true}:{})},`group:${input.sourceEventId}`)
   }})
+}
+
+/** The Agent a group message names: exactly one of Claude Code and Codex, else none (the dispatch asks for one). */
+export function groupMessageAgent(text:string):'claude_code'|'codex'|undefined {
+  const claude=/claude/i.test(text), codex=/codex/i.test(text)
+  return claude===codex ? undefined : claude ? 'claude_code' : 'codex'
 }
 
 /** Bound tasks with a reportable revision their group has not been told (b: group_task_bindings, t: factory_tasks). */
@@ -292,7 +303,7 @@ export async function groupsWithPendingTaskReports(client:Query):Promise<string[
 export async function reconcileGroupTaskReports(conversationId:string, dependencies?:{pool:Pool;authorize:GroupFactoryAdapters['authorize']}):Promise<number> {
   const pool=dependencies?.pool ?? (await import('@/lib/db')).pool
   const authorize=dependencies?.authorize ?? (await productionAdapters()).authorize
-  const client=await pool.connect()
+  const client=await connectForCommitEffects(pool)
   let count=0
   try {
     const {rows:bindings}=await client.query(`SELECT b.*,c."workspaceId" FROM group_task_bindings b JOIN conversations c ON c.id=b."conversationId" WHERE b."conversationId"=$1`,[conversationId])

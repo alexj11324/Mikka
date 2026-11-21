@@ -1,6 +1,7 @@
+import { useSyncExternalStore } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
 import { NavBar } from '@/components/NavBar'
-import { heldMessage } from '@/lib/message-actions'
+import { heldMessage, subscribeHeldMessage } from '@/lib/message-actions'
 import { colors, font } from '@/lib/theme'
 
 /**
@@ -9,7 +10,7 @@ import { colors, font } from '@/lib/theme'
  * keyboard comes up.
  */
 export default function MessageText() {
-  const text = heldMessage()?.text ?? ''
+  const text = useSyncExternalStore(subscribeHeldMessage, heldMessage, heldMessage)?.text ?? ''
   return (
     <View style={styles.screen}>
       <NavBar title="选择文本" />

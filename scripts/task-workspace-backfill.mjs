@@ -21,8 +21,8 @@ const runEvidence = `SELECT r."issueId", b."workspaceId"::text, 'bot' AS source,
     FROM agent_runs r WHERE r."issueId"=ANY($1::uuid[]) AND r."agentDefinition"#>>'{executionIdentity,workspaceId}' IS NOT NULL`
 
 async function lockWorkspaces(tenant, candidates) {
-  const { rows } = candidates.length ? await tenant.query('SELECT id FROM mikka_workspaces WHERE id=ANY($1::uuid[]) ORDER BY id FOR SHARE', [candidates]) : { rows: [] }
-  return new Set(rows.map(row => row.id))
+  const { rows } = candidates.length ? await tenant.query('SELECT id,kind FROM mikka_workspaces WHERE id=ANY($1::uuid[]) ORDER BY id FOR SHARE', [candidates]) : { rows: [] }
+  return new Map(rows.map(row => [row.id, row.kind]))
 }
 
 /** Resume safely after either database migrated or a prior batch committed.
@@ -36,6 +36,7 @@ export async function backfillTaskWorkspaces(application, workspace) {
   const { rows: [sourceReady] } = await workspace.query(`SELECT to_regclass('mikka_workspaces') IS NOT NULL
     AND to_regclass('mikka_team_issues') IS NOT NULL AS ready`)
   if (!sourceReady.ready) return { bound: 0, pending: 0, runsBound: 0, artifactsBound: 0, factoryBound: 0 }
+  const aclReady = (await application.query("SELECT to_regclass('resource_access_policies') IS NOT NULL AS ready")).rows[0].ready
   let after = null, bound = 0, pending = 0
   for (;;) {
     const { rows } = await application.query(`SELECT id FROM issues WHERE "workspaceId" IS NULL
@@ -91,6 +92,18 @@ export async function backfillTaskWorkspaces(application, workspace) {
         const resolved = changed ? { workspaceId: null, reason: 'conflicting_evidence' } : resolveTaskWorkspace(proofs, existing)
         if (resolved.workspaceId) {
           const result = await app.query('UPDATE issues SET "workspaceId"=$2 WHERE id=$1 AND "workspaceId" IS NULL', [id, resolved.workspaceId])
+          // Work with either SQL default during a code-first rollout. Only
+          // the separately locked kind decides implicit sharing; a scope
+          // string or creator is never Workspace kind evidence.
+          if (result.rowCount && aclReady && existing.get(resolved.workspaceId) === 'team') {
+            await app.query(`UPDATE resource_access_policies SET visibility='shared',provenance='legacy_shared_task'
+              WHERE kind='task' AND id=$1 AND "workspaceId"=$2 AND "ownerId"=$3
+                AND visibility='private' AND provenance='legacy_private' AND "parentId" IS NULL`, [id, resolved.workspaceId, userId])
+          } else if (result.rowCount && aclReady && existing.get(resolved.workspaceId) === 'personal') {
+            await app.query(`UPDATE resource_access_policies SET visibility='private',provenance='legacy_private'
+              WHERE kind='task' AND id=$1 AND "workspaceId"=$2 AND "ownerId"=$3
+                AND visibility='shared' AND provenance='legacy_shared_task'`, [id, resolved.workspaceId, userId])
+          }
           bound += result.rowCount
           await app.query('DELETE FROM issue_workspace_repairs WHERE "issueId"=$1', [id])
         } else {

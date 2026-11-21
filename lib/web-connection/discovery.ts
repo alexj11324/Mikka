@@ -3,7 +3,8 @@ import { canonicalWebServer, WEB_CONNECTION_PROTOCOL } from './policy'
 export type WebServer = { url: string; name: string; version: string; edition: 'cloud' | 'community'; signIn: { email: boolean; google: boolean; github: boolean } }
 export type WebServerProbe =
   | { status: 'ok'; server: WebServer }
-  | { status: 'invalid_address' | 'https_required' | 'unreachable' | 'not_mikka' | 'web_disabled' }
+  | { status: 'invalid_address' | 'https_required' | 'unreachable' | 'not_mikka' }
+  | { status: 'web_disabled' }
   | { status: 'server_update_required'; version: string | null }
   | { status: 'app_update_required'; minimum: string | null }
 export type WebFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -51,7 +52,7 @@ export async function probeWebServer(input: unknown, options: { fetch: WebFetch;
       const edition = body?.edition
       const serverBase = typeof body?.basePath === 'string' && (body.basePath.startsWith('/') || body.basePath === '') ? canonicalWebServer(`${address.origin}${body.basePath}`) : null
       const signIn = record(body?.signIn)
-      if (response.ok && name && version && (edition === 'cloud' || edition === 'community') && serverBase && signIn && ['email', 'google', 'github'].every(key => typeof signIn[key] === 'boolean')) {
+      if (response.ok && name && version && (edition === 'cloud' || edition === 'community') && serverBase && (address.pathname === '/' || serverBase === candidate) && signIn && ['email', 'google', 'github'].every(key => typeof signIn[key] === 'boolean')) {
         const web = record(body?.web), protocol = record(web?.protocol)
         if (!web || !protocol || !Number.isSafeInteger(protocol.min) || !Number.isSafeInteger(protocol.max) || (protocol.min as number) > (protocol.max as number)) return { status: 'server_update_required', version }
         if ((protocol.max as number) < WEB_CONNECTION_PROTOCOL) return { status: 'server_update_required', version }

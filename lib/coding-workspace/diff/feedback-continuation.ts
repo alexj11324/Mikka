@@ -17,6 +17,7 @@ import { factoryAutomaticRuntime } from '../../factory/automatic-dispatch'
 import type { ReviewActor, ReviewScope } from './authority'
 import type { ReviewBatchRow } from './batch-store'
 import type { DiffDependencies } from './service'
+import type { RunOrigin, RunOriginRef } from '../../run-origin'
 
 const unavailable = () => new WorkspaceReviewError('workspace_review_unavailable')
 const outdated = () => new WorkspaceReviewError('workspace_snapshot_outdated')
@@ -33,8 +34,8 @@ export async function queueReviewContinuation(deps: DiffDependencies, tx: PoolCl
   const { rows: [source] } = await tx.query<{
     agentId: string; deviceId: string; deviceRepoId: string; botId: string | null; agentDefinition: WorkerDefinitionSnapshot | null;
     deviceKind: string; remoteUrl: string | null; repositoryKey: string; runtimeBotId: string | null; workspaceId: string | null;
-    questionContinuation: { requireSessionResume?: boolean } | null;
-  }>(`SELECT r."agentId",r."deviceId",r."deviceRepoId",r."botId",r."agentDefinition",r."questionContinuation",
+    questionContinuation: { requireSessionResume?: boolean } | null; origin: RunOrigin | null; originRef: RunOriginRef | null;
+  }>(`SELECT r."agentId",r."deviceId",r."deviceRepoId",r."botId",r."agentDefinition",r."questionContinuation",r.origin,r."originRef",
       d.kind AS "deviceKind",repo."remoteUrl",repo."repoPath" AS "repositoryKey",b."botId" AS "runtimeBotId",b."workspaceId"
     FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=r."deviceId"
     JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
@@ -59,10 +60,13 @@ export async function queueReviewContinuation(deps: DiffDependencies, tx: PoolCl
   } }
   const common = { issueId: scope.taskId, botId: source.botId, key, sourceEventId, previousRunId: runId,
     selection: { sourceRunId: runId, model, batchId: batch.id, fingerprint: batch.fingerprint } }
+  // A review continuation keeps the reviewed run's entry; a legacy source
+  // names the host stage that dispatches it rather than guessing 'web'.
+  const origin: RunOrigin = source.origin ?? 'factory', originRef = source.originRef ?? null
   if (source.deviceKind !== 'cloud') {
     const result = await queueFactoryTask(deps.database, actor.userId, { ...common, agentId: source.agentId, deviceRepoId: source.deviceRepoId,
       queue: (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined,
-        { ...model, threadRunId: runId, pinnedDeviceId: source.agentDefinition?.pinnedDeviceId }) }, attachment)
+        { ...model, origin, originRef, threadRunId: runId, pinnedDeviceId: source.agentDefinition?.pinnedDeviceId }) }, attachment)
     return { runId: result.runId, wake: async () => { notifyDeviceWork(source.deviceId) } }
   }
   if (!source.runtimeBotId || source.workspaceId !== actor.workspaceId || !source.agentDefinition) throw unavailable()
@@ -75,7 +79,7 @@ export async function queueReviewContinuation(deps: DiffDependencies, tx: PoolCl
   const result = await queueFactoryTask(deps.database, actor.userId, { ...common, agentId: runtime.agentId, deviceRepoId: repo.id,
     queue: (client, _userId, _input, _botId, context) => queueCloudRun(deps.database, actor, {
       botId: source.runtimeBotId!, issueId: scope.taskId!, agentId: runtime.agentId, deviceRepoId: repo.id,
-      title: issue.title, body: tiptapToText(issue.content), ...model, withoutBot: source.botId === null,
+      title: issue.title, body: tiptapToText(issue.content), ...model, origin, originRef, withoutBot: source.botId === null,
       threadRunId: runId, sourceEventId: context.sourceEventId, idempotencyKey: `factory:${context.attemptId}`,
     }, client, context) }, attachment)
   return { runId: result.runId, wake: async () => {

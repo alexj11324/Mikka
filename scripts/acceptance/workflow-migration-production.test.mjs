@@ -139,10 +139,9 @@ function fullFixture(options = {}) {
   const selectedEnv = options.deployed ? { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: OTHER,
     GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_RUN_ID: '20', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_WORKFLOW_REF: REPOSITORY + '/' + DEPLOYED_WORKFLOW + '@refs/heads/main',
-    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: SHA,
-    WEB_DEPLOY_RUN_ID: '10', VERCEL_DEPLOYMENT_ID: DEPLOYMENT } : env
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: SHA } : env
   const selectedEvent = options.deployed ? { repository,
-    inputs: { application_sha: SHA, web_run_id: '10', deployment_id: DEPLOYMENT } } : event
+    inputs: { application_sha: SHA } } : event
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), headers = new Headers(init.headers), method = init.method ?? 'GET'
     requests.push({ origin: url.origin, path: url.pathname, search: url.search, method, body: init.body })
@@ -155,12 +154,6 @@ function fullFixture(options = {}) {
           repository, head_repository: repository, url: 'https://api.github.com/repos/' + REPOSITORY + '/actions/runs/20',
           path: DEPLOYED_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: OTHER,
           status: 'in_progress', conclusion: null })
-        if (url.pathname.endsWith('/actions/runs/10')) return json({ ...release, repository, head_repository: repository, run_attempt: 1 })
-        if (url.pathname.endsWith('/actions/runs/10/attempts/1/jobs')) return json({ total_count: 1, jobs: [{
-          id: 30, run_id: 10, name: 'deploy', head_sha: SHA, status: 'completed', conclusion: 'success',
-          steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-            'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),
-        }] })
       }
       if (url.pathname.endsWith('/issues/1415')) return json({ number: 1415, state: options.closed ? 'closed' : 'open',
         url: 'https://api.github.com/repos/' + REPOSITORY + '/issues/1415', repository_url: 'https://api.github.com/repos/' + REPOSITORY })
@@ -171,15 +164,15 @@ function fullFixture(options = {}) {
       assert.equal(headers.get('authorization'), 'Bearer ' + TOKEN)
       assert.equal(url.searchParams.get('teamId'), TEAM); assert.equal(method, 'GET')
       return url.pathname.startsWith('/v4/') ? json({ alias: 'app.aspectlylabs.com', projectId: PROJECT,
-        deploymentId: options.driftAfterSubmit && submitted ? 'dpl_ChangedSameSha' : DEPLOYMENT, updatedAt: NOW })
+        deploymentId: DEPLOYMENT, updatedAt: NOW })
         : json({ id: DEPLOYMENT,
           ...(options.nestedProject ? { project: { id: PROJECT } } : { projectId: PROJECT }),
-          ...(options.conflictingManagedProject && ++deploymentReads === 3
+          ...(options.conflictingManagedProject && ++deploymentReads === 1
             ? { projectId: PROJECT, project: { id: 'prj_Foreign' } } : {}),
           gitSource: { sha: SHA }, readyState: 'READY', target: 'production' })
     }
     assert.equal(url.origin, ORIGIN); assert.equal(headers.get('authorization'), null)
-    if (url.pathname === '/mikka/api/version') return json({ build: SHA })
+    if (url.pathname === '/mikka/api/version') return json({ build: options.driftAfterSubmit && submitted ? OTHER : SHA })
     assert.equal(headers.get('origin'), ORIGIN)
     if (url.pathname.endsWith('/sign-in/email')) {
       assert.deepEqual(JSON.parse(init.body), { email: EMAIL, password: PASSWORD })
@@ -207,17 +200,19 @@ function fullFixture(options = {}) {
             ? POLICY_ADMIN_EMAIL : 'other-admin@example.invalid', role: 'admin', status: 'active' }] })
     }
     if (url.pathname === '/mikka/api/coordinator/messages') assert.equal(teamSelected, true, 'business must use the normal selected team cookie')
-    if (url.pathname === '/mikka/api/coordinator/messages' && method === 'POST') {
-      const body = JSON.parse(init.body); assert.match(body.submissionId, /^[0-9a-f-]{36}$/)
+    if (url.pathname === '/mikka/api/agents/eve/v1/session' && method === 'POST') {
+      const body = JSON.parse(init.body); assert.match(headers.get('x-mikka-submission-id'), /^[0-9a-f-]{36}$/)
+      assert.equal(teamSelected, true); assert.equal(url.searchParams.get('botId'), BOT)
+      assert.deepEqual(body.clientContext, { expectedOwnerId: OWNER, expectedWorkspaceId: id(12) })
       if (submitted) {
-        assert.ok(body.text.includes(SCHEDULE)); assert.ok(body.text.includes('Cancel only'))
+        assert.ok(body.message.includes(SCHEDULE)); assert.ok(body.message.includes('Cancel only'))
         cancelled = true
       } else {
-        definition = JSON.parse(body.text.match(/exact definition: (\{.+\})\. It must/)[1])
+        definition = JSON.parse(body.message.match(/exact definition: (\{.+\})\. It must/)[1])
         assert.deepEqual(definition, reminderDefinition(definition.title, definition.timing.at))
         submitted = true
       }
-      return json({ queued: true, enabled: true }, 202)
+      return json(options.invalidSubmitReceipt ? { queued: true, enabled: true } : { ok: true, sessionId: 'wrun_schedule', deliveryId: headers.get('x-mikka-submission-id') }, options.submitStatus ?? 202)
     }
     if (url.pathname === '/mikka/api/rpc') {
       assert.equal(headers.get('x-mikka-rpc'), '1')
@@ -297,31 +292,21 @@ test('failed due result cancels only the exact tool-proven schedule through the 
   assert.equal(report.status, 'fail'); assert.equal(report.cleanupSubmissionCount, 1)
   assert.equal(report.futureScheduleEvidence, 'normal-owner-schedule-cancel')
   assert.equal(report.futureScheduleConfirmedAbsent, true); assert.equal(report.sessionClosed, true)
-  assert.equal(f.requests.filter(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST').length, 2)
+  assert.equal(f.requests.filter(row => row.path === '/mikka/api/agents/eve/v1/session' && row.method === 'POST').length, 2)
 })
 
 test('closed issue, stale main, denied manager or missing team never submits a task', async () => {
   for (const options of [{ closed: true }, { wrongMain: true }, { managerDenied: true }, { noTeams: true }]) {
     const f = fullFixture(options), report = await f.run()
     assert.notEqual(report.status, 'pass')
-    assert.equal(f.requests.some(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST'), false)
+    assert.equal(f.requests.some(row => row.path === '/mikka/api/agents/eve/v1/session' && row.method === 'POST'), false)
   }
 })
 
-test('workflow keeps standalone read acceptance and serializes the bounded migration proof', async () => {
+test('read cache acceptance is dispatched; the closed migration proof runs only in its deployed-target workflow', async () => {
   const text = await readFile(new URL('../../.github/workflows/read-cache-production.yml', import.meta.url), 'utf8')
-  const migration = text.slice(text.indexOf('  workflow-migration:'))
-  const acceptance = text.slice(text.indexOf('  acceptance:'), text.indexOf('  workflow-migration:'))
-  assert.match(acceptance, /run: node --import tsx scripts\/acceptance\/read-cache-production\.mjs\n/)
-  assert.match(migration, /needs: \[guards, acceptance\]/)
-  assert.match(migration, /read-cache-production\.mjs --attest --migration-1415/)
-  assert.doesNotMatch(migration, /read-cache-production\.mjs --migration-1415/)
-  assert.doesNotMatch(migration, /production-web-parity-evidence|sandboxes-cloud\.docker\.com/)
-  assert.match(migration, /if: steps\.attest\.outputs\.readable == 'true'\n        run: pnpm exec playwright install --with-deps --only-shell chromium/)
-  assert.match(migration, /if: steps\.attest\.outputs\.readable == 'true'\n        run: pnpm exec playwright test -c playwright\.smoke\.config\.ts/)
-  assert.ok(migration.indexOf('secret-name: SMOKE_OWNER_PASSWORD') < migration.indexOf('run: pnpm exec playwright test'))
-  assert.ok(migration.indexOf('run: pnpm exec playwright test') < migration.indexOf('secret-name: VERCEL_TEAM_TOKEN'))
-  assert.match(text, /secret-name: VERCEL_TEAM_TOKEN/)
+  assert.match(text, /run: node --import tsx scripts\/acceptance\/read-cache-production\.mjs\n/)
+  assert.doesNotMatch(text, /workflow_run:|Web deploy|workflow-migration:/)
   assert.match(text, /workflow-migration-production\.test\.mjs/)
   const desktop = await readFile(new URL('../../.github/workflows/desktop.yml', import.meta.url), 'utf8')
   assert.ok(!desktop.includes("'scripts/acceptance/"))
@@ -334,7 +319,6 @@ test('explicit deployed target reuses the same owner and managed reminder proof 
   assert.equal(report.status, 'pass'); assert.equal(report.targetMode, 'deployed-target')
   assert.equal(report.applicationSha, SHA); assert.equal(report.driverRevision, OTHER)
   assert.equal(report.driverRunId, 20); assert.equal(report.driverRunAttempt, 1)
-  assert.equal(report.webDeployJobId, 30); assert.equal(report.deploymentId, DEPLOYMENT)
   assert.equal(report.targetBefore.status, 'ready'); assert.equal(report.targetAfter.status, 'ready')
   assert.equal(report.managed.coordinatorCompleted, true); assert.equal(report.managed.dueTimerObserved, true)
   assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 0)
@@ -359,7 +343,7 @@ test('target drift still permits only exact known-schedule cleanup and closes th
   assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 1)
   assert.equal(report.futureScheduleConfirmedAbsent, true); assert.equal(report.sessionClosed, true)
   assert.equal(report.futureScheduleEvidence, 'normal-owner-schedule-cancel')
-  assert.equal(f.requests.filter(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST').length, 2)
+  assert.equal(f.requests.filter(row => row.path === '/mikka/api/agents/eve/v1/session' && row.method === 'POST').length, 2)
   const logout = f.requests.findLastIndex(row => row.path.endsWith('/sign-out'))
   const lastProof = f.requests.findLastIndex(row => row.path.endsWith('/actions/runs/20'))
   assert.ok(logout >= 0 && lastProof > logout, 'the final target check follows resource and session cleanup')
@@ -842,13 +826,18 @@ test('missing admin and unreadable or mismatched candidate keep cleanup and targ
   }
 })
 
-test('managed evidence accepts actual locked compiler identifiers and rejects source-file aliases', async () => {
+test('historical managed evidence accepts locked compiler identifiers and rejects source-file aliases', async () => {
   const workflowRequire = createRequire(import.meta.resolve('workflow/nitro'))
   const nitroRequire = createRequire(workflowRequire.resolve('@workflow/nitro'))
   const builders = pathToFileURL(nitroRequire.resolve('@workflow/builders'))
   const { applySwcTransform } = await import(new URL('./apply-swc-transform.js', builders).href)
   const { fileURLToPath } = await import('node:url')
   const root = fileURLToPath(new URL('../../', import.meta.url))
+  // Retain the old report codec after the Coordinator moved to native Eve.
+  const historicalCoordinator = `export async function coordinatorTurn() {
+    'use workflow'
+    return null
+  }`
   const ids = []
   for (const [file, mode, name] of [
     ['workflows/coordinator/workflow.ts', 'workflow', 'coordinatorTurn'],
@@ -856,7 +845,8 @@ test('managed evidence accepts actual locked compiler identifiers and rejects so
     ['workflows/due-timer/steps.ts', 'step', 'runDue'],
   ]) {
     const filename = fileURLToPath(new URL('../../' + file, import.meta.url))
-    const transformed = await applySwcTransform(file, await readFile(filename, 'utf8'), mode, filename, root, root)
+    const source = file === 'workflows/coordinator/workflow.ts' ? historicalCoordinator : await readFile(filename, 'utf8')
+    const transformed = await applySwcTransform(file, source, mode, filename, root, root)
     const entry = transformed.workflowManifest[mode === 'workflow' ? 'workflows' : 'steps'][file][name]
     ids.push(entry[mode === 'workflow' ? 'workflowId' : 'stepId'])
   }
@@ -879,5 +869,14 @@ test('managed evidence accepts actual locked compiler identifiers and rejects so
     assert.equal(managedEvidence({ ...p, timer: { ...p.timer, workflowName: rewrite(ids[1]) } }), null)
     assert.equal(managedEvidence({ ...p, events: p.events.map(event => event.eventType === 'step_created'
       ? { ...event, eventData: { stepName: rewrite(ids[2]) } } : event) }), null)
+  }
+})
+
+test('native schedule submissions reject non-202 and malformed admission receipts', async () => {
+  for (const options of [{ submitStatus: 200 }, { invalidSubmitReceipt: true }]) {
+    const f = fullFixture(options), report = await f.run()
+    assert.notEqual(report.status, 'pass')
+    assert.equal(report.code, 'submission_failed')
+    assert.equal(report.sessionClosed, true)
   }
 })

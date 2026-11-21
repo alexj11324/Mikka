@@ -7,7 +7,6 @@ const version = z.number().int().positive()
 const requestId = z.uuid()
 const commandSchema = z.discriminatedUnion('action',[
   z.strictObject({ action:z.literal('set_workspace_write_policy'),permissions:writePolicySettingsSchema,expectedVersion:z.string().regex(/^(0|[1-9]\d*)$/) }),
-  z.strictObject({ action:z.literal('set_write_policy'),permissions:writePolicySettingsSchema,expectedVersion:z.string().regex(/^(0|[1-9]\d*)$/) }),
   z.strictObject({ action:z.literal('save'),definition:agentDefinitionSchema,expectedVersion:version,requestId }),
   z.strictObject({ action:z.literal('import'),document:z.unknown(),expectedVersion:version,requestId }),
   z.strictObject({ action:z.literal('rollback'),targetVersionId:z.uuid(),expectedVersion:version,requestId }),
@@ -66,10 +65,6 @@ export function createAgentDefinitionHandler(deps: {
           if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
           return response(await deps.writePolicy.settings.readWorkspace(scope))
         }
-        if (view==='write_policy') {
-          if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
-          return response(await deps.writePolicy.settings.read(scope))
-        }
         if (view==='history') return response({ versions:await deps.store.history(scope) })
         if (view==='dataset') return response({ cases:await deps.store.dataset(scope) })
         if (view==='proposals') return response({ proposals:await deps.store.proposals(scope) })
@@ -87,9 +82,6 @@ export function createAgentDefinitionHandler(deps: {
         case 'set_workspace_write_policy':
           if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
           return response(await deps.writePolicy.settings.setWorkspace(scope,command.permissions,command.expectedVersion))
-        case 'set_write_policy':
-          if (!deps.writePolicy?.enabled()) return response({ error:'notEnabled' },404)
-          return response(await deps.writePolicy.settings.set(scope,command.permissions,command.expectedVersion))
         case 'save':return response(await deps.store.save(scope,command.definition,command.expectedVersion,command.requestId,deps.defaults))
         case 'import':return response(await deps.store.save(scope,importDefinition(command.document),command.expectedVersion,command.requestId,deps.defaults))
         case 'rollback':return response(await deps.store.rollback(scope,command.targetVersionId,command.expectedVersion,command.requestId,deps.defaults))

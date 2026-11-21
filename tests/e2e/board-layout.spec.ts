@@ -43,7 +43,7 @@ for (const width of [1280, 1440]) {
     await seedTask(page, '已完成里的任务', { status: 'done' })
     await seedTask(page, '待整理里的任务', { status: 'backlog' })
     await page.goto(app('/'))
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
 
     const board = page.getByRole('region', { name: '横向滚动任务看板', exact: true })
     const sidebar = page.getByRole('complementary', { name: 'Coordinator', exact: true })
@@ -83,7 +83,7 @@ test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无�
   await register(page)
   await seedTask(page, '窄窗口里的任务', { status: 'todo' })
   await page.goto(app('/'))
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
 
   // Below 1280 the 360px panel would squeeze the board (R-65): it starts folded.
   const card = page.getByRole('group', { name: '窄窗口里的任务', exact: true })
@@ -93,7 +93,7 @@ test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无�
   await showCreatedByMe(page)
   await expect(card).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true })).toBeHidden()
-  await page.getByRole('button', { name: '展开对话', exact: true }).click()
+  await page.getByRole('button', { name: '展开线程', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Coordinator', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
 
@@ -114,7 +114,7 @@ test('看板工具栏：范围切换、筛选和筛选条同高', async ({ page 
   await page.setViewportSize({ width: 1440, height: 900 })
   await register(page)
   await page.goto(app('/'))
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
 
   const toolbar = page.getByRole('toolbar', { name: '看板工具栏', exact: true })
   const scope = toolbar.getByRole('group', { name: '任务范围', exact: true })
@@ -157,7 +157,7 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
       return route.fulfill({ json: { viewerId, state: url.endsWith('/95') ? 'merged' : 'open' } })
     })
     await page.goto(app('/'))
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
 
     const botCard = page.getByRole('group', { name: 'Bot 负责的看板任务', exact: true })
     const prCard = page.getByRole('group', { name: '只有 PR 的看板任务', exact: true })

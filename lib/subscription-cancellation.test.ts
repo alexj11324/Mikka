@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { WorkflowAgent, type ModelCallStreamPart } from '@ai-sdk/workflow'
 import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
 import { SubscriptionService } from './subscription-service'
 import { subscriptionFixture } from '../tests/fixtures/subscription'
-import { untilStopped } from './coordinator/stop'
 
 function controlledSubscription() {
   const { use, access } = subscriptionFixture('claude_cpa')
@@ -89,33 +87,6 @@ test('start cancellation retains its cause and does not become a generation fail
   await assert.rejects(async () => model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'synthetic' }] }], abortSignal: fixture.stop.signal }), (error: unknown) => error instanceof Error && error.name === 'AbortError' && hasCause(error, cancelled))
   assert.equal(fixture.starts, 1)
   assert.equal(logs.length, 0)
-})
-
-test('the actual WorkflowAgent accepts cancellation without writing an error into its public stream', async t => {
-  const logs: string[] = []
-  t.mock.method(console, 'warn', (line: string) => logs.push(line))
-  const fixture = controlledSubscription()
-  const model = await fixture.service.model(fixture.use, fixture.stop.signal)
-  const parts: ModelCallStreamPart[] = []
-  const writable = new WritableStream<ModelCallStreamPart>({ write(part) {
-    parts.push(part)
-    if (part.type === 'text-delta' && !fixture.stop.signal.aborted) {
-      fixture.stop.abort()
-      fixture.fail(new WorkerRefusal('subscription_cancelled'))
-    }
-  } })
-  const turn = new WorkflowAgent({ model }).stream({ prompt: 'synthetic', maxRetries: 0, abortSignal: fixture.stop.signal, writable, preventClose: true })
-  assert.deepEqual(await untilStopped(turn, fixture.stop.signal), { stopped: true })
-  const result = await turn
-  assert.equal('error' in result, false)
-  assert.ok(parts.some(part => part.type === 'text-delta'))
-  assert.equal(parts.some(part => part.type === 'error'), false)
-  assert.equal(fixture.starts, 1)
-  assert.equal(logs.length, 0)
-  // The Coordinator still owns this stream and can append stopped/committed
-  // boundaries through its existing steps after the model releases its lock.
-  const writer = writable.getWriter()
-  writer.releaseLock()
 })
 
 test('no stop, forged codes, provider failures, and deadline expiry retain the normal error path', async t => {

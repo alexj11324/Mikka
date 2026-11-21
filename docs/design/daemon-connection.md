@@ -11,6 +11,13 @@ Install the published daemon, sign in through the existing Mikka login, then run
 it on their computer. In the browser, compare the code with the terminal and
 approve or deny that connection.
 
+Once signed in, the daemon opens its device gateway socket. The computer is
+online, and can take work, only while it holds that socket (the device
+session, [decision 2026-11-17-2215](decisions/2026-11-17-2215-device-session-no-heartbeat.md));
+there is no heartbeat and no polling fallback. A daemon too old to hold a
+session gets `426 daemonUpgradeRequired` on every device route: the person
+updates it and signs in again.
+
 ## Where it lives
 
 Settings › 设备 › 连接电脑 opens the command dialog. The daemon prints a link to

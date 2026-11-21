@@ -1,11 +1,11 @@
 import { mobileMessages } from '@/lib/messages'
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { Keyboard } from 'react-native'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AppState, Keyboard } from 'react-native'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
-import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
+import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, personalReadback, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { uuid } from 'expo'
 import { Spinner } from '@/components/icons'
@@ -25,11 +25,11 @@ import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { shortWhen } from '@/lib/clock'
 import { separatorLabel, startsGroup } from '@/lib/chat-time'
-import { isOpenUI } from '@/lib/openui'
 import type { HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
-import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
+import { canAnswerCard, outgoingKey, personalMessage, unsettled } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
+import { acknowledgedPersonalMessages, usePersonalDelivery } from '@/features/chat/components/personal-delivery'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { ChatHeader } from '@/features/chat/components/chat-header'
@@ -41,16 +41,21 @@ import { reviewHref } from '@/features/review/model/routes'
 import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
+import { Segmented } from '@/components/Segmented'
 import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
 import { ADD_TO_CHAT, endsSelection, quotedMessage, selectionQuote, type Rect, type SelectionAction } from '@/features/chat/model/chat-selection'
 import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
-import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { onAppForeground, useLiveApi, useRefresh } from '@/lib/useApi'
 import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
 import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
+import { useEveChat } from '@/lib/eve-chat'
+import { activeTurn } from 'eve/events'
+import { EveInteractions } from '@/features/chat/components/eve-interactions'
+import { eveChatItems, generatedCardDocument } from '@/features/chat/model/eve-messages'
 import { StopFailed } from '@/components/StopFailed'
 import { ReadNotice } from '@/components/ReadNotice'
 import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
@@ -66,7 +71,7 @@ import { colors } from '@/lib/theme'
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
+function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
   const self = botId ?? 'coordinator'
   const router = useRouter()
@@ -78,37 +83,47 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
-  const home = useHome().data?.live?.workspaceId
-  const homeBots = useHome().data?.bots
+  const homeData = useHome().data
+  const home = homeData?.live?.workspaceId
+  const homeBots = homeData?.bots
+  const coordinator = self === 'coordinator' || Boolean(homeBots?.some(bot => bot.id === self && bot.coordinator))
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
   // running out has no write, so the server names it as a deadline.
   // A push reads only what is new since the last read, and merges it into what is shown (#1408).
-  const readChat = useCallback(async (at: string) => mergeChatRead(apiCache.get<ChatRead>(at), await api<ChatRead>(chatUpdatePath(at, apiCache.get<ChatRead>(at)))), [])
-  const { data, error, reload, setData } = useLiveApi<ChatRead>(path, chat => ({
+  const personalScope = homeData?.user.id && home ? JSON.stringify(['personal-send', homeData.user.id, home, self]) : null
+  const readChat = useCallback(async (path: string) => {
+    const previous = apiCache.get<ChatRead>(path)
+    const acknowledged = acknowledgedPersonalMessages(personalScope)
+    const next = await api<ChatRead>(chatUpdatePath(path, previous))
+    const latest = apiCache.get<ChatRead>(path)
+    const merged = mergeChatRead(latest, next)
+    return merged === latest ? merged : personalReadback(merged, acknowledged)
+  }, [personalScope])
+  const { data, error, reload, reloadAfterWrite, setData } = useLiveApi<ChatRead>(path, chat => ({
     refs: [{ kind: 'bot_chat', id: chat?.botId && chat.live?.workspaceId ? chat.botId : UNRESOLVED_LIVE_ID, scope: chat?.live?.workspaceId ?? null }],
     minIntervalMs: 2_000, deadline: chat?.live?.deadline,
   }), readChat)
+  const agent = useEveChat(botId, Boolean(data), reload, homeData?.user.id, home)
+  useEffect(() => { if (data && agent.session) void agent.resume().catch(() => undefined) }, [data, agent.session?.sessionId, agent.resume])
   const serviceUnavailable = data?.enabled === false
   const serviceRefresh = useRefresh(reload)
   // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
   // The title menu's threads: read when the chat opens, again when a thread list changes; never while idle.
   // The title menu's tasks: the ones this bot dispatched (the Coordinator's are its bot row's).
-  const tasks = useTasks()
   const ownBotId = self === 'coordinator' ? homeBots?.find(item => item.coordinator)?.id : self
+  const tasks = useTasks(Boolean(ownBotId), ownBotId)
   const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
     refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
   }))
-  const [outbox, setOutbox] = useState<Outgoing[]>([])
-  const pendingSends = useRef<Outgoing[]>([])
-  const delivering = useRef(new Map<string, Promise<boolean>>())
   const apiContext = apiCache.context()
-  const updateOutbox = (change: (list: Outgoing[]) => Outgoing[]) => {
-    pendingSends.current = change(pendingSends.current)
-    setOutbox(pendingSends.current)
-  }
-  useEffect(() => { pendingSends.current = []; setOutbox([]) }, [botId, apiContext])
+  const scope = data ? personalScope : null
+  const canSend = Boolean(scope) && !serviceUnavailable && agent.status !== 'resuming'
+  const received = useMemo(() => new Set([...(data?.acknowledgedBeforeRead ?? []), ...(data?.items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : []) ?? [])]), [data?.items, data?.acknowledgedBeforeRead])
+  const personal = usePersonalDelivery(scope, canSend, received, agent.sendMessage, reloadAfterWrite)
+  const outbox = personal.rows
   const [text, setText] = useState(draft ?? '')
-  const working = Boolean(data?.working) || inFlight(outbox)
+  const [turnPolicy, setTurnPolicy] = useState<'queue' | 'steer'>('queue')
+  const working = agent.status === 'busy' || outbox.some(item => item.phase === 'sending')
   const push = usePushState()
   const reduceMotion = useReducedMotionPreference()
   // Opened from a push about a proposal: its card sits at the end of the chat, which is where the chat opens.
@@ -131,20 +146,38 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   useEffect(() => { if (draft) setText(draft) }, [draft])
 
-  const allItems = data?.items ?? []
+  const allItems = useMemo(() => {
+    const stored = data?.items ?? []
+    return [...stored, ...eveChatItems({ messages: agent.messages, events: agent.events, session: agent.session }, stored)]
+  }, [data?.items, agent.messages, agent.events, agent.session])
   const sources = data?.sources ?? {}
   // Queued messages wait above the composer, not in the conversation (#1408 Phase 3). The screen looks again when the
   // oldest pending message would turn queued: a UI timer, never a read.
   const sentWhileWorking = useRef(new Set<string>())
   const [now, setNow] = useState(Date.now)
-  const queueCheck = nextQueueCheck(allItems, Boolean(data?.working), now)
+  const queueCheck = nextQueueCheck(allItems, agent.status === 'busy', now)
   useEffect(() => {
     if (queueCheck === null) return
     const timer = setTimeout(() => setNow(Date.now()), Math.max(0, queueCheck - Date.now()))
     return () => clearTimeout(timer)
   }, [queueCheck])
-  const queue = queuedItems(allItems, Boolean(data?.working), now, sentWhileWorking.current)
+  const queue = queuedItems(allItems, agent.status === 'busy', now, sentWhileWorking.current)
   const items = queue.length ? allItems.filter(item => !queue.includes(item)) : allItems
+  const lastMessage = items.findLast(item => item.from !== 'event' && !item.pending && item.position > 0)
+  const lastId = lastMessage?.id ?? (lastMessage ? String(lastMessage.position) : null)
+  const acknowledged = useRef<string | null>(null)
+  useFocusEffect(useCallback(() => {
+    const acknowledge = () => {
+      if (AppState.currentState !== 'active' || !atLatest || !lastId || !data || error || acknowledged.current === lastId) return
+      acknowledged.current = lastId
+      const id = data.botId ? 'bot:' + data.botId : 'coordinator'
+      void api('/api/conversations/' + encodeURIComponent(id) + '/read', { method: 'POST', body: { messageId: lastId } })
+        .catch(() => { if (acknowledged.current === lastId) acknowledged.current = null })
+    }
+    const frame = requestAnimationFrame(acknowledge)
+    const unwatch = onAppForeground(acknowledge)
+    return () => { cancelAnimationFrame(frame); unwatch() }
+  }, [atLatest, data, error, lastId]))
   // 选择文本: one message's words are selectable where they are; capsules above the composer act on the selection.
   const [selection, setSelection] = useState<{ key: number; text: string; selected: string } | null>(null)
   const selectionRect = useRef<Rect | null>(null)
@@ -169,6 +202,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   const latestReply = items.reduce((last, item, index) => item.from === 'coordinator' && item.text ? index : item.from === 'person' ? -1 : last, -1)
   // A card is answered once the person has written after it (here or anywhere else).
   const lastMine = items.reduce((last, item, index) => item.from === 'person' ? index : last, -1)
+  const rowState = useMemo(() => ({ data, outbox, selection, working, lastMine, latestReply, canSend }),
+    [data, outbox, selection, working, lastMine, latestReply, canSend])
   const proactive = items.some((item, index) => item.from === 'coordinator' && items[index - 1]?.from === 'event')
 
   // iOS asks once; the moment is the first message the Coordinator sent on its own, not app launch.
@@ -181,27 +216,10 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
     else router.push(`/thread/${source.id}`)
   }
 
-  const deliver = (item: Outgoing): Promise<boolean> => {
-    const active = delivering.current.get(item.submissionId)
-    if (active) return active
-    const request = (async () => {
-      if (item.context !== apiCache.context()) return false
-      try {
-        const receipt = await api<{ queued?: boolean }>('/api/mobile/chat', { method: 'POST', body: submissionBody(item) })
-        if (receipt?.queued !== true) throw new Error('sendUnconfirmed')
-        await reload()
-        return apiCache.commit(item.context, () => updateOutbox(list => delivered(list, item.key)))
-      } catch (error) {
-        apiCache.commit(item.context, () => updateOutbox(list => marked(list, item.key, sendFailureState(error))))
-        return false
-      }
-    })().finally(() => { delivering.current.delete(item.submissionId) })
-    delivering.current.set(item.submissionId, request)
-    return request
-  }
-
-  const send = async (typed: string, attachments: Attachment[] = []) => {
-    if (serviceUnavailable) return false
+  const send = async (typed: string, attachments: Attachment[] = [], sourceCardId?: string) => {
+    if (!canSend) return false
+    const pendingSends = personal.read().filter(item => !received.has(item.id))
+    if (sourceCardId && !canAnswerCard(canSend, pendingSends, sourceCardId)) return false
     // While words are selected, what is typed answers them: it goes out quoting the selection.
     const words = selection && !quote && typed.trim() ? quotedMessage(selectionQuote(selection.selected, selection.text), typed) : typed
     setSelection(null)
@@ -212,30 +230,27 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
     if (working) sentWhileWorking.current.add(message)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
-    const held = unsettled(pendingSends.current, message, images, self, context)
-    const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context })[0]
-    updateOutbox(list => held ? marked(list, item.key, 'sending') : [...list, item])
-    return deliver(item)
+    const held = sourceCardId ? unsettled(pendingSends, message, images, self, context, sourceCardId) : undefined
+    const previous = sourceCardId ? pendingSends.find(item => item.sourceCardId === sourceCardId) : undefined
+    // A lost acknowledgement may have committed. Only its original body and ID can be sent again.
+    if (previous && !held && (previous.phase !== 'failed' || previous.error === mobileMessages.Coordinator.sendUncertain)) return false
+    const item = held ?? personalMessage(outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context, sourceCardId, ...(agent.status === 'busy' ? { turnPolicy } : {}) })
+    const acknowledgement = personal.start(item)
+    if (!acknowledgement) return false
+    if (previous && previous.id !== item.id) personal.discard(previous.id)
+    return sourceCardId ? acknowledgement : true
   }
 
   const selectionAction = (action: SelectionAction) => {
     if (!selection) return
-    // 添加到对话: the selection becomes the composer's quote; the person writes the rest.
+    // 添加到线程: the selection becomes the composer's quote; the person writes the rest.
     if (action.key === ADD_TO_CHAT.key) { setQuote(quotable(selectionQuote(selection.selected, selection.text))); setSelection(null); return }
     void send(quotedMessage(selectionQuote(selection.selected, selection.text), action.instruction))
   }
 
-  const retry = async (item: Outgoing) => {
-    updateOutbox(list => marked(list, item.key, 'sending'))
-    // The composer still holds the words of a failed send; once they arrive it empties.
-    if (await deliver(item)) setText(current => current.trim() === item.text ? '' : current)
-  }
-
-  const answer = async (message: string) => send(message)
-
   // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out; one that fails or
   // leaves the chat working 10 seconds later shows 「没停下 · 重试」.
-  const stopper = useStop(() => api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }), Boolean(data?.working), reload)
+  const stopper = useStop(() => agent.cancel(), agent.status === 'busy', reload)
 
   const reactions = data?.reactions ?? {}
   const reactionPending = useRef(new Map<string, object>())
@@ -271,6 +286,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   const renderItem = (item: Chat['items'][number], index: number) => {
     // A centred time above each group: the first message, one 15 minutes after the last, or one on a new day.
     const separator = startsGroup(item.createdAt, items[index - 1]?.createdAt) ? separatorLabel(item.createdAt) : null
+    const cardDocument = generatedCardDocument(item)
     const question = item.from === 'event' ? questionCard(item.line, sources) : null
     const selected = selection?.key === item.position ? selection : null
     return (
@@ -290,8 +306,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
         ) : null}
         {item.from === 'coordinator' && item.text ? (
           <MessageRow onSelect={selected ? undefined : () => toggleSelection(item.position, item.text)}>
-            {isOpenUI(item.text)
-              ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} sources={sources} onOpen={open} />
+            {cardDocument
+              ? <OpenUIReply text={item.text} live={index > lastMine} canAnswer={child => canAnswerCard(canSend, outbox, `${cardDocument}:${child}`)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={(message, child) => send(message, [], `${cardDocument}:${child}`)} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
@@ -323,7 +339,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the title pill opens the bot's page, ⋯ its tasks and its page. */}
-      <ChatHeader scrolled={underBar.scrolled} name={name} color={color} shape={shape} botId={ownBotId} coordinator={self === 'coordinator'} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
+      <ChatHeader scrolled={underBar.scrolled} name={coordinator ? 'Coordinator' : name} color={color} shape={shape} botId={ownBotId} coordinator={coordinator} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
         onAllTasks={() => router.push(`/bots/${self}/tasks`)} onInfo={() => router.push(`/bots/${self}/info`)} />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }}
@@ -334,17 +350,19 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           if (down && endsSelection(down, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() }, selectionRect.current)) setSelection(null)
         } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem} anchorIndex={anchorIndex}
+        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} extraData={rowState} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+          keyOf={item => generatedCardDocument(item) ?? item.streamId ?? (item.pending ? `pending-${item.position}` : String(item.position))} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
           footer={<>
-        {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state !== 'sending'} unconfirmed={item.state === 'unconfirmed'} onRetry={() => void retry(item)} />)}
+        {outbox.map(item => item.phase === 'accepted'
+          ? <MyBubble key={item.id} text={item.text} photos={item.images.map(image => ({ uri: image.uri }))} />
+          : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={canSend ? () => { void personal.start(item) } : undefined} />)}
         {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
-        {data && data.enabled !== false && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
+        {data && data.enabled !== false && !items.length && !outbox.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
+        <ReadNotice error={error ?? agent.error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         <ReadNotice error={pending.error} hasData={Boolean(pending.data)} label="待处理事项" onRetry={pending.reload} />
         {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}
         {pending.data ? <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} /> : null}
@@ -353,10 +371,14 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
-          <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={data?.working ? () => void stopper.stop() : undefined} />
-          <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
+      <Composer value={text} sendDisabled={!canSend} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>线程服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}<EveInteractions agent={agent} />{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
+          {agent.status === 'busy' && <Segmented value={turnPolicy} onChange={setTurnPolicy} options={[
+            { value: 'queue', label: mobileMessages.IssueThreads.deliveryModes.queue },
+            { value: 'steer', label: mobileMessages.IssueThreads.deliveryModes.steer },
+          ]} />}
+          <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={agent.status === 'busy' ? () => void stopper.stop() : undefined} />
+          <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={(agent.status === 'busy' || activeTurn(agent.view) !== undefined) && agent.status !== 'resuming' && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )
 }
@@ -401,3 +423,9 @@ const styles = StyleSheet.create({
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   error: { alignSelf: 'center', color: colors.danger, fontSize: 13, textAlign: 'center', marginHorizontal: 24 },
 })
+
+/** The native eve binding must never survive a Bot, account or Workspace switch. */
+export function ChatScreen(props: Parameters<typeof ChatScreenSession>[0]) {
+  const workspaceId = useHome().data?.live?.workspaceId
+  return <ChatScreenSession key={`${apiCache.context()}:${workspaceId ?? ''}:${props.botId ?? 'coordinator'}`} {...props} />
+}

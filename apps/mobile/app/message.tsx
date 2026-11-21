@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useRouter } from 'expo-router'
@@ -8,7 +8,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { CloseButton, Group } from '@/components/ui'
 import { tap } from '@/lib/haptics'
-import { heldMessage, REACTIONS } from '@/lib/message-actions'
+import { heldMessage, REACTIONS, subscribeHeldMessage } from '@/lib/message-actions'
 import { colors } from '@/lib/theme'
 
 /**
@@ -18,7 +18,7 @@ import { colors } from '@/lib/theme'
  */
 export default function MessageActions() {
   const router = useRouter()
-  const message = heldMessage()
+  const message = useSyncExternalStore(subscribeHeldMessage, heldMessage, heldMessage)
   const afterClose = useRef<(() => void) | null>(null)
   useEffect(() => () => { afterClose.current?.() }, [])
   if (!message) return null

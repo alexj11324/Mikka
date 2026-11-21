@@ -20,12 +20,12 @@ export const modelRoutingEvidenceSchema = z.discriminatedUnion('version', [
 
 const reference = z.string().min(1).max(200)
 const resource = z.object({
-  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']),
+  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'cloudflare_sponsored', 'mcp']),
   id: reference, ownerId: reference, access: z.enum(['owner', 'workspace_share']),
   revision: z.string().max(200).optional(),
 })
 const account = z.object({
-  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b']),
+  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b', 'cloudflare_sponsored']),
   ownerId: reference, resourceId: reference,
   amount: z.enum(['provider_unknown', 'metered', 'not_applicable']),
 })
@@ -52,6 +52,8 @@ const evidence = z.object({ run: z.object({
   executionIdentity: identity.nullable(),
   labels: executionIdentityLabelsSchema.nullable().optional().catch(null),
   modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
+  /** The task followed the dispatching chat's model rather than one someone named. */
+  modelFollowed: z.boolean().nullable().optional().catch(null),
   // What this run's prompt carried of its workspace skills: the bodies it
   // inlined, and the ones it only named because the section would not hold
   // them whole. Separate from `configuredSkills`/`loadedSkills` below, which

@@ -15,7 +15,7 @@ mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (op
 test('billing management HTTP preserves independent tenants, owners and immutable receipts', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const priorEdition = process.env.MIKKA_EDITION
   process.env.MIKKA_EDITION = 'cloud'
-  const [{ pool }, { workspacePool }, workspace, organization, { withBillingAuthority }, { createPersonalAccessToken }] = await Promise.all([
+  const [{ pool }, { workspacePool }, workspace, organization, { withBillingAuthority }, { createLegacyPersonalAccessToken }] = await Promise.all([
     import('../lib/db'), import('../lib/workspace-db'), import('../app/api/workspaces/[workspaceId]/billing/route'),
     import('../app/api/organizations/[organizationId]/billing/route'), import('../lib/billing/authority'), import('../lib/tokens/store'),
   ])
@@ -38,7 +38,7 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     { method, headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
   const get = (id = first.id, headers?: Record<string, string>, query = '') => workspace.GET(request('workspace', id, 'GET', undefined, headers, query), { params: Promise.resolve({ workspaceId: id }) })
   const post = (body: unknown, id = first.id, headers?: Record<string, string>) => workspace.POST(request('workspace', id, 'POST', body, headers), { params: Promise.resolve({ workspaceId: id }) })
-  const orgGet = (id = organizationId, headers?: Record<string, string>) => organization.GET(request('organization', id, 'GET', undefined, headers), { params: Promise.resolve({ organizationId: id }) })
+  const orgGet = (id = organizationId, headers?: Record<string, string>, query = '') => organization.GET(request('organization', id, 'GET', undefined, headers, query), { params: Promise.resolve({ organizationId: id }) })
   const orgPost = (body: unknown) => organization.POST(request('organization', organizationId, 'POST', body), { params: Promise.resolve({ organizationId }) })
   t.after(async () => {
     actor = null
@@ -100,16 +100,33 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
       ($1,$2,$2,$3,'synthetic-platform','settled',2500000,0,0,2500000),($4,$2,$2,$3,'synthetic-platform','unknown',null,400000,0,0)`, [call, first.id, member, held])
     const budget = { scope: 'member', scopeId: member, period: 'month', limitPoints: 300, warningPercent: 80 }
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget })).status, 200)
+    const saveBudget = (limitPoints: number | null, warningPercent = budget.warningPercent) => post({
+      action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints, warningPercent },
+    })
+    const changeCount = async () => (await pool.query(`select count(*)::int n from workspace_audit_events
+      where "workspaceId"=$1 and action='billing.limits_changed' and "targetType"='budget_member' and "targetId"=$2`, [first.id, member])).rows[0].n
+    const originalTime = async () => (await pool.query(`select "updatedAt"::text as stamp from billing_resource_budgets
+      where "workspaceId"=$1 and scope='member' and "scopeId"=$2 and period='month'`, [first.id, member])).rows[0].stamp
+    const firstTime = await originalTime()
+    assert.deepEqual((await Promise.all([saveBudget(300), saveBudget(300)])).map(result => result.status), [200, 200])
+    assert.equal(await originalTime(), firstTime)
+    assert.equal(await changeCount(), 1)
+    assert.equal((await saveBudget(300, 90)).status, 200)
+    assert.equal(await changeCount(), 2, 'a warning threshold change is a real edit')
     const view = await (await get()).json() as BillingManagementView, row = view.budgets.find(item => item.scope === 'member')!
     assert.deepEqual([row.spentPoints, row.reservedPoints, row.remainingPoints, row.thresholdReached, row.exhausted], [250, 40, 10, true, false])
     assert.deepEqual([view.usage.costMicroUsd, view.usage.reservedMicroUsd, view.usage.unknownCalls], [2500000, 400000, 1])
+    assert.equal(view.usage.daily, undefined)
+    const freeDetail = await (await orgGet(organizationId, {}, `?usageMember=${member}`)).json() as BillingManagementView
+    assert.equal(freeDetail.usage.memberDetail, undefined)
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints: 0 } })).status, 200)
     assert.equal((await (await get()).json()).budgets[0].exhausted, true)
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, scopeId: outsider } })).status, 403)
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [first.id, member])
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints: null } })).status, 200, 'an obsolete member limit can be removed without resurrecting their membership')
     assert.equal((await pool.query('select count(*)::int n from hosted_usage where id=any($1::text[])', [[call, held]])).rows[0].n, 2)
-    assert.equal((await pool.query(`select count(*)::int n from workspace_audit_events where "workspaceId"=$1 and action='billing.limits_changed'`, [first.id])).rows[0].n, 3)
+    assert.deepEqual((await Promise.all([saveBudget(null), saveBudget(null)])).map(result => result.status), [200, 200])
+    assert.equal(await changeCount(), 4)
     const unavailable = await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, scope: 'project', scopeId: randomUUID() } })
     assert.equal(unavailable.status, view.resourceTargetsAvailable ? 403 : 409)
     await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2', [first.id, member])
@@ -136,8 +153,41 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
       on conflict ("workspaceId") do update set plan='enterprise',source='cloud',"expiresAt"=null`, [first.id])
     const view = await (await orgGet()).json() as BillingManagementView
     assert.deepEqual(view.capacity, { plan: 'enterprise', hostedMaxInFlight: 128, activeHumanLimit: null })
+    const day = (await pool.query<{ date: string }>(`select to_char("createdAt" at time zone 'UTC','YYYY-MM-DD') date
+      from hosted_usage where "workspaceId"=$1 and state='settled'`, [first.id])).rows[0].date
+    assert.deepEqual(view.usage.daily?.find(row => row.date === day), { date: day, costMicroUsd: 2500000, reservedMicroUsd: 400000, unknownCalls: 1 })
+    assert.ok(view.usage.daily?.some(row => row.date !== day && row.costMicroUsd === 0 && row.reservedMicroUsd === 0 && row.unknownCalls === 0))
     assert.equal(view.billing?.entitlementPlan, 'free')
     assert.equal(view.billing?.live, false)
+  })
+
+  await t.test('entitled organization finance reads settled model usage only for the selected member and payer', async () => {
+    actor = owner
+    const detail = async (memberId: string) => (await (await orgGet(organizationId, {}, `?usageMember=${encodeURIComponent(memberId)}`)).json()) as BillingManagementView
+    const usage = (await detail(member)).usage
+    assert.deepEqual(usage.memberDetail, { id: member,
+      models: [{ model: 'synthetic-platform', costMicroUsd: 2500000, inputTokens: '0', outputTokens: '0', unknownCalls: 0 }] })
+    assert.equal(usage.reservedMicroUsd, 400000)
+    assert.deepEqual((await detail(outsider)).usage.memberDetail, { id: outsider, models: [] })
+    assert.equal(((await (await orgGet()).json()) as BillingManagementView).usage.memberDetail, undefined)
+    actor = member
+    assert.equal((await orgGet(organizationId, {}, `?usageMember=${member}`)).status, 403)
+  })
+
+  await t.test('organization cost attribution ranks confirmed spend and resolves ties consistently', async () => {
+    actor = owner
+    const ownerCall = randomUUID(), unattributedCall = randomUUID()
+    try {
+      await pool.query(`insert into hosted_usage(id,"workspaceId","usageWorkspaceId","actorId",model,state,"costMicroUsd","freeMicroUsd","purchasedMicroUsd")
+        values ($1,$2,$2,$3,'synthetic-platform','settled',3000000,0,3000000),($4,$2,$2,null,'synthetic-platform','settled',2500000,0,2500000)`,
+        [ownerCall, first.id, owner, unattributedCall])
+      const readMembers = async () => ((await (await orgGet()).json()) as BillingManagementView).usage.members.map(row => row.id)
+      assert.deepEqual(await readMembers(), [owner, member, null])
+      await pool.query('update hosted_usage set "costMicroUsd"=1000000, "purchasedMicroUsd"=1000000 where id=$1', [ownerCall])
+      assert.deepEqual(await readMembers(), [member, null, owner])
+    } finally {
+      await pool.query('delete from hosted_usage where id=any($1::text[])', [[ownerCall, unattributedCall]])
+    }
   })
 
   await t.test('an inactive historical personal credit share remains revocable while the Organization pays', async () => {
@@ -151,7 +201,7 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
   })
 
   await t.test('real scoped PATs cannot enumerate Organizations, cross tenants or survive expiry/revocation', async () => {
-    const token = await createPersonalAccessToken(owner, first.id, { name: 'Billing acceptance', expiresAt: null })
+    const token = await createLegacyPersonalAccessToken(owner, first.id, { name: 'Billing acceptance', expiresAt: null })
     const headers = { authorization: `Bearer ${token.token}` }
     actor = null
     const read = await get(first.id, headers), data = await read.json() as BillingManagementView

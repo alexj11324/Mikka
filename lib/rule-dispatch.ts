@@ -19,8 +19,13 @@ type Query = Pick<Pool, "query">;
 export async function cloudReady(
   query: Query,
   scope: { ownerId: string; workspaceId: string; botId: string | null; harness: string },
+  purpose?: import('./cloud-template-models').CloudModelPurpose,
 ) {
   if (!cloudComputerRunsEnabled()) return false;
+  if (purpose === 'cloudflare_task') {
+    const { hostedTaskEnabled } = await import('./cloud-computer/sponsored-task')
+    return hostedTaskEnabled(scope.workspaceId)
+  }
   const { rowCount } = await query.query(
     `SELECT 1 WHERE ${ownE2BKeySql('$3::text')}
         AND NOT EXISTS (SELECT 1 FROM user_e2b_keys uk WHERE uk."userId"=$3::text AND uk."lastErrorCode"='invalid')

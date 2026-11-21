@@ -17,8 +17,9 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubMcp: capture('github'), findRepository: capture('find-repository'), getFactoryTask: capture('factory-read-legacy-id'), readFactoryTask: capture('factory-read-scoped-id')})
-stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
+stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), githubCallAllowedStep: async () => 'allow', githubMcp: capture('github'), findRepository: capture('find-repository'), readFactoryTask: capture('factory-read-scoped-id')})
+const readPersonalSkill = capture('read-personal-skill')
+stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }), readPersonalSkill })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
 let factoryRegistry: typeof import('../../workflows/coordinator/factory-tools')
@@ -29,9 +30,47 @@ test('a new builtin execution retains every existing core tool from the real int
   assert.ok(previous.read_gmail_message, 'the existing host exposes Gmail full reads')
   const execution: AgentExecution = { id: '10000000-0000-4000-8000-000000000001', status: 'running', snapshot: makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT_AGENT_DEFINITION, 'host', { harness: 'ai_sdk', model: 'existing' }) }
   const versioned = registry.coordinatorTools('synthetic-owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution })
-  assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill'].sort())
+  assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill', 'read_personal_skill'].sort())
 })
 
+test('native Bot policy exposes configured write and mailbox schemas without allocating an execution', async () => {
+  const definition = parseDefinition({ ...DEFAULT_AGENT_DEFINITION, tools: ['web_search', 'send_slack_message', 'mailbox_inbox'] })
+  const submitted: unknown[] = []
+  const tools = registry.coordinatorTools(owner, bot, undefined, {
+    policy: { definition, effectiveTools: definition.tools }, runtime: { harness: 'ai_sdk', model: 'openai/gpt-6-luna' },
+    writeEnabled: true, mailboxEnabled: true, mailboxTools: ['mailbox_inbox'],
+    writeTools: { catalog: registry.coordinatorWriteCatalogue, submit: async call => { submitted.push(call) } },
+  })
+  assert.deepEqual(Object.keys(tools).sort(), ['mailbox_inbox', 'send_slack_message', 'web_search'])
+  assert.equal(tools.read_gmail_message, undefined)
+  await invoke(tools, 'send_slack_message', { channel: 'C12345678', text: 'Fixture message' })
+  assert.deepEqual(submitted, [{ action: 'send_slack_message', input: { channel: 'C12345678', text: 'Fixture message' }, toolCallId: 'synthetic-call' }])
+})
+
+test('native scheduled discovery narrows Bot policy to the occurrence read tools', () => {
+  const definition = parseDefinition({ ...DEFAULT_AGENT_DEFINITION, tools: ['web_search', 'read_gmail_message', 'send_email'] })
+  const tools = registry.coordinatorTools(owner, bot, undefined, {
+    policy: { definition, effectiveTools: definition.tools }, readOnly: true, readToolIds: ['web_search'],
+  })
+  assert.deepEqual(Object.keys(tools), ['web_search'])
+})
+
+
+test('read_personal_skill is offered to a versioned round and calls its own step', async () => {
+  // ALE-75: "read_personal_skill 注册且可调用". Registered means it reaches the
+  // tool set a versioned execution is given; callable means its execute routes
+  // to the step that reads personal_skills — not to loadAgentSkill, which reads
+  // the agent-kit definition and would answer skillNotAssigned for every
+  // personally installed skill.
+  const run = execution()
+  const tools = registry.coordinatorTools(owner, bot, scope, { coordinator: true, execution: run })
+  assert.ok(tools.read_personal_skill, 'the tool is in the versioned catalogue')
+  const skillId = '10000000-0000-4000-8000-000000000010'
+  await invoke(tools, 'read_personal_skill', { skillId })
+  const recorded = calls.filter(call => call.name === 'read-personal-skill')
+  assert.equal(recorded.length, 1, 'the tool routed to its own step exactly once')
+  assert.deepEqual(recorded[0].args, [owner, bot, run.id, skillId, scope])
+})
 
 const owner = 'synthetic-owner', bot = '10000000-0000-4000-8000-000000000003'
 const scope = {holder: 'synthetic-holder', turnId: 'synthetic-turn', callId: 'synthetic-call'}
@@ -86,7 +125,7 @@ test('all four existing flag combinations preserve the actual pre-kit catalogue 
       const defaults = service.agentKitDefaults()
       const previous = registry.coordinatorTools(owner, bot, undefined, {computerEnabled})
       const versioned = registry.coordinatorTools(owner, bot, undefined, {computerEnabled, execution: execution(defaults)})
-      assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill'].sort())
+      assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill', 'read_personal_skill'].sort())
       for (const name of COMPUTER_TOOL_IDS) assert.equal(defaults.tools.includes(name), computerEnabled)
     }
     assert.equal(DEFAULT_AGENT_DEFINITION.tools.some(name => (COMPUTER_TOOL_IDS as readonly string[]).includes(name)), false)
@@ -155,6 +194,14 @@ test('existing custom and legacy execution snapshots never acquire new capabilit
   } finally {
     factoryGateKeys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i] })
   }
+})
+
+test('Coordinator-only Factory tools do not construct entries that the scoped registry replaces', () => {
+  const coordinatorOnly = factoryRegistry.factoryCoordinatorTools(owner, scope)
+  const scoped = registry.createCoordinatorRegistry(owner, bot, scope, {
+    switches: { issueTools: true, factoryRouting: true, factoryLifecycle: true }, execution: execution(),
+  })
+  assert.deepEqual(Object.keys(coordinatorOnly).filter(name => Object.hasOwn(scoped, name)), [])
 })
 
 test('Factory gates narrow frozen grants, preserve ordinary tools and keep named Bots on scoped entry points', async () => {
@@ -238,7 +285,7 @@ test('Factory dispatch and ordinary dispatch keep separate host entry points and
   for (const key of factoryGateKeys) process.env[key] = '1'
   calls.length = 0
   const tools = registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { coordinator: true, execution: execution()})
-  const ordinary = {agentId: bot, repo: 'https://github.com/synthetic-owner/synthetic-repository.git', issueId: bot}
+  const ordinary = {agentId: bot, repo: 'https://github.com/synthetic-owner/synthetic-repository.git', issueId: bot, model: {harness: 'codex' as const}}
   const factory = {agentId: bot, deviceRepoId: bot, binding: {taskId: bot, issueId: bot, attemptId: bot, revision: 1, candidateId: null}}
   assert.equal((await asSchema(tools.dispatch_run.inputSchema).validate!(ordinary)).success, true)
   assert.equal((await asSchema(tools.dispatch_run.inputSchema).validate!({agentId: bot, deviceRepoId: bot, issueId: bot})).success, false)
@@ -322,21 +369,17 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
   const switches = { issueTools: true, factoryRouting: true, factoryLifecycle: true }
   const taskId = '10000000-0000-4000-8000-000000000011'
   const issueId = '10000000-0000-4000-8000-000000000012'
-  const originalDescriptions = {
-    legacy: "Read the task, current operation binding, reasons, candidates and retained execution evidence. V2 exposes one public stage with optional needsYou and bounded clarification context; use binding for controls. Older tasks keep their legacy contract.",
-    scoped: "Read this chat’s task, exact operation binding and retained execution evidence. V2 uses one public stage with optional needsYou; clarification records missing information/permissions and needsSpec. Use binding for subsequent controls. Older tasks keep their legacy contract.",
-  }
-  const cases: { name: string; tools: ToolSet; strict: boolean; description: string; expectedCall: (typeof calls)[number] }[] = [
-    { name: 'named Bot', tools: registry.coordinatorTools(owner, bot, scope, { switches, execution: execution() }), strict: true, description: originalDescriptions.scoped, expectedCall: { name: 'factory-read-scoped-id', args: [owner, taskId, scope, bot] } },
-    { name: 'Coordinator', tools: registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { switches, coordinator: true, execution: execution() }), strict: true, description: originalDescriptions.scoped, expectedCall: { name: 'factory-read-scoped-id', args: [owner, taskId, scope, COORDINATOR_BOT] } },
-    { name: 'Factory export', tools: factoryRegistry.factoryCoordinatorTools(owner, scope), strict: false, description: originalDescriptions.legacy, expectedCall: { name: 'factory-read-legacy-id', args: [owner, { taskId }, scope] } },
+  const originalDescription = "Read this chat’s task, exact operation binding and retained execution evidence. V2 uses one public stage with optional needsYou; clarification records missing information/permissions and needsSpec. Use binding for subsequent controls. Older tasks keep their legacy contract."
+  const cases = [
+    { name: 'named Bot', tools: registry.coordinatorTools(owner, bot, scope, { switches, execution: execution() }), botId: bot },
+    { name: 'Coordinator', tools: registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { switches, coordinator: true, execution: execution() }), botId: COORDINATOR_BOT },
   ]
   for (const item of cases) await t.test(item.name, async () => {
     const read = item.tools.get_factory_task
     assert.ok(read)
     const schema = asSchema(read.inputSchema)
     const inputSchema = await schema.jsonSchema
-    const originalInput = item.strict ? z.object({ taskId: z.uuid() }).strict() : z.object({ taskId: z.uuid() })
+    const originalInput = z.object({ taskId: z.uuid() }).strict()
     const originalSchema = await asSchema(originalInput).jsonSchema
     const withoutDescription = structuredClone(inputSchema)
     const parameter = withoutDescription.properties?.taskId
@@ -350,12 +393,11 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
     assert.deepEqual(await schema.validate!({ taskId: issueId }), { success: true, value: { taskId: issueId } })
     for (const input of [{}, { taskId: 'not-a-uuid' }, { issueId }]) assert.equal((await schema.validate!(input)).success, false)
     const unknown = await schema.validate!({ taskId, issueId })
-    if (item.strict) assert.equal(unknown.success, false)
-    else assert.deepEqual(unknown, { success: true, value: { taskId } })
+    assert.equal(unknown.success, false)
 
     calls.length = 0
     await invoke(item.tools, 'get_factory_task', { taskId })
-    assert.deepEqual(calls, [item.expectedCall])
+    assert.deepEqual(calls, [{ name: 'factory-read-scoped-id', args: [owner, taskId, scope, item.botId] }])
 
     const description = read.description
     assert.ok(typeof description === 'string')
@@ -371,14 +413,12 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
 
     const metadataBytes = (description: string | undefined, parameters: typeof inputSchema) =>
       Buffer.byteLength(JSON.stringify({ name: 'get_factory_task', description, inputSchema: parameters }), 'utf8')
-    const beforeBytes = metadataBytes(item.description, originalSchema)
+    const beforeBytes = metadataBytes(originalDescription, originalSchema)
     const afterBytes = metadataBytes(description, inputSchema)
     assert.ok(afterBytes <= beforeBytes, 'serialized tool description and complete input schema cannot grow')
     t.diagnostic(JSON.stringify({ surface: item.name, beforeBytes, afterBytes, deltaBytes: afterBytes - beforeBytes }))
 
-    if (item.strict) {
-      assert.deepEqual(await asSchema(item.tools.get_issue.inputSchema).validate!({ issueId }), { success: true, value: { issueId } })
-      assert.equal((await asSchema(item.tools.dispatch_run.inputSchema).validate!({ issueId, readOnly: true })).success, true)
-    }
+    assert.deepEqual(await asSchema(item.tools.get_issue.inputSchema).validate!({ issueId }), { success: true, value: { issueId } })
+    assert.equal((await asSchema(item.tools.dispatch_run.inputSchema).validate!({ issueId, readOnly: true, model: { harness: 'codex' } })).success, true)
   })
 })

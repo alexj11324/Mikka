@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname } from '@/lib/client-runtime/navigation'
 import posthog from 'posthog-js'
 import { authClient } from '@/lib/auth-client'
 import { analyticsPath } from '@/lib/analytics-policy'

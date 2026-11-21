@@ -97,8 +97,8 @@ By default, paid_fallback_enabled and profiles_active remain read-only blockers.
 --prepare temporarily disables subscription-to-API-Key fallback and existing
 enabled Profiles through normal application APIs. It validates the other gates
 first; in all mode, an unavailable case does not prevent an available case from
-running. chosen=false remains a blocker because the normal model API cannot
-restore an inherited choice. Global model order is never changed.
+running. chosen=false with preferenceState=absent uses temporary-if-absent;
+cleanup uses revision-checked restore-implicit. Global model order is never changed.
 
 Before each preparation or restoration write, both existing owner-wide run
 readers must report only terminal runs, including other workspaces. Each exposes
@@ -125,8 +125,8 @@ Each selected case uses its exact existing subscription:
 - Codex: gpt-6-luna.
 
 API execution creates one temporary fixed Agent Profile, selects the corresponding
-Coordinator composer subscription, and calls coordinator.sendCoordinatorMessage
-through /api/rpc with a cloud destination and the Profile ID. The task requests a
+Coordinator composer subscription, and submits through the authenticated Eve
+session endpoint with a cloud destination and the Profile ID. The task requests a
 tiny text Artifact with exact bytes, plus the ordinary independent review and
 normal delivery acceptance. The frozen Factory flowVersion controls the checks:
 v2 requires execute and one independent review; historical tasks also require
@@ -201,6 +201,16 @@ driver's cookie jar nor sends a task/model request through a separate API.
 A refusal, timeout, ambiguous selection or uncertain click never retries the
 submission. The original driver still observes the actual persisted UI message
 and verifies all task, Factory, native-run and Artifact evidence.
+
+The actor explicitly admits its real automation through PostHog's public
+`opt_out_useragent_filter` option for this fresh browser context. Before its
+first page, it installs a non-persistent marker only on the official app's
+top-level documents. An unexpired marker at initialization enables this option;
+the ten-minute bound does not reset a running SDK. Closing the owned context
+ends that instance. Ordinary visitor instances keep the default bot filter.
+The browser retains its actual user agent and automation signals, and the
+sanitizer preserves only the SDK's `bot` or `browser` classification. Replay
+records the actual automated UI actions under the unchanged masking policy.
 
 Before the paid click, the actor checks that the active PostHog session has
 loaded its SDK, started recording and observed a sanitized snapshot. It reads

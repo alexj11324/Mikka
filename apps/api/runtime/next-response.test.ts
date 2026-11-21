@@ -8,7 +8,7 @@ test('NextResponse JSON preserves HTTP refusals with the real srvx global Respon
   // This file runs in its own node:test process, before any application import.
   globalThis.Response = FastResponse as unknown as typeof Response
   try {
-    const { NextResponse } = await import('../compat/server')
+    const { NextResponse } = await import('@/lib/server-runtime/server')
     const { createApiHandler } = await import('../src/application')
     assert.equal(Object.getPrototypeOf(NextResponse), FastResponse)
 

@@ -1,5 +1,5 @@
 // Production resolver, cloud queue, stage dispatcher and worker freeze on real
-// PostgreSQL. Reports, subscriptions and Decision transport are synthetic;
+// PostgreSQL. Reports, subscriptions and the model-routing transport are synthetic;
 // provider lifecycle is observed at its boundary, never called or claimed live.
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -11,11 +11,13 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { gzipSync } from 'node:zlib'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
+import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 import { dbUrl, seedUser, seedPersonalWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { templateModelsFixture } from '../../tests/support/template-models'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import type { DecisionAnswer } from '../coordinator/decision'
 import type { OrderHarness } from '../model-order-plan'
 import type { FactorySnapshot } from './store'
 import type { ReviewActor } from '../coding-workspace/diff/authority'
@@ -30,14 +32,16 @@ process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 // teardown while the current child is still unwinding, obscuring that failure.
 test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 240_000 }, async t => {
   assert.ok(dbUrl)
+  await isolateCoordinatorWakes(t)
   const admin = new Pool({ connectionString: dbUrl })
   const database = `factory_profile_dispatch_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}"`)
+  await createTestDatabase(admin, database)
   const isolated = new URL(dbUrl); isolated.pathname = `/${database}`
   const url = isolated.toString()
   const old = { E2E_DATABASE_URL: process.env.E2E_DATABASE_URL, MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }
   Object.assign(process.env, { E2E_DATABASE_URL: url, MIKKA_DATABASE_URL: url, DATABASE_URL: url })
   const pool = new Pool({ connectionString: url, max: 12, options: '-c statement_timeout=15000 -c lock_timeout=5000' })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   t.after(async () => {
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
@@ -66,24 +70,18 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       },
     }),
   } })
-  let decisionProfile = ''
-  let decisionFailure: 'missing-pair-reason' | 'none' | 'refusal' | null = null
-  const decisionInputs: { purpose: string; input: unknown; questions: unknown; profileId: string }[] = []
+  const decisionInputs: { purpose: string; input: unknown; questions: unknown }[] = []
   const decisionCounts = () => ({
     profile: decisionInputs.filter(call => call.purpose === 'factory-agent-profile').length,
     model: decisionInputs.filter(call => call.purpose === 'task-model-routing').length,
   })
+  // Only model routing may reach the transport; a Profile is never selected by
+  // a Decision (decision 2026-11-15-1630). Every call answers "unavailable" so
+  // routing exercises its fallback deliberately.
   t.mock.module(new URL('../coordinator/decide.ts', import.meta.url).href, { namedExports: {
     invokeDecision: async (purpose: string, input: unknown, questions: unknown) => {
-      decisionInputs.push({ purpose, input, questions, profileId: decisionProfile })
-      // A legacy Profile may route its inherited model, independently of Profile
-      // selection. Exercise its unavailable-decision fallback deliberately.
-      if (purpose === 'task-model-routing') return null
-      const answers = new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: decisionFailure === 'none' ? 'none' : decisionFailure === 'missing-pair-reason' ? decisionProfile : `${decisionProfile}:stage_fit`, confidence: .95 }],
-      ])
-      if (decisionFailure === 'refusal') answers.clear() // The actual adapter omits refused answers.
-      return { answers, execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'synthetic-profile-stage', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
+      decisionInputs.push({ purpose, input, questions })
+      return null
     },
   } })
   const modules = await Promise.all([
@@ -120,7 +118,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     if (!submitted) await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Create a checked deliverable"}')`, [sourceEventId, ownerId, botId, issueId])
     await pool.query(`INSERT INTO user_e2b_keys ("userId",ciphertext,iv,"keyVersion",last4) VALUES ($1,'synthetic-unopened','synthetic-unopened',1,'test')`, [ownerId])
     await pool.query(`INSERT INTO model_order_settings ("ownerId","workspaceId",location,customized) VALUES ($1,$2,'cloud',true)`, [ownerId, workspaceId])
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Prepared cloud fixture','cloud',true,now(),$3)`, [deviceId, ownerId, JSON.stringify(caps())])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Prepared cloud fixture','cloud',true,now(),$3,now())`, [deviceId, ownerId, JSON.stringify(caps())])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","deviceId","sandboxId","operationId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [workspaceId, ownerId, deviceId, `synthetic-machine-${deviceId}`, randomUUID()])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [botId, workspaceId, ownerId])
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,$4,'main')`, [repoId, deviceId, ownerId, `/home/user/.mikka/bot-workspaces/${botId}`])
@@ -216,7 +214,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(usageCalls.length, beforeUsage)
   })
   const exercise = async (withProfiles: boolean, missingCodex: boolean, autoModelRouting = true, explicitDefault = false, parentMode: 'prepared' | 'metadata-only' = 'prepared', flowVersion: 1 | 2 = 2) => {
-    const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined), beforeDecisions = decisionCounts()
+    const f = await fixture(withProfiles, missingCodex, false, explicitDefault ? 'default' : undefined)
     if (flowVersion === 1) {
       // Persist the historical contract before any execution/check is queued.
       await pool.query(`UPDATE factory_tasks SET route=route-'flowVersion' WHERE id=$1`, [f.task.id])
@@ -256,9 +254,10 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const source = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.claude_code, deviceRepoId: f.repoId })
     const sha = 'a'.repeat(40), deliverySha = 'b'.repeat(40), nativeSession = `claude-native-${source.runId}`
     await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"='submitted',report=$3 WHERE id=$1`, [source.runId, nativeSession, JSON.stringify({ sourceCommit: sha, deliverableCommit: deliverySha, summary: 'PRIVATE_PRODUCER_REPORT Synthetic successful implementation and validation report', runtime: { observedModel: model.claude_code } })])
+    await addFactoryVisualEvidence(pool, source.runId)
     const sourceBefore = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0]
     if (missingCodex && parentMode === 'prepared') await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [f.workspaceId, f.ownerId])
-    decisionProfile = f.review?.id ?? ''
+    const beforeReview = decisionCounts()
     const reconciler = createFactoryReconciler(pool, f.store, undefined, {}, f.botId, automaticFactoryDispatch(pool))
     await reconciler.run(f.ownerId, source.runId)
     const current = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
@@ -267,7 +266,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const attempt = (await pool.query('SELECT * FROM factory_attempts WHERE id=$1', [current.attemptId])).rows[0]
     const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [current.candidateId])).rows[0]
     const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [attempt.runId])).rows[0]
-    const expectedHarness = withProfiles ? 'codex' : 'claude_code'
+    // Review never chooses a Profile (decision 2026-11-15-1630): it stays on the
+    // producer's Agent with the built-in role, whether or not Profiles exist.
+    const expectedHarness = 'claude_code' as const
     const runtime = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1 AND harness=$2', [f.botId, expectedHarness])).rows[0]
     assert.equal(run.agentId, runtime.agentId); assert.equal(run.issueId, f.issueId); assert.equal(run.botId, f.botId)
     assert.equal(attempt.taskId, f.task.id); assert.equal(attempt.candidateId, candidate.id)
@@ -281,37 +282,12 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const binding = (await pool.query('SELECT * FROM byos_bindings WHERE id=$1', [run.agentDefinition.subscription.bindingId])).rows[0]
     assert.equal(binding.connectionId, f.connections[expectedHarness]); assert.equal(binding.consumerId, runtime.agentId)
     const frozen = run.agentDefinition.agentProfile
-    if (withProfiles) {
-      assert.equal(frozen.profileId, f.review!.id); assert.equal(frozen.version, f.review!.version); assert.equal(frozen.digest, f.review!.digest)
-      assert.equal(frozen.source, 'decision'); assert.equal(frozen.effort, 'low')
-      const profileCall = decisionInputs.filter(call => call.purpose === 'factory-agent-profile').at(-1)!
-      const profileInput = JSON.parse(String(profileCall.input))
-      assert.equal(profileInput.currentWork?.stage, 'review', 'the host supplies the current stage before selecting a role')
-      assert.equal(profileInput.currentWork.responsibility, 'independent_review')
-      assert.equal(profileInput.currentWork.readOnly, true)
-      assert.match(profileInput.currentWork.objective, /correctness and regressions/)
-      assert.match(profileInput.currentWork.evidence, /implementation.*validation evidence/)
-      if (flowVersion === 2) assert.match(profileInput.currentWork.evidence, /single review/)
-      assert.deepEqual(profileInput.currentWork.candidate, { id: candidate.id, kind: candidate.kind, sha: candidate.sha })
-      assert.equal(candidate.sha, null, 'a deliverable is not given a fabricated repository candidate SHA')
-      assert.deepEqual(profileInput.currentWork.producer, { runId: source.runId, harness: 'claude_code', model: model.claude_code,
-        profile: { id: explicitDefault ? 'default' : f.implement!.id, version: sourceBefore.agentDefinition.agentProfile.version } })
-      assert.equal(profileInput.currentWork.taskId, current.id); assert.equal(profileInput.currentWork.attemptId, current.attemptId)
-      assert.equal(profileInput.currentWork.requestEpoch, current.sourceEventId)
-      assert.match(profileInput.acceptanceReference.originalTask.content, /ORIGINAL_IMPLEMENTATION_REQUEST/)
-      assert.ok(!JSON.stringify(profileInput.currentWork).includes(originalRequest), 'original execution text remains background, never current-stage instructions')
-      assert.match(String(profileCall.questions && JSON.stringify(profileCall.questions)), /currentWork/)
-      for (const privateValue of ['PRIVATE_PROFILE_', 'PRIVATE_PRODUCER_REPORT', nativeSession, f.connections.claude_code, f.connections.codex]) assert.ok(!String(profileCall.input).includes(privateValue), privateValue)
-      assert.equal(frozen.targetEntry.source.connectionId, f.connections.codex)
-      assert.match(run.prompt, /PRIVATE_PROFILE_Review/)
-      assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, explicitDefault ? 'default' : f.implement!.id)
-      assert.deepEqual(decisionCounts(), { profile: beforeDecisions.profile + 1, model: beforeDecisions.model }, 'a fixed Profile selects its role once without model routing')
-    } else {
-      assert.equal(frozen.profileId, 'default'); assert.equal(frozen.source, 'default')
-      assert.deepEqual(decisionCounts(), { profile: beforeDecisions.profile, model: beforeDecisions.model + (autoModelRouting ? 1 : 0) }, 'same-Harness fallback routes once only when automatic routing is enabled')
-      if (autoModelRouting) assert.equal(run.agentDefinition.modelDispatch.routing.reason, 'decision_unavailable')
-      else assert.equal(run.agentDefinition.modelDispatch.routing, undefined, 'an older choice has no fabricated routing snapshot')
-    }
+    assert.equal(frozen.profileId, 'default'); assert.equal(frozen.source, 'default')
+    assert.ok(!String(run.prompt).includes('PRIVATE_PROFILE_'), 'no custom Profile is chosen for Review automatically')
+    if (withProfiles) assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, explicitDefault ? 'default' : f.implement!.id)
+    // Decision 2026-11-15-1630: no model routing and no Profile selection, whatever the old routing column says.
+    assert.deepEqual(decisionCounts(), beforeReview, 'Review asks no Decision to choose a model or a Profile')
+    assert.equal(run.agentDefinition.modelDispatch.routing, undefined, 'no routing snapshot is recorded')
     assert.deepEqual(handoffs.at(-1), { previous: source.runId, runId: run.id })
     assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0], sourceBefore)
     const afterDecisions = decisionCounts()
@@ -324,99 +300,18 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     if (parentBefore) assert.deepEqual(await readParent(), parentBefore, 'producer and independent Review must not prepare, wake or change the parent')
     return { ...f, source, current, attempt, candidate, run }
   }
-  await t.test('Decision rejection retains closed diagnostics and filtered availability without creating a run or binding', async t => {
-    const f = await fixture(), profileStore = new profiles.AgentProfileStore(pool)
-    const disabled = await profileStore.create(f.scope, { name: 'PRIVATE_DISABLED_PROFILE', description: 'PRIVATE_DISABLED_CAPABILITY', enabled: false, harness: 'codex', model: { mode: 'inherit' } })
-    await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [f.connections.codex])
-    const oldUsageProbe = usageProbe; usageProbe = async () => {}
-    const warnings: string[] = []
-    const warning = t.mock.method(console, 'warn', (line: unknown) => { warnings.push(String(line)) })
-    const beforeBindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows
-    const execution = { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions' as const, providerGenerationId: 'PRIVATE_PROVIDER_GENERATION', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const }
-    const privateAnswer = 'PRIVATE_RAW_DECISION_RESPONSE'
-    const responses = [
-      { detail: 'decision_unavailable', answers: null },
-      { detail: 'invalid_profile_answer', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>() },
-      { detail: 'no_suitable_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: 'none' }],
-      ]) },
-      { detail: 'uncertain_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: `${f.implement!.id}:stage_fit`, confidence: .42 }],
-      ]) },
-      { detail: 'invalid_profile_answer', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: `${f.implement!.id}:stage_fit`, confidence: .95 }],
-        ['reason', { name: 'reason', type: 'choice', choice: 'stage_fit' }],
-      ]) },
-      { detail: 'invalid_reason', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: f.implement!.id, confidence: .95 }],
-      ]) },
-      { detail: 'unknown_profile', answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([
-        ['profile', { name: 'profile', type: 'choice', choice: privateAnswer }],
-      ]) },
-    ]
-    try {
-      for (const response of responses) {
-        let decisions = 0
-        await assert.rejects(profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, stage: 'review', location: 'cloud', cloudPurpose: 'desktop' }, {
-          decision: async (purpose, input, questions, _signal, diagnostics) => {
-            decisions++
-            assert.equal(purpose, 'factory-agent-profile'); assert.deepEqual(diagnostics, { retainInvalidReceipt: true })
-            assert.ok(!JSON.stringify(input).includes('PRIVATE_PROFILE_Implement'))
-            const choices = questions[0].type === 'choice' ? questions[0].choices.map(item => item.value) : []
-            assert.equal(questions.length, 1)
-            assert.deepEqual(choices, [`${f.implement!.id}:capability_fit`, `${f.implement!.id}:stage_fit`, 'none'])
-            return response.answers ? { answers: response.answers, execution } : null
-          },
-        }), error => {
-          assert.ok(error instanceof profiles.AgentProfileError)
-          assert.equal(error.code, 'agentProfileDecisionUnavailable'); assert.equal(error.message, 'agentProfileDecisionUnavailable')
-          assert.equal(error.status, 409); assert.equal(error.detail, response.detail)
-          return true
-        })
-        assert.equal(decisions, 1)
-        const logged = JSON.parse(warnings.at(-1)!)
-        assert.equal(logged.code, 'agentProfileDecisionUnavailable'); assert.equal(logged.detail, response.detail)
-        assert.equal(logged.issueId, f.issueId); assert.equal(logged.stage, 'review')
-        assert.equal(logged.candidateCount, 1); assert.equal(logged.candidateIds, f.implement!.id)
-        assert.equal(logged.profileCount, 3); assert.equal(logged.profileDiagnosticsTruncated, false)
-        assert.deepEqual(new Set(logged.profileAvailability.split(',')), new Set([`${f.implement!.id}:available`, `${f.review!.id}:checking`, `${disabled.id}:disabled`]))
-        assert.equal(logged.decisionExecutionId, response.answers ? execution.executionId : undefined)
-        assert.equal(logged.selectedProfileId, response.detail === 'uncertain_profile' ? f.implement!.id : undefined)
-        assert.equal(logged.decisionConfidence, response.detail === 'uncertain_profile' ? .42 : undefined)
-        assert.deepEqual(logged.causes, [])
-      }
-      assert.equal(warnings.length, responses.length)
-      assert.ok(!warnings.join('\n').includes(`${f.implement!.id}:stage_fit`), 'raw atomic pair answers are not logged')
-      for (const forbidden of [privateAnswer, 'PRIVATE_PROFILE_', disabled.name, disabled.description, execution.providerGenerationId, f.ownerId, f.connections.codex, f.connections.claude_code]) assert.ok(!warnings.join('\n').includes(forbidden), forbidden)
-      assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, beforeBindings)
-      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
-    } finally { warning.mock.restore(); usageProbe = oldUsageProbe }
-  })
-  await t.test('CC implementation selects independent Codex Review with frozen exact Profile and subscription', async () => { await exercise(true, false) })
-  await t.test('a prepared sleeping parent gains its missing Codex metadata without provider I/O', async () => { await exercise(true, true) })
-  await t.test('an unprepared parent admits CC implementation and independent Codex Profile Review without changing the parent', async () => {
+  await t.test('CC implementation with a custom Profile reviews with the built-in role on its own Agent and subscription', async () => { await exercise(true, false) })
+  await t.test('a prepared sleeping parent with missing Codex metadata still reviews without provider I/O', async () => { await exercise(true, true) })
+  await t.test('an unprepared parent admits CC implementation and its Review without changing the parent or selecting a Profile', async () => {
     const before = decisionInputs.length
-    const f = await exercise(true, true, true, false, 'metadata-only')
-    const calls = decisionInputs.slice(before).filter(call => call.purpose === 'factory-agent-profile')
-    assert.equal(calls.length, 1)
-    const input = JSON.parse(calls[0]!.input as string)
-    assert.equal(input.task.kind, 'independent_check'); assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
-    assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId); assert.equal(input.task.candidateId, f.candidate.id)
-    assert.equal(input.task.content, undefined); assert.ok(input.acceptanceReference?.originalTask)
+    await exercise(true, true, true, false, 'metadata-only')
+    assert.equal(decisionInputs.slice(before).filter(call => call.purpose === 'factory-agent-profile').length, 0)
   })
   await t.test('no configured Profile retains CC despite Codex being first in model preference', async () => { await exercise(false, false) })
-  await t.test('an owner Default task still permits the host to choose independent Codex Review for its next stage', async () => {
-    const f = await exercise(true, false, true, true)
-    const input = JSON.parse(decisionInputs.at(-1)!.input as string)
-    assert.equal(input.task.kind, 'independent_check', 'the actual selection request describes the current check, not another producer')
-    assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
-    assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId)
-    assert.equal(input.task.candidateId, f.candidate.id)
-    const issue = (await pool.query('SELECT title,content FROM issues WHERE id=$1', [f.issueId])).rows[0]
-    assert.equal(input.acceptanceReference.originalTask.title, issue.title)
-    assert.equal(input.acceptanceReference.originalTask.content, JSON.stringify(issue.content))
-    assert.equal(input.acceptanceReference.currentOwnerRequest, '')
-    assert.equal(input.task.content, undefined, 'the implementation contract is only an acceptance reference')
+  await t.test('an owner Default task keeps the built-in role for its Review stage', async () => {
+    const before = decisionInputs.length
+    await exercise(true, false, true, true)
+    assert.equal(decisionInputs.slice(before).filter(call => call.purpose === 'factory-agent-profile').length, 0)
   })
   const profileRefusal = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
   const unclaimedReview = async (withRouting = false) => {
@@ -437,7 +332,6 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await reconcile.run(f.ownerId, f.run.id)
     return { ...f, blocked: await f.store.read(f.ownerId, f.task.id) }
   }
-  const recheckCallsStart = decisionInputs.length
   const { createFactoryHumanStore } = await import('./human-store')
   const humanStore = (dispatch = automaticFactoryDispatch(pool)) => createFactoryHumanStore(pool, botId => bindFactoryStoreWorkspace(pool, createFactoryStore(pool,
     async (owner, issueId, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issueId, owner])).rowCount === 1,
@@ -462,7 +356,6 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       return (await f.store.read(f.ownerId, f.task.id)).task
     }
     // The two historical checks intentionally have different frozen roles and sources.
-    decisionProfile = f.implement!.id
     const verifyTask = await complete(f.run.id)
     assert.equal(verifyTask.stage, 'verify'); assert.equal(verifyTask.status, 'running')
     const verify = (await pool.query('SELECT r.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1', [verifyTask.attemptId])).rows[0]
@@ -506,7 +399,6 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }
     // Changing present preferences cannot change either historical selection.
     await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
-    decisionProfile = f.implement!.id
     const decisionsBefore = decisionCounts()
     const [response, duplicate] = await Promise.all([f.handleFactory(f.human, f.request), f.handleFactory(f.human, f.request),
       expired ? rejectsExpiredAnswer() : Promise.resolve()])
@@ -760,7 +652,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     try { await assert.rejects(f.handleFactory(f.human, f.request), /synthetic Owner recheck receipt failure/) }
     finally { await pool.query('DROP TRIGGER reject_recheck_receipt ON factory_events; DROP FUNCTION reject_recheck_receipt()') }
     assert.deepEqual(await rows(), before)
-    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.codex])
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [f.connections.claude_code]) // Review runs on the producer's Agent
     assert.equal((await f.handleFactory(f.human, f.request)).status, 409)
     assert.deepEqual(await rows(), before, 'source refusal never consumes the waiting question')
   })
@@ -796,7 +688,6 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       if (exhausted) assert.equal((await pool.query('SELECT status FROM factory_questions WHERE "taskId"=$1', [f.task.id])).rows[0].status, 'open')
     } finally { usageProbe = oldProbe }
   })
-  const recheckCallsEnd = decisionInputs.length
   const unsubmittedReview = async (snapshot = false) => {
     const f = await exercise(false, false, false)
     // The daemon boundary is synthetic; queue, immutable completion receipt,
@@ -971,7 +862,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
     assert.equal(f.blocked.attempts.filter(a => a.stage === 'execute').length, 1)
   })
-  for (const withRouting of [false, true]) await t.test(`Owner retry preserves the ${withRouting ? 'routed' : 'legacy without routing'} review source without a new execution or model selection`, async () => {
+  for (const withRouting of [false]) await t.test(`Owner retry preserves the ${withRouting ? 'routed' : 'legacy without routing'} review source without a new execution or model selection`, async () => {
     const f = await unclaimedReview(withRouting)
     assert.equal(f.blocked.task.route.flowVersion, 2)
     assert.equal(f.run.agentDefinition.modelDispatch.routing !== undefined, withRouting)
@@ -992,12 +883,11 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await pool.query("UPDATE cloud_machines SET state='sleeping' WHERE \"workspaceId\"=$1 AND \"ownerId\"=$2", [f.workspaceId, f.ownerId])
     // A newly preferred independent role must not replace the source already
     // frozen for this acceptance case when the person asks to retry it.
-    const otherProfile = await new profiles.AgentProfileStore(pool).create(f.scope, {
+    await new profiles.AgentProfileStore(pool).create(f.scope, {
       name: 'Different review source', description: 'Synthetic independent role introduced after refusal', roles: ['Review'],
       harness: 'codex', model: { mode: 'fixed', harness: 'codex', model: model.codex, source: { kind: 'subscription', connectionId: f.connections.codex } },
       instructions: 'PRIVATE_PROFILE_Different_review', skills: ['independent-review'], effort: 'low',
     })
-    decisionProfile = otherProfile.id
     const human = humanStore()
     const beforeCalls = decisionCounts(), beforeHandoffs = handoffs.length
     const beforeRun = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [f.run.id])).rows[0]
@@ -1353,8 +1243,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const { rebindExecutionDevice } = await import('../execution-identity')
   const claimFixture = async (inherit = false) => {
     const f = await fixture(true, false, inherit)
-    if (inherit) decisionProfile = f.implement!.id
-    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, ...(inherit ? {} : { profileId: f.implement!.id }), location: 'cloud', cloudPurpose: 'desktop' })
+    // A Profile is used only when named; the person picks it in both modes.
+    const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, { issueId: f.issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'desktop' })
     if (selected.target.kind !== 'cloud') assert.fail(JSON.stringify(selected.target))
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents.claude_code, 'claude_code', f.connections.claude_code, model.claude_code)
     const queue: typeof queueCloudRun = inherit ? async (db, actor, input) => {
@@ -1366,7 +1256,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       title: 'Claim the frozen Profile', body: 'Synthetic freshness boundary', model: model.claude_code,
       ...(inherit ? { sourceEventId: f.sourceEventId } : {}),
       subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: !inherit,
-      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry, ...(selected.target.routing ? { routing: selected.target.routing } : {}) } } : {}),
+      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry } } : {}),
     })
     // The same handoff as provisioning, with no provider or model call.
     const threadDevice = randomUUID()
@@ -1388,8 +1278,18 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const claim = async (f: Awaited<ReturnType<typeof claimFixture>>) => {
     const lease = new Date(Date.now() + 30_000)
     const beforeClaim = f.inherit ? async (tx: import('pg').PoolClient) => {
-      const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
-      assert.equal(result.preserveQuestionWorktree, true)
+      const queries = t.mock.method(tx, 'query')
+      try {
+        const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
+        assert.equal(result.preserveQuestionWorktree, true)
+        const lineageReads = queries.mock.calls.filter(call => {
+          const query = call.arguments[0]
+          return typeof query === 'string' && query.includes('WITH RECURSIVE lineage AS') && query.includes('FROM lineage l')
+        })
+        assert.equal(lineageReads.length, 1, 'the lease claim resolves its Factory task lineage once')
+      } finally {
+        queries.mock.restore()
+      }
     } : undefined
     return factoryResourceWorkspace(pool)(f.ownerId, f.task.id, () =>
       claimCloudRun(pool, f.actor, f.runId, f.threadDevice, lease, f.subscriptionBindingId, beforeClaim, undefined, false))
@@ -1409,11 +1309,13 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     ])
     const f = await fixture(true, false, false, undefined, true)
     assert.equal(f.task.stage, 'spec'); assert.equal(f.task.candidateId, null)
-    // The fixture's named Codex Profile is explicitly picked; role discovery
-    // and Decision transport are not part of an already admitted native resume.
+    // The person picks the fixture's Profile and names the Codex model: a
+    // Profile is content only, so the model comes from the task.
     const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, {
       issueId: f.issueId, stage: 'spec', profileId: f.review!.id, location: 'cloud', cloudPurpose: 'desktop',
+      asked: { harness: 'codex', model: model.codex },
     })
+    assert.equal(selected.agentProfile?.contentOnly, true); assert.equal(selected.agentProfile?.source, 'explicit')
     const target = selected.target
     if (target.kind !== 'cloud') assert.fail('the plan requires its recorded cloud Codex destination')
     assert.equal(target.harness, 'codex'); assert.equal(target.model, model.codex)
@@ -1766,119 +1668,40 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
     assert.deepEqual(decisionCounts(), beforeDecisions, 'a named model on Default does not invoke either Decision during first dispatch or same-session answer')
 
-    // #1225 production reached a valid native submission, then a Profile/reason
-    // protocol rejection. This is one representative invalid_reason response;
-    // it does not claim which private answer the live Decision returned.
+    // A completed native deliverable goes straight to Review. No Profile is
+    // chosen for it (decision 2026-11-15-1630): the built-in role runs on the
+    // producer's own Agent and model, with no Profile Decision.
     const deliverySha = 'b'.repeat(40)
     await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"finishedAt"=now(),report=$3 WHERE id=$1`, [child.id, nativeSession, JSON.stringify({
       sourceCommit: 'a'.repeat(40), deliverableCommit: deliverySha, summary: 'Synthetic completed native deliverable', runtime: { observedModel: model.codex },
     })])
+    await addFactoryVisualEvidence(pool, child.id)
     const producerRows = (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows
-    const beforeHandoffs = handoffs.length, completion = createFactoryReconciler(pool, f.store, questions, {}, f.botId, automaticFactoryDispatch(pool))
-    const warnings: string[] = [], warning = t.mock.method(console, 'warn', (line: unknown) => { warnings.push(String(line)) })
-    decisionProfile = f.review!.id
-    try {
-      decisionFailure = 'missing-pair-reason'
-      await completion.run(f.ownerId, child.id)
-      let blocked = await f.store.read(f.ownerId, f.task.id)
-      assert.equal(blocked.task.stage, 'review'); assert.equal(blocked.task.status, 'blocked')
-      assert.ok(blocked.task.candidateId)
-      const candidateId = blocked.task.candidateId
-      const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [candidateId])).rows[0]
-      assert.equal(candidate.runId, child.id)
-      assert.deepEqual(blocked.checkDispatchRecovery, { binding: { taskId: f.task.id, revision: blocked.task.revision } })
-      assert.equal(JSON.parse(warnings.at(-1)!).detail, 'invalid_reason')
-      assert.equal(handoffs.length, beforeHandoffs)
-      const human = humanStore(), { handleFactory } = await import('./http')
-      const request = (revision: number) => ({ userId: f.ownerId, method: 'POST', taskId: f.task.id, origin: 'https://app.example',
-        url: `https://app.example/api/factory/tasks/${f.task.id}`, body: { binding: { taskId: f.task.id, revision }, eventId: randomUUID(), action: 'retry', reason: 'Retry the independent review of the retained candidate.' } })
-      const { sweepFactoryWatchdog } = await import('./watchdog')
-      // Owner retry records a pending attempt. The existing recovery cron then
-      // dispatches it after one minute; the HTTP handler does not dispatch it.
-      // Age only this synthetic task relative to the oldest task in this test
-      // database, so no other fixture enters the real bounded cron query.
-      const sweepAt = new Date((await pool.query('SELECT min("updatedAt") AS value FROM factory_tasks')).rows[0].value)
-      const sweepReview = async () => {
-        const pending = await f.store.read(f.ownerId, f.task.id)
-        assert.equal(pending.task.status, 'pending'); assert.equal(pending.task.stage, 'review')
-        assert.equal(pending.task.candidateId, candidateId)
-        await pool.query('UPDATE factory_tasks SET "updatedAt"=$2 WHERE id=$1', [f.task.id, new Date(sweepAt.getTime() - 60_001)])
-        const observed = await sweepFactoryWatchdog(pool, {
-          runtime: botId => { assert.equal(botId, f.botId); return { store: f.store, reconcile: completion } },
-          dispatch: automaticFactoryDispatch(pool),
-          wake: async () => { assert.fail('a retained candidate retry must use the normal check dispatcher') },
-        }, sweepAt)
-        assert.deepEqual(observed, { scanned: 1, recovered: 1, blocked: 0, deferred: 0, failed: 0 })
-        return f.store.read(f.ownerId, f.task.id)
-      }
-      for (const failure of ['none', 'refusal'] as const) {
-        decisionFailure = failure
-        const retry = request(blocked.task.revision)
-        const response = await handleFactory(human, retry)
-        assert.equal(response.status, 200)
-        const calls = decisionCounts()
-        assert.deepEqual(await handleFactory(human, retry), response, 'the same Owner retry does not repeat a refused Decision')
-        assert.deepEqual(decisionCounts(), calls)
-        blocked = await sweepReview()
-        assert.equal(blocked.task.status, 'blocked'); assert.equal(blocked.task.stage, 'review')
-        assert.equal(blocked.task.candidateId, candidateId)
-        assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 1)
-        assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows, producerRows)
-        assert.equal(handoffs.length, beforeHandoffs, 'none/refusal never becomes Default or starts another producer')
-        const afterSweep = decisionCounts()
-        assert.deepEqual(await handleFactory(human, retry), response, 'the accepted retry receipt stays idempotent after cron observes the refusal')
-        assert.deepEqual(decisionCounts(), afterSweep)
-      }
-      decisionFailure = null
-      const retry = request(blocked.task.revision)
-      const [response, duplicate] = await Promise.all([handleFactory(human, retry), handleFactory(human, retry)])
-      assert.equal(response.status, 200); assert.deepEqual(duplicate, response)
-      const result = await sweepReview()
-      assert.equal(result.task.status, 'running'); assert.equal(result.task.stage, 'review')
-      assert.equal(result.task.candidateId, candidateId); assert.equal(result.task.sourceEventId, f.sourceEventId)
-      const reviewAttempt = result.attempts.find(attempt => attempt.id === result.task.attemptId)!
-      assert.ok(reviewAttempt.runId)
-      const review = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [reviewAttempt.runId])).rows[0]
-      assert.equal(review.baseBranch, deliverySha); assert.equal(review.agentDefinition.readOnly, true)
-      assert.equal(review.agentDefinition.agentProfile.profileId, f.review!.id)
-      assert.equal(review.agentDefinition.agentProfile.reason, 'stage_fit', 'the host stores the reason selected in the same constrained pair')
-      assert.equal(review.agentDefinition.agentProfile.source, 'decision')
-      assert.equal(review.agentDefinition.agentProfile.version, f.review!.version); assert.equal(review.agentDefinition.agentProfile.digest, f.review!.digest)
-      assert.equal(review.agentDefinition.model, model.codex); assert.equal(review.agentDefinition.harness, 'codex')
-      for (const key of ['sessionId', 'continuesRunId', 'retryOf', 'questionContinuation']) assert.equal(review[key], null, key)
-      assert.equal(review.agentDefinition.profileOriginRunId, undefined)
-      assert.equal(review.agentDefinition.definitionDigest, workerDefinitionDigest(review.agentDefinition))
-      // The transport returns the same fixed pair regardless of these fields.
-      // Inspect the real request outside it: this proves the host supplied its
-      // actual stage/target, not that a live model must choose this Profile.
-      const expectedOwnerRequest = await (await import('./checks')).currentFactoryRequest(pool, result.task)
-      assert.ok(expectedOwnerRequest.includes(answer.text))
-      const checkCalls = decisionInputs.filter(call => call.purpose === 'factory-agent-profile').slice(beforeDecisions.profile)
-      assert.equal(checkCalls.length, 4)
-      for (const call of checkCalls) {
-        const input = JSON.parse(call.input as string)
-        assert.equal(input.task.kind, 'independent_check')
-        assert.equal(input.task.stage, 'review'); assert.equal(input.task.readOnly, true)
-        assert.equal(input.task.taskId, f.task.id); assert.equal(input.task.requestEpoch, f.sourceEventId)
-        assert.equal(input.task.candidateId, reviewAttempt.candidateId)
-        // The database adds the task's number to its document; the contract text is unchanged.
-        assert.deepEqual(JSON.parse(input.acceptanceReference.originalTask.content).content, contractDocument.content)
-        assert.equal(input.acceptanceReference.currentOwnerRequest, expectedOwnerRequest, 'reuse the receipt-bound Owner answer already used by this candidate')
-        assert.equal(JSON.stringify(input.task).includes(producerContract), false)
-        assert.equal(JSON.stringify(input.task).includes(answer.text), false)
-      }
-      const afterDecisions = decisionCounts()
-      await completion.run(f.ownerId, child.id)
-      assert.deepEqual(await handleFactory(human, retry), response)
-      assert.deepEqual(decisionCounts(), afterDecisions)
-      assert.deepEqual(afterDecisions, { profile: beforeDecisions.profile + 4, model: beforeDecisions.model })
-      assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 1)
-      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\' AND "runId" IS NOT NULL', [f.task.id])).rowCount, 1)
-      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 3)
-      assert.equal(handoffs.length, beforeHandoffs + 1)
-      assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[first.runId, child.id]])).rows, producerRows)
-      assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
-    } finally { decisionFailure = null; warning.mock.restore() }
+    const beforeHandoffs = handoffs.length, beforeReview = decisionCounts()
+    const completion = createFactoryReconciler(pool, f.store, questions, {}, f.botId, automaticFactoryDispatch(pool))
+    await completion.run(f.ownerId, child.id)
+    const result = await f.store.read(f.ownerId, f.task.id)
+    assert.equal(result.task.stage, 'review'); assert.equal(result.task.status, 'running', result.task.reason ?? undefined)
+    assert.equal(result.task.sourceEventId, f.sourceEventId)
+    const reviewAttempt = result.attempts.find(attempt => attempt.id === result.task.attemptId)!
+    assert.ok(reviewAttempt.runId)
+    const review = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [reviewAttempt.runId])).rows[0]
+    assert.equal(review.baseBranch, deliverySha); assert.equal(review.agentDefinition.readOnly, true)
+    assert.equal(review.agentDefinition.agentProfile.profileId, 'default'); assert.equal(review.agentDefinition.agentProfile.source, 'default')
+    assert.equal(review.agentDefinition.harness, 'codex'); assert.equal(review.agentDefinition.model, model.codex)
+    for (const key of ['sessionId', 'continuesRunId', 'retryOf', 'questionContinuation']) assert.equal(review[key], null, key)
+    assert.equal(review.agentDefinition.profileOriginRunId, undefined)
+    assert.equal(review.agentDefinition.definitionDigest, workerDefinitionDigest(review.agentDefinition))
+    assert.equal(decisionCounts().profile, beforeReview.profile, 'Review never selects a Profile')
+    const afterReview = decisionCounts()
+    await completion.run(f.ownerId, child.id)
+    assert.deepEqual(decisionCounts(), afterReview, 'reconciling the same producer again does not dispatch another Review')
+    assert.equal((await pool.query('SELECT 1 FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rowCount, 1)
+    assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\' AND "runId" IS NOT NULL', [f.task.id])).rowCount, 1)
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 3)
+    assert.equal(handoffs.length, beforeHandoffs + 1)
+    assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[first.runId, child.id]])).rows, producerRows)
+    assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE id=$1', [f.sourceEventId])).rows[0], originalEvent)
   })
   await t.test('queue Available crosses 60s before claim; one exact-source usage refresh admits the original run', async t => {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
@@ -1941,17 +1764,14 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [f.runId])).rowCount, 0)
     })
   }
-  // Recheck fixtures independently assert their initial role selection and
-  // the absence of any new Decision during the frozen review/verify round.
-  assert.deepEqual([...decisionInputs.slice(0, recheckCallsStart), ...decisionInputs.slice(recheckCallsEnd)].map(call => call.purpose), ['factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'task-model-routing', 'factory-agent-profile', 'task-model-routing',
-    'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile', 'factory-agent-profile'])
+  // No stage ever selects a Profile (decision 2026-11-15-1630); only model
+  // routing reaches the Decision transport.
+  assert.deepEqual(decisionInputs.filter(call => call.purpose === 'factory-agent-profile'), [])
   // Validate captured inputs outside the transport: model routing intentionally
   // catches transport errors, which must not swallow a privacy assertion.
   for (const call of decisionInputs) {
     const serialized = JSON.stringify(call.input)
     for (const privateText of ['PRIVATE_PROFILE_', 'PRIVATE_PRODUCER_REPORT', 'claude-native-', 'connectionId', 'synthetic-subscription-', 'providerSubject']) assert.ok(!serialized.includes(privateText), privateText)
-    assert.ok(serialized.includes('review'))
-    if (call.purpose === 'factory-agent-profile') assert.ok(JSON.stringify(call.questions).includes(call.profileId))
   }
   await t.test('unchanged inherited frontend Profile survives JSONB, device handoff and expired quota at first cloud claim', async t => {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
@@ -1961,7 +1781,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(frozen.version, 1)
     assert.equal(frozen.profileId, f.implement!.id)
     assert.equal(frozen.digest, f.implement!.digest)
-    assert.equal(frozen.source, 'decision')
+    assert.equal(frozen.source, 'explicit'); assert.equal(frozen.contentOnly, true)
     assert.equal(frozen.definition.model.mode, 'inherit')
     assert.deepEqual(frozen.definition.skills, ['implementation-evidence'])
     assert.equal(frozen.effort, undefined)
@@ -1987,22 +1807,17 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.ok(await claim(f))
     await unchangedRun(f, 'preparing')
     assert.deepEqual(usageCalls.slice(beforeUsage), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
-    assert.deepEqual(decisionCounts(), { profile: before.profile + 1, model: before.model + 1 })
+    assert.deepEqual(decisionCounts(), before, 'no Decision chooses the model')
   })
-  await t.test('task text and offered request fields cannot create host independent-check context', async () => {
+  await t.test('task text and offered request fields cannot select a Profile or create check context', async () => {
     const f = await fixture(), before = decisionCounts()
-    const offered = { stage: 'review', taskId: f.task.id, requestEpoch: f.sourceEventId, candidateId: randomUUID(), currentOwnerRequest: 'Invented Owner answer' }
-    decisionProfile = f.implement!.id
+    const offered = { stage: 'review', taskId: f.task.id, requestEpoch: f.sourceEventId, candidateId: randomUUID(), currentOwnerRequest: 'Invented Owner answer', profileId: f.implement!.id }
     const request = { issueId: f.issueId, stage: 'execute', location: 'cloud' as const, cloudPurpose: 'desktop' as const,
       independentCheck: offered, note: JSON.stringify({ independentCheck: offered }) }
     const selected = await profiles.resolveAgentProfileDispatch(pool, f.scope, request)
-    assert.equal(selected.agentProfile?.profileId, f.implement!.id)
-    assert.equal(selected.agentProfile?.source, 'decision')
-    assert.deepEqual(decisionCounts(), { profile: before.profile + 1, model: before.model })
-    const input = JSON.parse(decisionInputs.at(-1)!.input as string)
-    assert.equal(input.task.stage, 'execute'); assert.equal(input.task.note, request.note)
-    assert.equal(input.task.kind, undefined); assert.equal(input.task.candidateId, undefined)
-    assert.equal(input.acceptanceReference, undefined, 'only internal host dependencies supply an independent-check work object')
+    assert.equal(selected.agentProfile?.profileId, 'default', 'an unnamed Profile is never chosen from task text')
+    assert.equal(selected.agentProfile?.source, 'default')
+    assert.equal(decisionCounts().profile, before.profile)
   })
 
   // Review feedback joins these same production dispatchers. The only effect
@@ -2093,6 +1908,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await pool.query('UPDATE agent_runs SET status=\'succeeded\',"startedAt"=now(),"finishedAt"=now(),"sessionId"=$2,"stopReason"=\'submitted\',report=$3 WHERE id=$1',
       [runId, 'native-review-' + runId, { sourceCommit: reviewBaseSha, publish: { commit: reviewHeadSha, pushed: true },
         verify: { status: 'passed' }, summary: 'Completed repository candidate.', runtime: { observedModel: model[harness] } }])
+    // The factory handoff gate checks the candidate's producer run; this
+    // review-feedback fixture exercises the repair path, not evidence capture.
+    if (mode === 'factory') await addFactoryVisualEvidence(pool, runId)
     assert.ok((await pool.query('SELECT 1 FROM run_publications WHERE "runId"=$1 AND "remoteKey"=$2', [runId, repositoryKey])).rowCount,
       'the production queue freezes the repository admission and publication')
     if (mode === 'factory') {
@@ -2103,6 +1921,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal(current.stage, 'review', current.reason); assert.equal(current.status, 'pending', current.reason)
       const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE id=$1', [current.candidateId])).rows[0]
       assert.equal(candidate.runId, runId); assert.equal(candidate.sha, reviewHeadSha); assert.equal(candidate.kind, 'repository')
+      // Same handoff gate as production: the producer must have ready visual
+      // evidence and a public receipt before repair feedback is dispatched.
+      await addFactoryPublicationEvidence(pool, f.task.id)
     }
     const scope = await ensureReviewScope(reviewDeps, who, runId, f.repoId)
     const files: DiffFileMetadata[] = proofFiles.map(file => {

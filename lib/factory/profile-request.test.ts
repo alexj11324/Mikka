@@ -5,11 +5,16 @@ import { requestedAgentProfile, requestedTaskSelection } from './profile-request
 
 const id = (last: number) => `a1284000-0000-4000-8000-${String(last).padStart(12, '0')}`
 const scope = { ownerId: id(1), workspaceId: id(2), botId: id(3) }
+const owned = new Set([id(5), id(6)])
 function source(payload?: Record<string, unknown>, onRead?: () => void) {
   return { query: async (sql: string, params: unknown[]) => {
+    if (sql.includes('FROM factory_agent_profiles')) {
+      assert.deepEqual(params.slice(1), [scope.ownerId, scope.workspaceId], 'a Coordinator choice is read in the owner scope')
+      return owned.has(params[0] as string) ? { rows: [{ id: params[0] }], rowCount: 1 } : { rows: [], rowCount: 0 }
+    }
     onRead?.()
     assert.match(sql, /kind='user_message'/)
-    assert.deepEqual(params, [id(4), scope.ownerId, scope.botId])
+    assert.deepEqual(params, [id(4), scope.ownerId, scope.botId, scope.workspaceId])
     return { rows: payload ? [{ payload }] : [], rowCount: payload ? 1 : 0 }
   } } as unknown as Pick<Pool, 'query'>
 }
@@ -27,14 +32,16 @@ test('the task-form Default pin is authoritative but text and tool parameters ca
   await assert.rejects(requestedAgentProfile(source(), scope, undefined, 'default'), /agentProfilePinConflict/)
   await assert.rejects(requestedAgentProfile(source(), scope, id(4), 'default'), /agentProfilePinConflict/)
 })
-test('automatic requests stay automatic and non-user events cannot manufacture an explicit pin', async () => {
-  assert.equal(await requestedAgentProfile(source({ text: 'Build this feature' }), scope, id(4), undefined), undefined)
-  await assert.rejects(requestedAgentProfile(source(), scope, id(4), id(5)), /agentProfilePinConflict/)
-  await assert.rejects(requestedAgentProfile(source(), scope, undefined, id(5)), /agentProfilePinConflict/)
+test('without a task-form choice the Coordinator may choose one of the owner\'s Agent 配置', async () => {
+  assert.equal(await requestedAgentProfile(source({ text: 'Build this feature' }), scope, id(4), undefined), undefined, 'nothing is chosen automatically')
+  assert.equal(await requestedAgentProfile(source({ text: 'Build this feature' }), scope, id(4), id(6)), id(6))
+  assert.equal(await requestedAgentProfile(source(), scope, undefined, id(6)), id(6))
+  await assert.rejects(requestedAgentProfile(source(), scope, id(4), id(9)), /agentProfileNotFound/, 'another owner\'s or a missing Profile is refused')
+  await assert.rejects(requestedAgentProfile(source(), scope, id(4), 'not-a-profile'), /Invalid|invalid/)
 })
 
 test('task placement and Profile share the same authenticated source read', async () => {
-  for (const taskDestination of [{ kind: 'cloud' }, { kind: 'device', deviceId: id(7) }] as const) {
+  for (const taskDestination of [{ kind: 'cloud' }, { kind: 'device', deviceId: id(7) }, { kind: 'device', deviceId: id(7), agentId: id(8) }] as const) {
     let reads = 0
     const database = source({ profileId: id(5), taskDestination }, () => { reads++ })
     assert.deepEqual(await requestedTaskSelection(database, scope, id(4), id(6)), { profileId: id(5), taskDestination })

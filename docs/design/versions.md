@@ -84,11 +84,11 @@ WebUI, LibreChat, Lobe Chat, Dify, Cal.com):
 
 - New sections: 个人 › 安全 (N1: password, Passkey, Google, 2FA, sessions),
   数据与隐私 (N2: export, shared links), 开发者 (N3: personal access tokens);
-  工作区 › 权限与审批 (N4: computer use plus read/write per connected app),
+  工作区 › 应用与运行权限 (N4: workspace app access, allow/ask/deny, plus the workspace run policy),
   密钥与环境 (N5: secrets masked in output vs. environment variables, egress
   allowlist), 审计日志 (N6: admin only, 90 days, IP).
 - Moved: 登录/登录设备 from 账户 to 安全; 导出/已共享链接 to 数据与隐私;
-  电脑操作 from Bot to 权限与审批 (S-H rebased onto N4).
+  电脑操作 from Bot to 团队权限 (S-H rebased onto 团队权限).
 - Renamed: 已保存的登录 → 登录与密钥 (adds 我的密钥), 设备 → 我的电脑.
 - 通知: channel × event pills (手机 / 邮件 / Telegram), 安静时段; the daily
   reminder count is a status line, not a section.

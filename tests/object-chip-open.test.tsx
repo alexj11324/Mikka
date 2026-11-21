@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { before, test } from 'node:test'
 import { act } from 'react'
 import { Window } from 'happy-dom'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import messages from '../messages/en.json'
 import type { CitationSource } from '../lib/coordinator/citations'
+import { taskPresentation } from '../lib/task-presentation'
 
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -29,36 +30,55 @@ sources[RUNS.succeeded] = { ...sources[RUNS.succeeded], outcome: 'done' } as Cit
 
 const issue = (id: string, patch: Partial<Extract<CitationSource, { kind: 'issue' }>>): CitationSource => ({ kind: 'issue', id, number: 5, identifier: 'ZHIX-5', title: 'Task', status: 'doing', priority: 'normal', ...patch })
 
-test('a task chip is its own state icon and code (localTaskState); the title, state and priority are in the hover card', async () => {
+test('a task chip uses the same authorized presentation as its detail, including a threadless task and Factory review', async () => {
   const { AgentCitationsContext, CitationChip } = citations
+  const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
   const ids = Array.from({ length: 7 }, (_, n) => `00000000-0000-4000-8000-0000000000b${n}`)
   const tasks: Record<string, CitationSource> = {
     [ids[0]]: issue(ids[0], { run: { status: 'running', outcome: null } }),
     [ids[1]]: issue(ids[1], { run: { status: 'succeeded', outcome: 'failed' } }),
     [ids[2]]: issue(ids[2], { run: { status: 'succeeded', outcome: 'blocked' } }),
-    [ids[3]]: issue(ids[3], { run: { status: 'waiting_input', outcome: null } }),
+    [ids[3]]: issue(ids[3], { run: null }),
     // A done run whose PR is open waits for review: the task's state, never the run's result.
     [ids[4]]: issue(ids[4], { run: { status: 'succeeded', outcome: 'done' }, pullRequests: [{ url: 'https://github.com/a/b/pull/1', state: 'open' }] }),
     [ids[5]]: issue(ids[5], { status: 'backlog', run: null }),
-    // An older payload with no run: its board status alone; no code falls back to the title.
+    // An older citation retains its title when it has no code.
     [ids[6]]: issue(ids[6], { status: 'done', identifier: null, title: 'Ship it' }),
   }
+  const current = { status: 'doing' as const, metadata: { pullRequests: [] } }
+  const projections = [
+    taskPresentation(current, { runId: 'r', status: 'running', outcome: null }, null, () => false),
+    taskPresentation(current, { runId: 'r', status: 'failed', outcome: 'failed' }, null, () => false),
+    taskPresentation(current, { runId: 'r', status: 'succeeded', outcome: 'blocked' }, null, () => false),
+    taskPresentation(current, undefined, { stage: 'handoff', needsYou: { kind: 'spec_review', since: '2026-11-01' } }, () => false),
+    taskPresentation(current, undefined, { stage: 'handoff', needsYou: { kind: 'pr_review', since: '2026-11-01' } }, () => false),
+    taskPresentation({ ...current, status: 'backlog' }, undefined, null, () => false),
+    taskPresentation({ ...current, status: 'done' }, undefined, null, () => false),
+  ]
+  const opened: string[] = []
   const container = browser.document.createElement('div') as unknown as HTMLElement
   document.body.append(container)
   const root = createRoot(container)
   await act(async () => {
     root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
-      <AgentCitationsContext value={{ sources: tasks, previews: {}, onOpenIssue: () => {} }}>
+      <TaskPresentationsContext value={Object.fromEntries(ids.map((id, index) => [id, projections[index]]))}>
+      <AgentCitationsContext value={{ sources: tasks, previews: {}, onOpenIssue: id => opened.push(id) }}>
         {ids.map(id => <CitationChip key={id} id={id} kind="issue" />)}
       </AgentCitationsContext>
+      </TaskPresentationsContext>
     </NextIntlClientProvider>)
   })
   try {
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
-    assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-state]')?.getAttribute('data-task-state')), ['running', 'failed', 'blocked', 'waiting', 'waiting', 'idle', 'done'])
+    // One status, the task's status field (2026-11-13-1405); what its Agent is doing is the small mark after it.
+    assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-status]')?.getAttribute('data-task-status')), ['doing', 'doing', 'doing', 'doing', 'doing', 'backlog', 'done'])
+    // A chip has exactly one icon, the status: what an Agent is doing is never drawn on the task's chip.
+    assert.deepEqual(chips.map(chip => chip.querySelectorAll('svg').length), [1, 1, 1, 1, 1, 1, 1])
+    assert.ok(chips.every(chip => !chip.querySelector('[data-run-indicator]')))
+    await act(async () => { chips[3].click(); chips[5].click() })
+    assert.deepEqual(opened, [ids[3], ids[5]])
     assert.deepEqual(chips.map(chip => chip.textContent), ['ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'Ship it'])
-    assert.ok(chips[0].querySelector('svg')?.getAttribute('class')?.includes('lucide-circle-dot'), 'running is the ring')
-    assert.ok(chips[3].querySelector('svg')?.getAttribute('class')?.includes('lucide-hand'), 'waiting is the hand')
+    assert.equal(chips[0].querySelector('svg')?.getAttribute('data-mark'), 'half', '进行中 is the status mark, whatever the run does')
     assert.equal(chips[6].getAttribute('aria-label'), 'Open task: Ship it')
   } finally {
     await act(async () => { root.unmount() })
@@ -116,9 +136,10 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
     const [taskChip, ...threadChips] = chips
     assert.equal(taskChip.textContent, 'ZHIX-4')
     // The task's title, without the code the task chip already carries; nothing else on it (decision 2026-11-10).
-    assert.deepEqual(threadChips.map(chip => chip.textContent), ['Rebuild the shell', 'Rebuild the shell', 'Rebuild the shell'])
+    assert.deepEqual(threadChips.map(chip => chip.textContent), ['Thread running', 'Thread failed', 'Thread succeeded'], 'each conversation by its own short title, not its task\'s')
     for (const chip of threadChips) {
-      assert.equal(chip.querySelector('svg, [role="img"], [data-thread-attention]'), null, 'no icon, dot or badge')
+      assert.equal(chip.querySelector('[data-thread-attention]'), null, 'no dot or badge')
+      assert.ok(chip.querySelectorAll('svg').length <= 1, 'at most the one activity mark')
       assert.match(chip.className, /text-object-chip-foreground/, 'thread titles use the existing citation link colour')
       assert.doesNotMatch(chip.className, /(^| )text-primary( |$)/, 'hosted primary is body black, not the citation link colour')
       assert.match(chip.className, /bg-transparent/)
@@ -127,7 +148,10 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
       assert.equal(chip.getAttribute('role'), 'button')
       assert.equal(chip.getAttribute('tabindex'), '0')
     }
-    assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Rebuild the shell')
+    // The conversation's activity is one small mark after its title: working and failed show it, a finished run shows nothing.
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator') ?? null), ['working', 'error', null])
+    assert.equal(threadChips[0].querySelector('[data-slot="thread-activity"]')?.previousSibling?.textContent, 'Thread running', 'the mark comes after the title')
+    assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Thread running')
     await act(async () => { threadChips[1].click() })
     // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).
     assert.equal(new URL(browser.location.href).searchParams.get('thread'), RUNS.failed)

@@ -23,7 +23,7 @@ const browser = new Window({ url: `${origin}/mikka/en/sign-in` })
 const assigned: string[] = []
 let createRoot: typeof import('react-dom/client')['createRoot']
 let AuthForm: typeof import('../components/auth-form')['AuthForm']
-let IntlProvider: typeof import('next-intl')['NextIntlClientProvider']
+let IntlProvider: typeof import('@/lib/intl/i18n-client')['NextIntlClientProvider']
 let messages: Record<string, unknown>
 before(async () => {
   for (const [key, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator, location: browser.location, history: browser.history, sessionStorage: browser.sessionStorage, IS_REACT_ACT_ENVIRONMENT: true, Element: browser.Element, HTMLElement: browser.HTMLElement, Node: browser.Node, ShadowRoot: browser.ShadowRoot, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: browser.requestAnimationFrame.bind(browser), cancelAnimationFrame: browser.cancelAnimationFrame.bind(browser) })) {
@@ -32,14 +32,14 @@ before(async () => {
   Object.defineProperty(browser.location, 'assign', { configurable: true, value: (url: string) => { assigned.push(url) } })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ AuthForm } = await import('../components/auth-form'))
-  ;({ NextIntlClientProvider: IntlProvider } = await import('next-intl'))
+  ;({ NextIntlClientProvider: IntlProvider } = await import('@/lib/intl/i18n-client'))
   messages = (await import('../messages/en.json')).default
 })
 after(() => browser.close())
 beforeEach(() => { socialCalls.length = 0; assigned.length = 0 })
 
-async function render(query: Record<string, string>, props: Partial<Parameters<typeof AuthForm>[0]>, handoff = desktopFlow) {
-  browser.history.replaceState({}, '', `/mikka/en/sign-in?${new URLSearchParams({ desktop: '1', desktop_state: handoff.state, desktop_next: '/', desktop_callback: callback, ...query })}`)
+async function render(query: Record<string, string>, props: Partial<Parameters<typeof AuthForm>[0]>, handoff: typeof desktopFlow | null = desktopFlow) {
+  browser.history.replaceState({}, '', `/mikka/en/sign-in?${new URLSearchParams({ ...(handoff && { desktop: '1', desktop_state: handoff.state, desktop_next: '/', desktop_callback: callback }), ...query })}`)
   const container = browser.document.createElement('div') as unknown as HTMLElement
   document.body.append(container)
   const root = createRoot(container)
@@ -114,5 +114,23 @@ test('without a provider, another account opens the ordinary sign-in card with t
     const google = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Continue with Google')) as HTMLButtonElement
     await act(async () => { google.click() })
     assert.deepEqual(socialCalls.map(call => [call.provider, call.additionalParams]), [['google', { prompt: 'select_account' }]])
+  } finally { await unmount() }
+})
+
+
+test('expired self-host sign-in names the saved installation and never presents the Cloud credential form', async () => {
+  const url = 'https://self.example/mikka'
+  const server = { url, name: 'Personal Server', version: 'v1', edition: 'community', signIn: { email: true, google: false, github: false } }
+  browser.localStorage.setItem('mikka.web.servers.v1', JSON.stringify({ version: 1, servers: [server] }))
+  browser.sessionStorage.setItem('mikka.web.sessions.v1', JSON.stringify({ version: 1, credentials: [], active: null, expiredServer: url }))
+  const { installWebServerTransport } = await import('../lib/web-connection/browser')
+  installWebServerTransport(browser as unknown as globalThis.Window)
+  const { container, unmount } = await render({}, { mode: 'sign-in', googleEnabled: true }, null)
+  try {
+    assert.match(container.textContent ?? '', /Personal Server/)
+    assert.match(container.textContent ?? '', /Session expired/)
+    assert.ok([...container.querySelectorAll('button')].some(button => button.textContent === 'Sign in'))
+    assert.equal(container.querySelector('input[name="password"]'), null)
+    assert.equal(socialCalls.length, 0)
   } finally { await unmount() }
 })

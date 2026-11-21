@@ -21,8 +21,8 @@ const pending = (event: { tier?: string | null; deliveredAt?: unknown }) => !eve
  * Starts the owner's Coordinator wake once this transaction commits, for a
  * pending inbox row (#1212). The row is the durable outbox; this replaces the
  * minute sweep as the thing that notices it. One wake per owner per commit;
- * nothing on rollback; never fails the write. A wake while a turn holds the
- * chat defers, and that turn's lease release wakes it again (store.releaseLease).
+ * nothing on rollback; never fails the write. Eve owns per-session queueing
+ * after the committed product event has been delivered.
  */
 export function wakeCoordinatorAfterCommit(executor: object, userId: string, event: { tier?: string | null; deliveredAt?: unknown } = {}) {
   if (!pending(event)) return

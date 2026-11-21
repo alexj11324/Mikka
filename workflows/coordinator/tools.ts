@@ -5,8 +5,12 @@ import { createComposioAITools, createGoogleAITools, type ComposioActionName } f
 import { createAppTools } from '@/lib/app-tools'
 import { instrumentTools } from '@/lib/agent-kit/instrument'
 import type { AgentExecution } from '@/lib/agent-kit/store'
+import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
 import * as steps from './steps'
 import * as kit from './agent-kit-steps'
+import { interopTool } from './interop-steps'
+import { INTEROP_TOOLS, INTEROP_TOOL_IDS } from '@/lib/interop/tool-schemas'
 import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { factoryDispatchSchema } from '@/lib/factory/dispatch-schema'
@@ -19,13 +23,14 @@ import { deploymentSwitch } from '@/lib/deployment-switches'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 import { modelWriteTools, type ModelWriteCall, type ModelWriteTool } from '@/lib/operations/model-write-tools'
-import { FACTORY_TOOL_IDS, PERSONAL_WRITE_TOOL_IDS } from '@/lib/agent-kit/registry'
+import { FACTORY_TOOL_IDS, PERSONAL_WRITE_TOOL_IDS, selectRegisteredTools } from '@/lib/agent-kit/registry'
 import { writeSchemas } from '@/lib/operations/write-schema'
 import { supportsWritePlanning } from '@/lib/operations/write-planning-model'
 import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 import { scheduleTools } from '@/lib/schedules/tools'
 import { recordDecisionSchema } from '@/lib/project-map/contracts'
 import { withToolDisplayNames } from '@/lib/coordinator/tool-metadata'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
 /** Deployment switches the tools depend on (lib/deployment-switches.ts), read in a step: a workflow body never reads one itself. */
@@ -36,7 +41,7 @@ export function readCoordinatorSwitches(): CoordinatorSwitches {
   return { issueTools: issueMutationsEnabled(), factoryRouting: deploymentSwitch('factoryRouting'), factoryLifecycle: deploymentSwitch('factoryLifecycle') }
 }
 
-export interface CoordinatorToolOptions { /** The hosted prompt omitted repository facts; discover its workspace context on demand. */ lazyGitHubContext?: boolean; /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+export interface CoordinatorToolOptions { /** The hosted prompt omitted repository facts; discover its workspace context on demand. */ lazyGitHubContext?: boolean; /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; policy?: Pick<DefinitionSnapshot, 'definition' | 'effectiveTools'>; runtime?: HostedRuntimeSnapshot; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; /** Evidence-only entry provenance for dispatched runs; the app's chats are 'web', Slack names itself. */ origin?: RunOrigin; originRef?: RunOriginRef | null; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 /** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
 const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
 const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
@@ -44,9 +49,15 @@ const needsSpecInput = z.boolean().optional().describe('true when the person ask
 
 const factoryCapabilities = new Set<string>([...FACTORY_TOOL_IDS, 'dispatch_factory_task', 'recover_factory_check', 'intake_factory_request'])
 
+export const coordinatorWriteCatalogue: readonly ModelWriteTool[] = [
+  { name:'append_notion_paragraph', description:'Append text to a Notion page.', inputSchema:writeSchemas.append_notion_paragraph },
+  { name:'send_slack_message', description:'Send a Slack message.', inputSchema:writeSchemas.send_slack_message },
+  { name:'cancel_calendar_event', description:'Cancel a calendar event.', inputSchema:writeSchemas.cancel_calendar_event },
+]
+
 export function createCoordinatorRegistry(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
-  const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false,sourceEventId } = options
+  const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false,sourceEventId,origin,originRef } = options
   const switches = options.switches ?? readCoordinatorSwitches()
   const factoryOn = switches.issueTools && switches.factoryRouting && switches.factoryLifecycle
   const id = z.uuid()
@@ -54,11 +65,9 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = coordinator ? id : id.optional()
   const targetBot = (requested?: string) => coordinator ? requested ?? null : (!requested || requested === botId ? botId : null)
-  const writeTools = options.writeTools ?? (execution ? { catalog: [
-    { name:'append_notion_paragraph', description:'Append text to a Notion page.', inputSchema:writeSchemas.append_notion_paragraph },
-    { name:'send_slack_message', description:'Send a Slack message.', inputSchema:writeSchemas.send_slack_message },
-    { name:'cancel_calendar_event', description:'Cancel a calendar event.', inputSchema:writeSchemas.cancel_calendar_event },
-  ], submit:(call:ModelWriteCall) => steps.personalWrite(userId,botId,execution.id,call,scope) } : undefined)
+  const writeTools = options.writeTools ?? (execution ? { catalog: coordinatorWriteCatalogue,
+    submit:(call:ModelWriteCall) => steps.personalWrite(userId,botId,execution.id,call,scope) } : undefined)
+  const runtime = execution?.snapshot.runtime ?? options.runtime
   if (writeTools && writeTools.catalog.some(entry => !(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(entry.name))) throw new Error('invalidWriteToolCatalog')
   const read = (action: ComposioActionName, input: unknown, accountId?: string) => steps.composioAction(userId, action, input, scope, accountId, botId)
   const registry = {
@@ -73,9 +82,9 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.personalMcp(userId, botId, execution?.id, input, scope),
     }),
     ...scheduleTools(command => steps.scheduleCommand(userId, botId, options.sourceEventId, command, scope)),
-    ...modelWriteTools((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
+    ...modelWriteTools((options.writeEnabled === true) && Boolean(runtime && supportsWritePlanning(runtime)) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
     ...(coordinator && factoryOn ? factoryCoordinatorTools(userId,scope) : {}),
-    ...personalMailboxTools(mailboxEnabled && Boolean(execution), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
+    ...personalMailboxTools(mailboxEnabled && Boolean(execution || options.policy), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
     // A named Bot carries its id so the workspace's 团队权限 › 允许使用的应用 applies (lib/app-policy).
     ...createComposioAITools(read),
     ...createAppTools({ list: input => steps.appTools(userId, botId, 'list', input, scope), call: input => steps.appTools(userId, botId, 'call', input, scope) }),
@@ -91,7 +100,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.listIssues(userId, input, scope, botId),
     }),
     get_issue: tool({
-      description: 'Read one issue: its text, status, priority, latest runs, and its thread (runId, status, repository) when it has one. More work for a task with a thread goes to that thread: dispatch_run without repo, or send_to_run while it runs.',
+      description: 'Read one issue: its text, status, priority, latest runs, and its thread (runId, status, repository, agent: the Agent it keeps for life) when it has one. More work for a task with a thread goes to that thread: dispatch_run without repo, or send_to_run while it runs.',
       inputSchema: z.object({ issueId: id }),
       execute: input => steps.getIssue(userId, input, scope, botId),
     }),
@@ -144,7 +153,12 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     github_call: tool({
       description: 'Call one GitHub tool from github_tools as the person: read issues, pull requests and CI; comment; open or merge pull requests. Use its name and schema, only for the person’s task. An mcpOutcomeUnknown result must not be retried automatically.',
       inputSchema: z.object({ name: z.string().min(1).max(128), arguments: z.record(z.string(), z.unknown()) }).strict(),
-      execute: input => steps.githubMcp(userId, input, scope),
+      execute: async input => {
+        const policy = await steps.githubCallAllowedStep(userId, botId)
+        if (policy === 'deny') return { error: 'githubActionDenied' }
+        if (policy === 'unavailable') return { error: 'githubPolicyUnavailable' }
+        return steps.githubMcp(userId, input, scope)
+      },
     }),
     ...(computerEnabled ? {
       start_web_subagent: tool({
@@ -184,19 +198,19 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       }),
       dispatch_bot_computer: tool({
         description: `Give an existing issue's work that needs a screen (computer use, watching a front-end test run) to a Bot computer, or any work the person asked to run there; it runs on its own machine with a desktop. A standalone file or report with no repository also goes here, even without screen interaction. Repository work that needs no screen and was not explicitly requested on a Bot computer goes to dispatch_run. ${ONE_THREAD} The host wakes and prepares this Bot's existing computer after checking access and the selected subscription or API key. A separate wake call is not required. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.`,
-        inputSchema: z.object({ botId: botInput, issueId: id, profileId: agentProfileReferenceSchema.optional().describe('Exact authorized Factory Agent Profile ID only when explicitly chosen; default requires the structured task-form selection. Omit for host selection.'), harness: z.enum(['codex', 'claude_code']).optional().describe('Only when the person explicitly named Claude Code or Codex. Otherwise the host selects the authorized Profile and harness.'), note: z.string().max(10_000).optional(), suggestionId: id.optional(), readOnly: z.boolean().optional().describe('true when the task only reads and reports: no file changes, commit, push or PR.'), needsSpec: needsSpecInput, newThread: newThreadInput, model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional().describe('The model id for this harness, only when the person named one. Choose from the Allowed models (优先使用的模型) list in your instructions; omit to use the first entry that can run now. A model outside that list returns error modelNotAllowed with result.allowed, and nothing is queued.') }),
-        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
+        inputSchema: z.object({ botId: botInput, issueId: id, profileId: agentProfileReferenceSchema.optional().describe('An Agent 配置 (Factory Agent Profile) id from list_factory_agent_profiles: instructions and Skills only, never a model or machine. Pass one when the person chose it, or when one clearly fits the task. Omit for none; nothing is chosen automatically. A task-form choice always wins.'), harness: z.enum(['codex', 'claude_code']).optional().describe('The Agent that runs it. Required for a new thread: the one the person named; when they named none, ask (Claude Code or Codex) instead of picking one, or the call returns agentRequired. On a task with a thread, that thread\'s own Agent or omit it; the thread never switches Agent.'), note: z.string().max(10_000).optional(), suggestionId: id.optional(), readOnly: z.boolean().optional().describe('true when the task only reads and reports: no file changes, commit, push or PR.'), needsSpec: needsSpecInput, newThread: newThreadInput, model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional().describe('The model id for this harness, only when the person named one. Choose from the Allowed models (优先使用的模型) list in your instructions; omit to use the first entry that can run now. A model outside that list returns error modelNotAllowed with result.allowed, and nothing is queued.') }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}), ...(origin ? { origin } : {}), ...(originRef ? { originRef } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
       }),
     } : {}),
     list_factory_agent_profiles: tool({
-      description: 'List the owner’s authorized, runnable Factory Agent Profiles with public names and responsibilities only. When the person explicitly names a role, match its exact ID here and pass profileId to dispatch. Otherwise omit profileId and the host Decision service selects from its authorized candidates. A Profile is a role, not a Bot or a physical computer. It never grants credentials or overrides a named model/device.',
+      description: 'List the owner’s Agent 配置 (Factory Agent Profiles): names, descriptions and Skill names. An Agent 配置 is content only: instructions and Skills. It never sets the model or the machine; those come from the task and the person\'s settings. Pass one\'s exact id as profileId when the person names it or it clearly fits the task; otherwise omit profileId.',
       inputSchema: z.object({}),
       execute: () => steps.listFactoryAgentProfiles(userId, botId, scope),
     }),
     dispatch_run: tool({
-      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, placed by 运行位置. 云端 (the default): their own E2B cloud when their key works, else a server that takes part in scheduling, else a computer that does; 本地: a server, else a computer. Threads never run on Mikka 默认, which only answers in Bot chats. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. result.fallback cloudUnavailable: the cloud could not start it, so it went to that computer; say so in a few words. An [Event] message arrives when the run ends. When nothing can run (no allowed model, none connected, no computer): error machineUnavailable with result.reason and result.card, whose options lead to adding a subscription or key, a computer or an E2B key. Render result.card as one BeQuestions question in a bare OpenUI reply starting with root = Stack(...), with no code fence, JSON dump or bullet list. Preserve its title, description and options, including value, label, description and action; call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: it runs there only when no other repository fits the name; error repositoryAmbiguous (several: result.candidates with each one's description and homepage, and result.card) or repositoryNotFound (none, result.card) queues nothing. Judge the candidates against the person's words and call dispatch_run again with the owner/repo you chose, or draw result.card and call again after the person picks. On a task with a thread, pass repo only when the person named a repository that is not the thread's: the work then goes to a new thread there, the old one stops (result.replacedThreadId), and you tell the person. Error githubNotConnected: the person connects GitHub in 插件 › GitHub. Error githubReconnectRequired: their GitHub authorization expired or was revoked; they reconnect it in 插件 › GitHub. Error githubUnavailable: GitHub cannot be reached right now (already retried); tell the person and dispatch nothing. In each case nothing was queued. Error repositoryRequired: this repository-dispatch path needs a repository for the first thread. For a standalone file or report with no repository, use dispatch_bot_computer when available; do not invent a repository or ask for GitHub access.`,
+      description: `Give an issue's work to an agent. ${ONE_THREAD} Every dispatch names its Agent in model.harness (Claude Code or Codex): a thread runs on that one Agent for life and never switches to the other. Within that Agent, the person's preferred models (Settings › 模型与订阅) in their order, the first that can run now, unless a model is named. Error agentRequired: no Agent was named and nothing was queued; ask the person which Agent should run it (Claude Code or Codex), then call again. It is placed by 运行位置. 云端 (the default): their own E2B cloud when their key works, else a server that takes part in scheduling, else a computer that does; 本地: a server, else a computer. Threads never run on Mikka 默认, which only answers in Bot chats. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. result.fallback cloudUnavailable: the cloud could not start it, so it went to that computer; say so in a few words. An [Event] message arrives when the run ends. When nothing can run (no allowed model, none connected, no computer): error machineUnavailable with result.reason and result.card, whose options lead to adding a subscription or key, a computer or an E2B key. Render result.card as one BeQuestions question in a bare OpenUI reply starting with root = Stack(...), with no code fence, JSON dump or bullet list. Preserve its title, description and options, including value, label, description and action; call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: it runs there only when no other repository fits the name; error repositoryAmbiguous (several: result.candidates with each one's description and homepage, and result.card) or repositoryNotFound (none, result.card) queues nothing. Judge the candidates against the person's words and call dispatch_run again with the owner/repo you chose, or draw result.card and call again after the person picks. On a task with a thread, pass repo only when the person named a repository that is not the thread's: the work then goes to a new thread there, the old one stops (result.replacedThreadId), and you tell the person. Error githubNotConnected: the person connects GitHub in 插件 › GitHub. Error githubReconnectRequired: their GitHub authorization expired or was revoked; they reconnect it in 插件 › GitHub. Error githubUnavailable: GitHub cannot be reached right now (already retried); tell the person and dispatch nothing. In each case nothing was queued. Error repositoryRequired: this repository-dispatch path needs a repository for the first thread. For a standalone file or report with no repository, use dispatch_bot_computer when available; do not invent a repository or ask for GitHub access.`,
       inputSchema: z.object({
-        issueId: id, profileId: agentProfileReferenceSchema.optional().describe('Only the exact ID of an authorized Factory Agent Profile explicitly chosen by the person; default requires the structured task-form selection. Omit for host Decision selection. Profiles never override an explicitly named model or computer.'), agentId: id.optional().describe('Deprecated: omit. 模型与订阅 picks the Agent.'),
+        issueId: id, profileId: agentProfileReferenceSchema.optional().describe('An Agent 配置 id from list_factory_agent_profiles when the person chose it or it clearly fits the task; omit for none. It carries instructions and Skills only and never changes the model or machine. Profiles never override an explicitly named model or computer.'), agentId: id.optional().describe('Only with target.deviceId: the Agent on that computer (list_agents). A computer runs one Agent per installed CLI; when it has several and neither this nor model names one, the dispatch returns agentRequired.'),
         // A Factory attempt's device repository goes through dispatch_factory_task, never here.
         deviceRepoId: z.never().optional(),
         repo: z.string().trim().min(1).max(4_000).optional().describe('Omit when the task already has a thread (get_issue thread): more work keeps that thread\'s repository. For a task\'s first thread: GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used, every word kept (e.g. acme_tools, the Acme docs); the host finds it among their authorized repositories, and when several fit returns repositoryAmbiguous with candidates (description, homepage) and a card. On a task with a thread, pass repo only when the person named a repository that is not the thread\'s: the work then moves to a new thread there. The daemon clones it; no repository registration is needed.'),
@@ -205,10 +219,10 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         needsSpec: needsSpecInput,
         newThread: newThreadInput,
         target: z.union([z.literal('cloud'), z.object({ deviceId: id })]).optional().describe('Only when the person named where to run it: one of their computers by its deviceId from list_agents, or "cloud". Omit to let 模型与订阅 choose. A named computer that is offline or off returns machineUnavailable with result.card; nothing is queued and no other computer is used.'),
-        model: z.object({ harness: z.enum(['claude_code', 'codex']), model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }).optional().describe('Only when the person named the Agent or model for this thread. Choose from the Allowed models (优先使用的模型) list in your instructions; omit to use the first entry that can run now. A model outside that list returns error modelNotAllowed with result.allowed, and nothing is queued. The Agent alone ("give it to Codex"): pass harness only; the host takes that Agent\'s first entry in the list. A model too: its id exactly as the list shows it.'),
+        model: z.object({ harness: z.enum(['claude_code', 'codex']), model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }).describe('Required: the Agent that runs this thread. On a task with a thread, that thread\'s own Agent (get_issue thread); a different one returns threadProfileMismatch. For a new thread, the Agent the person named or picked in the task form; when they named none, ask which one (Claude Code or Codex) before dispatching, never pick one yourself. Pass harness only unless the person named a model; then also its id exactly as the Allowed models (优先使用的模型) list shows it. A model outside that list returns error modelNotAllowed with result.allowed, and nothing is queued.'),
       }),
       execute: (input,call) => {
-        const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {})}
+        const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {}),...(origin ? { origin } : {}),...(originRef ? { originRef } : {})}
         return options.taskEventId
           ? steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId)
           : steps.dispatchRun(userId, request, scope, botId, execution ?? undefined)
@@ -260,24 +274,32 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       inputSchema: z.object({ runId: id }),
       execute: input => steps.stopRun(userId, input, scope, botId),
     }),
+    // Reads, sends and shared Drive across threads and Bots (decision 2026-11-19-2200).
+    ...Object.fromEntries(INTEROP_TOOL_IDS.map(name => [name, tool({ description: INTEROP_TOOLS[name].description,
+      inputSchema: INTEROP_TOOLS[name].inputSchema as z.ZodType<Record<string, unknown>>,
+      execute: (input: Record<string, unknown>) => interopTool(userId, botId, name, input, scope) })])),
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
+    read_personal_skill:tool({ description:'Read the full instructions of one skill the person installed. The skills list in your system prompt carries only each skill\'s name and a description; its body is not there. Call this with the skill id before relying on a skill, and do not assume what a skill says from its name.',inputSchema:z.object({skillId:z.uuid()}),execute:input=>kit.readPersonalSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }
   return withToolDisplayNames(options.readOnly ? scheduledReadTools(registry, options.readToolIds) : registry)
 }
 export function coordinatorTools(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   const registry = createCoordinatorRegistry(userId,botId,scope,options)
   const { execution } = options
-  if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill'))
+  const policy = execution?.snapshot ?? options.policy
+  const runtime = execution?.snapshot.runtime ?? options.runtime
+  if (!policy) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill' && name !== 'read_personal_skill'))
   // A rollout gate can narrow a frozen grant; enabling it never adds tool IDs
   // absent from this execution's immutable effectiveTools.
-  const requested = execution.snapshot.effectiveTools.filter(name =>
+  const requested = policy.effectiveTools.filter(name =>
     (!options.readOnly || Object.hasOwn(registry, name)) &&
     // Frozen grants are narrowed by the current Factory rollout and Bot scope.
     // Unknown tool IDs still reach instrumentTools and fail closed there.
     (!factoryCapabilities.has(name) || Object.hasOwn(registry, name)) &&
     ((options.switches ?? readCoordinatorSwitches()).issueTools || (name !== 'create_issue' && name !== 'update_issue')) &&
     (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))) &&
-    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
+    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(runtime && supportsWritePlanning(runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
+  if (!execution) return selectRegisteredTools(registry, requested)
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => {

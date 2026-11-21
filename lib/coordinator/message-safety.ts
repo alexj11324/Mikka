@@ -6,6 +6,7 @@ import { personalMessagePacket, personalMessageSummary } from '../personal-agent
 import { taskDestinationPrompt, taskDestinationSchema, type TaskDestination } from '../task-destination'
 import { taskTitleInputSchema } from '../task-title-input'
 import { runtimeMessageDisplay, type MessageDisplay } from './message-display'
+import { taskAgentSchema, type TaskAgent } from '@/lib/task-create-command'
 
 export interface EventSource {
   id?: string
@@ -22,7 +23,7 @@ export interface QuotaSwitchNotice { kind: 'quotaSwitch'; subscription: 'claude'
 export interface PointsSwitchNotice { kind: 'pointsSwitch'; model: string }
 export type SwitchNotice = QuotaSwitchNotice | PointsSwitchNotice
 interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: SwitchNotice }
-export type SourcedMessage = ModelMessage & { mikkaDisplay?: MessageDisplay; mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string } }
+export type SourcedMessage = ModelMessage & { mikkaDisplay?: MessageDisplay; mikkaEvent?: EventProvenance; mikkaUserEvent?: { submissionId?: string; id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; taskAgent?: TaskAgent } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
 /** Called with the stored server event, never with JSON decoded from its body. */
@@ -32,9 +33,10 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
     const destination = taskDestinationSchema.safeParse(event.payload.taskDestination)
     const profile = agentProfileReferenceSchema.safeParse(event.payload.profileId)
     const taskTitle = taskTitleInputSchema.safeParse(event.payload.taskTitle)
+    const taskAgent = taskAgentSchema.safeParse((event.payload.taskCommand as { agent?: unknown } | undefined)?.agent)
     const display: MessageDisplay = event.payload.source === 'coordinator_welcome' ? { version: 1, kind: 'welcome' }
       : { version: 1, kind: 'person', text: typeof event.payload.text === 'string' ? event.payload.text : projection }
-    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaDisplay: display, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}), ...(taskTitle.success ? { taskTitle: taskTitle.data } : {}) } }
+    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaDisplay: display, mikkaUserEvent: { ...(typeof event.payload.submissionId === 'string' ? { submissionId: event.payload.submissionId } : {}), id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}), ...(taskTitle.success ? { taskTitle: taskTitle.data } : {}), ...(taskAgent.success ? { taskAgent: taskAgent.data } : {}) } }
   }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
@@ -67,8 +69,8 @@ export function pointsSwitchMessage(model: string, at: Date): SourcedMessage {
 export function modelMessage(message: ModelMessage): ModelMessage {
   const { mikkaEvent, mikkaUserEvent, mikkaDisplay: _display, ...plain } = message as SourcedMessage
   if (mikkaUserEvent) {
-    if (!mikkaUserEvent.taskDestination && !mikkaUserEvent.profileId && !mikkaUserEvent.taskTitle) return plain
-    const selection = [mikkaUserEvent.taskDestination ? taskDestinationPrompt(mikkaUserEvent.taskDestination) : '', mikkaUserEvent.profileId ? `The person explicitly selected Factory Agent Profile ${mikkaUserEvent.profileId} in the task form. Pass this exact profileId to task dispatch. The host rechecks its scope and configuration; do not replace it with an automatically chosen profile.` : '', mikkaUserEvent.taskTitle ? `The person typed this task title in the task form: ${JSON.stringify(mikkaUserEvent.taskTitle)}. Create the task with exactly this title; the host uses it even if you pass another.` : ''].filter(Boolean).join('\n')
+    if (!mikkaUserEvent.taskDestination && !mikkaUserEvent.profileId && !mikkaUserEvent.taskTitle && !mikkaUserEvent.taskAgent) return plain
+    const selection = [mikkaUserEvent.taskDestination ? taskDestinationPrompt(mikkaUserEvent.taskDestination) : '', mikkaUserEvent.profileId ? `The person explicitly selected Factory Agent Profile ${mikkaUserEvent.profileId} in the task form. Pass this exact profileId to task dispatch; do not replace it with another one.` : '', mikkaUserEvent.taskAgent ? `The person picked the Agent ${mikkaUserEvent.taskAgent} in the task form. Pass model.harness ${mikkaUserEvent.taskAgent} to task dispatch; the host runs the task on it even if you pass another.` : '', mikkaUserEvent.taskTitle ? `The person typed this task title in the task form: ${JSON.stringify(mikkaUserEvent.taskTitle)}. Create the task with exactly this title; the host uses it even if you pass another.` : ''].filter(Boolean).join('\n')
     return { ...plain, content: typeof plain.content === 'string' ? `${plain.content}\n\n${selection}` : [...plain.content, { type: 'text', text: selection }] } as ModelMessage
   }
   if (!mikkaEvent) return plain.role === 'user' ? { ...plain, content: JSON.stringify({ kind: 'legacy_unattributed_message', authority: 'not_user_approval', untrustedData: { content: plain.content } }) } as ModelMessage : plain

@@ -41,13 +41,19 @@ export async function setWorkspaceBudget(actorId: string, workspaceId: string, i
           if (!resource.rows.length) throw new WorkspaceError('workspaceAccessDenied')
         }
       }
-      const prior = await tx.execute<{ limitPoints: number }>(sql`select "limitPoints" from billing_resource_budgets where "workspaceId"=${workspaceId}::uuid and scope=${value.scope} and "scopeId"=${value.scopeId} and period=${value.period} for update`)
-      if (value.limitPoints === null) await tx.execute(sql`delete from billing_resource_budgets where "workspaceId"=${workspaceId}::uuid and scope=${value.scope} and "scopeId"=${value.scopeId} and period=${value.period}`)
-      else await tx.execute(sql`insert into billing_resource_budgets (id,"workspaceId",scope,"scopeId",period,"limitPoints","warningPercent","updatedBy")
+      const { rows: [prior] } = await tx.execute<{ limitPoints: number; warningPercent: number }>(sql`select "limitPoints","warningPercent" from billing_resource_budgets where "workspaceId"=${workspaceId}::uuid and scope=${value.scope} and "scopeId"=${value.scopeId} and period=${value.period} for update`)
+      // Replayed saves and removals return the current view without changing its author, time or audit history.
+      if (value.limitPoints === null) {
+        if (!prior) return
+        await tx.execute(sql`delete from billing_resource_budgets where "workspaceId"=${workspaceId}::uuid and scope=${value.scope} and "scopeId"=${value.scopeId} and period=${value.period}`)
+      } else {
+        if (prior?.limitPoints === value.limitPoints && prior.warningPercent === value.warningPercent) return
+        await tx.execute(sql`insert into billing_resource_budgets (id,"workspaceId",scope,"scopeId",period,"limitPoints","warningPercent","updatedBy")
         values (${randomUUID()}::uuid,${workspaceId}::uuid,${value.scope},${value.scopeId},${value.period},${value.limitPoints},${value.warningPercent},${actorId})
         on conflict ("workspaceId",scope,"scopeId",period) do update set "limitPoints"=excluded."limitPoints","warningPercent"=excluded."warningPercent","updatedBy"=excluded."updatedBy","updatedAt"=now()`)
+      }
       await recordAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'billing.limits_changed',
-        target: { type: `budget_${value.scope}`, id: value.scopeId }, metadata: { fromCents: prior.rows[0]?.limitPoints ?? null, toCents: value.limitPoints } })
+        target: { type: `budget_${value.scope}`, id: value.scopeId }, metadata: { fromCents: prior?.limitPoints ?? null, toCents: value.limitPoints } })
     })
   })
   return workspaceBudgetView(actorId, workspaceId)

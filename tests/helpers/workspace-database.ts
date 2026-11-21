@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import type { Pool } from 'pg'
+import { observePoolCommits } from '../../lib/db/commit-effects'
 
 /** A single-process PG suite owns and validates its target before calling this.
  * Point the real canonical Workspace executor at that same isolated database /
@@ -10,6 +11,7 @@ export async function bindFixtureWorkspaceDatabase(source: Pool) {
   const target = new URL(connectionString)
   assert.ok(['postgres:', 'postgresql:'].includes(target.protocol)
     && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname), 'fixture workspace target must be loopback')
+  observePoolCommits(source)
   const { workspacePool } = await import('../../lib/workspace-db')
   assert.equal(workspacePool.totalCount, 0, 'configure the Workspace pool before its first connection')
   assert.equal(workspacePool.waitingCount, 0, 'no other suite may be using this process pool')

@@ -20,26 +20,29 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 
 | Source | Commit | License | Skills |
 | --- | --- | --- | --- |
-| [AllThingsSmitty/proven-skills](https://github.com/AllThingsSmitty/proven-skills) | `5b74885f7e0568565c04534831cb73eaffd4c0e4` | MIT, (c) 2026 Matt Smith | `debug`, `incident`, `perf`, `node-ops`, `security`, `db-review` |
+| [AllThingsSmitty/proven-skills](https://github.com/AllThingsSmitty/proven-skills) | `5b74885f7e0568565c04534831cb73eaffd4c0e4` | MIT, (c) 2026 Matt Smith | `incident`, `perf`, `node-ops`, `security`, `db-review` (`debug` removed 2026-11-19: duplicated `diagnosing-bugs`) |
 | [param087/saas-ui-skills](https://github.com/param087/saas-ui-skills) | `4017eaf1e1167a56a5271839053d888faeb1f44a` | MIT, (c) 2026 Param Bhavsar | `settings-pages` |
 | [Dammyjay93/interface-design](https://github.com/Dammyjay93/interface-design) | `2f9be3206855bcb2d1d0af262c8bae25cba6658d` | MIT, (c) 2026 Damola Akinleye | `interface-design`, commands `interface-design:design-review` and `interface-design:design-deslop` (vendored 2026-10-31) |
 | [heydamir/unslop](https://github.com/heydamir/unslop) | `4652254daff586ff4739849395a127b56f7f8cc7` | CC BY 4.0, by Damir Sokolovsky ([@heydamir](https://x.com/heydamir)) | `unslop` (vendored 2026-10-31). Changed: upstream `scripts/` (`snapshot.mjs`, `story.mjs`) left out under the no-scripts rule below, so the live-site snapshot and story-video steps in `SKILL.md` do not run here; every other file is unmodified |
 | [uizze.sh](https://uizze.sh/.well-known/skills/index.json) (skills.sh listing `uizze.sh/ios-design`) | fetched 2026-10-31, checksums in `CHECKSUMS.sha256` | Apache-2.0 with MIT notices (`LICENSE`, `NOTICE`) | `ios-design` (vendored 2026-10-31 at Alex's request). Changed: `scripts/verify-visual-evidence.mjs` left out under the no-scripts rule below; every other file is unmodified |
-| [mattpocock/skills](https://github.com/mattpocock/skills) | `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d` | MIT, (c) 2026 Matt Pocock | Vendored 2026-11-02 at Alex's request, flattened from `skills/<group>/<name>/`: `ask-matt`, `codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grill-me`, `grill-with-docs`, `grilling`, `handoff`, `implement`, `implement-spec`, `improve-codebase-architecture`, `loop-me`, `pr`, `prototype`, `research`, `retro`, `software-factory`, `tdd`, `teach`, `to-questionnaire`, `to-spec`, `to-tickets`, `triage`, `wait-what`, `wayfinder`, `writing-beats`, `writing-for-agents`, `writing-fragments`, `writing-shape`. Removed later as irrelevant to Mikka (2026-11-03): `migrate-to-shoehorn` (no shoehorn dependency) and `scaffold-exercises` (no course exercises). Changed: `diagnosing-bugs/scripts/hitl-loop.template.sh` left out under the no-scripts rule. Not vendored: `code-review` (same name as Claude Code's built-in skill), `git-guardrails-claude-code` (installs a hook script into settings.json), `wizard` (reads real `.env` files; ships a script template), `chief-of-staff` (acts on its own, posts to the tracker, makes unrequested repo-wide changes), `claude-handoff` (starts an unsupervised background `claude --bg`), `setup-pre-commit` (stages and commits every changed file), `setup-matt-pocock-skills` and `setup-ts-deep-modules` (write CLAUDE.md/AGENTS.md and CI config) |
-| [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `3a13158ff1f32156cbe144108de48eda2ecaed9a` | MIT, (c) 2024 Next Level Builder | `ui-ux-pro-max` (vendored 2026-11-02, from `.claude/skills/ui-ux-pro-max/`). Changed: `scripts/` (Python search over the CSVs in `data/`) and `data/` left out under the no-scripts rule, so the `search.py` steps in `SKILL.md` do not run here; use `SKILL.md` and `references/` as checklists |
-| [uxcel-lab/product-skills](https://github.com/uxcel-lab/product-skills) | `5007cd0241ccaa51ae2e4681f9618912dc10e239` | MIT, (c) 2026 Uxcel Lab | `ux-information-architecture-audit` (`ux/audits/information-architecture`), `ux-navigation` (`ux/components/navigation`), `ux-settings` (`ux/screens/settings`), `ux-heuristics-audit` (`ux/audits/heuristics`), vendored 2026-11-02, unmodified. Their mentions of `docs/orchestration-policy.md` and sibling `ux-*` skills point at files not vendored; the skills say to proceed without them |
-| [obra/superpowers](https://github.com/obra/superpowers) | `2ce8aa15d05bd57213e6f746f953aafb7ded7a8b` | MIT, (c) 2025 Jesse Vincent | `systematic-debugging`, `verification-before-completion`, vendored 2026-11-03 at Alex’s request. Markdown files are unmodified. `find-polluter.sh` and `condition-based-waiting-example.ts` are omitted under the no-scripts rule; their references are explanatory only. Companion TDD guidance uses the existing project `tdd` skill. |
+| [mattpocock/skills](https://github.com/mattpocock/skills) | `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d` | MIT, (c) 2026 Matt Pocock | Version 1.3.2; originally vendored 2026-11-02, with `code-review` added 2026-11-13 from the same revision. Flattened from `skills/<group>/<name>/`: `ask-matt`, `code-review`, `codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grill-me`, `grill-with-docs`, `grilling`, `handoff`, `implement`, `implement-spec`, `improve-codebase-architecture`, `loop-me`, `pr`, `prototype`, `research`, `retro`, `software-factory`, `tdd`, `teach`, `to-questionnaire`, `to-spec`, `to-tickets`, `triage`, `wait-what`, `wayfinder`, `writing-beats`, `writing-for-agents`, `writing-fragments`, `writing-shape`. Removed later as irrelevant to Mikka (2026-11-03): `migrate-to-shoehorn` (no shoehorn dependency) and `scaffold-exercises` (no course exercises). Changed: `diagnosing-bugs/scripts/hitl-loop.template.sh` left out under the no-scripts rule. Not vendored: `git-guardrails-claude-code` (installs a hook script into settings.json), `wizard` (reads real `.env` files; ships a script template), `chief-of-staff` (acts on its own, posts to the tracker, makes unrequested repo-wide changes), `claude-handoff` (starts an unsupervised background `claude --bg`), `setup-pre-commit` (stages and commits every changed file), `setup-matt-pocock-skills` and `setup-ts-deep-modules` (write CLAUDE.md/AGENTS.md and CI config) |
+| [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `3a13158ff1f32156cbe144108de48eda2ecaed9a` | MIT, (c) 2024 Next Level Builder | `ui-ux-pro-max` (vendored 2026-11-02, from `.claude/skills/ui-ux-pro-max/`). Changed: `scripts/` (Python search over the CSVs in `data/`) and `data/` intentionally left out. On 2026-11-12 its local `SKILL.md` was rewritten as a reference-only Mikka adapter so it no longer instructs agents to invoke missing `search.py`; upstream pinned version remains documented |
+| [uxcel-lab/product-skills](https://github.com/uxcel-lab/product-skills) | `5007cd0241ccaa51ae2e4681f9618912dc10e239` | MIT, (c) 2026 Uxcel Lab | `ux-information-architecture-audit` (`ux/audits/information-architecture`), `ux-navigation` (`ux/components/navigation`), `ux-settings` (`ux/screens/settings`), vendored 2026-11-02, unmodified. `ux-heuristics-audit` from the same revision was removed 2026-11-19: `ux-heuristics` already covers Nielsen's 10 heuristics with severity ratings and the 10-point score. Their mentions of `docs/orchestration-policy.md` and sibling `ux-*` skills point at files not vendored; the skills say to proceed without them |
+| [obra/superpowers](https://github.com/obra/superpowers) | `2ce8aa15d05bd57213e6f746f953aafb7ded7a8b` | MIT, (c) 2025 Jesse Vincent | `verification-before-completion`, vendored 2026-11-03 at Alex’s request. `systematic-debugging` from the same revision was removed 2026-11-19 as a duplicate of `diagnosing-bugs`; `diagnosing-bugs` is now the single debugging entry point. |
 | [wondelai/skills](https://github.com/wondelai/skills) | `d8d5d75f83da9f16d8aad5bab5f5b341a4770a30` | MIT, (c) 2025 Wondel.ai sp. z o.o. | `ux-heuristics` (vendored 2026-11-04 at Alex's request), unmodified. Krug's "Don't Make Me Think" laws plus Nielsen's 10 heuristics, with severity ratings and a 10-point score. Its book links and mentions of sibling skills (`refactoring-ui`, `cro-methodology`) are references only; those skills were not vendored |
-| [mastepanoski/claude-skills](https://github.com/mastepanoski/claude-skills) | `ac3023830834f9c7c181649f31fbfd48c91837d3` | MIT, (c) 2026 mastepanoski | `cognitive-walkthrough` (`skills/cognitive-walkthrough/`, vendored 2026-11-04 at Alex's request), unmodified. Its mentions of sibling skills (Nielsen Heuristics, Don Norman Principles, WCAG Accessibility) point at skills not vendored; use `ux-heuristics` / `ux-heuristics-audit` instead |
+| [mastepanoski/claude-skills](https://github.com/mastepanoski/claude-skills) | `ac3023830834f9c7c181649f31fbfd48c91837d3` | MIT, (c) 2026 mastepanoski | `cognitive-walkthrough` (`skills/cognitive-walkthrough/`, vendored 2026-11-04 at Alex's request), unmodified. Its mentions of sibling skills (Nielsen Heuristics, Don Norman Principles, WCAG Accessibility) point at skills not vendored; use `ux-heuristics` instead |
 | [expo/skills](https://github.com/expo/skills) | `a9e5bd3fa00b4e61f632e43f85da73aee1942582` | MIT, (c) 2025-present 650 Industries, Inc. (Expo); `expo-animation` also MIT, (c) 2026 Emil Kowalski (its own `LICENSE`) | `expo-overview`, `expo-native-ui`, `expo-animation`, `expo-ui`, `expo-router`, `expo-design-system`, vendored 2026-11-05 at Alex's request from `plugins/expo/skills/`, unmodified. Changed: `expo-ui/scripts/list-components.js` left out under the no-scripts rule; to list `@expo/ui` components, read the installed package's `.d.ts` files as its `references/swift-ui.md` also says. Their mentions of sibling skills not vendored here (`expo-project-structure`, `expo-data-fetching`, `eas-app-stores`, `eas-simulator`, …) are references only; `eas-simulator` was left out because iOS changes are checked on Alex's phone after each OTA, not on a cloud simulator |
 | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62` | MIT (declared in the skill's frontmatter; the repository ships no `LICENSE` file) | `react-native-skills` (`skills/react-native-skills/`), vendored 2026-11-05 at Alex's request, unmodified |
 | [warpdotdev/common-skills](https://github.com/warpdotdev/common-skills) | `8792394ff1b655e0af451b8fabb68ef0cfcbd208` | MIT, (c) 2026 Denver Technologies, Inc. | `merge-risk` (vendored 2026-11-06 from `.agents/skills/merge-risk/SKILL.md`, unmodified; five-dimensional PR merge-risk review, no scripts) |
 | [avdlee/swiftui-agent-skill](https://github.com/avdlee/swiftui-agent-skill) | `62bd760f005093d1e2e4de5db156e456a5f96400` | MIT, (c) 2026 Antoine van der Lee | `swiftui-expert-skill` (vendored 2026-11-08 at Alex's request, from `skills/swiftui-expert-skill/`). Changed: `scripts/` (the Instruments `record_trace.py` / `analyze_trace.py` helpers and `instruments_parser/`) left out under the no-scripts rule, so the trace recording and analysis steps in `SKILL.md` do not run here; every other file is unmodified |
 | [gannonh/skills](https://github.com/gannonh/skills) | `2ef000341d4e60af00e8934ba1d4cfef82b63b13` | MIT, (c) 2026 Gannon Hall | `update-docs` (`skills/update-docs/`, vendored 2026-11-08), unmodified. The optional `documentation-and-adrs` reference uses an available installed skill when relevant |
 | [wondelai/skills](https://github.com/wondelai/skills) | `6621b1f32cca2b9b17d7a18c076bf6e7da83f8a6` | MIT, (c) 2025 Wondel.ai sp. z o.o. Google guide attribution is retained in `SKILL.md` | `technical-documentation` (vendored 2026-11-08), unmodified, including all seven reference pages |
+| [openclaw/openclaw](https://github.com/openclaw/openclaw) | `4947e40db109a28c1fbdcf692eb431db19d46720` | MIT, (c) 2026 OpenClaw Foundation | `test-audit` (vendored 2026-11-12 at Alex's request, from `.agents/skills/test-audit/`), including `CAMPAIGN.md` and `references/audit.md`. Changed: added a Mikka usage pointer to `SKILL.md` and pinned the cross-repository boundary/proof links. Mikka's companion `README.md` routes OpenClaw-specific commands to existing project validation; no scripts or extra framework are included |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
-`update-docs` license is retained in [`update-docs/LICENSE.md`](update-docs/LICENSE.md).
+`update-docs` and `test-audit` licenses are retained in their skill directories:
+[`update-docs/LICENSE.md`](update-docs/LICENSE.md) and
+[`test-audit/LICENSE.md`](test-audit/LICENSE.md).
 
 ## Which skill to use
 
@@ -66,13 +69,22 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
 - **iOS app UI** (`apps/mobile`): load `expo-overview` first and the Expo skills it routes to (`expo-native-ui`, `expo-router`, `expo-animation`, `expo-ui`, `expo-design-system`), with `react-native-skills` for list, animation and UI patterns. An iOS UI PR carries Expo Web screenshots and a checklist of what Alex checks on TestFlight after the OTA. `ios-design` stays a review checklist (native controls first, gestures as springs, keyboard through `react-native-keyboard-controller`); its Uizze MCP steps are optional and not connected here. Where it and the Expo skills differ on how to build something in Expo, the Expo skills decide.
 
 - **Flow usability (glanceable, simple user flow)**: before a design or UI change is handed in, run `ux-heuristics` (score every screen out of 10; below 8 is not ready) and `cognitive-walkthrough` on each key task, counting clicks, scrolls and page switches per step. Report both results with the design. The author's own score is only a reference: the review that decides is done by an independent reviewer that did not author the design, against full-size screenshots and the live product, and it also checks R-84 to R-90 in `docs/design/rules.md` (Design review) one by one, including R-90: every part reuses an existing component.
-- **Product UX checks**: `ux-heuristics-audit`, `ux-information-architecture-audit`, `ux-navigation`, `ux-settings` (with `settings-pages`); `ui-ux-pro-max` references as a UI checklist. `docs/design/` and `interface-design` still decide.
+- **Product UX checks**: `ux-heuristics` (Nielsen's 10 heuristics with severity ratings and the 10-point score), `ux-information-architecture-audit`, `ux-navigation`, `ux-settings` (with `settings-pages`); `ui-ux-pro-max` references as a UI checklist. `docs/design/` and `interface-design` still decide.
+- **Architecture remediation** uses `improve-codebase-architecture` with
+  `codebase-design` to trace callers and test whether a layer can be removed.
+  Use `domain-modeling` to locate the owning writer, `diagnosing-bugs` and
+  `diagnosing-bugs` to reproduce failures, and `tdd` to cover the public
+  behavior. Review the issue and diff using Matt Pocock's `code-review`, then
+  use `verification-before-completion` and `merge-risk` for delivery. Claude
+  Code resolves `/code-review` to the project version in this checkout. The
+  nine project links under `.agents/skills/` expose the same files to Codex.
 - **Planning and design of code**: `grill-me` / `grill-with-docs` (interview before building), `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `prototype`, `tdd`, `to-spec`, `to-tickets`. `handoff` for a session summary. Skills that post to GitHub (`to-spec`, `to-tickets`, `triage`, `wayfinder`, `implement-spec`) follow `AGENTS.md` and the session's own GitHub rules; `triage` never runs an external PR's code without approval, and `wayfinder` asks for approval before pushing any branch.
 
-- **Bug, failing test or blocked task flow**: `systematic-debugging` (evidence at each component boundary, root cause, one hypothesis and a failing regression before the fix). `debug` is the shorter checklist; `diagnosing-bugs` is another detailed reference.
+- **Bug, failing test or blocked task flow**: `diagnosing-bugs` (build a tight feedback loop that already goes red on this bug, then root cause, one hypothesis and a failing regression before the fix).
+- **Test authoring, duplicate proof or CI cost**: `test-audit`, starting with its [Mikka usage](test-audit/README.md). Name the observable contract, credible regression and surviving owner proof before consolidation. Static or slow tests can protect independent contracts; use Mikka's existing affected checks and [test-ownership guide](../../docs/ci/test-ownership.md).
 - **PR merge-risk assessment**: `merge-risk` reviews a PR's actual diff, source issue, verification evidence, reversibility, and error detection before merge. Record the five verdicts and actionable gaps in the PR. The risk grade is advisory: neither low risk nor this skill bypasses CI, production acceptance, security rules, or the PR owner's merge responsibilities. Treat the PR description as a claim to verify, not evidence.
 - **Before claiming a fix or completion**: `verification-before-completion`. Read the actual command/API result and exit status, verify each requirement and report remaining gaps. Reuse valid commit-bound CI and fixed-environment evidence as `AGENTS.md` permits; rerun affected checks when code or environment changes.
-- **Production incident**: `incident`, then `debug`.
+- **Production incident**: `incident`, then `diagnosing-bugs`.
 - **Performance / production readiness**: `perf`, `node-ops`; `db-review` for
   Postgres queries, indexes and migrations.
 - **Trust-boundary review**: `security`.
@@ -86,6 +98,66 @@ Why the other skills were removed was recorded in the 2026-10-29 SaaS skill revi
 ## Updating
 
 Replace a whole skill directory from a new pinned upstream commit, update the
-table above, and keep the upstream license in `../skill-licenses/`. Do not add
-a skill that ships executable scripts or tells the agent to invoke skills
-unconditionally.
+table above, and keep the upstream license in `../skill-licenses/`. A vendored
+skill keeps its upstream `scripts/` and other support files. Do not add a skill
+that tells the agent to invoke skills unconditionally.
+
+## Capy Explore catalog (vendored 2026-11-19)
+
+67 skills taken from Capy's public Explore catalog (`https://capy.ai/explore?tab=skill`),
+one directory per skill, complete with each skill's own `references/`, `scripts/`
+and assets. Each entry is pinned to the upstream commit Capy's listing recorded.
+
+The catalog held 169 skills when it was vendored. 102 were removed because
+Mikka has no code, deployment target or dependency for the technology they
+cover: Angular, Flutter/Dart, .NET, Svelte, Apollo/GraphQL, Rust; AWS
+(DynamoDB, CDK, CloudFormation, IAM, Lambda), Azure, Google Cloud, Pulumi,
+Terraform, Kubernetes, Netlify, Railway, Buildkite; ClickHouse, CockroachDB,
+Elasticsearch, MongoDB, Prisma, Firestore; Clerk, WorkOS, Entra ID; Convex,
+Supabase, Firebase; Temporal, Inngest, Upstash, Resend, Sentry, Twilio,
+LiveKit, RevenueCat; k6, PromQL, KQL; plus document-generator and
+writing-style skills with no engineering role here. Mikka's own stack is
+PostgreSQL + drizzle, Cloudflare Workers, React/Next, Expo and Stripe, and the
+remaining entries cover it.
+
+Four names Capy lists were already vendored here from the same upstream and were
+skipped: `codebase-design`, `handoff`, `pr`, `react-native-skills`.
+
+| Source repository | Commit | Skills |
+| --- | --- | --- |
+| [PostHog/skills](https://github.com/PostHog/skills) | `4ffcd7c0cc069f62124c55943ee72330cf8e526c` | `posthog-instrument-error-tracking`, `posthog-instrument-integration`, `posthog-instrument-llm-analytics` |
+| [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) | `1be8e34187e34647bb83adc3a1323b26ae6f6abe` | `api-and-interface-design`, `ci-cd-and-automation`, `code-simplification`, `deprecation-and-migration`, `documentation-and-adrs`, `git-workflow-and-versioning`, `spec-driven-development` |
+| [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) | `4eb71d92a39cab44ad40ac9d8a6a5ccb4029d6c2` | `docker-patterns` |
+| [anthropics/skills](https://github.com/anthropics/skills) | `683bc88e56f3e09ba94f7055977f3d3aa499f202` | `frontend-design`, `mcp-builder`, `skill-creator` |
+| [anthropics/skills](https://github.com/anthropics/skills) | `e4bb5d960d87126ff3b3a8af1a104b7db67560ba` | `doc-coauthoring`, `docx`, `pdf`, `pptx`, `xlsx` |
+| [aws/agent-toolkit-for-aws](https://github.com/aws/agent-toolkit-for-aws) | `2cb0fa1c2e668e1bb075028800b6b27efb95779e` | `securing-s3-buckets` |
+| [callstackincubator/agent-skills](https://github.com/callstackincubator/agent-skills) | `59e9d17446a248b21d86f078fcd0bd2d36db1ca4` | `react-navigation`, `upgrading-react-native` |
+| [cloudflare/skills](https://github.com/cloudflare/skills) | `c430dd965cea3a8faf0ef035e3b3d73b38518081` | `cloudflare-agents-sdk`, `cloudflare-durable-objects`, `cloudflare-email-service`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`, `wrangler` |
+| [emilkowalski/skills](https://github.com/emilkowalski/skills) | `e8a175de22ae1e49370fc144c1f3bb9aeedf988d` | `break-ui`, `emil-design-eng` |
+| [expo/skills](https://github.com/expo/skills) | `d4f484024fec15196bfd3c272e953e3f983972cf` | `eas-update`, `eas-workflows` |
+| [muratcankoylan/Agent-Skills-for-Context-Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering) | `58b55a8921758d13453b440704fb1b5b208c0b0e` | `agent-tool-design`, `context-compression` |
+| [neondatabase/agent-skills](https://github.com/neondatabase/agent-skills) | `bfd013c352ed31b57a573e4f60263afc5fdd7f7a` | `neon-postgres` |
+| [openai/skills](https://github.com/openai/skills) | `49f948faa9258a0c61caceaf225e179651397431` | `cli-creator`, `security-best-practices`, `security-ownership-map`, `security-threat-model` |
+| [stripe/ai](https://github.com/stripe/ai) | `e9deec62821ca59aa6ca18b4d243c9ced389cd54` | `stripe-best-practices`, `upgrade-stripe` |
+| [supabase/agent-skills](https://github.com/supabase/agent-skills) | `c9be0e931b7930f7d02126d04774d904c381e7d7` | `supabase-postgres-best-practices` |
+| [trailofbits/skills](https://github.com/trailofbits/skills) | `442fc9d6c89b1e937e6f7a477e7071ea75fcbea4` | `agentic-actions-auditor`, `audit-context-building`, `differential-review`, `fp-check`, `mutation-testing`, `property-based-testing`, `sharp-edges`, `supply-chain-risk-auditor`, `trailofbits-codeql`, `trailofbits-semgrep`, `variant-analysis` |
+| [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) | `b06e2533ba9b3823b8a96c859d455cb55f4d7893` | `agent-browser` |
+| [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `063bee94c3f4df8453406c830b0a7df0f2860278` | `vercel-composition-patterns`, `vercel-react-best-practices`, `vercel-react-view-transitions` |
+| [vercel-labs/skills](https://github.com/vercel-labs/skills) | `50894c1d98bc45ca1ab127213e59d6525065b5e7` | `find-skills` |
+| [wshobson/agents](https://github.com/wshobson/agents) | `46891e7e60da0e52baf1050b7b6391b64e84c6d9` | `bash-defensive-patterns`, `dependency-upgrade`, `e2e-testing-patterns`, `git-advanced-workflows`, `postgresql-table-design`, `postmortem-writing`, `python-testing-patterns`, `sql-optimization-patterns`, `typescript-advanced-types` |
+
+## Mikka UX-quality skill adapters (2026-11-12)
+
+The files below are **Mikka-authored procedural adapters**, not verbatim vendored upstream repositories or installed external executables. Existing `AGENTS.md`, design/permission/paid-block/source constraints always take precedence. No external scripts, automatic network fetches, browser binaries, data tables or new design tokens are installed.
+
+| Mikka skill | Function | Upstream reference |
+| --- | --- | --- |
+| `mikka-ux-quality-audit` | Cross-domain router, severity, evidence and issue/PR lifecycle | Mikka-owned synthesis of the preexisting skills |
+| `mikka-action-coverage` | Two-way backend command ↔ authorized UI affordance and durable effect | Mikka-owned, linked to #2212/#1979/#1980 |
+| `mikka-browser-qa` | Source-pinned official renderer/browser observations; optional CLI when already installed | [agent-browser at f88c40b](https://github.com/vercel-labs/agent-browser/tree/f88c40b7ed7c2344af54b804b440b11169f98906), Apache-2.0 |
+| `web-design-guidelines` | Accessibility, forms, feedback, responsive/focus review, subordinated to Mikka rules | [web-interface-guidelines at 434b7f9](https://github.com/vercel-labs/web-interface-guidelines/tree/434b7f91364665f2f733b310ec54809bf8f37937), MIT. The [agent-skill wrapper at 1a2c79d](https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/web-design-guidelines/SKILL.md) declares no license and is linked only. |
+| `webapp-testing` | Real browser + HTTP/PG acceptance with project test runner, **no upstream Python helpers** | [webapp-testing at 2c5958e](https://github.com/anthropics/skills/tree/2c5958ecac7cee2b583967a2c4981d0f4a75c579/skills/webapp-testing), Apache-2.0 |
+| `impeccable-audit` | Visual craft/UX audit without alternative design system or paid UI restyling | [Impeccable at b4bff16](https://github.com/pbakaus/impeccable/tree/b4bff1626c344067788c2679f048a20057c7cc5a), Apache-2.0 |
+| `ui-ux-pro-max` | Existing MIT reference checklists, adapted to use `references/` without absent search scripts | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) pinned above |
+
+Upstream methods are acknowledged, not copied as executable dependencies. For availability, Mikka's built-in `pnpm lint:ui` does not cover every private/native UI: use the role-aware matrix and actual source-pinned official runtime. Browser observations are **not** an automatic main-branch E2E CI gate. See [audit baseline](../../docs/design/ux-quality-audit.md) and [#2212](https://github.com/alexj11324/Mikka/issues/2212).

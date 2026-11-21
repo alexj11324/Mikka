@@ -1,0 +1,200 @@
+import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { mkdir, readFile, writeFile, chown, stat } from 'node:fs/promises'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+let input = ''
+for await (const chunk of process.stdin) input += chunk
+const { sha, sourceDigest, runId, attempt } = JSON.parse(input)
+if (
+  !/^[a-f0-9]{40}$/.test(sha) ||
+  !/^[a-f0-9]{64}$/.test(sourceDigest) ||
+  !/^\d{1,20}$/.test(runId) ||
+  !/^\d{1,6}$/.test(attempt)
+)
+  throw Error('Invalid reviewed build input')
+const work = '/build-work',
+  home = '/build-home',
+  src = work + '/repo'
+const receipt = { began: Date.now(), sha, events: [] }
+function event(phase) {
+  receipt.events.push({ phase, at: Date.now() })
+}
+async function run(bin, args, opts = {}) {
+  let tail = ''
+  const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], ...opts })
+  const consume = (b) => {
+    tail = (tail + b.toString()).slice(-2600)
+  }
+  child.stdout.on('data', consume)
+  child.stderr.on('data', consume)
+  const code = await new Promise((ok, no) => {
+    child.on('error', no)
+    child.on('close', ok)
+  })
+  if (code !== 0) {
+    throw Error(bin + ' ' + code + ' ' + tail)
+  }
+  return tail.trim()
+}
+const droppedPrivileges = [
+  '--reuid=1000',
+  '--regid=1000',
+  '--clear-groups',
+  '--inh-caps=-all',
+  '--ambient-caps=-all',
+  '--bounding-set=-all',
+  '--no-new-privs',
+]
+const fixed = {
+  PATH: '/usr/local/bin:/usr/bin:/bin:/opt/pnpm/bin',
+  HOME: home,
+  CI: 'true',
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
+  NITRO_PRESET: 'node-server',
+  MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare',
+  NODE_OPTIONS: '--max-old-space-size=6144',
+  MIKKA_BUILD_REVISION: sha,
+  GITHUB_SHA: sha,
+  GITHUB_RUN_ID: runId,
+  GITHUB_RUN_ATTEMPT: attempt,
+  XDG_CACHE_HOME: home + '/.cache',
+}
+async function download(url, path, expected) {
+  const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(120000) })
+  if (!res.ok || !res.body) throw Error('fetch ' + new URL(url).host + ' ' + res.status)
+  await pipeline(Readable.fromWeb(res.body), createWriteStream(path, { flags: 'wx' }))
+  const digest = createHash('sha256')
+  for await (const c of createReadStream(path)) digest.update(c)
+  const hash = digest.digest('hex')
+  if (expected && hash !== expected) throw Error('SHA256 mismatch')
+  return hash
+}
+async function main() {
+  for (const path of [work, home, src, '/opt/pnpm']) {
+    await mkdir(path)
+    await chown(path, 1000, 1000)
+  }
+  event('qualify net namespace')
+  const isolation = await run(
+    '/usr/bin/unshare',
+    [
+      '--net',
+      '--fork',
+      '--kill-child=KILL',
+      '/usr/bin/setpriv',
+      ...droppedPrivileges,
+      '/bin/sh',
+      '-ec',
+      `test "$(id -u)" = 1000; test "$(awk 'NR>1 {n++} END {print n+0}' /proc/net/route)" = 0; cat /proc/self/status | grep -E '^(CapEff|NoNewPrivs)'`,
+    ],
+    { env: fixed },
+  )
+  receipt.offlineGuard = isolation
+  event('download pinned source and package manager')
+  receipt.tarSha256 = await download(
+    'https://codeload.github.com/alexj11324/Mikka/tar.gz/' + sha,
+    work + '/src.tgz',
+    sourceDigest,
+  )
+  await download(
+    'https://registry.npmjs.org/pnpm/-/pnpm-10.34.3.tgz',
+    work + '/pnpm.tgz',
+    '1c40544020a2e633068ed43a98eb5c0fed7d64a1c6d6f2382e43df91419dad62',
+  )
+  await run(
+    '/usr/bin/setpriv',
+    [...droppedPrivileges, 'tar', 'xzf', work + '/src.tgz', '-C', src, '--strip-components=1'],
+    { env: fixed },
+  )
+  await run(
+    '/usr/bin/setpriv',
+    [...droppedPrivileges, 'tar', 'xzf', work + '/pnpm.tgz', '-C', '/opt/pnpm', '--strip-components=1'],
+    { env: fixed },
+  )
+  const wrapper = '/opt/pnpm/bin/pnpm'
+  await writeFile(wrapper, '#!/bin/sh\nexec node /opt/pnpm/bin/pnpm.cjs "$@"\n', { mode: 0o755 })
+  const pinned = await run(process.execPath, ['/opt/pnpm/bin/pnpm.cjs', '--version'])
+  if (pinned !== '10.34.3') throw Error('pnpm mismatch')
+  event('frozen dependency installation')
+  // Only the operator-reviewed source archive can install dependencies. Compilation
+  // receives no egress, external credentials or container runtime socket.
+  await run(
+    '/usr/bin/unshare',
+    [
+      '--mount',
+      '--pid',
+      '--mount-proc',
+      '--fork',
+      '--kill-child=KILL',
+      '/usr/bin/setpriv',
+      ...droppedPrivileges,
+      process.execPath,
+      '/opt/pnpm/bin/pnpm.cjs',
+      'install',
+      '--frozen-lockfile',
+      '--reporter=append-only',
+    ],
+    { cwd: src, env: fixed },
+  )
+  event('offline node24 compile')
+  await run(
+    '/usr/bin/unshare',
+    [
+      '--net',
+      '--mount',
+      '--pid',
+      '--mount-proc',
+      '--fork',
+      '--kill-child=KILL',
+      '/usr/bin/setpriv',
+      ...droppedPrivileges,
+      '/bin/bash',
+      '-euc',
+      'export MIKKA_DEPLOYMENT_ID="$(node lib/deployment-id.mjs)"; exec bash scripts/compile-cloudflare-eve-host.sh',
+    ],
+    { cwd: src, env: fixed },
+  )
+  event('verify actual output')
+  const manifest = JSON.parse(await readFile(src + '/.output/cf-eve/eve-host.json', 'utf8'))
+  if (
+    manifest.version !== 1 ||
+    manifest.sourceSha !== sha ||
+    manifest.uiSha !== sha ||
+    manifest.uiSource !== 'public-server' ||
+    !(await stat(src + '/.output/cf-eve/eve/server/index.mjs')).isFile()
+  )
+    throw Error('Compiled host does not match approved input')
+  await run(
+    '/usr/bin/setpriv',
+    [...droppedPrivileges, '/bin/tar', '-czf', '/tmp/eve-host.tar.gz', '-C', src + '/.output/cf-eve', '.'],
+    { env: fixed },
+  )
+  const size = (await stat('/tmp/eve-host.tar.gz')).size
+  if (size > 512 * 1024 * 1024) throw Error('Compiled archive exceeds 512 MiB')
+  const digest = createHash('sha256')
+  for await (const c of createReadStream('/tmp/eve-host.tar.gz')) digest.update(c)
+  return { size, sha256: digest.digest('hex'), manifest, node: process.version }
+}
+try {
+  receipt.artifact = await main()
+  receipt.ok = true
+} catch (e) {
+  receipt.ok = false
+  receipt.error = String(e.message).slice(-1500)
+}
+for (const [field, counter] of [
+  ['cpuStat', 'cpu.stat'],
+  ['memoryBytes', 'memory.current'],
+  ['peakMemoryBytes', 'memory.peak'],
+]) {
+  try {
+    receipt[field] = (await readFile('/sys/fs/cgroup/' + counter, 'utf8')).trim()
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    receipt[field] = null
+  }
+}
+receipt.ended = Date.now()
+console.log(JSON.stringify(receipt))

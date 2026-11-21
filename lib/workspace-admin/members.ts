@@ -15,6 +15,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
 import { botListChanged, ownerListChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '../live/lists'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '../coding-workspace/review-sessions'
 
 const memberId = z.string().min(1).max(200)
 
@@ -44,7 +45,7 @@ async function requireTransferTarget(tx: WorkspaceTransaction, workspaceId: stri
  * is paused with their other bots when they leave (releaseDepartingMember)
  * and stays theirs.
  */
-export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string | null, toUserId: string, only?: string[]): Promise<AssetTransfer> {
+export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string | null, toUserId: string, only?: string[], notificationExecutor: object = tx): Promise<AssetTransfer> {
   // A null owner (「待接管」, the owner deleted their account) is only ever taken over one bot at a time.
   if (fromUserId === null && !only) throw new Error('transferBots needs explicit bots for a null owner')
   const ownedBy = fromUserId === null ? isNull(bots.ownerId) : eq(bots.ownerId, fromUserId)
@@ -65,10 +66,15 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
   await tx.execute(sql`update agents a set name = a.name || ' · ' || a.id::text, "updatedAt" = now()
     from bot_cloud_runtimes x where x."agentId" = a.id and x."botId" in ${ids}`)
   await tx.execute(sql`delete from bot_cloud_runtimes where "botId" in ${ids}`)
-  await tx.execute(sql`delete from computer_run_bindings where "botId" in ${ids}`)
+  const detached = await tx.execute<{ runId: string }>(sql`delete from computer_run_bindings where "botId" in ${ids} returning "runId"`)
+  if (detached.rows.length) (await import('../coding-workspace/review-sessions'))
+    .reviewSessionsRevoked(notificationExecutor, { runIds: detached.rows.map(row => row.runId) }, 'run_changed')
   await tx.execute(sql`delete from agent_kit_heads where bot_id in ${ids}`)
   // A bot handed over runs on its new owner's resources, never on the previous owner's credentials.
   await tx.update(bots).set({ ownerId: toUserId, archivedAt: null, updatedAt: new Date() }).where(and(inArray(bots.id, ids), eq(bots.workspaceId, workspaceId), ownedBy))
+  // The Bot's access policy follows its owner, so the new owner can manage and share it and the old one no longer can.
+  await tx.execute(sql`select set_config('mikka.acl_actor',${toUserId},true),set_config('mikka.acl_source','bot_transfer',true)`)
+  await tx.execute(sql`update resource_access_policies set "ownerId"=${toUserId} where kind='bot' and id in ${ids} and "ownerId" is distinct from ${toUserId}`)
   for (const id of ids) await botListChanged(tx, id)
   if (fromUserId) await ownerListChanged(tx, fromUserId, ['thread_list', 'task_run_list', 'bot_chat_list'])
   await workspaceListChanged(tx, workspaceId, ['bot_list'])
@@ -77,17 +83,19 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
- * their subscription share, API key shares, Skill shares and credit share leave
+ * their API key shares, Skill shares and credit share leave
  * with them and their bots there pause until an
- * admin takes one over. Runs on that subscription are stopped at once, and
+ * admin takes one over. Runs on their subscriptions there are stopped at once, and
  * the machine receives a stop through its control channel. New admissions and
  * background credential renewals check the current share and membership.
  */
 export async function releaseDepartingMember(workspaceId: string, userId: string) {
+  // Repeat after COMMIT for callers that only schedule cleanup. Removal and
+  // suspension also fence while the Workspace/member locks are still held.
+  await (await import('../coding-workspace/review-sessions')).revokeReviewSessions(pool, { workspaceId, ownerId: userId }, 'membership_changed')
   // A card they designated keeps paying through its grace period; admins see when it stops (计费).
   await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
-    await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
     await main.execute(sql`delete from personal_mcp_workspace_shares g using personal_mcp_servers s where g.server_id=s.id and s.user_id=${userId} and g.workspace_id=${workspaceId}`)
     await main.execute(sql`delete from personal_skill_workspace_shares g using personal_skills s where g.skill_id=s.id and s.user_id=${userId} and g.workspace_id=${workspaceId}`)
     // Their credits stop paying for the team at once (lib/credit-shares.ts).
@@ -102,6 +110,8 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
   await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
+  // Every run there that lost its authority (theirs, and others' on Bots handed over) stops now (decision 2026-11-17-2215).
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ workspaceId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */
@@ -113,33 +123,33 @@ export async function restoreReturningMember(workspaceId: string, userId: string
 /** An admin takes over a paused bot of someone who left, was suspended or deleted their account (null owner); it then runs on the admin's own resources. */
 export async function takeOverBot(actorId: string, workspaceId: string, botId: string): Promise<AssetTransfer> {
   z.uuid().parse(botId)
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  let name = ''
-  const transferred = await db.transaction(async main => {
-    const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
-      .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).for('update').limit(1)
-    if (!bot) throw new WorkspaceError('botNotFound')
-    name = bot.name
-    if (bot.ownerId === actorId) {
-      await main.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(eq(bots.id, botId))
-      await botListChanged(main, botId)
-      return { bots: 1 }
-    }
-    return transferBots(main, workspaceId, bot.ownerId, actorId, [botId])
-  })
-  // 接管 changes who pays for and owns the bot's runs, so it is in the workspace's activity log like 移除 and 停用.
-  await workspaceDb.transaction(async tx => {
+  const transfer = await workspaceDb.transaction(async tx => {
     const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
-    await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'bot.taken_over', target: { type: 'bot', id: botId, label: name } })
+    return db.transaction(async main => {
+      const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
+        .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).for('update').limit(1)
+      if (!bot) throw new WorkspaceError('botNotFound')
+      await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'bot.taken_over', target: { type: 'bot', id: botId, label: bot.name } })
+      if (bot.ownerId === actorId) {
+        await main.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(eq(bots.id, botId))
+        await botListChanged(main, botId)
+        return { bots: 1 }
+      }
+      return transferBots(main, workspaceId, bot.ownerId, actorId, [botId], tx)
+    })
   })
-  return transferred
+  // A new owner changes the runs' execution identity; those runs stop now.
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ botId })
+  return transfer
 }
 
 /** Paused bots in this workspace, for its admins. */
 export async function archivedBots(actorId: string, workspaceId: string) {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
-    .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).orderBy(bots.name)
+  return workspaceDb.transaction(async tx => {
+    await requireWorkspace(tx, workspaceId, actorId, true)
+    return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
+      .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).orderBy(bots.name)
+  })
 }
 
 /** An active admin other than `userId` remains. */
@@ -163,7 +173,9 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
   const { enqueueMemberLifecycle, drainMemberLifecycleOutbox } = await import('@/lib/governance/member-outbox')
   memberId.parse(targetId)
   if (targetId === actorId) throw new WorkspaceError('workspaceCannotRemoveSelf')
-  const removed = await workspaceDb.transaction(async tx => {
+  let reviewIds: string[] = []
+  let removed: RemovedMember
+  try { removed = await workspaceDb.transaction(async tx => {
     const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
     const [target] = await tx.select().from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetId))).for('update').limit(1)
@@ -171,8 +183,9 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
     if (target.role === 'admin' && target.status === 'active') await assertAnotherAdmin(tx, workspaceId, targetId)
     const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     if (transferTo !== undefined) await requireTransferTarget(tx, workspaceId, targetId, transferTo)
+    reviewIds = await markReviewSessionsRevoked(pool, { workspaceId, ownerId: targetId }, 'membership_changed')
     await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'member.removed', target: { type: 'member', id: targetId, label: target.name || target.email }, ...audit })
-    const transferred = transferTo === undefined ? { bots: 0 } : await db.transaction(main => transferBots(main, workspaceId, targetId, transferTo))
+    const transferred = transferTo === undefined ? { bots: 0 } : await db.transaction(main => transferBots(main, workspaceId, targetId, transferTo, undefined, tx))
     const teamIds = (await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId))).map(row => row.id)
     if (teamIds.length) await tx.delete(teamMembers).where(and(inArray(teamMembers.teamId, teamIds), eq(teamMembers.userId, targetId)))
     await tx.update(workspaceInvitations).set({ status: 'revoked' })
@@ -181,7 +194,7 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
     await enqueueMemberLifecycle(tx, workspaceId, targetId, 'suspend')
     await workspaceListScopeChanged(tx, workspaceId, before)
     return { removed: true as const, transferred, label: target.name || target.email }
-  })
+  }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
   // After the membership is gone: the membership check already fences them, this removes what stays behind.
   await drainMemberLifecycleOutbox(workspaceId, targetId)
   return removed
@@ -190,5 +203,5 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
 /** Used by updateWorkspaceMember when an admin suspends someone and names who takes over their bots. */
 export async function transferOnSuspend(tx: WorkspaceTransaction, workspaceId: string, targetId: string, transferTo: string): Promise<AssetTransfer> {
   await requireTransferTarget(tx, workspaceId, targetId, transferTo)
-  return db.transaction(main => transferBots(main, workspaceId, targetId, transferTo))
+  return db.transaction(main => transferBots(main, workspaceId, targetId, transferTo, undefined, tx))
 }

@@ -3,7 +3,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { ActionSheetIOS, Linking, Platform, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Hand, Info } from 'lucide-react-native'
+import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Folder, Globe, Hand, Info } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -15,12 +15,14 @@ import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
 import { clearApiCache } from '@/lib/useApi'
+import { usePluginConnections } from '@/features/plugins/use-plugin-connections'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy } from '@/lib/server-copy'
-import { openPrivacyPolicy } from '@/lib/web'
+import { openOnWeb, openPrivacyPolicy } from '@/lib/web'
+import { mobileFilesPath, mobileOrganizationPath } from '../../../../../lib/mobile-web-target'
 import { mobileMessages as messages } from '@/lib/messages'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
@@ -39,6 +41,7 @@ export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { data, error, reload } = useSettings()
+  const connections = usePluginConnections()
   const leaving = useRef(false)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutFailed, setSignOutFailed] = useState(false)
@@ -62,15 +65,16 @@ export default function SettingsScreen() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <NavBar title="设置" topTitle background={colors.grouped} />
+      <NavBar title={messages.Settings.title} topTitle background={colors.grouped} />
       {!data && error ? (
         <View style={{ paddingTop: 40, alignItems: 'center', gap: 10 }}>
-          <Text style={{ color: colors.danger, fontSize: 13 }}>设置加载失败。</Text>
-          <CardButton label="重试" onPress={() => void reload()} />
+          <Text style={{ color: colors.danger, fontSize: 13 }}>{messages.MobileCore.readFailed.replace('{label}', messages.Settings.title)}</Text>
+          <CardButton label={messages.Common.retry} onPress={() => void reload()} />
         </View>
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
-          <ReadNotice error={error} hasData label="设置" onRetry={reload} />
+          <ReadNotice error={error} hasData label={messages.Settings.title} onRetry={reload} />
+          <ReadNotice error={connections.error} hasData={connections.hasRetainedData} label={connections.noticeLabel} onRetry={connections.reload} />
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />
           <Group>
@@ -79,12 +83,14 @@ export default function SettingsScreen() {
           </Group>
           <Group>
             <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />
+            {data.organizationSettingsAvailable && <Row label={messages.MobileCore.organizationOnWeb} onPress={() => void openOnWeb(mobileOrganizationPath(data.workspace.id), { confirmAccount: true })} />}
+            {data.personalFilesAvailable && <Row icon={icon('folder.fill', Folder, '#007AFF')} label={messages.MobileCore.personalFilesOnWeb} onPress={() => void openOnWeb(mobileFilesPath(data.workspace.id), { confirmAccount: true })} />}
             {data.billingScope && <Row label={messages.Billing.management.billingEntry} onPress={() => router.push('/settings/billing')} />}
           </Group>
           <Group>
-            <Row icon={icon('bell.fill', Bell, '#FF3B30')} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
+            <Row icon={icon('bell.fill', Bell, '#FF3B30')} label={messages.Settings.sections.notifications.title} value={data.preferences.proactive ? messages.MobileCore.notifications.on : messages.MobileCore.notifications.off} onPress={() => router.push('/settings/notifications')} />
             <Row icon={icon('book.fill', BookOpen, '#AF52DE')} label="记忆" onPress={() => router.push('/settings/memory')} />
-            <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={String(data.apps.filter(app => app.connected).length || '')} onPress={() => router.push('/settings/plugins')} />
+            <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={connections.error ? '连接状态未知' : connections.snapshot ? String(connections.snapshot.toolkits.length) : undefined} onPress={() => router.push('/settings/plugins')} />
           </Group>
           <Group>
             <Row icon={icon('globe', Globe, '#5856D6')} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}

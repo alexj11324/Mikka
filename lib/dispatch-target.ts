@@ -26,10 +26,10 @@ type Query = Pick<Pool, 'query'>
  */
 export async function targetDevice(query: Query, userId: string, deviceId: string): Promise<
   { deviceId: string; name: string; agentId: string; harness: string; model?: string } | { error: 'notFound' } | { error: 'unavailable' }> {
-  const { rows: [device] } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null }>(
-    `SELECT id,name,enabled,"lastSeenAt",harnesses FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`, [deviceId, userId])
+  const { rows: [device] } = await query.query<{ id: string; name: string; enabled: boolean; sessionOpenedAt: Date | null; sessionClosedAt: Date | null; harnesses: HarnessInfo[] | null }>(
+    `SELECT id,name,enabled,"sessionOpenedAt","sessionClosedAt",harnesses FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`, [deviceId, userId])
   if (!device) return { error: 'notFound' }
-  if (!device.enabled || !await deviceIsOnline(device)) return { error: 'unavailable' }
+  if (!device.enabled || !deviceIsOnline(device)) return { error: 'unavailable' }
   for (const info of (device.harnesses ?? []).filter(item => item.installed)) {
     const { rows: [agent] } = await query.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 ORDER BY "createdAt",id LIMIT 1', [userId, device.id, info.harness])
     if (agent) return { deviceId: device.id, name: device.name, agentId: agent.id, harness: info.harness, ...(info.defaultModelSlot ?? info.models?.[0] ? { model: info.defaultModelSlot ?? info.models?.[0] } : {}) }
@@ -51,4 +51,22 @@ export async function runPlacement(query: Query, userId: string, runId: string):
 export function movesThread(target: DispatchTarget | undefined, placement: RunPlacement | null): boolean {
   if (!target || !placement) return false
   return target === 'cloud' ? placement.kind !== 'cloud' : placement.kind !== 'device' || placement.deviceId !== target.deviceId
+}
+
+/**
+ * The Agent a run on a named computer uses (fail fast, no default): the named
+ * one, else the only installed Agent of the model's harness, else the
+ * computer's only installed Agent. Several left: agentRequired. None that fits:
+ * agentHarnessMissing.
+ */
+export function chooseDeviceAgent(agents: readonly { id: string; harness: string }[], installed: ReadonlySet<string>, agentId?: string, harness?: string):
+  { id: string } | { error: 'agentRequired' | 'agentHarnessMissing' } {
+  const usable = agents.filter(agent => installed.has(agent.harness))
+  if (agentId) {
+    const agent = usable.find(item => item.id === agentId)
+    return agent && (!harness || agent.harness === harness) ? { id: agent.id } : { error: 'agentHarnessMissing' }
+  }
+  const matching = harness ? usable.filter(agent => agent.harness === harness) : usable
+  const harnesses = new Set(matching.map(agent => agent.harness))
+  return harnesses.size === 1 ? { id: matching[0].id } : { error: harnesses.size ? 'agentRequired' : 'agentHarnessMissing' }
 }

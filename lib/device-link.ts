@@ -1,8 +1,7 @@
 import { runMessagePrompt } from './run-message-prompt'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { setTimeout as delay } from 'node:timers/promises'
-import { and, asc, eq, getTableColumns, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, or, sql, getTableColumns, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
@@ -11,8 +10,6 @@ import type { RunCommand } from '@mikka/protocol/device'
 import type { DeviceCommandKind } from '@/lib/device-management'
 import { deviceRequestCaller } from '@/lib/device-request-context'
 import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
-import { DEVICE_WORK_CHANNEL, subscribeShared } from '@/lib/db/listen'
-import { deviceGatewayEndpoint } from '@/lib/device-gateway-client'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer
@@ -20,11 +17,20 @@ import { deviceGatewayEndpoint } from '@/lib/device-gateway-client'
  */
 export const WORKSPACE_ID = '00000000-0000-4000-8000-000000000001'
 
-/** How long after its last heartbeat a device still counts as online. */
-export const DEVICE_ONLINE_WINDOW_MS = 60_000
-
 /** Run states where the daemon may still be working: not terminal. */
 const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
+
+/**
+ * A run the server took back from this device: its lease ended (a closed
+ * session, a revocation) and it is still leased or was reclaimed as lost.
+ * A daemon that reconnects within its local grace still holds such a run;
+ * the commands read hands it a `stop` (decision 2026-11-17-2215, which
+ * replaced the heartbeat's `revoked` list). Bounded to recent lease ends: a
+ * daemon past its local grace has stopped the run itself.
+ */
+export const TAKEN_BACK_WINDOW = '10 minutes'
+const takenBackSql = (alias: string) => `(${alias}."leaseExpiresAt"<=now() AND ${alias}."leaseExpiresAt">now()-interval '${TAKEN_BACK_WINDOW}'
+  AND (${alias}.status IN ('preparing','running','paused','waiting_input','finishing') OR ${alias}."stopReason"='device_lost'))`
 
 export function newDeviceToken(): string {
   return `orv_${randomBytes(32).toString('base64url')}`
@@ -76,10 +82,11 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
     const removed = await pool.query<{ id: string }>(`SELECT d.id FROM device_token_devices t JOIN devices d ON d.id=t."deviceId"
       WHERE t."tokenId"=$1 AND d."ownerId"=$2 AND d."removedAt" IS NOT NULL`, [row.id, row.userId])
     if (removed.rowCount) {
+      // Only the device's report can deliver its uninstall receipt (app/v1/devices/[deviceId]/report).
       const path = new URL(request.url).pathname.replace(/^\/mikka(?=\/)/, '')
-      const heartbeat = /^\/v1\/devices\/([^/]+)\/heartbeat$/.exec(path)
-      if (request.method !== 'POST' || !heartbeat || !removed.rows.some(device => device.id === heartbeat[1])) return null
-      removingDeviceId = heartbeat[1]
+      const report = /^\/v1\/devices\/([^/]+)\/report$/.exec(path)
+      if (request.method !== 'POST' || !report || !removed.rows.some(device => device.id === report[1])) return null
+      removingDeviceId = report[1]
     }
   }
   if (row.boundDeviceId || row.boundWorkspaceId) {
@@ -93,8 +100,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
     })
     if (!allowed) return null
   }
-  // A daemon polls every few seconds; one write a minute is enough to show
-  // that a token is still in use.
+  // One write a minute is enough to show that a token is still in use.
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
     await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(and(eq(deviceTokens.id, row.id), isNull(deviceTokens.revokedAt)))
   }
@@ -156,76 +162,29 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
 }
 
 /**
- * How often a waiting long-poll (app/v1/devices/[deviceId]/commands) checks
- * for new work and for a revoked credential. Production never changes it;
- * lib/device-revocation.db.test.ts shortens it so the revocation bound is
- * asserted without waiting the full 5 s.
- */
-export const longPollIdleCheck = { ms: 5_000 }
-
-/**
- * LISTEN for this device's work and for its credential's revocation, on one
- * shared session per process (#1212). Only with the gateway configured: then
- * every write that gives a device work calls notifyDeviceWork, which also
- * NOTIFYs here. Null without it, or when LISTEN is unavailable; the long poll
- * then keeps its longPollIdleCheck timer.
- */
-export async function deviceWorkSubscription(deviceId: string, tokenId: string) {
-  if (!deviceGatewayEndpoint(deviceId, 'push')) return null
-  return subscribeShared(pool, DEVICE_WORK_CHANNEL, [deviceId, `token:${tokenId}`]).catch(() => null)
-}
-
-export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  try { await delay(ms, undefined, { signal }) }
-  catch (error) {
-    if (!(signal?.aborted && error instanceof Error && error.name === 'AbortError')) throw error
-  }
-}
-
-/** `?wait=<seconds>`, clamped to the protocol's maximum. */
-export function waitSeconds(request: Request, max: number): number {
-  const raw = Number(new URL(request.url).searchParams.get('wait') ?? '0')
-  if (!Number.isFinite(raw) || raw <= 0) return 0
-  return Math.min(Math.floor(raw), max)
-}
-
-/**
  * Whether `deviceWork` could find anything: one statement, one round trip,
  * with the credential check inside it (a revoked or expired credential
- * throws, as any fenced query does). A long-poll asks this between full
- * reads, which stay fenced and are the only path that hands over message
+ * throws, as any fenced query does). The commands read asks this before the
+ * full read, which stays fenced and is the only path that hands over message
  * text or queued runs. Mailbox notices are not modelled: with them on, a live
  * run always counts as possible work and the full read decides.
  * With `skipDeviceCommands` (a daemon that reads them from the poll), the same
  * statement also returns the oldest pending device command outside that list:
- * only its id and kind, which the heartbeat hands over too.
+ * only its id and kind, which the report hands over too.
  */
-export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
+export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
   const uuid = (id: string) => z.uuid().safeParse(id).success
   const { readUnderDeviceAuthority } = await import('@/lib/db')
-  const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
-    AND (r."stopRequestedAt" IS NOT NULL OR ($4 AND r.status='queued')
+  const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND NOT (r.id = ANY($3::uuid[]))
+    AND (r.status = ANY($2::text[]) OR ${takenBackSql('r')})
+    AND (r."stopRequestedAt" IS NOT NULL OR ${takenBackSql('r')} OR ($4 AND r.status='queued')
       OR ($5 AND r.status IN ('preparing','running','waiting_input'))
-      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL))),
+      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL AND m.failure IS NULL
+        AND ($8 OR NOT EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=m.id AND e."userId"=m."userId" AND e.payload#>>'{threadSubmission,delivery}'='steer'))))),
     CASE WHEN $6 THEN (SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
       WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND NOT (c.id = ANY($7::uuid[])) ORDER BY c."createdAt" LIMIT 1) END)`,
-  [deviceId, [...LIVE_RUN_STATUSES], skip.filter(uuid), Boolean(options.queued), Boolean(options.mailboxNotices), Boolean(options.skipDeviceCommands), (options.skipDeviceCommands ?? []).filter(uuid)])
+  [deviceId, [...LIVE_RUN_STATUSES], skip.filter(uuid), Boolean(options.queued), Boolean(options.mailboxNotices), Boolean(options.skipDeviceCommands), (options.skipDeviceCommands ?? []).filter(uuid), Boolean(options.activeTurnSteer)])
   return { work, deviceCommand }
-}
-
-/**
- * The oldest update or restart still waiting, for a daemon too old to take
- * device commands from `deviceMayHaveWork`. Same unlocked credential snapshot:
- * an idle poll must not lock the device row, and a revoked credential returns
- * nothing before the command id is handed over.
- */
-export async function deviceUpdateNotice(deviceId: string): Promise<{ id: string; kind: DeviceCommandKind } | null> {
-  const { readUnderDeviceAuthority } = await import('@/lib/db')
-  return readUnderDeviceAuthority<{ id: string; kind: DeviceCommandKind } | null>(
-    `(SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
-      WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND c.kind = ANY($2::text[])
-      ORDER BY c."createdAt" LIMIT 1)`,
-    [deviceId, ['update', 'restart']])
 }
 
 /**
@@ -233,42 +192,62 @@ export async function deviceUpdateNotice(deviceId: string): Promise<{ id: string
  * - `commands`: a person's message to a running agent (repeats until acked)
  *   and a stop someone asked for (repeats until the run ends);
  * - `queuedRuns`: runs waiting for it to claim them (only with `queued`).
- * Runs in `skip` are left out so a long-poll can wait for new ones.
+ * Runs in `skip` (already handed over) are left out.
  */
-export async function deviceWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
-  const runs = await db
-    .select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
+export async function deviceWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
+  const rows = await db
+    .select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt, takenBack: sql<boolean>`${sql.raw(takenBackSql('"agent_runs"'))}` })
     .from(agentRuns)
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LIVE_RUN_STATUSES])))
+    .where(and(eq(agentRuns.deviceId, deviceId), or(inArray(agentRuns.status, [...LIVE_RUN_STATUSES]), sql.raw(takenBackSql('"agent_runs"')))))
   const skipped = new Set(skip)
+  // A run whose lease ended gets its stop here, whether the server took it back
+  // or a stop (policy, revocation, a person) ended the lease at the same time.
+  const takenBack = rows.filter(run => run.takenBack && !skipped.has(run.id)).map(run => ({ kind: 'stop' as const, runId: run.id }))
+  const runs = rows.filter(run => (LIVE_RUN_STATUSES as readonly string[]).includes(run.status) && !run.takenBack)
   const live = runs.filter(run => !skipped.has(run.id))
   const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
-  if (live.length === 0) return { commands: [], queuedRuns }
+  if (live.length === 0) return { commands: takenBack.slice(0, 500), queuedRuns }
   const messages = await db
-    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin })
+    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin,
+      steer: sql<boolean>`EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=${runMessages.id} AND e."userId"=${runMessages.userId} AND e.payload#>>'{threadSubmission,delivery}'='steer')` })
     .from(runMessages)
-    .where(and(isNull(runMessages.deliveredAt), inArray(runMessages.runId, live.map(run => run.id))))
+    .where(and(isNull(runMessages.deliveredAt), sql`failure IS NULL`, inArray(runMessages.runId, live.map(run => run.id))))
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
   // The runId filter above excludes mailbox messages, whose runId is null.
-  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
+  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin, steer }) => runId && (!steer || options.activeTurnSteer) ? [{ kind: steer ? 'steer' as const : 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
   const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
   const notices = options.mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
-  return { commands: [...stops, ...notices, ...inputs].slice(0, 500), queuedRuns }
+  return { commands: [...stops, ...takenBack, ...notices, ...inputs].slice(0, 500), queuedRuns }
 }
 
 /** Marks messages the agent now holds; called by the daemon's ack. */
-export async function ackCommands(deviceId: string, delivered: readonly string[]): Promise<void> {
+export async function ackCommands(deviceId: string, delivered: readonly string[], refusedSteers: readonly string[] = []): Promise<void> {
+  if (refusedSteers.length) {
+    const refused = await pool.query<{ runId: string }>(`UPDATE run_messages m SET failure='threadDeliveryUnavailable'
+      FROM agent_runs r,coordinator_events e WHERE m.id=ANY($2::uuid[]) AND m."runId"=r.id AND r."deviceId"=$1
+        AND r."userId"=m."userId" AND e.id=m.id AND e."userId"=m."userId" AND e.payload#>>'{threadSubmission,delivery}'='steer'
+        AND m."deliveredAt" IS NULL AND m.failure IS NULL RETURNING m."runId"`, [deviceId, refusedSteers])
+    const { runChanged } = await import('./live/panels')
+    for (const runId of new Set(refused.rows.map(row => row.runId))) await runChanged(pool, runId)
+  }
   if (delivered.length === 0) return
   await ackMailboxNotices(deviceId, delivered)
   const owned = await db
-    .select({ id: runMessages.id })
+    .select({ id: runMessages.id, runId: runMessages.runId, steer: sql<boolean>`EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=${runMessages.id}
+      AND e."userId"=${runMessages.userId} AND e.payload#>>'{threadSubmission,delivery}'='steer')` })
     .from(runMessages)
     .innerJoin(agentRuns, eq(agentRuns.id, runMessages.runId))
     .where(and(eq(agentRuns.deviceId, deviceId), inArray(runMessages.id, [...delivered])))
   if (owned.length === 0) return
-  await db
+  const acknowledged = await db
     .update(runMessages)
     .set({ deliveredAt: new Date() })
-    .where(and(inArray(runMessages.id, owned.map(row => row.id)), isNull(runMessages.deliveredAt)))
+    .where(and(inArray(runMessages.id, owned.map(row => row.id)), isNull(runMessages.deliveredAt),sql`failure IS NULL`)).returning({ id: runMessages.id })
+  const changed = new Set(acknowledged.map(row => row.id))
+  const steered = owned.flatMap(row => row.steer && row.runId && changed.has(row.id) ? [row.runId] : [])
+  if (steered.length) {
+    const { runChanged } = await import('./live/panels')
+    for (const runId of new Set(steered)) await runChanged(pool, runId)
+  }
 }

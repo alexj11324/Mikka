@@ -4,6 +4,7 @@ import { storageAdapter } from '@better-auth/expo/client'
 import { MobileServerStore, type MobileServer } from './server-store'
 import { CLOUD_API_URL } from './server-discovery'
 import { apiCache } from './api-cache'
+import { createConversationJournal } from './conversation-journal'
 
 /**
  * Where Mikka runs, with its base path (lib/base-path.ts on the server), e.g.
@@ -20,6 +21,10 @@ const storage = Platform.OS === 'web' ? {
   getItemAsync: async (key: string) => globalThis.localStorage?.getItem(key) ?? null,
   setItemAsync: async (key: string, value: string) => { globalThis.localStorage?.setItem(key, value) },
 } : storageAdapter(SecureStore)
+export const conversationJournal = createConversationJournal(Platform.OS === 'web' ? {
+  getItem: key => globalThis.sessionStorage?.getItem(key) ?? null,
+  setItem: (key, value) => { if (value) globalThis.sessionStorage.setItem(key, value); else globalThis.sessionStorage.removeItem(key) },
+} : storageAdapter(SecureStore))
 export const servers = new MobileServerStore(storage, defaultServer)
 export const currentAccount = servers.current
 

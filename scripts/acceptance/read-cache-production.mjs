@@ -11,6 +11,9 @@ import { ORIGIN, REPOSITORY, successfulRelease } from './project-decisions.mjs'
 import { attestReadiness, ReadinessError, triggerGuard } from './production-readiness.mjs'
 import { createReadClient, discoverReadActions, requestAllowed as readRequestAllowed } from './read-cache.mjs'
 import { DeployedTargetError, deployedTargetGuard, attestDeployedTarget, publicTargetFailure } from './deployed-target.mjs'
+import { responseCookieJar } from './response-cookie-jar.mjs'
+
+export { responseCookieJar }
 
 const environment = Object.freeze({ origin: ORIGIN, basePath: '/mikka' })
 const plan = Object.freeze({ purpose: 'production-readiness', mode: 'readonly' })
@@ -32,7 +35,7 @@ const blocked = new Set(['trigger_rejected', 'attestation_required', 'account_re
   'session_missing', 'session_identity', 'session_close_failed', 'existing_bot_missing', 'existing_task_missing',
   'existing_thread_missing', 'existing_chat_tail_missing',
   'scope_changed', 'read_access_changed', 'request_failed', 'http_refused', 'acceptance_timeout', 'action_discovery_failed',
-  'deployment_proof', 'web_deploy', 'issue_proof'])
+  'deployment_proof', 'issue_proof'])
 const failures = new Set(['request_denied', 'redirect_refused', 'response_invalid', 'list_merge_invalid', 'chat_merge_invalid', 'acceptance_failed'])
 export class ProductionReadCacheError extends Error {
   constructor(code, options) {
@@ -64,12 +67,10 @@ export function productionGuard(env, event) {
     check(env.GITHUB_REPOSITORY === REPOSITORY && event?.repository?.full_name === REPOSITORY
       && env.GITHUB_REF === 'refs/heads/main' && /^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '')
       && event.action === 'completed' && automaticRelease(run, env.GITHUB_SHA, run?.id), 'trigger_rejected')
-    return { applicationSha: run.head_sha, driverRevision: env.GITHUB_SHA, mode: 'readonly', trigger: 'workflow_run', webDeployRunId: run.id }
+    return { applicationSha: run.head_sha, driverRevision: env.GITHUB_SHA, mode: 'readonly', trigger: 'workflow_run' }
   }
   check(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === 'refs/heads/main', 'trigger_rejected')
-  const guard = triggerGuard(env, event, plan)
-  check(guard.applicationSha === guard.driverRevision, 'trigger_rejected')
-  return guard
+  return triggerGuard(env, event, plan)
 }
 
 export async function attestProductionReadCache({ env = process.env, event, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
@@ -107,14 +108,10 @@ export async function attestProductionReadCache({ env = process.env, event, fetc
     await currentMain()
     const pin = async () => check((await read(`${ORIGIN}/mikka/api/version`)).build === guard.applicationSha, 'build_mismatch')
     await pin()
-    const run = await read(`${repositoryApi}/actions/runs/${guard.webDeployRunId}`, true)
-    check(automaticRelease(run, guard.applicationSha, guard.webDeployRunId), 'web_deploy')
-    await pin()
     await currentMain()
     return { ...base, status: 'ready', metadataReadAuthorized: true, readable: true, checkedAt: new Date(now()).toISOString() }
   }
-  // The existing proof checks the public build on both sides of a successful
-  // exact-SHA Web deploy. Worker execution readiness is irrelevant to reads.
+  // The live /mikka/api/version must serve the expected build. Worker execution readiness is irrelevant to reads.
   return attestReadiness({ env, event, plan, fetchImpl, now })
 }
 
@@ -125,11 +122,10 @@ function requireAttestation(guard, attestation, now, issueNumber) {
   check(attestation?.repository === REPOSITORY && attestation.mode === 'readonly'
     && attestation.applicationSha === guard.applicationSha && attestation.driverRevision === guard.driverRevision
     && attestation.executionReady === false
-    && Number.isSafeInteger(attestation.webDeployRunId) && attestation.webDeployRunId > 0
     && Number.isFinite(age) && age >= 0 && age <= 300_000, 'attestation_required')
   if (guard.trigger === 'workflow_run') {
     check(attestation.purpose === purpose && attestation.trigger === 'workflow_run'
-      && attestation.webDeployRunId === guard.webDeployRunId && attestation.issueNumber === issueNumber, 'attestation_required')
+      && attestation.issueNumber === issueNumber, 'attestation_required')
     if (attestation.status === 'skipped') {
       check(attestation.code === 'issue_closed' && attestation.issueState === 'closed'
         && attestation.metadataReadAuthorized === false && attestation.readable === false, 'attestation_required')
@@ -205,44 +201,6 @@ const chatProof = chat => chat?.continuation && { ...chat.continuation,
   sourceIds: Object.keys(chat.sources ?? {}).slice(0, 400), artifactIds: Object.keys(chat.artifacts ?? {}).slice(0, 400) }
 const mode = value => value?.unchanged === true ? 'unchanged' : value?.delta === true || value?.after !== undefined ? 'delta' : 'snapshot'
 
-/** A fresh, memory-only jar for this run's fixed origin. Page discovery can
- * establish cookies too; dropping them can make later read actions render the page. */
-export function responseCookieJar(now) {
-  const cookies = new Map()
-  const domainMatches = (host, domain) => host === domain || host.endsWith(`.${domain}`)
-  return {
-    receive(url, headers) {
-      for (const header of headers.getSetCookie()) {
-        const parts = header.split(';').map(value => value.trim()), separator = parts[0].indexOf('=')
-        if (separator < 1) continue
-        const name = parts[0].slice(0, separator), value = parts[0].slice(separator + 1)
-        if (!/^[!#$%&'*+\-.^_\x60|~0-9A-Za-z]+$/.test(name)) continue
-        const attributes = Object.fromEntries(parts.slice(1).map(part => {
-          const at = part.indexOf('=')
-          return at < 0 ? [part.toLowerCase(), true] : [part.slice(0, at).toLowerCase(), part.slice(at + 1)]
-        }))
-        const domain = typeof attributes.domain === 'string' ? attributes.domain.replace(/^\./, '').toLowerCase() : url.hostname
-        if (!domain || !domainMatches(url.hostname, domain)) continue
-        const defaultPath = url.pathname.slice(0, url.pathname.lastIndexOf('/')) || '/'
-        const path = typeof attributes.path === 'string' && attributes.path.startsWith('/') ? attributes.path : defaultPath
-        const maxAge = /^-?\d+$/.test(attributes['max-age'] ?? '') ? Number(attributes['max-age']) : NaN
-        const expires = Number.isFinite(maxAge) ? now() + maxAge * 1000 : Date.parse(attributes.expires)
-        const key = JSON.stringify([name, domain, path])
-        if (expires <= now()) cookies.delete(key)
-        else cookies.set(key, { name, value, domain, path, expires, secure: Boolean(attributes.secure) })
-      }
-    },
-    header(url) {
-      for (const [key, cookie] of cookies) if (cookie.expires <= now()) cookies.delete(key)
-      return [...cookies.values()].filter(cookie => domainMatches(url.hostname, cookie.domain)
-        && (!cookie.secure || url.protocol === 'https:')
-        && (url.pathname === cookie.path || url.pathname.startsWith(cookie.path.endsWith('/') ? cookie.path : `${cookie.path}/`)))
-        .sort((a, b) => b.path.length - a.path.length).map(cookie => `${cookie.name}=${cookie.value}`).join('; ')
-    },
-    clear() { cookies.clear() },
-  }
-}
-
 export async function runProductionReadCache({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
   const guard = productionGuard(env, event)
   // This explicit migration mode authorizes attestation, not the historical read measurements.
@@ -254,7 +212,7 @@ export async function runProductionReadCache({ env = process.env, event, attesta
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
   const measurements = [], refs = {}, deadline = now() + 300_000
-  const report = { version: 1, issue: issueNumber, purpose, ...guard, webDeployRunId: attestation.webDeployRunId,
+  const report = { version: 1, issue: issueNumber, purpose, ...guard,
     status: 'running', startedAt: now(), normalSessionObserved: false, sessionClosed: false,
     browserCacheVerified: false, businessMutationRequests: 0, modelCalls: 0, fixturesCreated: 0, backendMaintenanceWritesMeasured: false,
     cacheMissProbe: 'discard-one-held-item-with-server-issued-proofs', reads: [] }

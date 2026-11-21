@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { webUrlSchema } from '@/lib/search/url-schema'
+import { mcpEnvironmentSchema, mcpHeadersSchema, taskMcpServerSchema } from '../../packages/protocol/src/task-mcp'
 
 export class PluginError extends Error {
   constructor(readonly code: string, readonly status = 503) { super(code) }
@@ -11,16 +12,19 @@ export const mcpAuthSchema = z.object({
   name: z.string().regex(/^(?:authorization|x-api-key|api-key|x-auth-token)$/i),
   value: z.string().min(1).max(4096).refine(value => !/[\r\n\0]/.test(value)),
 }).strict()
-export const createMcpSchema = z.object({
+const remoteMcpSchema = z.object({
   name: z.string().trim().min(1).max(80), url: webUrlSchema.refine(value => { const url = new URL(value); return !url.search && !url.hash }, 'Use the auth field for credentials'),
   transport: z.enum(['http', 'sse']).default('http'),
-  enabled: z.boolean().default(true), auth: mcpAuthSchema.optional(),
-}).strict()
+  enabled: z.boolean().default(true), auth: mcpAuthSchema.optional(), headers: mcpHeadersSchema.optional(),
+}).strict().refine(value => !(value.auth && value.headers), 'Use auth or headers, not both')
+const stdioMcpSchema = taskMcpServerSchema.options[1].omit({ name: true }).extend({ name: z.string().trim().min(1).max(80), enabled: z.boolean().default(true) })
+export const createMcpSchema = z.union([remoteMcpSchema, stdioMcpSchema])
 export const updateMcpSchema = z.object({
   id: z.uuid(), name: z.string().trim().min(1).max(80).optional(), enabled: z.boolean().optional(),
   // A URL change requires a new connection, preventing credentials following another host.
   auth: mcpAuthSchema.nullable().optional(),
-}).strict().refine(value => value.name !== undefined || value.enabled !== undefined || value.auth !== undefined)
+  headers: mcpHeadersSchema.nullable().optional(), env: mcpEnvironmentSchema.optional(),
+}).strict().refine(value => !(value.auth !== undefined && value.headers !== undefined)).refine(value => value.name !== undefined || value.enabled !== undefined || value.auth !== undefined || value.headers !== undefined || value.env !== undefined)
 export const deletePluginSchema = z.object({ id: z.uuid() }).strict()
 export const shareMcpSchema = z.object({ serverId: z.uuid(), workspaceId: z.uuid(), shared: z.boolean() }).strict()
 export const installSkillSchema = z.object({
@@ -29,8 +33,8 @@ export const installSkillSchema = z.object({
 }).strict()
 export const updateSkillSchema = z.object({ id: z.uuid(), enabled: z.boolean() }).strict()
 export type McpServerView = {
-  id: string; name: string; url: string; transport: 'http' | 'sse'; enabled: boolean;
-  revision: number; authKind: 'header' | 'none'; createdAt: string;
+  id: string; name: string; url: string; transport: 'http' | 'sse' | 'stdio'; enabled: boolean;
+  revision: number; authKind: 'header' | 'none' | 'env'; createdAt: string;
 }
 export type McpWorkspaceServerView = Omit<McpServerView, 'url'> & {
   /** A teammate receives public metadata, never the owner's private endpoint. */

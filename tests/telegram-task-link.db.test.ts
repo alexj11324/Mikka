@@ -12,17 +12,17 @@ test('Telegram /link resolves stable and historical task identity inside the cur
   const workspace = await seedWorkspace(connection, creator, [{ userId: creator, role: 'admin' }, { userId: viewer, role: 'member' }])
   // Membership in another workspace must not widen this channel's binding.
   const foreign = await seedWorkspace(connection, foreignOwner, [{ userId: foreignOwner, role: 'admin' }, { userId: viewer, role: 'member' }])
-  const current = await seedIssue(connection, creator, workspace.id)
-  const anchor = await seedIssue(connection, viewer, workspace.id)
-  const outside = await seedIssue(connection, foreignOwner, foreign.id)
+  const current = await seedIssue(connection, creator, workspace.id, { registered: true })
+  const anchor = await seedIssue(connection, viewer, workspace.id, { registered: true })
+  const outside = await seedIssue(connection, foreignOwner, foreign.id, { registered: true })
   const telegramUserId = randomUUID(), threadId = `telegram-task-link-${randomUUID()}`, botId = randomUUID()
-  await connection.query('insert into telegram_links("userId","telegramUserId") values($1,$2)', [viewer, telegramUserId])
+  await connection.query('insert into telegram_links("userId","telegramUserId","telegramUserName","linkedAt") values($1,$2,\'fixture-viewer\',\'2026-11-12T00:00:00Z\')', [viewer, telegramUserId])
   await connection.query('insert into telegram_conversations("threadId","userId","issueId") values($1,$2,$3)', [threadId, viewer, anchor])
 
   // Only the transport's already-selected Coordinator binding and translated
   // copy are fixtures. The handler, alias resolver, tenant lease and SQL ACL run.
-  const intl = await import('next-intl/server')
-  mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+  const intl = await import('@/lib/intl/i18n-server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string, values?: Record<string, unknown>) => JSON.stringify({ key, ...values }), { has: () => true }) } })
   const coordinator = await import('../lib/coordinator/coordinator-bot')
   mock.module('../lib/coordinator/coordinator-bot', { namedExports: { ...coordinator,
@@ -31,10 +31,15 @@ test('Telegram /link resolves stable and historical task identity inside the cur
       assert.equal(requestedWorkspace, null)
       return { botId, workspaceId: workspace.id }
     } } })
+  const wake = await import('../lib/coordinator/wake')
+  const direct: string[] = []
+  mock.module('../lib/coordinator/wake', { namedExports: { ...wake, coordinatorEnabled: async () => true,
+    wakeCoordinator: async (owner: string) => { direct.push(owner) } } })
+  const { coordinatorWakeTransport } = await import('../lib/coordinator/wake-after-commit')
   const { handleTelegramDirectMessage } = await import('../lib/telegram/handler')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  t.after(async () => { mock.restoreAll(); await Promise.all([connection.end(), appPool.end(), workspacePool.end()]) })
+  t.after(async () => { delete coordinatorWakeTransport.wake; mock.restoreAll(); await Promise.all([connection.end(), appPool.end(), workspacePool.end()]) })
   const identifier = async (issueId: string) => (await connection.query<{ issuedIdentifier: string }>('select "issuedIdentifier" from issues where id=$1', [issueId])).rows[0].issuedIdentifier
   const conversation = async () => (await connection.query('select * from telegram_conversations where "threadId"=$1', [threadId])).rows[0]
   const reset = () => connection.query('update telegram_conversations set "issueId"=$2 where "threadId"=$1', [threadId, anchor])
@@ -49,6 +54,56 @@ test('Telegram /link resolves stable and historical task identity inside the cur
     return JSON.parse(posts[0]) as { key: string; issue?: string; title?: string }
   }
   const canonical = await identifier(current)
+
+  await t.test('a linked message commits before the acknowledgement and a Telegram replay recovers once', async () => {
+    await connection.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4)', [botId, viewer, workspace.id, 'DM fixture'])
+    const committed: string[] = []
+    let delivered = Promise.withResolvers<void>()
+    coordinatorWakeTransport.wake = async owner => { committed.push(owner); delivered.resolve() }
+    const messages: string[] = []
+    const send = (author: string) => handleTelegramDirectMessage({ id: threadId, isDM: true,
+      post: async (text: string) => { messages.push(JSON.parse(text).key) } } as never,
+    { author: { isBot: false, isMe: false, userId: author, userName: 'Fixture' },
+      raw: { message_id: 80, chat: { type: 'private' } }, text: 'First message' } as never)
+    await send('unlinked-telegram-user')
+    assert.deepEqual(messages, ['connect'])
+    for (let attempt = 0; attempt < 2; attempt++) {
+      delivered = Promise.withResolvers<void>()
+      await send(telegramUserId)
+      const stored = await connection.query('SELECT "userId","botId","issueId",payload FROM coordinator_events WHERE "dedupeKey"=$1', [`telegram:${threadId}:80`])
+      assert.equal(stored.rowCount, 1)
+      assert.deepEqual([stored.rows[0].userId, stored.rows[0].botId, stored.rows[0].issueId], [viewer, botId, anchor])
+      assert.deepEqual(stored.rows[0].payload.telegram, { threadId, telegramUserId, messageId: 80 })
+      assert.deepEqual(direct, [])
+      await delivered.promise
+    }
+    assert.deepEqual(messages, ['connect', 'coordinatorQueued', 'coordinatorQueued'])
+    assert.deepEqual(committed, [viewer, viewer])
+  })
+
+  await t.test('configured Telegram status reads only the requested account link', async () => {
+    const { readTelegramIntegrationStatus } = await import('../lib/telegram/connection-status')
+    const keys = ['TELEGRAM_BOT_USERNAME', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET_TOKEN'] as const
+    const previous = keys.map(key => process.env[key])
+    try {
+      keys.forEach(key => { delete process.env[key] })
+      const linked = { connected: true, telegramUserName: 'fixture-viewer', linkedAt: '2026-11-12T00:00:00.000Z' }
+      assert.deepEqual(await readTelegramIntegrationStatus(viewer), { configured: false, botUsername: null, ...linked })
+      Object.assign(process.env, { TELEGRAM_BOT_USERNAME: '@fixture_bot', TELEGRAM_BOT_TOKEN: 'fixture-only-token', TELEGRAM_WEBHOOK_SECRET_TOKEN: 'fixture-only-webhook' })
+      assert.deepEqual(await readTelegramIntegrationStatus(viewer), { configured: true, botUsername: 'fixture_bot', ...linked })
+      assert.deepEqual(await readTelegramIntegrationStatus(foreignOwner), {
+        configured: true, botUsername: 'fixture_bot', connected: false, telegramUserName: null, linkedAt: null,
+      })
+      for (const key of keys) {
+        const configured = process.env[key]!
+        delete process.env[key]
+        assert.equal((await readTelegramIntegrationStatus(viewer)).configured, false, key)
+        process.env[key] = configured
+      }
+    } finally {
+      keys.forEach((key, index) => { if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index] })
+    }
+  })
 
   await t.test('canonical Workspace identifiers resolve another creator\'s ungrouped task', async () => {
     assert.match(canonical, /^W[0-9A-F]{12,32}-[1-9]\d*$/)
@@ -98,7 +153,7 @@ test('Telegram /link resolves stable and historical task identity inside the cur
   })
 
   await t.test('a uniquely resolved alias cannot grant access to a deleted task', async () => {
-    const removed = await seedIssue(connection, creator, workspace.id)
+    const removed = await seedIssue(connection, creator, workspace.id, { registered: true })
     const label = await identifier(removed)
     const content = (await connection.query('select content from issues where id=$1', [removed])).rows[0].content
     content.attrs.mikka.deletedAt = '2026-11-08T00:00:00.000Z'

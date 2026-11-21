@@ -1,11 +1,10 @@
 import { factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
-import { NextResponse } from "next/server";
+import { NextResponse } from "@/lib/server-runtime/server";
 import { auth } from "@/lib/api-auth";
 import { factoryRouteEnabled, handleFactoryRoute } from "@/lib/factory/route-http";
 import { issueMutationsEnabled } from "@/lib/coordinator/issue-tools-enabled";
 
-export const dynamic = "force-dynamic";
 /** POST /api/factory/tasks/route: non-LLM routing (BE-10b); contract in lib/factory/route-http.ts. */
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });

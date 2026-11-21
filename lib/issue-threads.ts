@@ -1,8 +1,9 @@
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { runIsActive, runSummaryView } from './issue-run-conversation'
-import type { RunChain } from './run-chain'
+import type { RunAttempt, RunChain } from './run-chain'
 import { BUILTIN_AGENT_PROFILE_ID } from './factory/agent-profile-reference'
 import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profile-mark'
+import { threadTitle } from './short-title'
 
 /**
  * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
@@ -10,6 +11,7 @@ import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profi
  * agent, output or messages, and cannot open or join it.
  */
 export interface IssueThread {
+  pauseReason?: RunAttempt['pauseReason']
   failureDetails?: CompactRunFailure | null
   id: string
   status: string
@@ -25,7 +27,7 @@ export interface IssueThread {
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
-  detail: { name: string; agentName: string; harness: string; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null; /** A custom Agent Profile that did the run; absent for Default and runs before Profiles. */ profile?: ThreadProfile | null } | null
+  detail: { name: string; agentName: string; harness: string; agentId?: string; observedModel?: string | null; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null; /** A custom Agent Profile that did the run; absent for Default and runs before Profiles. */ profile?: ThreadProfile | null } | null
   /**
    * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
    * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
@@ -47,10 +49,13 @@ export interface IssueThread {
    * dispatch), or a rerun. It is derived from the run chain, never folded separately, and
    * it is the run `latestRunId` names: what send and stop address.
    */
-  continuation: { id: string; status: string; outcome?: string | null; stopping: boolean } | null
+  continuation: { id: string; status: string; pauseReason?: RunAttempt['pauseReason']; outcome?: string | null; stopping: boolean } | null
 }
 
 export interface IssueThreadAttempt {
+  pauseReason?: RunAttempt['pauseReason']
+  /** The Factory stage this run works on, shown where the conversation reaches it (2026-11-04-2200). */
+  stage?: RunAttempt['stage']
   failureDetails?: CompactRunFailure | null
   runId: string
   /** 1-based; the root run is attempt 1. */
@@ -67,12 +72,12 @@ export type ThreadQuestion = 'waiting' | 'resuming' | null
 /** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
 export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
   if (!chain) return thread
-  const attempts = chain.attempts.map(attempt => ({ ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
+  const attempts = chain.attempts.map(attempt => ({ ...(attempt.pauseReason ? { pauseReason: attempt.pauseReason } : {}), ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), ...(attempt.stage ? { stage: attempt.stage } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
     stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt }))
   const latest = attempts.find(attempt => attempt.runId === chain.latestRunId)
   return {
     ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId, attempts, failureDetails: readCompactRunFailure(latest?.failureDetails),
-    continuation: latest && latest.runId !== thread.id ? { id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
+    continuation: latest && latest.runId !== thread.id ? { ...(latest.pauseReason ? { pauseReason: latest.pauseReason } : {}), id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
   }
 }
 
@@ -94,16 +99,16 @@ export function threadQuestionRunId(thread: Pick<IssueThread, 'attempts'>) {
  * status, send and stop follow it. An answered question whose continuation has not started
  * shows as the run it is about to continue: the same running state, nothing new.
  */
-export function threadQuestionView(thread: { id: string; status: string; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; questionWake?: IssueThread['questionWake']; continuation?: IssueThread['continuation'] }) {
+export function threadQuestionView(thread: { id: string; status: string; pauseReason?: RunAttempt['pauseReason']; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; questionWake?: IssueThread['questionWake']; continuation?: IssueThread['continuation'] }) {
   const next = thread.continuation ?? null
   // A failed wake offers Retry on this child. The committed answer stays in
   // resuming, so ordinary Send cannot replay it or create another run.
   if (next?.status === 'queued' && thread.question === 'resuming') return { question: 'resuming' as const, waiting: false, status: thread.questionWake ? 'failed' : 'running', outcome: null, runId: next.id, stopping: false }
-  const live = next ?? { id: thread.id, status: thread.status, outcome: thread.outcome ?? null, stopping: !!thread.stopping }
+  const live = next ?? { pauseReason: thread.pauseReason, id: thread.id, status: thread.status, outcome: thread.outcome ?? null, stopping: !!thread.stopping }
   if (live.status === 'queued' && thread.question === 'resuming' && thread.questionWake)
     return { question: 'resuming' as const, waiting: false, status: 'failed', outcome: null, runId: live.id, stopping: false }
   const question = runIsActive(live.status) ? null : thread.question
-  return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
+  return { ...(live.pauseReason ? { pauseReason: live.pauseReason } : {}), question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
 }
 
 /** Human acceptance resolves only its current candidate's still-waiting producer.
@@ -125,9 +130,9 @@ export function threadTime(thread: { createdAt: Date; finishedAt: Date | null },
 export const ISSUE_THREAD_LIMIT = 20
 
 export interface IssueThreadRow {
-  id: string; issueId: string | null; userId: string; status: string; prompt: string
+  id: string; issueId: string | null; userId: string; status: string; pauseReason?: RunAttempt['pauseReason']; prompt: string; title?: string | null
   report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
-  agentName: string; harness: string; ownerName?: string | null
+  agentName: string; harness: string; agentId?: string; ownerName?: string | null
   stopRequestedAt?: Date | null
   outcome?: string | null
   /** agent_runs.kind: `implement` and `plan` are the conversation; `acceptance` is a Factory check. */
@@ -141,6 +146,7 @@ export interface IssueThreadRow {
 export type IssueThreadListRow = Omit<IssueThreadRow, 'prompt' | 'report' | 'error'> & {
   name: string
   summary: string | null
+  observedModel?: string | null
 }
 
 /** Markdown syntax a prompt may open with ("# Title", "- item", "**bold**"): never part of a name. */
@@ -148,11 +154,13 @@ function plainLine(line: string) {
   return line.replace(/^(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)+/, '').replace(/(\*\*|__|`|~~)/g, '').trim()
 }
 
-/** The thread's name: the first line of what it was asked to do, as plain text. */
+/**
+ * The thread's name until it has a stored title: the first line of what it was asked to do, as plain text, held to
+ * the short-title bound (lib/short-title.ts threadTitle) so no surface shows a longer one.
+ */
 export function threadName(prompt: string, fallback: string) {
   const line = prompt.split('\n').map(part => plainLine(part.trim())).find(Boolean)
-  if (!line) return fallback
-  return Array.from(line).length > 60 ? `${Array.from(line).slice(0, 59).join('')}…` : line
+  return line ? threadTitle({ name: line }) || fallback : fallback
 }
 
 /** Only a thread's owner, while still a collaborator, reads or joins it. */
@@ -178,14 +186,14 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
       failureDetails: readCompactRunFailure(row.failureDetails),
-      id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
+      ...(row.pauseReason ? { pauseReason: row.pauseReason } : {}), id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
+        ? { name: 'prompt' in row ? row.title || threadName(row.prompt, row.agentName) : threadTitle({ name: row.name }) || row.agentName, agentName: row.agentName, harness: row.harness, ...(row.agentId ? { agentId: row.agentId } : {}), ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary, ...('observedModel' in row ? { observedModel: row.observedModel } : {}) }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
         : null,
       rootRunId: row.id, latestRunId: row.id,
-      attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
+      attempts: [{ ...(row.pauseReason ? { pauseReason: row.pauseReason } : {}), runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
       question: null, continuation: null,
     }))
 }
@@ -202,7 +210,31 @@ export function threadProfile(value: unknown): ThreadProfile | null {
 }
 
 /** A run that is part of the task's conversation: implement or plan. A read without kinds counts every run. */
-export const isConversationRun = (thread: { kind?: string }) => !thread.kind || thread.kind === 'implement' || thread.kind === 'plan'
+export const isThreadRun = (thread: { kind?: string }) => !thread.kind || thread.kind === 'implement' || thread.kind === 'plan'
+
+/** Pick from a viewer's authorized conversation heads. The mobile detail and Web root selector
+ * use the same ordering, including when an older root received the most recent continuation. */
+export function latestConversationRun(runs: readonly { runId: string; kind?: string; createdAt: Date | string }[]): string | null {
+  let latest: { runId: string; time: number } | null = null
+  for (const run of runs) {
+    if (!isThreadRun(run)) continue
+    const time = new Date(run.createdAt).getTime()
+    if (!latest || time > latest.time || (time === latest.time && run.runId > latest.runId)) latest = { runId: run.runId, time }
+  }
+  return latest?.runId ?? null
+}
+
+/** A teammate's redacted root is activity metadata. A Factory check is readable evidence.
+ * Opening either never changes where a reply goes. */
+export function taskThreadRoots<T extends Pick<IssueThread, 'id' | 'kind' | 'detail' | 'attempts' | 'latestRunId'> & { createdAt: Date | string }>(threads: readonly T[]) {
+  const readable = threads.filter(thread => thread.detail !== null).sort((a, b) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id))
+  const latestId = latestConversationRun(readable.map(thread => ({
+    runId: thread.latestRunId, kind: thread.kind,
+    createdAt: thread.attempts.find(attempt => attempt.runId === thread.latestRunId)?.createdAt ?? thread.createdAt,
+  })))
+  return { readable, reply: readable.find(thread => thread.latestRunId === latestId) ?? null }
+}
 
 /**
  * One conversation per task (decision 2026-11-09-0045): consecutive threads by the same Agent and the
@@ -210,15 +242,15 @@ export const isConversationRun = (thread: { kind?: string }) => !thread.kind || 
  * `profile` is the custom Profile's id, null for Default and runs before Profiles. Oldest first; a stretch opens at its first thread and reads as its last. A thread whose
  * detail the reader cannot see has no Agent and stands alone unless the one before is hidden too.
  */
-export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string; profile?: { id: string } | null } | null }>(threads: readonly T[]): { agent: string | null; profile: string | null; first: T; last: T; ids: string[] }[] {
-  const out: { agent: string | null; profile: string | null; first: T; last: T; ids: string[] }[] = []
+export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string; agentId?: string; profile?: { id: string } | null } | null }>(threads: readonly T[]): { agent: string | null; agentId: string | null; profile: string | null; first: T; last: T; ids: string[] }[] {
+  const out: { agent: string | null; agentId: string | null; profile: string | null; first: T; last: T; ids: string[] }[] = []
   // Only the conversation's own runs make stretches; a Factory check (review, verify) is its result card on the
   // task page (2026-11-04-2200), never a 「换 Codex」 row.
-  for (const thread of [...threads].filter(isConversationRun).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
-    const agent = thread.detail?.harness ?? null, profile = thread.detail?.profile?.id ?? null
+  for (const thread of [...threads].filter(isThreadRun).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    const agent = thread.detail?.harness ?? null, agentId = thread.detail?.agentId ?? null, profile = thread.detail?.profile?.id ?? null
     const previous = out.at(-1)
-    if (previous && previous.agent === agent && previous.profile === profile) { previous.last = thread; previous.ids.push(thread.id) }
-    else out.push({ agent, profile, first: thread, last: thread, ids: [thread.id] })
+    if (previous && previous.agent === agent && previous.agentId === agentId && previous.profile === profile) { previous.last = thread; previous.ids.push(thread.id) }
+    else out.push({ agent, agentId, profile, first: thread, last: thread, ids: [thread.id] })
   }
   return out
 }

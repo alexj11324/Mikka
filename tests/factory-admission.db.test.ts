@@ -1,3 +1,5 @@
+import { builtinGateway } from '../lib/builtin-gateway/runtime'
+import { factoryResourceWorkspace } from './helpers/factory-resource-boundary'
 import { wireKeys } from '../lib/live/wire-keys.test-support'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -42,8 +44,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
-  const { lockCliAgentPolicy, readCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
-  const { setCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-settings')
+  const { lockCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
   const { factoryStore, dispatchFactoryRun, factoryQuestions } = await import('../lib/factory/server')
   const { factoryBinding } = await import('../lib/factory/dispatch')
   const { beginFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../lib/factory/transaction')
@@ -61,9 +62,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
     finally { tx.release() }
     })
   }
+  // The workspace is the only policy source (per-Bot and per-worker layers are
+  // retired), so the fixture writes the workspace row directly.
   async function policy(f: Fixture, permission: 'allow' | 'ask' | 'deny') {
-    const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
-    await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'agent', current.revision, { permissions: { git_push: permission } })
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy)
+      VALUES ($1,'allow',jsonb_build_object('permissions',jsonb_build_object('git_push',$2::text)))
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [f.workspaceId, permission])
   }
   async function addEvent(f: Pick<Fixture, 'userId' | 'issueId' | 'deviceId'>, options: { destination?: unknown; bound?: boolean; delivered?: boolean; botId?: string } = {}) {
     const id = randomUUID()
@@ -162,23 +166,25 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'no approval card')
     })
 
-    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; workerPolicy?: unknown } = {}) {
+    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; policyCeiling?: unknown } = {}) {
       const f = await fixture(options)
       const admitted = await dispatch(f)
       const deviceB = randomUUID(), agentB = randomUUID()
-      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,harnesses,"protocolVersion",enabled,"lastSeenAt")
-        SELECT $1,"ownerId",'Admission recovery B','local',harnesses,"protocolVersion",true,now() FROM devices WHERE id=$2`, [deviceB, f.deviceId])
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,harnesses,"protocolVersion",enabled,"lastSeenAt","sessionOpenedAt")
+        SELECT $1,"ownerId",'Admission recovery B','local',harnesses,"protocolVersion",true,now(),now() FROM devices WHERE id=$2`, [deviceB, f.deviceId])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Admission recovery B')`, [agentB, f.userId, deviceB])
       const now = new Date()
-      await pool.query(`UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1`, [f.deviceId, new Date(now.getTime() - 120_000)])
+      await pool.query(`UPDATE devices SET "lastSeenAt"=$2,"sessionClosedAt"=clock_timestamp() WHERE id=$1`, [f.deviceId, new Date(now.getTime() - 120_000)])
       await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=$2,"leaseExpiresAt"=$3,"sessionId"='admission-recovery-A' WHERE id=$1`, [admitted.runId, new Date(now.getTime() - 180_000), new Date(now.getTime() - 1_000)])
       await pool.query(`INSERT INTO run_checkpoints("runId","baseCommit",patch,files,"updatedAt","userId","takenAt") VALUES($1,$2,$3,1,$4,$5,$4)`, [admitted.runId, 'a'.repeat(40), gzipSync('diff --git a/target.txt b/target.txt\n'), now, f.userId])
       const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       if (options.revoke) await pool.query(`UPDATE byos_connections SET paused=true WHERE "ownerId"=$1`, [f.userId])
       if (options.legacyEpoch) await pool.query(`UPDATE factory_attempts SET output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId])
-      if (options.workerPolicy) {
-        const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
-        await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'worker', current.revision, options.workerPolicy)
+      if (options.policyCeiling) {
+        // A frozen ceiling (provider fallback / Factory check) is the one
+        // stricter-than-live policy that survives the workspace-only model.
+        await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{policyCeiling}',$2::jsonb) WHERE id=$1`,
+          [admitted.runId, JSON.stringify(options.policyCeiling)])
       }
       return { f, admitted, deviceB, agentB, now, before }
     }
@@ -223,54 +229,32 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal(current.runId, child.id, 'the real completion consumer must adopt the re-admitted Agent')
       const { rows: handoffs } = await pool.query(`SELECT result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_handoff' AND result->'checkpoint'->>'runId'=$2`, [f.task.id, admitted.runId])
       assert.ok(handoffs.some(h => h.result.requestEpoch === f.eventId && h.result.checkpoint.files === 1))
-      const { claimExecutionRun } = await import('../lib/factory/server')
-      assert.equal((await claimExecutionRun(f.userId, deviceB, child.id, new Date(now.getTime() + 90_000).toISOString())).length, 1)
+      const { claimLocalRun } = await import('../lib/computer/claim')
+      const { guardFactoryClaim } = await import('../lib/factory/runtime')
+      const lease = new Date(now.getTime() + 90_000)
+      const result = await factoryResourceWorkspace(pool)(f.userId, f.task.id, () =>
+        claimLocalRun(pool, child.id, deviceB, lease, undefined, async tx => {
+          await guardFactoryClaim(tx, f.userId, deviceB, child.id, lease.toISOString())
+        }))
+      assert.equal(result, 'claimed')
       await reclaim(f.userId, now)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 2)
     })
 
-    await t.test('an idle gateway B receives fresh admission and its still-online queued retry stays on B', async () => {
+    await t.test('B with an open session but no recent activity receives fresh admission, and its queued retry stays on B', async () => {
       const { f, admitted, deviceB, now } = await lostAdmission()
-      const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
-      let recheckingQueued = false, queuedPresenceReads = 0
-      const server = createServer((request, response) => {
-        const device = request.url?.split('/')[3]
-        if (request.url?.endsWith('/status')) {
-          // The first queued scan misses B; its socket is back by admission's
-          // locked recheck. This exercises the inner fence as well as selection.
-          const online = device === deviceB && (!recheckingQueued || ++queuedPresenceReads > 1)
-          response.setHeader('content-type', 'application/json')
-          response.end(JSON.stringify({ online, lastSeenAt: online ? now.toISOString() : null }))
-        } else { response.writeHead(204); response.end() }
-      })
-      server.listen(0, '127.0.0.1')
-      await once(server, 'listening')
-      const address = server.address()
-      assert.ok(address && typeof address === 'object')
-      process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${address.port}`
-      process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-handoff-presence-secret'
-      try {
-        await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [deviceB, new Date(now.getTime() - 600_000)])
-        await reclaim(f.userId, now)
-        const { rows: retries } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])
-        assert.equal(retries.length, 1, 'a real gateway status must admit B despite its intentionally idle HTTP heartbeat')
-        assert.equal(retries[0].deviceId, deviceB)
-        assert.equal(retries[0].agentDefinition.repositoryAdmission.deviceId, deviceB)
-        await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [f.deviceId, now])
-        recheckingQueued = true
-        await reclaim(f.userId, now)
-        assert.ok(queuedPresenceReads >= 3, 'availability is rechecked after the queued scan and target selection')
-        const current = (await pool.query('SELECT status,"deviceId" FROM agent_runs WHERE id=$1', [retries[0].id])).rows[0]
-        assert.deepEqual(current, { status: 'queued', deviceId: deviceB }, 'a queued gateway-online B is not stranded when A returns')
-        assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 2)
-      } finally {
-        if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL
-        else process.env.DEVICE_GATEWAY_URL = previous.url
-        if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET
-        else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
-        server.closeAllConnections()
-        await new Promise<void>(resolve => server.close(() => resolve()))
-      }
+      // Presence is the device session: an old "last seen" does not matter.
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [deviceB, new Date(now.getTime() - 600_000)])
+      await reclaim(f.userId, now)
+      const { rows: retries } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])
+      assert.equal(retries.length, 1, 'an open session admits B')
+      assert.equal(retries[0].deviceId, deviceB)
+      assert.equal(retries[0].agentDefinition.repositoryAdmission.deviceId, deviceB)
+      await pool.query('UPDATE devices SET "sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1', [f.deviceId])
+      await reclaim(f.userId, now)
+      const current = (await pool.query('SELECT status,"deviceId" FROM agent_runs WHERE id=$1', [retries[0].id])).rows[0]
+      assert.deepEqual(current, { status: 'queued', deviceId: deviceB }, 'a queued B with an open session is not stranded when A returns')
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 2)
     })
 
     await t.test('an admitted queued retry losing B creates a bounded fresh receipt instead of rewriting B placement', async () => {
@@ -279,8 +263,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const first = (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])).rows[0]
       assert.ok(first, 'B retry must exist through real admission')
       assert.equal(first.status, 'queued')
-      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [deviceB, new Date(now.getTime() - 120_000)])
-      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [f.deviceId, now])
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2,"sessionClosedAt"=clock_timestamp() WHERE id=$1', [deviceB, new Date(now.getTime() - 120_000)])
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2,"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1', [f.deviceId, now])
       await Promise.all(Array.from({ length: 3 }, () => reclaim(f.userId, now)))
       const { rows: descendants } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [first.id])
       assert.equal(descendants.length, 1)
@@ -302,13 +286,16 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0].status, 'blocked')
     })
 
+    // RunPolicy shape: every permission filled in, plus the workspace allow-list.
+    const livePermissions = { install_dependency: 'allow' as const, write_outside_repo: 'ask' as const, git_push: 'allow' as const, network: 'allow' as const, computer_use: 'ask' as const }
+    const liveNetwork = ['github.com', '*.github.com', '*.githubusercontent.com']
     for (const options of [
       { label: 'owner pinned A', destination: 'selected' as const },
       { label: 'the frozen model grant was revoked', revoke: true },
       { label: 'a legacy attempt has no epoch', legacyEpoch: true },
-      { label: 'B would drop an A worker deny', workerPolicy: { permissions: { install_dependency: 'deny' } } },
-      { label: 'B would drop A read-only mode', workerPolicy: { approvalMode: 'read_only' } },
-      { label: 'B would widen A network ceiling', workerPolicy: { networkAllow: ['allowed.example.com'] } },
+      { label: 'the original run had a frozen action deny', policyCeiling: { permissions: { ...livePermissions, install_dependency: 'deny' }, networkAllow: liveNetwork } },
+      { label: 'the original run was frozen read-only', policyCeiling: { permissions: livePermissions, networkAllow: liveNetwork, readOnly: true } },
+      { label: 'the original run had a frozen network ceiling', policyCeiling: { permissions: livePermissions, networkAllow: liveNetwork, networkCeiling: ['allowed.example.com'] } },
     ]) await t.test(`admitted recovery blocks without replaying offline A when ${options.label}`, async () => {
       const { f, admitted, now } = await lostAdmission(options)
       await reclaim(f.userId, now)
@@ -604,6 +591,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     await coordinator.flush()
     // Keep immutable audit fixtures, but leave no queued execution authority.
     if (fixtures.length) await pool.query('UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",now()) WHERE "userId"=any($1::text[])', [fixtures.map(f => f.userId)])
+    await builtinGateway()?.stop()
     await pool.end()
     await workspacePool.end()
   }

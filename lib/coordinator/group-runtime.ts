@@ -40,11 +40,12 @@ export const groupRuntime: GroupRuntime = {
       const { agentProfileDispatchAvailability }=await import('@/lib/factory/agent-profile')
       return withDatabaseClient(client,async()=>{
         const executionBotId=bot.ownerId===ownerId ? bot.id : await (await import('./coordinator-bot')).chatBotId(ownerId,null,workspaceId)
-        const key=JSON.stringify([executionBotId,bot.repository])
+        const repository=await (await import('@/lib/bot-environment')).botRepository({workspaceId,environmentId:bot.environmentId,repository:bot.repository})
+        const key=JSON.stringify([executionBotId,repository])
         const cached=availability.get(key)
         if (cached) return cached
-        if (bot.repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,bot.repository)) return {available:false,reason:'repositoryNotFound'}
-        const result=await agentProfileDispatchAvailability(pool,{ownerId,workspaceId,botId:executionBotId},{location:bot.repository?undefined:'cloud',cloudPurpose:bot.repository?'task':'desktop'},{deferStaleQuota:true})
+        if (repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,repository)) return {available:false,reason:'repositoryNotFound'}
+        const result=await agentProfileDispatchAvailability(pool,{ownerId,workspaceId,botId:executionBotId},{location:repository?undefined:'cloud',cloudPurpose:repository?'task':'desktop'},{deferStaleQuota:true})
         availability.set(key,result)
         return result
       })

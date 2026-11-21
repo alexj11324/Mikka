@@ -1,18 +1,22 @@
 import tailwind from '@tailwindcss/postcss'
-import { loadBindings } from 'next/dist/build/swc/index.js'
-import webBrowserTargets from 'next/dist/shared/lib/modern-browserslist-target.js'
-import { getTargets } from 'next/dist/build/webpack/loaders/lightningcss-loader/src/utils.js'
+import { transform } from 'lightningcss'
+import { sharedCssTargets } from './css-targets.mjs'
 
-/** Use the same Tailwind and Next build-only Lightning CSS pass as the
- * existing page. Vite must not perform a second, different color conversion. */
+/** Use the same Tailwind and build-only Lightning CSS pass the application
+ * shipped with. Vite must not perform a second, different color conversion.
+ *
+ * The version is pinned so the emitted bytes stay put across installs. Tailwind
+ * expands `@apply` before this pass, so the pinned version only sees plain CSS;
+ * a Lightning CSS pass that ran first would parse a nested `@apply` differently
+ * in 1.30 and 1.32 and drop the surrounding selector. See css-targets.mjs for
+ * the targets. */
 export function sharedStylePlugins(repository, { development = false } = {}) {
   return [tailwind({ base: repository, optimize: true }), {
     postcssPlugin: 'mikka-shared-lightning-css',
     async OnceExit(root, { result }) {
-      const { css: { lightning } } = await loadBindings()
-      const transformed = lightning.transform({
+      const transformed = transform({
         filename: result.opts.from ?? 'mikka-shared.css', code: Buffer.from(root.toString()), minify: !development,
-        targets: getTargets({ key: 'mikka-desktop-shared-css', targets: webBrowserTargets }),
+        targets: sharedCssTargets,
       })
       const { default: postcss } = await import('postcss')
       root.removeAll()

@@ -11,7 +11,6 @@ import {
   readChatFile,
 } from '@/lib/chat-attachments/store'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 async function handleGET(
   request: Request,

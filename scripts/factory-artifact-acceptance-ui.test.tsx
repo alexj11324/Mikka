@@ -35,7 +35,7 @@ mock.module('swr', { defaultExport: (key: string | readonly unknown[] | null) =>
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ cache, mutate: async (key: string) => { reloaded.push(key); onRevalidate?.(key) } }) } })
 // The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
 mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en',
   useTranslations: (namespace: string) => (key: string, args?: Record<string, string | number>) => {
     const value = `${namespace}.${key}`.split('.').reduce((node, part) => node?.[part], messages)
     assert.equal(typeof value, 'string', `missing copy ${namespace}.${key}`)
@@ -50,18 +50,18 @@ mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { name
 mock.module(new URL('../hooks/use-mobile.ts', import.meta.url).href, { namedExports: { useIsMobile: () => false } })
 mock.module(new URL('../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: () => {} } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: ({ runId }: { runId: string }) => <div data-producer={runId} /> } })
-mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { getIssueThread: async () => undefined, getThreadChanges: async () => ({ state: 'none' }) } })
+mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { getIssueThread: async () => undefined, getThreadMachine: async () => null, getThreadChanges: async () => ({ state: 'none' }) } })
 // The report's diff rows use @pierre/diffs, which registers a web component on import; they draw only in a browser.
 mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.url).href, { namedExports: {
   ThreadChangesPane: () => null, ThreadChangesView: () => null, ChangesTabLabel: () => null, Counts: () => null, FileSection: () => null,
   useDiffWrap: () => ['nowrap', () => {}],
 } })
-mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { namedExports: { getArtifact: async () => undefined, getArtifactText: async () => undefined, listRunArtifacts: async () => [] } })
+mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { namedExports: { getArtifact: async () => undefined, getArtifactText: async () => undefined, listRunArtifacts: async () => [], listTaskArtifacts: async () => [] } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { listBots: async () => [] } })
 mock.module(new URL('../components/artifacts/artifact-share.tsx', import.meta.url).href, { namedExports: { ArtifactShare: () => null } })
 mock.module(new URL('../components/coordinator/coordinator-chat.tsx', import.meta.url).href, { namedExports: { CoordinatorChat: () => null } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
-mock.module('next/dynamic', { defaultExport: () => (props: Parameters<typeof ArtifactViewer>[0]) => <ArtifactViewer {...props} /> })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => (props: Parameters<typeof ArtifactViewer>[0]) => <ArtifactViewer {...props} /> })
 
 const browser = new Window({ url: 'https://mikka.example/en' })
 let container: HTMLDivElement

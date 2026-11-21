@@ -130,7 +130,7 @@ test.beforeAll(async () => {
     await workspacePool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Synthetic search\',\'team\')', [id, user])
     await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'admin\',\'active\')', [id, user, `${user}@example.invalid`])
   }
-  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Synthetic search\',$4,$5)', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
+  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Synthetic search\',$4,$5,ARRAY[\'legacy:full\']::text[])', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1998-01-01T00:00:00Z\')', [emptyArchiveId, owner, `${prefix}-empty-archive`])
@@ -403,6 +403,30 @@ test('task source isolates the selected workspace and rechecks creator membershi
   expect(outsideToken.response.status()).toBe(403)
   expect(outsideToken.body).toEqual({ error: 'searchAccessDenied' })
   expect((await snapshot()).rows).toEqual(before)
+})
+
+test('archived session preview reads a single deterministic latest turn while retaining owner-only access', async ({ request }) => {
+  const archiveId = randomUUID()
+  const [lowerId, higherId] = [randomUUID(), randomUUID()].sort()
+  const timestamp = '2026-01-01T00:00:00Z'
+  await pool.query('INSERT INTO agent_sessions(id,"userId",title,"updatedAt") VALUES($1,$2,$3,now())',
+    [archiveId, owner, `${prefix}-one-preview`])
+  for (const [id, prompt, completion] of [
+    [lowerId, 'Earlier saved prompt', 'Earlier saved reply'],
+    [higherId, 'Later saved prompt', 'Later saved reply'],
+  ]) {
+    await pool.query('INSERT INTO agent_turns(id,"sessionId","userId",prompt,completion,status,"attemptId","createdAt") VALUES($1,$2,$3,$4,$5,\'complete\',$6,$7)',
+      [id, archiveId, owner, prompt, completion, randomUUID(), timestamp])
+  }
+  const url = 'http://127.0.0.1:3210/mikka/api/agent/sessions?new=1'
+  const response = await request.get(url, { headers: { cookie } })
+  expect(response.status()).toBe(200)
+  const body = await response.json()
+  expect(body.sessions.find((session: { id: string }) => session.id === archiveId)?.preview).toBe('Later saved reply')
+  const outsiderResponse = await request.get(url, { headers: { cookie: foreignCookie } })
+  expect(outsiderResponse.status()).toBe(200)
+  const outsiderBody = await outsiderResponse.json()
+  expect(outsiderBody.sessions.some((session: { id: string }) => session.id === archiveId)).toBe(false)
 })
 
 test('continuations recheck group leave, workspace suspension and real auth revocation', async ({ request }) => {

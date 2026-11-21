@@ -15,6 +15,12 @@ export type InboxPhoneHeader = boolean
 export type InboxPageProps = {
   threads: Thread[]
   issues: Issue[]
+  /** Task and run projections are read by the workspace shell. */
+  taskRead?: { loading: boolean; retry?: () => Promise<unknown> }
+  workspaceId?: string
+  ownerId?: string
+  /** All pending actions and suggestions in the authorized workspace, across pages. */
+  pendingCount?: number
   /** Opens a task, where its review or acceptance is handled. */
   onOpenIssue: (id: string) => void
   /** 连接应用, for someone with no app connected. */

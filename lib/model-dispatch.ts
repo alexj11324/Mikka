@@ -8,9 +8,6 @@ import type { SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import { cloudReady } from './rule-dispatch'
 import { credentialStates, dispatchOrder, orderCandidates, selectedOrderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
-import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from './model-routing'
-import { routeModelCandidates, type ModelRoutingContext } from './model-routing-server'
-import type { invokeDecision } from './coordinator/decide'
 
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
@@ -29,8 +26,8 @@ import type { invokeDecision } from './coordinator/decide'
 /** Why nothing runs: the list's reasons, or the model the thread named (decision 2026-11-02-1400). */
 export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable' | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable'
 export type ModelDispatch =
-  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string; routing?: ModelRoutingSnapshot; quotaCheckPending?: true }
-  | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean; routing?: ModelRoutingSnapshot; quotaCheckPending?: true }
+  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string; quotaCheckPending?: true }
+  | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean; quotaCheckPending?: true }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard>; skipped?: SkippedEntry[] }
 
 /**
@@ -39,7 +36,10 @@ export type ModelDispatch =
  * is refused before anything is queued. Null when it is listed, or when nothing was named (the list's first runnable entry).
  */
 export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { harness: OrderEntry['harness']; model?: string } | null): Promise<{ error: 'modelNotAllowed'; asked: { harness: OrderEntry['harness']; model?: string }; allowed: { harness: OrderEntry['harness']; model: string }[] } | null> {
-  if (!asked) return null
+  // The Agent alone is not a model: with nothing on its list, dispatch's own card says what to add.
+  if (!asked?.model) return null
+  // Any catalogue model may run on Mikka 额度 (decision 2026-11-15-2000).
+  if (asked.model && (await import('./model-catalog')).isCatalogId(asked.model)) return null
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const { entries } = await readOrder(pool, scope)
   if (entries.some(entry => entry.harness === asked.harness && (!asked.model || entry.model === asked.model))) return null
@@ -47,7 +47,7 @@ export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { h
 }
 
 export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: {
-  cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota
+  cloudPurpose?: import('./cloud-template-models').CloudModelPurpose; refreshQuota?: RefreshOrderQuota
   /** Host-only placement constraint: the Agent is already chosen, but its model still follows preferences. */
   harness?: OrderEntry['harness']
   /** Host-only continuation fence: a task never cycles through failed entries again. */
@@ -65,8 +65,6 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   /** The cloud already failed to start this run: a server or a computer only. */
   withoutCloud?: boolean
   /** Actual task dispatch only. Catalogue/settings/availability reads omit it. */
-  routing?: ModelRoutingContext
-  decision?: typeof invokeDecision
 } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   if (!dependencies.skipCatalogueRefresh) await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
@@ -89,79 +87,35 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const order = { ...stored, entries: dispatchOrder(stored.entries, stored.preferredHarness).filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
   if (exact && (!allowedAgent(exact) || (explicit && (explicit.harness !== exact.harness || explicit.model !== exact.model)) || !candidates.some(candidate => entryKey(candidate) === entryKey(exact)))) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[exact.harness], model: exact.model }) }
-  const canRoute = Boolean(dependencies.routing && stored.autoModelRouting && !asked?.model && !exact)
-  // Naming an Agent alone has always permitted its first reported model when
-  // its list is empty. Routing must not turn that explicit request into noModels.
-  if (canRoute && asked && !asked.model && !order.entries.length) {
-    const fallback = candidates.find(candidate => allowedAgent(candidate) && candidate.model === agentModel)
-    if (fallback) order.entries.push({ id: `thread:${fallback.harness}:${fallback.model}`, harness: fallback.harness, model: fallback.model, source: fallback.source })
-  }
-  const picked = exact ?? (explicit && !canRoute ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
+  const picked = exact ?? (explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
     ?? candidates.filter(candidate => allowedAgent(candidate) && candidate.harness === explicit.harness && candidate.model === explicit.model)
       .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined)
-  const named = explicit && !canRoute ? { agent: HARNESS_NAMES[explicit.harness], model: explicit.model } : null
+  // A catalogue model (`vendor/model`) no connected credential offers runs on
+  // Mikka 额度 through the model gateway (decision 2026-11-15-2000); the run's
+  // key, if one lists it, is still chosen at queue time.
+  const credits = explicit && !picked && !exact && (await import('./model-catalog')).isCatalogId(explicit.model)
+    ? { id: `credits:${explicit.harness}:${explicit.model}`, harness: explicit.harness, model: explicit.model, source: { kind: 'credits' as const } } : undefined
+  const chosen = picked ?? credits
+  const named = explicit ? { agent: HARNESS_NAMES[explicit.harness], model: explicit.model } : null
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
-  if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
-  const entries = picked ? [picked] : order.entries
+  if (named && !chosen) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
+  const entries = chosen ? [chosen] : order.entries
   const deferStaleQuota = dependencies.deferStaleQuota === true && dependencies.probeQuota === false
-    && dependencies.bindSubscription === false && dependencies.skipCatalogueRefresh === true && !dependencies.routing
+    && dependencies.bindSubscription === false && dependencies.skipCatalogueRefresh === true
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota, ...(deferStaleQuota ? { deferStaleQuota: true } : {}) })
   const devices = places !== 'cloudOnly' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
-  const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
+  const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' }, dependencies.cloudPurpose)
   // Deferring a positive old allowance does not establish failure or permit a
   // later source. Keep the dispatch spending fence through that pending entry.
   const pendingAt = deferStaleQuota ? entries.findIndex(entry => states.get(entry.id)?.quotaCheckPending) : -1
   const plannedEntries = pendingAt < 0 ? entries : entries.slice(0, pendingAt + 1)
-  let plan = planDispatch({ entries: picked ? [] : plannedEntries, explicit: picked ?? null, location: order.location, devices, credential: entry => {
+  let plan = planDispatch({ entries: chosen ? [] : plannedEntries, explicit: chosen ?? null, location: order.location, devices, credential: entry => {
     const state = states.get(entry.id)
     return deferStaleQuota && state?.quotaCheckPending ? { usable: true } : state?.credential ?? { usable: false, reason: 'missing' }
   }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
-  let routing: ModelRoutingSnapshot | undefined
-  if (canRoute && dependencies.routing) {
-    const harnesses = [...new Set(entries.map(entry => entry.harness))]
-    const readiness = new Map(await Promise.all(harnesses.map(async harness => [harness,
-      harness === entries[0]?.harness ? ready : places !== 'local' && await cloudReady(pool, { ...scope, harness })] as const)))
-    const { rows: agents } = devices.length ? await pool.query<{ id: string; deviceId: string; harness: string }>(
-      'SELECT id,"deviceId",harness FROM agents WHERE "userId"=$1 AND "deviceId"=ANY($2::uuid[]) AND ($3::text IS NULL OR id::text=$3)',
-      [scope.ownerId, devices.map(device => device.id), dependencies.agentId ?? null]) : { rows: [] }
-    // Preserve planDispatch's spending fence: an unchecked subscription is
-    // not evidence that a later paid key should be used instead.
-    const checkingAt = entries.findIndex(entry => {
-      const credential = states.get(entry.id)?.credential
-      return credential && !credential.usable && credential.reason === 'checking'
-    })
-    const eligibleEntries = checkingAt < 0 ? entries : entries.slice(0, checkingAt)
-    const runnable = eligibleEntries.flatMap(entry => {
-      const candidate = planDispatch({ entries: [], explicit: entry, location: order.location,
-        devices: devices.filter(device => agents.some(agent => agent.deviceId === device.id && agent.harness === entry.harness)),
-        credential: item => states.get(item.id)?.credential ?? { usable: false, reason: 'missing' },
-        cloudReady: readiness.get(entry.harness) ?? false, cloudModel: item => cloudModelSupport(item, dependencies.cloudPurpose) })
-      return candidate.kind === 'none' ? [] : [{ entry, plan: candidate }]
-    })
-    // An inherited preferred Agent is tried first; the other Agent's list is
-    // a fallback. Explicit/profile harness constraints were applied above.
-    const preferred = runnable.filter(item => item.entry.harness === stored.preferredHarness)
-    const routingPool = preferred.length ? preferred : runnable
-    const selected = await routeModelCandidates(pool, scope, routingPool.map(item => item.entry), dependencies.routing, stored.autoModelRouting, dependencies.decision)
-    if (selected) {
-      const position = Number(selected.id.slice('candidate:'.length))
-      // A failed/uncertain judge preserves the existing placement preference
-      // too: a later model on a server still precedes one on a laptop.
-      const orderedEntry = plan.kind === 'none' ? undefined : plan.entry
-      const ordered = orderedEntry && runnable.find(item => entryKey(item.entry) === entryKey(orderedEntry))
-      const keepOrdered = selected.snapshot.reason !== 'difficulty_fit' && selected.snapshot.reason !== 'escalated'
-        && !(dependencies.routing.escalate && dependencies.routing.previous)
-        && ordered && (!dependencies.routing.effort || supportedModelEfforts(ordered.entry.model, ordered.entry.harness).includes(dependencies.routing.effort))
-      const chosen = keepOrdered ? ordered : routingPool[position]
-      if (chosen) {
-        plan = chosen.plan
-        routing = { ...selected.snapshot, model: plan.model, harness: chosen.entry.harness, tier: modelTier(plan.model) }
-      }
-    }
-  }
   if (plan.kind === 'none' && deviceId && devices[0] && plan.reason === 'noDevice') {
     // What the named computer lacks for the model that would otherwise run (the thread's own model when it named one).
-    const wanted = picked ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
+    const wanted = chosen ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
     const installed = devices[0].harnesses.some(item => item.harness === wanted.harness && item.installed)
     const detail = wanted.source.kind === 'subscription' ? devices[0].harnesses.find(info => info.harness === wanted.harness)?.subscriptionPreflight : undefined
     return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, detail }) }
@@ -176,16 +130,16 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   }
   if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured' && plan.reason !== 'checking' && plan.reason !== 'cloudModelsUnknown' && plan.reason !== 'cloudModelNotReported') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
-    return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && picked ? { device: whyNoDevice(devices, picked) } : {}) }) }
+    return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && chosen ? { device: whyNoDevice(devices, chosen) } : {}) }) }
   }
   if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
   const quotaCheckPending = deferStaleQuota && states.get(plan.entry.id)?.quotaCheckPending ? { quotaCheckPending: true as const } : {}
-  if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key', ...(routing ? { routing } : {}), ...quotaCheckPending }
+  if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key', ...quotaCheckPending }
   const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 AND ($4::text IS NULL OR id::text=$4) ORDER BY "createdAt",id LIMIT 1',
     [scope.ownerId, plan.deviceId, plan.entry.harness, dependencies.agentId ?? null])
   if (!agent) return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice') }
   const subscriptionBindingId = dependencies.bindSubscription !== false && plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
-  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(routing ? { routing } : {}), ...quotaCheckPending }
+  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...quotaCheckPending }
 }
 
 /**

@@ -11,10 +11,26 @@ export const executionBotName = sql<string>`coalesce(
   case when ${agents.name} ~ '^(claude_code|codex|mock) [0-9a-f-]{36}$' then 'Coordinator' else ${agents.name} end
 )`
 
+/**
+ * A Bot that dispatched a run and still exists, even though it carried no owner for the two
+ * tiers above to match. That is a Bot kept for an admin to take over: `lib/account/delete.ts:421`
+ * leaves the row with `ownerId` null and archives it (「待接管」), and its threads used to read
+ * "Coordinator" — an attribution to a Bot that never dispatched them.
+ *
+ * Read from the identity frozen at dispatch (lib/execution-identity.ts:96) rather than from
+ * `agent_runs.botId`, which `agent_runs_bot_fk` (ON DELETE SET NULL) clears when a Bot is deleted.
+ * A deleted Bot leaves no row here, so its runs still fall through to `executionBotName`'s
+ * Coordinator, which is the Bot that ran them. A run with no recorded identity has nothing to
+ * read, so it too falls through: a gap in the record, not a claim about who dispatched it.
+ */
+const dispatchedBotName = sql<string | null>`(select ${shownName} from bots b
+  where b.id::text = ${agentRuns.agentDefinition}->'executionIdentity'->>'botId')`
+
 /** The dispatching Bot wins; hidden execution identities never become conversation names. */
 export const runBotName = sql<string>`coalesce(
   (select ${shownName} from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}),
   (select ${shownName} from bots b where b.id=${agentRuns.botId} and b."ownerId"=${agentRuns.userId}),
+  ${dispatchedBotName},
   ${executionBotName}
 )`
 

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync } from 'node:fs'
+import { copyFileSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, unlinkSync } from 'node:fs'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped, splitUtilities, utilityBase } from './ui-policy.mjs'
+import { entityContracts } from './entity-ui-policy.mjs'
 
 const policy = JSON.parse(readFileSync(new URL('../ui-policy.json', import.meta.url), 'utf8'))
 const prefix = `import { cn } from '@/lib/utils'; import { Button } from '@/components/ui/button';`
@@ -72,6 +73,12 @@ for (const [label, source, rule] of [
   ['uppercase tracked label', '<Button className="uppercase tracking-wider" />', 'typography/uppercase-label'],
   ['sparkle icon', 'import { Sparkles } from "lucide-react";', 'icons/no-sparkle'],
 ]) test(label, () => has(`${prefix}\n${source}`, rule))
+
+test('a priority is Mikka\'s own staircase, never equal-height tally bars (R-71a)', () => {
+  const rules = text => auditSource('components/icons/index.tsx', text, policy).map(item => item.rule)
+  assert.ok(rules('import { Tally1Icon } from "@hugeicons/core-free-icons";').includes('icons/priority-bars'))
+  assert.deepEqual(rules("export const SignalLow = own(['M7 19V13'])"), [])
+})
 
 test('a thread icon never borrows a task\'s circle (R-52)', () => {
   const rules = text => auditSource('components/workspace/thread-status-icon.tsx', text, policy).map(item => item.rule)
@@ -250,6 +257,27 @@ test('lint permits imported components but fails handwritten business UI without
   }
   try {
     execFileSync('git', ['init', '--quiet'], { cwd })
+    // The repository lint also checks the canonical business graph. Give this
+    // isolated UI fixture its required exports and native routes.
+    const contractExports = new Map()
+    for (const contract of entityContracts) {
+      for (const [file, ...names] of [contract.detail, ...(contract.adapters ?? []), ...contract.sources].filter(Boolean)) {
+        const exports = contractExports.get(file) ?? new Set()
+        for (const name of names) exports.add(name)
+        contractExports.set(file, exports)
+      }
+    }
+    const contractSources = new Map([...contractExports].map(([file, names]) => [file, [...names].map(name => `export function ${name}() { return null }`).join('\n')]))
+    for (const contract of entityContracts) {
+      for (const [file, name, module] of contract.routes ?? []) contractSources.set(file, module
+        ? `export { ${name} as default } from '${module}'`
+        : `export default function ${name}() { return null }`)
+    }
+    contractSources.set('components/coordinator/conversation-panels.tsx', "import { TaskDetail } from '../workspace/task-detail'; export function EmbeddedTaskDetail() { return <TaskDetail /> }")
+    for (const [file, source] of contractSources) {
+      mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true })
+      writeFileSync(path.join(cwd, file), source)
+    }
     for (const library of policy.componentRoots) {
       mkdirSync(path.join(cwd, library), { recursive: true })
       writeFileSync(path.join(cwd, library, 'example.tsx'), !['components/ui/', 'components/reui/'].includes(library) ? 'import { Button } from "@/components/ui/button"; export const LibraryComponent = ({ onSave }) => <Button onClick={onSave}>Save</Button>' : 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
@@ -257,11 +285,28 @@ test('lint permits imported components but fails handwritten business UI without
     writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
     writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))
     writeFileSync(path.join(cwd, filename), original)
+    // Lint reads the repository-wide entity contracts even for this one-screen fixture.
+    const contractFiles = new Set(entityContracts.flatMap(contract => [
+      ...(contract.routes ?? []), ...(contract.detail ? [contract.detail] : []), ...(contract.adapters ?? []), ...contract.sources,
+    ].map(([file]) => file)))
+    // Exclude only those fixture dependencies from the sample's source counts.
+    const ignoredPaths = Array.from(contractFiles, file => '/' + file.replace(/[?*[\\]/g, '\\$&'))
+    writeFileSync(path.join(cwd, '.git/info/exclude'), ignoredPaths.join('\n') + '\n')
+    for (const file of contractFiles) {
+      mkdirSync(path.join(cwd, path.dirname(file)), { recursive: true })
+      copyFileSync(new URL('../' + file, import.meta.url), path.join(cwd, file))
+    }
     const composed = await execute()
-    assert.equal(composed.status, 0)
+    assert.equal(composed.status, 0, JSON.stringify(composed.report.diagnostics))
     assert.equal(composed.report.errors, 0)
     assert.equal(composed.report.libraryFiles, policy.componentRoots.length)
     assert.equal(composed.report.files, 1)
+    const commandFile = 'app/actions/issues.ts'
+    writeFileSync(path.join(cwd, commandFile), contractSources.get(commandFile).replace('export function saveIssue', 'function saveIssue'))
+    const missingCommand = await execute()
+    assert.equal(missingCommand.status, 1)
+    assert.ok(missingCommand.report.diagnostics.some(d => d.file === commandFile && d.rule === 'entity/contract-export'))
+    writeFileSync(path.join(cwd, commandFile), contractSources.get(commandFile))
     writeFileSync(path.join(cwd, filename), 'export const Example = () => <button>Save</button>')
     const handwritten = await execute()
     assert.equal(handwritten.status, 1)
@@ -282,6 +327,14 @@ test('lint permits imported components but fails handwritten business UI without
     const rawBlock = await execute()
     assert.equal(rawBlock.status, 1)
     assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
+
+    for (const file of contractFiles) unlinkSync(path.join(cwd, file))
+    const missingContracts = await execute()
+    assert.equal(missingContracts.status, 1)
+    const missingFiles = missingContracts.report.diagnostics
+      .filter(d => d.rule === 'entity/contract-export' || d.rule === 'entity/native-detail-route')
+      .map(d => d.file)
+    assert.deepEqual(new Set(missingFiles), contractFiles)
   } finally {
     console.error(`Retained UI policy fixture directory: ${cwd}`)
   }
@@ -369,13 +422,12 @@ test('one container per surface: a frame inside a frame is a double border', () 
 })
 
 test('Chinese takes the system font, as in Comma: no self-hosted text font draws CJK and --font-sans names none before the system stack', async () => {
-  const { createRequire } = await import('node:module')
-  const fontkit = createRequire(import.meta.url)('next/dist/compiled/@next/font/dist/fontkit').default
+  const { create } = await import('fontkit')
   const root = new URL('../', import.meta.url)
   const cjk = cp => (cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFE30 && cp <= 0xFE4F) || (cp >= 0xFF00 && cp <= 0xFFEF)
   // A Latin font that drew CJK would win over the system font for those characters (mixed punctuation, wrong glyphs).
   for (const file of ['InterVariable.woff2', 'InterVariable-Italic.woff2']) {
-    const font = (fontkit.default ?? fontkit)(readFileSync(new URL(`app/fonts/${file}`, root)))
+    const font = create(readFileSync(new URL(`app/fonts/${file}`, root)))
     assert.deepEqual(font.characterSet.filter(cjk).map(cp => `U+${cp.toString(16).toUpperCase()}`), [], file)
   }
   const stack = readFileSync(new URL('app/globals.css', root), 'utf8').match(/--font-sans:\s*([^;]+);/)[1].split(',').map(family => family.trim().replaceAll('"', ''))

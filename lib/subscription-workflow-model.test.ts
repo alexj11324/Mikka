@@ -4,14 +4,14 @@ import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import { cacheableInstructions, withCacheBreakpoints } from './prompt-cache'
-import type { ModelCallTiming, SubscriptionTransportLog } from './model-call-timing'
-const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
+import type { ModelCallTiming, SubscriptionTransportLog, SubscriptionServiceTierLog } from './model-call-timing'
+const calls: {selection: unknown; signal: unknown; requestPolicy: unknown; options?: unknown}[] = []
 let resolverObservation: (() => Promise<void>) | undefined
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
 mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
-  resolveSubscriptionWorkflowModel: async (selection: unknown, signal: unknown) => {
+  resolveSubscriptionWorkflowModel: async (selection: unknown, signal: unknown, requestPolicy: unknown) => {
     await resolverObservation?.()
-    const call = {selection, signal, options: undefined as unknown}; calls.push(call)
+    const call = {selection, signal, requestPolicy, options: undefined as unknown}; calls.push(call)
     return {specificationVersion: 'v4', doStream: async (options: unknown) => {call.options = options; return {...streamResult, stream: new ReadableStream({start(controller) {controller.close()}})}}}
   },
 }})
@@ -134,10 +134,16 @@ test('only the supported Codex CPA route moves the prepared tail; Claude, API-ke
   }
 })
 
-type TimingLog = ModelCallTiming | SubscriptionTransportLog
-function timingPair(logs: TimingLog[]) {
-  assert.equal(logs.length, 2, 'one model timing and one transport diagnostic per completed mock stream')
-  assert.deepEqual(logs.map(line => line.msg).sort(), ['model_call_timing', 'subscription_transport_timing'])
+type TimingLog = ModelCallTiming | SubscriptionTransportLog | SubscriptionServiceTierLog
+function timingPair(logs: TimingLog[], observeServiceTier = false) {
+  assert.equal(logs.length, observeServiceTier ? 3 : 2, 'the Codex service-tier observation is a separate optional diagnostic')
+  assert.deepEqual(logs.map(line => line.msg).sort(), observeServiceTier
+    ? ['model_call_timing', 'subscription_service_tier', 'subscription_transport_timing']
+    : ['model_call_timing', 'subscription_transport_timing'])
+  if (observeServiceTier) assert.deepEqual(logs.find(line => line.msg === 'subscription_service_tier'), {
+    msg: 'subscription_service_tier', workflowRunId: null, stepId: null, attempt: null,
+    workerOrdinal: null, outcome: null, state: 'unavailable',
+  }, 'a mock provider without a worker does not establish the requested or actual service tier')
   const model = logs.find((line): line is ModelCallTiming => line.msg === 'model_call_timing')
   const transport = logs.find((line): line is SubscriptionTransportLog => line.msg === 'subscription_transport_timing')
   assert.ok(model)
@@ -165,7 +171,7 @@ test('timing reports whether the actual Codex layout was applied without changin
   for (const sample of cases) {
     const result = await new SubscriptionWorkflowModel(sample.frozen).doStream({ prompt: sample.prompt })
     await result.stream.pipeTo(new WritableStream())
-    const line = timingPair(logs.splice(0))
+    const line = timingPair(logs.splice(0), sample.frozen.route === 'codex_cpa')
     assert.equal(line.codexLayoutApplied, sample.expected, 'actual_codex_layout_not_reported')
     assert.equal(Object.hasOwn(line, 'codexLayoutApplied'), sample.expected !== undefined)
   }
@@ -194,4 +200,33 @@ test('setup quota workers are observed before the provider request without loggi
     assert.equal(JSON.stringify(logs).includes(selection.bindingId), false)
     assert.equal(JSON.stringify(logs).includes(selection.ownerId), false)
   } finally { resolverObservation = undefined }
+})
+
+test('the internal Coordinator policy reaches only Codex resolution, preserving model, effort, tools and cancellation', async () => {
+  const requestPolicy = { codexServiceTier: 'priority' as const }
+  const options: StreamOptions = { prompt: [{ role: 'user', content: [{ type: 'text', text: 'fixture' }] }],
+    abortSignal: new AbortController().signal,
+    providerOptions: { mikkaSubscription: { reasoning_effort: 'medium' } },
+    tools: [{ type: 'function', name: 'fixture_tool', inputSchema: { type: 'object', properties: {} } }],
+  }
+  for (const frozen of [
+    { ...selection, route: 'codex_cpa' as const },
+    selection,
+    { ...selection, route: 'openai_siwc' as const },
+    { type: 'api_key' as const, keyId: id(5), ownerId: selection.ownerId, consumerId: selection.consumerId, workspaceId: selection.workspaceId, modelId: 'claude-haiku-5-5' },
+  ]) {
+    const before = calls.length
+    const model = new SubscriptionWorkflowModel(frozen, requestPolicy)
+    const restored = SubscriptionWorkflowModel[WORKFLOW_DESERIALIZE](SubscriptionWorkflowModel[WORKFLOW_SERIALIZE](model))
+    const result = await restored.doStream(options)
+    await result.stream.pipeTo(new WritableStream())
+    assert.equal(calls.length, before + 1)
+    const call = calls.at(-1)!
+    assert.deepEqual(call.selection, frozen)
+    assert.deepEqual(call.requestPolicy, frozen.type === 'subscription' && frozen.route === 'codex_cpa' ? requestPolicy : undefined)
+    const forwarded = call.options as StreamOptions
+    assert.equal(forwarded.abortSignal, options.abortSignal)
+    assert.equal(forwarded.tools, options.tools)
+    assert.equal(forwarded.providerOptions, options.providerOptions)
+  }
 })

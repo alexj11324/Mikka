@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from '@/lib/server-runtime/server'
 import { PluginError } from '../../../../lib/plugins/contracts'
 
-// The generic connect flow: any store toolkit with Composio-managed auth can
-// be connected per person; anything else is refused before Composio is asked.
+// The generic connect flow starts links for managed OAuth and provider-supported DCR;
+// anything outside the store is refused before Composio is asked.
 const authorized: { user: string; toolkit: string }[] = []
-const store = new Set(['gmail', 'hubspot', 'googlesheets'])
+const store = new Set(['gmail', 'hubspot', 'googlesheets', 'dcr_provider'])
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
-mock.module('next/server', { namedExports: { NextRequest, NextResponse, after: () => {} } })
+mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest, NextResponse, after: () => {} } })
 stub('../../../../lib/request-log.ts', { noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('../../../../lib/api-auth.ts', { auth: { api: { getSession: async () => ({ user: { id: 'synthetic-user' } }) } } })
 stub('../../../../lib/auth.ts', { authBaseURL: 'https://example.test' })
@@ -29,13 +29,13 @@ const connect = (body: unknown, origin = 'https://example.test') => new Request(
 
 test('any store toolkit starts a per-person Composio connect link', async () => {
   authorized.length = 0
-  for (const toolkit of ['hubspot', 'googlesheets']) {
+  for (const toolkit of ['hubspot', 'googlesheets', 'dcr_provider']) {
     const response = await POST(connect({ toolkit, returnTo: '/plugins' }) as never)
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { redirectUrl: 'https://connect.composio.dev/link_1' })
     assert.match(response.headers.get('set-cookie') ?? '', /mikka_composio_flow=/)
   }
-  assert.deepEqual(authorized, [{ user: 'synthetic-user', toolkit: 'hubspot' }, { user: 'synthetic-user', toolkit: 'googlesheets' }])
+  assert.deepEqual(authorized, [{ user: 'synthetic-user', toolkit: 'hubspot' }, { user: 'synthetic-user', toolkit: 'googlesheets' }, { user: 'synthetic-user', toolkit: 'dcr_provider' }])
 })
 
 test('a toolkit outside the store, a malformed slug or a cross-origin request never reaches Composio', async () => {

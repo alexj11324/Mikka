@@ -6,11 +6,11 @@ import { mock, test } from 'node:test'
 import { RUN_DECISION_CATALOGUE } from './mcp-tool'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { createApiHandler } from '../../apps/api/src/application'
-import * as apiServer from '../../apps/api/compat/server'
+import * as apiServer from '../../lib/server-runtime/server'
 import { ownLiveRuntime } from '../../tests/support/live-runtime'
 
 test('decision HTTP routes and worker MCP persist through real token authorization', { skip: !dbUrl }, async t => {
-  mock.module('next/server', { namedExports: apiServer })
+  mock.module('@/lib/server-runtime/server', { namedExports: apiServer })
   const live = await ownLiveRuntime(t)
   mock.module('@/lib/auth', { namedExports: {
     MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } },
@@ -19,7 +19,7 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   const connection = new Pool({ connectionString: dbUrl, max: 2 })
   const { pool } = await import('@/lib/db')
   const { workspacePool } = await import('@/lib/workspace-db')
-  const { createPersonalAccessToken } = await import('@/lib/tokens/store')
+  const { createLegacyPersonalAccessToken } = await import('@/lib/tokens/store')
   const { issueRunToken } = await import('@/lib/mcp/worker')
   const route = await import('../../app/api/projects/[projectId]/decisions/route')
   const marking = await import('../../app/api/projects/[projectId]/decisions/from-message/route')
@@ -40,8 +40,8 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   ])
   const originalMessageAt = new Date('2026-01-01T00:00:00Z')
   await connection.query('update coordinator_messages set "createdAt"=$2 where id=$1', [messageId, originalMessageAt])
-  const token = await createPersonalAccessToken(owner, workspace.id, { name: 'Project decisions HTTP test' })
-  const otherToken = await createPersonalAccessToken(other, foreign.id, { name: 'Foreign project decisions HTTP test' })
+  const token = await createLegacyPersonalAccessToken(owner, workspace.id, { name: 'Project decisions HTTP test' })
+  const otherToken = await createLegacyPersonalAccessToken(other, foreign.id, { name: 'Foreign project decisions HTTP test' })
   const agentId = await seedAgent(connection, owner)
   const runId = await seedRun(connection, { userId: owner, agentId, issueId, status: 'running' })
   const runToken = await issueRunToken({ id: runId, userId: owner })

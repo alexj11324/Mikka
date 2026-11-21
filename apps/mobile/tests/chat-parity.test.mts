@@ -93,4 +93,7 @@ test('the title menu lists the bot\'s open tasks, waiting ones first, a few of t
   assert.deepEqual(menuTasks([task('b', 'done')], 'b1').map(item => item.id), ['b'])
   assert.deepEqual(menuTasks(null, 'b1'), [])
   assert.deepEqual(menuTasks(tasks, null), [])
+  const wasDispatched = { ...tasks[0], dispatchedBy: 'earlier-bot' }
+  assert.deepEqual(menuTasks([wasDispatched], 'earlier-bot').map(item => item.id), [wasDispatched.id])
+  assert.deepEqual(menuTasks([wasDispatched], 'other-bot'), [])
 })

@@ -17,7 +17,7 @@ export class ComputerError extends Error {
 }
 type Actor = { userId: string; workspaceId: string }
 type Bot = { id: string; name: string; ownerId: string; workspaceId: string }
-type Machine = { workspaceId: string; ownerId: string; sandboxId: string | null; operationId: string; state: string; runtimeReady: boolean }
+type Machine = { workspaceId: string; ownerId: string; sandboxId: string | null; operationId: string; state: string; errorCode: string | null; runtimeReady: boolean }
 type Desktop = { botId: string; ownerId: string; display: number; epoch: number; control: string; controlledBy: string | null; controlUntil: Date | null; lastAction: unknown }
 
 /** Serialize machine allocation and control transitions across server instances. */
@@ -115,26 +115,35 @@ export class ComputerStore {
     return rows[0]
   }
   async state(actor: Actor, botId: string): Promise<ComputerState> {
-    await this.bot(actor, botId)
-    const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",m."provisionLeaseUntil",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
-    const row = rows[0]
-    if (!row) {
-      const machine = (await this.pool.query('SELECT state,"provisionLeaseUntil" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
-      return { machine: machine?.state === 'waking' ? 'waking' : 'sleeping', control: 'idle',
-        live: computerLiveState(actor.workspaceId, machine?.state === 'waking' ? [machine.provisionLeaseUntil] : []) }
+    const { rows: [row] } = await this.pool.query(`SELECT m.state AS machine, m."sandboxId", m."provisionLeaseUntil",
+      d.control, d."controlledBy", d."controlUntil", d."lastAction"
+      FROM bots b
+      LEFT JOIN cloud_machines m ON m."workspaceId" = b."workspaceId" AND m."ownerId" = b."ownerId"
+      LEFT JOIN bot_desktops d ON d."botId" = b.id AND d."workspaceId" = m."workspaceId" AND d."ownerId" = m."ownerId"
+      WHERE b.id = $1 AND b."workspaceId" = $2 AND b."ownerId" = $3`, [botId, actor.workspaceId, actor.userId])
+    if (!row) throw new ComputerError(404, 'Computer not found')
+    const provisionDeadline = row.machine === 'waking' ? row.provisionLeaseUntil : null
+    const provisionExpired = (now: number) => provisionDeadline != null && new Date(provisionDeadline).getTime() <= now
+    let machine = row.machine
+    if (row.control === null) {
+      const now = Date.now()
+      const abandonedProvision = provisionExpired(now)
+      return { machine: abandonedProvision ? 'error' : machine === 'waking' ? 'waking' : 'sleeping', control: 'idle',
+        live: computerLiveState(actor.workspaceId, abandonedProvision ? [] : [provisionDeadline], now) }
     }
-    const deadlines: (Date | null | undefined)[] = row.machine === 'waking' ? [row.provisionLeaseUntil] : []
-    if (row.sandboxId && row.machine !== 'error' && row.machine !== 'waking') {
-      row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
+    const deadlines: (Date | null | undefined)[] = []
+    if (row.sandboxId && machine !== 'error' && machine !== 'waking') {
+      machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
     }
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
     const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt",
-      LEAST(v."expiresAt",v."seenAt"+interval '10 seconds',r."leaseExpiresAt") AS "visibleUntil"
+      LEAST(v."expiresAt",r."leaseExpiresAt") AS "visibleUntil"
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
-        AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds' AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
+        AND v."expiresAt">now() AND v."seenAt"<>'-infinity'::timestamptz AND r."stopRequestedAt" IS NULL
+        AND EXISTS (SELECT 1 FROM devices d WHERE d.id=r."deviceId" AND (d."sessionOpenedAt" IS NOT NULL AND (d."sessionClosedAt" IS NULL OR d."sessionClosedAt" < d."sessionOpenedAt"))) AND r."leaseExpiresAt">now()
         AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
     const call = review?.call
     const pendingApproval: ComputerState['pendingApproval'] = call && (call.name === 'click' || call.name === 'type_text' || call.name === 'get_desktop_state' || call.name === 'press_key' || call.name === 'scroll')
@@ -147,8 +156,11 @@ export class ComputerStore {
           expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     if (held) deadlines.push(row.controlUntil)
     if (pendingApproval) deadlines.push(review.visibleUntil)
-    return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
-      live: computerLiveState(actor.workspaceId, deadlines),
+    const now = Date.now()
+    if (provisionExpired(now)) machine = 'error'
+    else if (provisionDeadline != null) deadlines.push(provisionDeadline)
+    return { machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
+      live: computerLiveState(actor.workspaceId, deadlines, now),
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
   }
   private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {

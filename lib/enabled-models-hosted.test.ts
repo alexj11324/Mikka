@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
-import { COORDINATOR_MODEL } from './coordinator/model'
-let kind = 'self-hosted', targetReads = 0
+let kind = 'hosted'
 mock.module(new URL('./default-model.ts', import.meta.url).href, { namedExports: {
-  defaultModelTarget: async () => { targetReads++; return { kind, serviceUrl: 'https://cloud.example.invalid' } },
+  defaultModelTarget: async () => kind === 'none' ? null : { kind },
 } })
 
 import type { BotSubscriptionChoice } from './bot-model-choice'
 import type { UsableApiKey } from './model-api-keys'
-import { HOSTED_CHOICE } from './bot-model-menu-view'
+import { creditsOptionId } from './bot-model-menu-view'
+import { SELF_HOSTED_DEFAULT_CATALOG_ID } from './model-gateway/config'
+
+/** A Mikka 额度 pick (decision 2026-11-15-1900). */
+const CREDITS_MODEL = 'deepseek/deepseek-v4-pro'
+const CREDITS = creditsOptionId(CREDITS_MODEL)
 
 type Fallback = { kind: 'api_key'; keyId: string; model: string } | { kind: 'subscription'; bindingId: string; model: string } | null
 let fallback: Fallback = null
@@ -76,39 +80,25 @@ function fixture(ownerId = 'alice', flags: (boolean | Error)[] = [true]) {
 const choose = (f: ReturnType<typeof fixture>, preference: Parameters<typeof resolveBotModelChoice>[4] = {}, keys: UsableApiKey[] = []) =>
   resolveBotModelChoice(f.query as never, f.settings, f.scope, '10000000-0000-4000-8000-000000000005', preference, { keys })
 
-test('hosted settings expose the actual default target when cloud supersedes a configured local provider', async () => {
-  const names = ['MIKKA_EDITION', 'MIKKA_DEFAULT_MODEL_BASE_URL', 'MIKKA_DEFAULT_MODEL_API_KEY', 'MIKKA_DEFAULT_MODEL_ID']
-  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
+test('hosted settings list the models offered by the configured LiteLLM source', async () => {
+  const { readEnabledModels } = await import('./enabled-models')
+  const query = { query: async (sql: string) => ({ rows: sql.includes('FROM "user"') ? [{ enabled: true }] : [] }) } as unknown as Pool
+  const scope = { ownerId: 'fixture-owner', workspaceId: '10000000-0000-4000-8000-000000000001' }
+  process.env.MIKKA_EDITION = 'community'
   try {
-    Object.assign(process.env, { MIKKA_EDITION: 'community', MIKKA_DEFAULT_MODEL_BASE_URL: 'https://provider.example.invalid/v1',
-      MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-fixture-only', MIKKA_DEFAULT_MODEL_ID: 'local-configured-model' })
-    const { readEnabledModels } = await import('./enabled-models')
-    const query = { query: async (sql: string) => ({ rows: sql.includes('FROM "user"') ? [{ enabled: true }] : [] }) } as unknown as Pool
-    const scope = { ownerId: 'fixture-owner', workspaceId: '10000000-0000-4000-8000-000000000001' }
-    const model = async () => (await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models[0].id
-    assert.equal(await model(), 'local-configured-model')
-    kind = 'cloud'
-    assert.equal(await model(), COORDINATOR_MODEL, 'the inactive local provider must not be shown as the cloud model')
-    assert.equal(targetReads, 2)
-    process.env.MIKKA_EDITION = 'cloud'
-    assert.equal(await model(), COORDINATOR_MODEL)
-    assert.equal(targetReads, 2, 'cloud edition does not read a self-hosted binding')
-  } finally {
-    for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
-  }
+    assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models.map(model => model.id), [SELF_HOSTED_DEFAULT_CATALOG_ID])
+    kind = 'none'
+    assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models, [])
+  } finally { kind = 'hosted'; process.env.MIKKA_EDITION = 'cloud' }
 })
 
-for (const source of ['selected', 'shared', 'default', 'pooled'] as const) test(`a valid ${source} subscription does not query unrelated hosted policy`, async () => {
+for (const source of ['selected', 'default'] as const) test(`a valid ${source} subscription does not query unrelated hosted policy`, async () => {
   const f = fixture('alice', [new Error('the unrelated hosted read must not run')])
-  const selected = source === 'shared' ? { ...binding, ownerId: 'bob' } : binding
-  if (source === 'selected') f.state.selected = selected
-  else if (source === 'shared') f.state.shared = selected
-  else if (source === 'default') f.state.own = [selected]
-  else f.state.pooled = [selected]
-  const explicit = source === 'selected' || source === 'shared'
+  if (source === 'selected') f.state.selected = binding
+  else f.state.own = [binding]
+  const explicit = source === 'selected'
   const result = await choose(f, explicit ? { selected: binding.bindingId } : {})
-  assert.deepEqual(result, { kind: 'subscription', binding: selected, chosen: explicit,
-    ...(source === 'shared' || source === 'pooled' ? { sharedOwnerId: selected.ownerId } : {}) })
+  assert.deepEqual(result, { kind: 'subscription', binding, chosen: explicit })
   assert.equal(f.calls.filter(call => call === 'hosted').length, 0)
 })
 
@@ -122,10 +112,11 @@ test('a valid explicit API key does not query hosted policy', async () => {
 test('explicit hosted choice reads once before subscriptions and each new choice reads fresh policy', async () => {
   const f = fixture('alice', [true, false])
   f.state.own = [binding]
-  assert.deepEqual(await choose(f, { selected: HOSTED_CHOICE }), { kind: 'hosted', chosen: true })
+  assert.deepEqual(await choose(f, { selected: CREDITS }), { kind: 'hosted', model: CREDITS_MODEL, chosen: true })
   assert.deepEqual(f.calls, ['hosted'])
   f.state.own = []
-  await assert.rejects(choose(f, { selected: HOSTED_CHOICE }), { code: 'executionModelUnknown' })
+  // The source is off and nothing else can run: no model, so the chat asks for one.
+  assert.deepEqual(await choose(f, { selected: CREDITS }), { kind: 'none', chosen: false, fallback: 'preference' })
   assert.equal(f.calls.filter(call => call === 'hosted').length, 2, 'false is reused by both consumers; no cross-call cache')
   assert.equal(f.calls[1], 'hosted', 'the explicit choice still checks policy before reading subscriptions')
 })
@@ -133,15 +124,15 @@ test('explicit hosted choice reads once before subscriptions and each new choice
 test('disabled explicit hosted choice keeps an available subscription fallback', async () => {
   const f = fixture('alice', [false])
   f.state.own = [binding]
-  assert.deepEqual(await choose(f, { selected: HOSTED_CHOICE }), {
+  assert.deepEqual(await choose(f, { selected: CREDITS }), {
     kind: 'subscription', binding, chosen: false, fallback: 'preference',
   })
   assert.equal(f.calls[0], 'hosted')
   assert.equal(f.calls.filter(call => call === 'hosted').length, 1)
 })
 
-for (const kind of ['subscription', 'api_key'] as const) test(`disabled implicit hosted choice keeps the configured ${kind} fallback`, async () => {
-  const f = fixture('alice', [false])
+for (const kind of ['subscription', 'api_key'] as const) test(`no choice takes the ${kind} 优先使用的模型 names, without reading hosted policy`, async () => {
+  const f = fixture('alice', [new Error('no Mikka 额度 is involved')])
   if (kind === 'subscription') {
     fallback = { kind, bindingId: binding.bindingId, model: binding.modelId }
     f.state.selected = binding
@@ -149,27 +140,42 @@ for (const kind of ['subscription', 'api_key'] as const) test(`disabled implicit
   assert.deepEqual(await choose(f, {}, [key]), kind === 'subscription'
     ? { kind: 'subscription', binding, chosen: false, fallback: 'preference' }
     : { kind: 'apiKey', key, model: 'gpt-6-luna', chosen: false, fallback: 'preference' })
-  assert.equal(f.calls.filter(call => call === 'hosted').length, 1)
+  assert.equal(f.calls.filter(call => call === 'hosted').length, 0)
   assert.equal(fallbackReads, 1)
 })
 
-test('actual hosted policy failure propagates without fallback and the next invocation can recover', async () => {
+test('no choice and nothing to fill in is no model, never a silent Mikka 额度 default', async () => {
+  const f = fixture('alice', [new Error('no Mikka 额度 is involved')])
+  assert.deepEqual(await choose(f), { kind: 'none', chosen: false })
+  assert.equal(f.calls.filter(call => call === 'hosted').length, 0)
+  process.env.MIKKA_EDITION = 'community'
+  const configured = kind
+  try {
+    // A self-hosted server offers only its administrator's model: with nothing to choose, a chat uses it.
+    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'hosted', model: SELF_HOSTED_DEFAULT_CATALOG_ID, chosen: false })
+    // A server with no model of its own still has no model to run.
+    kind = 'none'
+    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'none', chosen: false })
+  } finally { process.env.MIKKA_EDITION = 'cloud'; kind = configured }
+})
+
+test('actual hosted policy failure on a Mikka 额度 pick propagates and the next invocation can recover', async () => {
   const failure = new Error('synthetic hosted policy read failure')
   const f = fixture('alice', [failure, true])
-  await assert.rejects(choose(f), error => error === failure)
+  await assert.rejects(choose(f, { selected: CREDITS }), error => error === failure)
   assert.equal(fallbackReads, 0)
-  assert.deepEqual(await choose(f), { kind: 'hosted', chosen: false })
+  assert.deepEqual(await choose(f, { selected: CREDITS }), { kind: 'hosted', model: CREDITS_MODEL, chosen: true })
   assert.equal(f.calls.filter(call => call === 'hosted').length, 2)
 })
 
-test('concurrent owners do not share hosted policy and community defaults still respect disabled hosted', async () => {
+test('concurrent owners do not share hosted policy and community servers still respect a disabled source', async () => {
   const alice = fixture('alice', [true]), bob = fixture('bob', [false])
-  const results = await Promise.allSettled([choose(alice), choose(bob)])
-  assert.equal(results[0].status, 'fulfilled')
-  assert.equal(results[1].status, 'rejected')
+  const [onAlice, onBob] = await Promise.all([choose(alice, { selected: CREDITS }), choose(bob, { selected: CREDITS })])
+  assert.equal(onAlice.kind, 'hosted')
+  assert.equal(onBob.kind, 'none')
   assert.equal(alice.calls.filter(call => call === 'hosted').length, 1)
   assert.equal(bob.calls.filter(call => call === 'hosted').length, 1)
   process.env.MIKKA_EDITION = 'community'
-  try { await assert.rejects(choose(fixture('alice', [false])), { code: 'executionModelUnknown' }) }
+  try { assert.equal((await choose(fixture('alice', [false]), { selected: CREDITS })).kind, 'none') }
   finally { process.env.MIKKA_EDITION = 'cloud' }
 })

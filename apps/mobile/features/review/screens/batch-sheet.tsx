@@ -5,7 +5,6 @@ import { NavBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
 import { tap } from '@/lib/haptics'
 import { colors, LIST_INSET } from '@/lib/theme'
-import { useBatch } from '../model/batch-store'
 import { useReview } from '../components/use-review'
 import { removeComment, toggleCheck } from '../model/review'
 
@@ -16,8 +15,7 @@ import { removeComment, toggleCheck } from '../model/review'
 export function BatchSheet() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const [batch, setBatch] = useBatch(id)
-  const checks = useReview(id).checks
+  const { batch, setBatch, checks } = useReview(id)
   return (
     <>
       <NavBar sheet fade={false} title="待发送" right={{ icon: 'checkmark', label: '完成', web: <Check size={20} color={colors.ink} />, onPress: () => router.back() }} />

@@ -187,6 +187,18 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await updateIssue(owner, { issueId: id, title: 'Later user request' }, actor, `later-${randomUUID()}`)
     assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'Updated title', status: 'doing' }, actor, updateCall), changed)
     assert.equal((await pool.query('select title from issues where id=$1', [id])).rows[0].title, 'Later user request')
+    const { collectIssueEffects } = await import('../lib/issue-effects')
+    const effects: Parameters<typeof collectIssueEffects>[0] = []
+    const completed = await collectIssueEffects(effects, () => updateIssue(owner, { issueId: id, status: 'done' }, actor))
+    assert.ok('id' in completed)
+    const statusEvents = await pool.query('SELECT kind,"botId" FROM coordinator_events WHERE "userId"=$1 AND "issueId"=$2 AND kind=$3', [owner, id, 'issue_done'])
+    assert.deepEqual(statusEvents.rows, [{ kind: 'issue_done', botId: coordinator }])
+    assert.deepEqual(effects.filter(effect => effect.kind === 'wake'), [], 'the committed Coordinator event already wakes its owner')
+    // Pre-existing tool receipts may still have a pending wake from an earlier deployment.
+    await pool.query('UPDATE issue_tool_calls SET effects=$3::jsonb WHERE "userId"=$1 AND "toolCallId"=$2', [owner, updateCall, JSON.stringify([{ kind: 'wake', userId: owner }])])
+    assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'Updated title', status: 'doing' }, actor, updateCall), changed)
+    const replayedWake = await pool.query('SELECT effects FROM issue_tool_calls WHERE "userId"=$1 AND "toolCallId"=$2', [owner, updateCall])
+    assert.deepEqual(replayedWake.rows, [{ effects: [] }], 'the existing receipt replays and clears its wake')
     assert.deepEqual(await updateIssue(stranger, { issueId: id, title: 'Unauthorized' }, actor, `foreign-${randomUUID()}`), { error: 'issueNotFound' })
     assert.ok('id' in await createIssue(stranger, { title: 'Separate owner' }, actor, callId), 'same tool call id is scoped to owner')
     // MCP writes name the Coordinator by its old system actor; the registered tools write as its bot row.

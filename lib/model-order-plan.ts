@@ -22,7 +22,15 @@ import type { CloudModelState } from './cloud-template-models'
 export type OrderHarness = 'claude_code' | 'codex'
 export type RunLocation = 'cloud' | 'local'
 
-export type EntrySource = { kind: 'subscription'; connectionId: string } | { kind: 'api_key'; keyId: string }
+/** `credits`: a catalogue model (`vendor/model`) run on Mikka 额度 through the model
+ * gateway (decision 2026-11-15-2000). It is never a candidate in 优先使用的模型; a
+ * thread gets it only when its chat chose it or someone named it. */
+/** A credential the person connected: what 优先使用的模型 and the candidates list. */
+export type CredentialSource = { kind: 'subscription'; connectionId: string } | { kind: 'api_key'; keyId: string }
+export type EntrySource = CredentialSource | { kind: 'credits' }
+
+/** The credential an entry names: a subscription connection, an API key, or Mikka 额度. */
+export const sourceId = (source: EntrySource): string => source.kind === 'subscription' ? source.connectionId : source.kind === 'api_key' ? source.keyId : 'credits'
 
 export interface OrderEntry {
   id: string
@@ -30,6 +38,8 @@ export interface OrderEntry {
   model: string
   source: EntrySource
 }
+/** An entry of 优先使用的模型 as stored: always a connected credential, never Mikka 额度. */
+export type StoredEntry = OrderEntry & { source: CredentialSource }
 
 /** Why a credential cannot run now; `resetsAt` when it comes back on its own. */
 export type CredentialState =
@@ -48,7 +58,7 @@ export interface PoolDevice {
   activeRuns: number
   /** When it joined (ms): the earlier goes first on a tie. */
   joinedAt: number
-  /** Last heartbeat; server reads normalize it to ms for the settings view. */
+  /** Last time the device was heard from (shown as "last seen"); server reads normalize it to ms. */
   lastSeenAt?: Date | string | number | null
   harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionModelCatalogue' | 'subscriptionPreflight'>[]
 }
@@ -221,7 +231,7 @@ export const DEFAULT_ORDER_PREFERENCE: readonly { harness: OrderHarness; words: 
   { harness: 'claude_code', words: ['opus'] },
 ]
 
-export interface OrderCandidate { harness: OrderHarness; model: string; name: string; source: EntrySource }
+export interface OrderCandidate { harness: OrderHarness; model: string; name: string; source: CredentialSource }
 
 /** A catalogue may include historical releases. Only untouched defaults collapse
  * those releases; the complete catalogue remains available for manual choices.
@@ -243,7 +253,7 @@ export function latestDefaultCandidates<T extends OrderCandidate>(candidates: re
   for (const candidate of candidates) {
     const current = release(candidate.model)
     if (!current) continue
-    const source = candidate.source.kind === 'subscription' ? candidate.source.connectionId : candidate.source.keyId
+    const source = sourceId(candidate.source)
     const key = `${candidate.harness}\u0000${candidate.source.kind}\u0000${source}\u0000${current.family}`
     families.set(candidate, key)
     const previous = selected.get(key)
@@ -298,7 +308,7 @@ export function defaultOrderByAgent(all: readonly OrderCandidate[], preferred: O
 
 /** The model and credential, whatever the Agent. */
 export const offerKey = (entry: Pick<OrderEntry, 'model' | 'source'>) =>
-  `${entry.model}\u0000${entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId}`
+  `${entry.model}\u0000${sourceId(entry.source)}`
 
 /** Which Agents can run each model and credential (a DeepSeek or Kimi key: both). */
 export function agentsByOffer(candidates: readonly Pick<OrderCandidate, 'harness' | 'model' | 'source'>[]): Map<string, OrderHarness[]> {
@@ -319,7 +329,7 @@ export function onPreferredAgent<T extends Pick<OrderCandidate, 'harness' | 'mod
 
 /** The same Agent, model and credential: one entry. */
 export const entryKey = (entry: Pick<OrderEntry, 'harness' | 'model' | 'source'>) =>
-  `${entry.harness}\u0000${entry.model}\u0000${entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId}`
+  `${entry.harness}\u0000${entry.model}\u0000${sourceId(entry.source)}`
 
 /**
  * The order dispatch tries with no Agent named (decision 2026-11-05-0400): the 优先使用的 Agent's own list first,

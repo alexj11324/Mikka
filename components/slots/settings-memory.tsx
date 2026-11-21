@@ -1,20 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
-import { Pencil, Trash2 } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Pencil, Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { USER_FACT_KINDS, type UserFactKind } from '@/lib/profile/kinds'
-import { FieldError } from '@/components/ui/field'
 import { useMemorySettings, type MemoryFact as Fact } from '@/hooks/settings/use-memory-settings'
 
 /** 记忆 (R-73): the person's facts as a Markdown-style summary, one heading per kind; each fact can be corrected or deleted. */
 export function MemorySettings() {
   const t = useTranslations('Settings.memory')
-  const { data, error, failed, setEnabled, correct, remove } = useMemorySettings()
+  const common = useTranslations('Common')
+  const { data, error, failed, reload, setEnabled, correct, remove, review } = useMemorySettings()
   const [editing, setEditing] = useState<{ id: string; subject: string } | null>(null)
 
   async function save() {
@@ -32,8 +32,25 @@ export function MemorySettings() {
         <Switch aria-label={t('learn')} checked={data?.enabled ?? true} disabled={!data} onCheckedChange={enabled => { void setEnabled(enabled) }} />
       </SettingRow>
     </SettingsSection>
-    {(error || failed) && <FieldError className="px-1">{t('error')}</FieldError>}
-    {data && !groups.length && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
+    {(error || failed) && <SettingsSaveError message={t('error')} retryLabel={common('retry')} onRetry={() => { void reload() }} />}
+    {/*
+     * 待确认: every fact Mikka learns is written as `pending` and never reaches `facts`
+     * until someone approves it, so without this list the person could neither see what
+     * Mikka believes nor let any of it take effect.
+     */}
+    {data && data.pending.length > 0 && <SettingsSection id="memory-pending" title={t('pendingTitle')} description={t('pendingHint')}>
+      {data.pending.map((fact: Fact) => <div key={fact.id} className="flex min-h-12 items-center gap-2 px-5 py-2 text-sm">
+        <span className="min-w-0 flex-1">
+          {fact.subject}
+          <span className="ms-2 text-muted-foreground">{t(`kinds.${fact.kind as UserFactKind}`)}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-0.5">
+          <Button variant="secondary" size="sm" onClick={() => { void review(fact.id, 'approve') }}>{t('approve')}</Button>
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => { void review(fact.id, 'reject') }}>{t('reject')}</Button>
+        </span>
+      </div>)}
+    </SettingsSection>}
+    {data && !groups.length && data.pending.length === 0 && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
     {/* Each kind is a section card like every other settings group; a fact is a row whose 28px actions show on hover or focus (always on touch). */}
     {groups.map(group => <SettingsSection key={group.kind} id={`memory-${group.kind}`} title={t(`kinds.${group.kind as UserFactKind}`)}>
       {group.facts.map((fact: Fact) => <div key={fact.id} className="group/fact flex min-h-12 items-center gap-2 px-5 py-2 text-sm">

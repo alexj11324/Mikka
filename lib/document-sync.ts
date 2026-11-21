@@ -49,6 +49,16 @@ export class DocumentSync {
     this.snapshot = next
     this.listeners.forEach(listener => listener())
   }
+  /** A failed save leaves callbacks attached to the same local Yjs version for the existing retry. */
+  afterAcknowledged = (saved: () => void) => {
+    const target = this.version
+    if (target <= this.acknowledged) { saved(); return }
+    const stop = this.subscribe(() => {
+      if (this.acknowledged < target) return
+      stop()
+      saved()
+    })
+  }
   async exchange(id = this.id) {
     if (!id) return
     if (this.flight) return this.flight

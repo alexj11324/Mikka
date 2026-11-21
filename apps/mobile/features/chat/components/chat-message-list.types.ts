@@ -11,6 +11,8 @@ export type ChatListHandle = { toLatest: (animated?: boolean) => void }
 
 export type ChatListProps<T> = {
   data: T[]
+  /** State outside the transcript that changes a visible row without changing its identity. */
+  extraData?: unknown
   keyOf: (item: T) => string
   renderItem: (item: T, index: number) => ReactElement | null
   /** Above the first message: the spinner or button for older messages. */

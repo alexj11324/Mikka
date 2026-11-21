@@ -1,15 +1,15 @@
-// Real PostgreSQL regression coverage for the claim/heartbeat control plane.
+// Real PostgreSQL regression coverage for the claim and use-time Secret checks
+// (decision 2026-11-17-2215: no renewal; every use re-reads the live run).
 // No provider calls, real credentials, HTTP proxy or test authentication bypasses.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import type { PoolClient } from 'pg'
 import type { DeviceCaller } from '../lib/device-link'
 import type { SecretHttpPolicy } from '../lib/secrets/delivery'
 import type { ProjectExecutionSnapshot } from '../lib/project-resources/contracts'
 import { dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
-test('protected task Secret claims and renewals against PostgreSQL', { skip: !dbUrl }, async t => {
+test('protected task Secret claims and use-time checks against PostgreSQL', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   const env = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
@@ -25,7 +25,7 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
   const { sealSecret, userE2bKeyAad } = await import('../lib/secrets/crypto')
   const { hashDeviceToken } = await import('../lib/device-link')
   const { issueEgressCapability, openEgressCapability } = await import('../lib/secrets/egress-capability')
-  const { renewTaskSecretAccess } = await import('../lib/secrets/task-renewal')
+  const { egressBindingActive } = await import('../lib/secrets/egress-binding')
   const { authorizedClaimResponse } = await import('../lib/run-claim-response')
   const { CodedError } = await import('@mikka/protocol/coded-error')
   t.after(async () => {
@@ -34,7 +34,6 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   const http: SecretHttpPolicy = { origin: 'https://api.example.com', header: 'authorization', prefix: 'Bearer ', rules: [{ method: 'GET', path: '/v1/items', match: 'exact' }] }
-  const endpoint = (runId: string) => `https://mikka.example/v1/runs/${runId}/secret-egress`
 
   const fixture = async (options: { kind?: 'local' | 'cloud'; status?: string; personalScope?: boolean; legacy?: boolean; environment?: boolean; personalOverride?: boolean } = {}) => {
     const owner = await seedUser(pool, 'secret-access')
@@ -47,7 +46,7 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     const saved = options.personalScope
       ? await personal.createUserSecret(owner, { name, kind: 'secret', value, delivery: { mode: 'protected', http } }, {})
       : await store.createWorkspaceSecret(owner, ws.id, { name, kind: 'secret', value, delivery: { mode: 'protected', http } })
-    await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,$3,$4)', [deviceId, owner, 'secret-access-device', kind])
+    await pool.query('insert into devices (id,"ownerId",name,kind,"sessionOpenedAt") values ($1,$2,$3,$4,now())', [deviceId, owner, 'secret-access-device', kind])
     await pool.query('insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,$6)', [tokenId, owner, hashDeviceToken('dt_' + randomBytes(24).toString('hex')), kind === 'cloud' ? deviceId : null, kind === 'cloud' ? workspaceId : null, lease])
     const repositoryKey = 'v2/github.com/acme/secret-fixture'
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl") values ($1,$2,$3,$4,$5)', [repoId, deviceId, owner, options.environment ? repositoryKey : `/tmp/${repoId}`, 'https://github.com/acme/secret-fixture.git'])
@@ -77,6 +76,7 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
       const projectId = randomUUID()
       await pool.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
         values($1,$2,$3,'Secret access Project','','','planned','none','','','','','[]',1)`, [projectId, owner, ws.id])
+      await (await import('../lib/resource-access/projects')).registerProjectAccess(owner, projectId, ws.id)
       await seedProjectTasks(pool, projectId, [issueId])
       await resources.saveProjectResources(owner, { workspaceId: ws.id, projectId, revision: 1,
         repositories: [{ repositoryKey, baseBranch: null, environmentId: environment.id, isPrimary: true }], environmentIds: [environment.id], defaultEnvironmentId: environment.id })
@@ -97,407 +97,66 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     const binding = { ownerId: owner, workspaceId, repository: 'acme/secret-fixture', runId, deviceId, deviceTokenId: tokenId, attempt: 1 }
     const grantInput = { ...binding, name, secretId: secret.id!, revision: secret.revision, secret: value, http, leaseExpiresAt: lease }
     const grant = issueEgressCapability(grantInput, now.getTime(), env)
-    const input = { caller, deviceId, runs: [{ runId, secretCapabilities: [grant.capability] }], leases: { [runId]: lease.toISOString() }, endpoint }
-    const renew = (overrides: Partial<Parameters<typeof renewTaskSecretAccess>[0]> = {}, at = new Date(now.getTime() + 5),
-      clock: () => number = () => at.getTime()) => renewTaskSecretAccess({ ...input, ...overrides }, at, env, clock)
-    const report = (capability: string) => [{ runId, secretCapabilities: [capability] }]
+    /** What the egress route does at every use: open the bearer, then read the live run. */
+    const use = (capability = grant.capability) => egressBindingActive(openEgressCapability(capability, { runId }, now.getTime() + 5, env))
     const activeAgain = () => pool.query('update agent_runs set status=\'running\',"stopRequestedAt"=null,"leaseExpiresAt"=$2 where id=$1', [runId, lease])
-    return { owner, ws, workspaceId, now, lease, deviceId, tokenId, runId, repoId, agentId, issueId, saved, name, value, caller, injection, binding, grantInput, grant, input, renew, report, activeAgain, projectExecution, shadow }
+    return { owner, ws, workspaceId, now, lease, deviceId, tokenId, runId, repoId, agentId, issueId, saved, name, value, caller, injection, binding, grantInput, grant, use, activeAgain, projectExecution, shadow }
   }
   type Fixture = Awaited<ReturnType<typeof fixture>>
-  const denied = async (f: Fixture, overrides: Partial<Parameters<typeof renewTaskSecretAccess>[0]> = {}, at?: Date) => {
-    const result = await f.renew(overrides, at)
-    assert.deepEqual(result, { taskSecrets: {}, revoked: [f.runId] })
-  }
+  const grantWith = (f: Fixture, changes: Partial<typeof f.grantInput>) => issueEgressCapability({ ...f.grantInput, ...changes }, f.now.getTime(), env).capability
 
-  await t.test('the original owner/device/attempt/scope receives an opaque renewed grant; note edits preserve its security revision', async () => {
+  await t.test('the capability expires with the run lease and its bound run is accepted while it holds the lease and session', async () => {
     const f = await fixture()
-    assert.deepEqual(f.injection.env, {})
-    const before = await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner)
-    await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, note: 'description changed' })
-    assert.equal(await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner), before)
-    const renewed = await f.renew()
-    assert.deepEqual(renewed.revoked, [])
-    const access = renewed.taskSecrets[f.runId]
-    assert.equal(access.endpoint, endpoint(f.runId))
-    assert.deepEqual(access.unavailable, [])
-    assert.equal(access.grants.length, 1)
-    const claims = openEgressCapability(access.grants[0].capability, f.binding, f.now.getTime() + 5, env)
+    assert.equal(f.grant.expiresAt, f.lease.toISOString(), 'no 90-second bound: the lease is the expiry')
+    assert.equal(await f.use(), true)
+    const claims = openEgressCapability(f.grant.capability, f.binding, f.now.getTime() + 5, env)
     assert.equal(claims.secret, f.value)
     assert.equal(claims.secretId, f.saved.id)
-    assert.equal(claims.revision, f.grantInput.revision)
-    assert.ok(!JSON.stringify(renewed).includes(f.value))
-    assert.ok(!JSON.stringify(renewed).includes(f.value.slice(0, 16)))
   })
 
-  await t.test('renewal completes with one available APP connection and keeps the selected Secret grant', async () => {
-    const f = await fixture({ environment: true })
-    const maximum = appPool.options.max
-    assert.ok(typeof maximum === 'number' && Number.isInteger(maximum) && maximum > 1)
-    const holders: Array<{ release(): void }> = []
-    let pending: ReturnType<typeof f.renew> | undefined
-    let timer: ReturnType<typeof setTimeout> | undefined
-    try {
-      // Reserve all but the transaction's connection. Its execution-identity
-      // recheck must reuse that connection instead of waiting on this pool.
-      for (let count = 0; count < maximum - 1; count++) holders.push(await appPool.connect())
-      pending = f.renew()
-      const renewed = await Promise.race([pending, new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Secret renewal waited for a second APP connection from the full pool')), 4_000)
-      })])
-      assert.deepEqual(renewed.revoked, [])
-      const access = renewed.taskSecrets[f.runId]
-      assert.equal(access.grants.length, 1)
-      const claims = openEgressCapability(access.grants[0].capability, f.binding, f.now.getTime() + 5, env)
-      assert.equal(claims.secretId, f.saved.id)
-      assert.equal(claims.revision, f.grantInput.revision)
-      assert.equal(claims.secret, f.value)
-      assert.ok(!JSON.stringify(renewed).includes(f.value))
-    } finally {
-      if (timer) clearTimeout(timer)
-      for (const holder of holders) holder.release()
-      // A RED run may still hold its transaction after the deadline. Free the
-      // reserved connections first, then await rollback/commit before teardown.
-      await pending?.catch(() => undefined)
-    }
-  })
-
-  await t.test('Task deletion serializes with Secret renewal and cannot be followed by a stale new capability', async () => {
-    const f = await fixture({ environment: true })
-    const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
-    const { rows: [task] } = await pool.query('select content from issues where id=$1', [f.issueId])
-    const deletedContent = withIssueMetadata(task.content, { ...readIssueMetadata(task.content), deletedAt: new Date().toISOString() })
-    const state = async () => (await pool.query('select "workspaceId","issueId",status,attempt,"leaseExpiresAt","stopRequestedAt" from agent_runs where id=$1', [f.runId])).rows[0]
-    const before = await state()
-    const writer = await pool.connect()
-    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
-    const originals = new Map<PoolClient, PoolClient['query']>()
-    let intercepted = 0
-    let pending: ReturnType<typeof f.renew> | undefined
-    let timer: ReturnType<typeof setTimeout> | undefined
-    // Run every query against PostgreSQL. Pause only this fixture's real
-    // execution-identity read, after renewal has obtained its authority rows.
-    const observe = (client: PoolClient) => {
-      if (originals.has(client)) return
-      const query = client.query
-      originals.set(client, query)
-      client.query = ((...args: unknown[]) => {
-        const result = Reflect.apply(query, client, args)
-        if (args[0] !== 'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1'
-          || !Array.isArray(args[1]) || args[1][0] !== f.deviceId) return result
-        intercepted++
-        return Promise.resolve(result).then(async value => {
-          entered.resolve()
-          await release.promise
-          return value
-        })
-      }) as PoolClient['query']
-    }
-    appPool.on('acquire', observe)
-    try {
-      pending = f.renew({}, new Date(f.now.getTime() + 5), Date.now)
-      await Promise.race([entered.promise, pending.then(() => {
-        throw new Error('Renewal ended before the real device authorization query')
-      }), new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Renewal did not reach the real device authorization query')), 5_000)
-      })])
-      if (timer) { clearTimeout(timer); timer = undefined }
-      assert.equal(intercepted, 1)
-      await writer.query('begin')
-      await writer.query("set local lock_timeout='1s'")
-      let deletionCommitted = false
-      try {
-        // Match setIssueDeleted's Task-first lock and metadata update. The
-        // old Run-only renewal lets this commit while its Task snapshot is stale.
-        await writer.query('select id from issues where id=$1 for update', [f.issueId])
-        await writer.query('update issues set content=$2,revision=revision+1,"updatedAt"=now() where id=$1', [f.issueId, deletedContent])
-        await writer.query('commit')
-        deletionCommitted = true
-      } catch (error) {
-        await writer.query('rollback')
-        assert.equal((error as { code?: string }).code, '55P03', 'only a real PostgreSQL Task lock may defer deletion')
-      }
-      release.resolve()
-      const renewed = await pending
-      if (deletionCommitted) {
-        assert.deepEqual(renewed, { taskSecrets: {}, revoked: [f.runId] },
-          'Task deletion committed before issuance; renewal must not return a new capability from its old Task snapshot')
-      } else {
-        assert.deepEqual(renewed.revoked, [])
-        const grants = renewed.taskSecrets[f.runId].grants
-        assert.equal(grants.length, 1)
-        const claims = openEgressCapability(grants[0].capability, f.binding, Date.now(), env)
-        assert.equal(claims.secretId, f.saved.id)
-        assert.equal(claims.revision, f.grantInput.revision)
-        assert.equal(claims.secret, f.value)
-        assert.ok(!JSON.stringify(renewed).includes(f.value))
-        // Once renewal commits, the same ordinary deletion succeeds. Every
-        // subsequent renewal must observe that committed tombstone.
-        await writer.query('begin')
-        await writer.query("set local lock_timeout='1s'")
-        await writer.query('select id from issues where id=$1 for update', [f.issueId])
-        await writer.query('update issues set content=$2,revision=revision+1,"updatedAt"=now() where id=$1', [f.issueId, deletedContent])
-        await writer.query('commit')
-      }
-      await denied(f)
-      assert.deepEqual(await state(), before, 'refused Secret renewal cannot mutate the existing Run or its lease')
-    } finally {
-      if (timer) clearTimeout(timer)
-      release.resolve()
-      await writer.query('rollback')
-      writer.release()
-      await pending?.catch(() => undefined)
-      appPool.off('acquire', observe)
-      for (const [client, query] of originals) client.query = query
-    }
-  })
-
-  await t.test('cross-owner, device, workspace, repository, token and attempt claims are rejected', async () => {
+  await t.test('another owner, workspace, device, credential or attempt is refused at use', async () => {
     const f = await fixture()
-    await denied(f, { caller: { ...f.caller, userId: 'another-owner' } })
-    await denied(f, { deviceId: randomUUID() })
-    await denied(f, { caller: { ...f.caller, tokenId: randomUUID() } })
-    for (const mismatch of [{ ownerId: 'another-owner' }, { workspaceId: randomUUID() }, { repository: 'acme/other' },
-      { deviceId: randomUUID() }, { deviceTokenId: randomUUID() }, { attempt: 2 }]) {
-      const forgedScope = issueEgressCapability({ ...f.grantInput, ...mismatch }, f.now.getTime(), env)
-      await denied(f, { runs: f.report(forgedScope.capability) })
-    }
-    await pool.query('update agent_runs set attempt=2 where id=$1', [f.runId])
-    await denied(f)
+    for (const changes of [{ ownerId: 'someone-else' }, { workspaceId: randomUUID() }, { deviceId: randomUUID() }, { deviceTokenId: randomUUID() }, { attempt: 2 }])
+      assert.equal(await f.use(grantWith(f, changes)), false, JSON.stringify(changes))
   })
 
-  await t.test('wrong or stale run lease, stopped/completed runs, and expired bearers cannot renew', async () => {
+  await t.test('a stopped, ended or lease-less run, or an ended lease, is refused at its next use', async () => {
     const f = await fixture()
-    await denied(f, { leases: {} })
-    await denied(f, { leases: { [f.runId]: new Date(f.lease.getTime() + 1).toISOString() } })
-    await denied(f, {}, new Date(f.now.getTime() + 90_000))
-    await pool.query('update agent_runs set "stopRequestedAt"=now() where id=$1', [f.runId])
-    await denied(f)
+    for (const change of [`"stopRequestedAt"=now()`, `status='succeeded'`, `status='queued'`, `"leaseExpiresAt"=now()`, `"leaseExpiresAt"=NULL`]) {
+      await pool.query(`update agent_runs set ${change} where id=$1`, [f.runId])
+      assert.equal(await f.use(), false, change)
+      await f.activeAgain()
+      assert.equal(await f.use(), true)
+    }
+  })
+
+  await t.test('a closed device session, a disabled or removed device, and a revoked credential are refused at use', async () => {
+    const f = await fixture()
+    const { applyDeviceSessionReport } = await import('../lib/device-session')
+    assert.equal((await applyDeviceSessionReport(f.deviceId, { state: 'connected', at: new Date().toISOString(), socketId: 'socket-access01' })).applied, true)
+    assert.equal(await f.use(), true)
+    assert.equal((await applyDeviceSessionReport(f.deviceId, { state: 'disconnected', at: new Date().toISOString(), socketId: 'socket-access01' })).applied, true)
+    assert.equal(await f.use(), false, 'the disconnect ended the lease and the session')
     await f.activeAgain()
-    await pool.query('update agent_runs set status=\'succeeded\' where id=$1', [f.runId])
-    await denied(f)
-    await f.activeAgain()
-    const expired = new Date(f.now.getTime() - 1)
-    await pool.query('update agent_runs set "leaseExpiresAt"=$2 where id=$1', [f.runId, expired])
-    await denied(f, { leases: { [f.runId]: expired.toISOString() } })
-  })
-
-  await t.test('the post-await clock refuses a bearer, current token or run lease that expires after the SQL snapshot', async () => {
-    const bearer = await fixture()
-    assert.deepEqual(await bearer.renew({}, new Date(bearer.now.getTime() + 5), () => bearer.now.getTime() + 90_000),
-      { taskSecrets: {}, revoked: [bearer.runId] })
-
-    const credential = await fixture()
-    const tokenExpires = credential.now.getTime() + 1_000
-    await pool.query('update device_tokens set "expiresAt"=$2 where id=$1', [credential.tokenId, new Date(tokenExpires)])
-    assert.deepEqual(await credential.renew({}, new Date(credential.now.getTime() + 5), () => tokenExpires),
-      { taskSecrets: {}, revoked: [credential.runId] })
-
-    const lease = await fixture()
-    const leaseExpires = new Date(lease.now.getTime() + 1_000)
-    await pool.query('update agent_runs set "leaseExpiresAt"=$2 where id=$1', [lease.runId, leaseExpires])
-    assert.deepEqual(await lease.renew({ leases: { [lease.runId]: leaseExpires.toISOString() } }, new Date(lease.now.getTime() + 5), () => leaseExpires.getTime()),
-      { taskSecrets: {}, revoked: [lease.runId] })
-
-    const live = await fixture()
-    const issuedAt = live.now.getTime() + 1_000
-    const renewed = await live.renew({}, new Date(live.now.getTime() + 5), () => issuedAt)
-    assert.deepEqual(renewed.revoked, [])
-    const claims = openEgressCapability(renewed.taskSecrets[live.runId].grants[0].capability, live.binding, issuedAt, env)
-    assert.equal(claims.issuedAt, issuedAt, 'new grants start at the fresh clock after authorization reads')
-    assert.equal(claims.expiresAt, Math.min(live.lease.getTime(), issuedAt + 90_000))
-  })
-
-  await t.test('human pauses retain only the current live lease; a quota pause without a lease cannot renew', async () => {
-    const f = await fixture({ status: 'waiting_input' })
-    assert.deepEqual((await f.renew()).revoked, [])
-    await pool.query('update agent_runs set status=\'paused\',"pauseReason"=\'human_control\' where id=$1', [f.runId])
-    assert.deepEqual((await f.renew()).revoked, [])
-    await pool.query('update agent_runs set "pauseReason"=\'quota_exhausted\',"leaseExpiresAt"=null where id=$1', [f.runId])
-    await denied(f)
-  })
-
-  await t.test('disabled/removed devices and revoked or expired current local tokens cannot renew', async () => {
-    const f = await fixture()
-    await pool.query('update devices set enabled=false where id=$1', [f.deviceId])
-    await denied(f)
-    await pool.query('update devices set enabled=true,"removedAt"=now() where id=$1', [f.deviceId])
-    await denied(f)
-    await pool.query('update devices set "removedAt"=null where id=$1', [f.deviceId])
+    assert.equal(await f.use(), false, 'even with a lease, a closed session refuses')
+    await pool.query('update devices set "sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL where id=$1', [f.deviceId])
+    assert.equal(await f.use(), true)
+    for (const [change, restore] of [['enabled=false', 'enabled=true'], ['"removedAt"=now()', '"removedAt"=NULL']]) {
+      await pool.query(`update devices set ${change} where id=$1`, [f.deviceId])
+      assert.equal(await f.use(), false, change)
+      await pool.query(`update devices set ${restore} where id=$1`, [f.deviceId])
+    }
     await pool.query('update device_tokens set "revokedAt"=now() where id=$1', [f.tokenId])
-    await denied(f)
-    await pool.query('update device_tokens set "revokedAt"=null,"expiresAt"=$2 where id=$1', [f.tokenId, new Date(f.now.getTime() - 1)])
-    await denied(f)
+    assert.equal(await f.use(), false, 'revoked claim credential')
   })
 
-  await t.test('metadata id/revision checks reject rotation, deletion, recreation and policy withdrawal even before a stop is observed', async () => {
-    const f = await fixture()
-    await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, value: f.value + '-rotated' })
-    await f.activeAgain() // Simulate a stale in-flight control response; metadata must independently fail closed.
-    await denied(f)
-    await store.deleteWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id })
-    await f.activeAgain()
-    await denied(f)
-    const replacement = await store.createWorkspaceSecret(f.owner, f.ws.id, { name: f.name, kind: 'secret', value: f.value, delivery: { mode: 'protected', http } })
-    assert.notEqual(replacement.id, f.saved.id)
-    await f.activeAgain()
-    await denied(f)
-    const current = (await runtime.taskSecretMetadata(f.workspaceId, f.binding.repository, f.owner)).find(row => row.name === f.name)!
-    const currentGrant = issueEgressCapability({ ...f.grantInput, secretId: current.id, revision: current.revision }, f.now.getTime(), env)
-    await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: replacement.id, delivery: { mode: 'direct', exposeToAgent: true } })
-    await f.activeAgain()
-    await denied(f, { runs: f.report(currentGrant.capability) })
-  })
-
-  await t.test('missing metadata provenance, duplicate grants and personal overrides never repair an old capability', async () => {
-    const f = await fixture()
-    for (const missing of [{ secretId: undefined }, { revision: undefined }]) {
-      const grant = issueEgressCapability({ ...f.grantInput, ...missing }, f.now.getTime(), env)
-      await denied(f, { runs: f.report(grant.capability) })
-    }
-    await denied(f, { runs: [{ runId: f.runId, secretCapabilities: [f.grant.capability, f.grant.capability] }] })
-    await personal.createUserSecret(f.owner, { name: f.name, kind: 'secret', value: f.value, delivery: { mode: 'protected', http }, overrideWorkspace: true }, { workspaceId: f.ws.id })
-    await f.activeAgain()
-    await denied(f)
-  })
-
-  await t.test('a repository change and a retry cannot reuse a previous grant', async () => {
-    const f = await fixture()
-    await pool.query('update device_repos set "remoteUrl"=$2 where id=$1', [f.repoId, 'git@github.com:acme/other.git'])
-    await denied(f)
-    await pool.query('update device_repos set "remoteUrl"=$2 where id=$1', [f.repoId, 'https://github.com/acme/secret-fixture.git'])
-    const retryId = randomUUID()
-    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt",attempt,"retryOf") select $2,"userId","issueId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt",2,id from agent_runs where id=$1', [f.runId, retryId])
-    const result = await f.renew({ runs: [{ runId: retryId, secretCapabilities: [f.grant.capability] }], leases: { [retryId]: f.lease.toISOString() } })
-    assert.deepEqual(result, { taskSecrets: {}, revoked: [retryId] })
-  })
-
-  await t.test('cloud token rotation retains original claim lineage; expiration differs from revocation and wrong successor scope fails', async () => {
-    const f = await fixture({ kind: 'cloud' })
-    const successor = randomUUID()
-    await pool.query('insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,$6)', [successor, f.owner, hashDeviceToken('dt_' + randomBytes(24).toString('hex')), f.deviceId, f.ws.id, f.lease])
-    const caller = { ...f.caller, tokenId: successor }
-    await pool.query('update device_tokens set "expiresAt"=$2 where id=$1', [f.tokenId, new Date(f.now.getTime() - 1)])
-    const renewed = await f.renew({ caller })
-    assert.deepEqual(renewed.revoked, [])
-    assert.equal(openEgressCapability(renewed.taskSecrets[f.runId].grants[0].capability, f.binding, f.now.getTime() + 5, env).deviceTokenId, f.tokenId)
-    await denied(f, { caller: { ...caller, scopeWorkspaceId: randomUUID() } })
-    await pool.query('update device_tokens set "boundWorkspaceId"=$2 where id=$1', [successor, randomUUID()])
-    await denied(f, { caller })
-    await pool.query('update device_tokens set "boundWorkspaceId"=$2 where id=$1', [successor, f.ws.id])
-    await pool.query('update device_tokens set "revokedAt"=now() where id=$1', [f.tokenId])
-    await denied(f, { caller })
-  })
-
-  await t.test('ordinary Personal runs keep their real tenant on local and cloud renewal', async () => {
-    for (const kind of ['local', 'cloud'] as const) {
-      const personalRun = await fixture({ kind, personalScope: true })
-      assert.notEqual(personalRun.workspaceId, personalRun.ws.id)
-      assert.equal((await pool.query('select kind from mikka_workspaces where id=$1', [personalRun.workspaceId])).rows[0].kind, 'personal')
-      assert.equal(await runtime.runWorkspaceId(personalRun.runId), personalRun.workspaceId)
-      const renewed = await personalRun.renew()
-      assert.deepEqual(renewed.revoked, [])
-      assert.equal(openEgressCapability(renewed.taskSecrets[personalRun.runId].grants[0].capability, personalRun.binding, personalRun.now.getTime() + 5, env).workspaceId, personalRun.workspaceId)
-      const wrong = issueEgressCapability({ ...personalRun.grantInput, workspaceId: personalRun.ws.id }, personalRun.now.getTime(), env)
-      await denied(personalRun, { runs: personalRun.report(wrong.capability) })
-    }
-  })
-
-  await t.test('a claim token cannot reattribute a legacy bound run and frozen null is refused', async () => {
-    const legacy = await fixture({ kind: 'cloud', legacy: true })
-    assert.deepEqual((await legacy.renew()).revoked, [])
-    const other = await seedWorkspace(pool, legacy.owner, [{ userId: legacy.owner, role: 'admin' }])
-    await pool.query('update device_tokens set "boundWorkspaceId"=$2 where id=$1', [legacy.tokenId, other.id])
-    const state = async (runId: string) => (await pool.query('select "workspaceId",status,"leaseExpiresAt","stopRequestedAt",attempt from agent_runs where id=$1', [runId])).rows[0]
-    const beforeLegacy = await state(legacy.runId)
-    await denied(legacy, { caller: { ...legacy.caller, scopeWorkspaceId: other.id } })
-    assert.deepEqual(await state(legacy.runId), beforeLegacy, 'a refused renewal changes no run or lease')
-    assert.equal(await runtime.runWorkspaceId(legacy.runId), legacy.workspaceId)
-
-    const frozen = await fixture()
-    await pool.query(`update agent_runs set "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}','null'::jsonb) where id=$1`, [frozen.runId])
-    const beforeFrozen = await state(frozen.runId)
-    await denied(frozen)
-    assert.deepEqual(await state(frozen.runId), beforeFrozen, 'frozen-null refusal issues no replacement lease')
-    assert.equal(await runtime.runWorkspaceId(frozen.runId), frozen.workspaceId)
-  })
-
-  await t.test('PostgreSQL rejects a foreign frozen tenant and unattributed runs receive no claim or renewal', async () => {
-    const f = await fixture()
-    const other = await seedWorkspace(pool, f.owner, [{ userId: f.owner, role: 'admin' }])
-    await assert.rejects(pool.query(`update agent_runs set "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)) where id=$1`, [f.runId, other.id]), { code: '23514' })
-    assert.deepEqual((await f.renew()).revoked, [], 'the refused foreign write leaves the valid run unchanged')
-    const runId = randomUUID()
-    await pool.query(`insert into agent_runs (id,"userId","agentId","deviceId","deviceRepoId","deviceTokenId",status,"leaseExpiresAt",attempt)
-      values ($1,$2,$3,$4,$5,$6,'running',$7,1)`, [runId, f.owner, f.agentId, f.deviceId, f.repoId, f.tokenId, f.lease])
-    const state = async () => (await pool.query('select "workspaceId",status,"leaseExpiresAt","stopRequestedAt",attempt from agent_runs where id=$1', [runId])).rows[0]
-    const before = await state()
-    assert.equal(before.workspaceId, null)
-    const grant = issueEgressCapability({ ...f.grantInput, runId, workspaceId: null }, f.now.getTime(), env)
-    assert.deepEqual(await f.renew({ runs: [{ runId, secretCapabilities: [grant.capability] }], leases: { [runId]: f.lease.toISOString() } }), { taskSecrets: {}, revoked: [runId] })
-    let responses = 0
-    assert.equal(await authorizedClaimResponse(f.owner, { id: runId, issueId: null, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId }, f.lease.toISOString(), () => {
-      responses++
-      return Response.json({ grant })
-    }), null)
-    assert.equal(responses, 0, 'unattributed runs cannot expose prepared credentials')
-    assert.deepEqual(await state(), before, 'scope refusal changes no status, attempt or lease')
-  })
-
-  await t.test('a suspended or removed workspace member cannot renew legacy or frozen workspace grants', async () => {
-    for (const options of [{ kind: 'cloud', legacy: true }, { kind: 'cloud' }, { kind: 'local' }] as const) {
-      const f = await fixture(options)
-      assert.deepEqual((await f.renew()).revoked, [])
-      await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [f.ws.id, f.owner])
-      await denied(f)
-      await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2', [f.ws.id, f.owner])
-      assert.deepEqual((await f.renew()).revoked, [])
-      await pool.query('delete from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [f.ws.id, f.owner])
-      await denied(f)
-    }
-  })
-
-  await t.test('Environment renewal ignores unselected same-name repository values and refuses their capabilities', async () => {
-    const f = await fixture({ environment: true })
-    assert.ok(f.shadow && f.projectExecution?.environment)
-    assert.deepEqual(f.injection.env, { REGION: 'selected-environment' })
-    assert.deepEqual(f.injection.secretNames, [])
-    const expected = f.injection.snapshot
-    assert.equal(await runtime.environmentSecretSnapshot(f.ws.id, f.binding.repository, f.projectExecution.environment, f.owner), expected)
-    await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.shadow.id, value: 'unselected-repository-rotated' })
-    const { rows: [stillRunning] } = await pool.query('select "stopRequestedAt","leaseExpiresAt" from agent_runs where id=$1', [f.runId])
-    assert.equal(stillRunning.stopRequestedAt, null, 'an unselected same-name repository change does not stop this Environment')
-    assert.equal(stillRunning.leaseExpiresAt.toISOString(), f.lease.toISOString())
-    assert.equal(await runtime.environmentSecretSnapshot(f.ws.id, f.binding.repository, f.projectExecution.environment, f.owner), expected)
-    const renewed = await f.renew()
-    assert.deepEqual(renewed.revoked, [])
-    const claims = openEgressCapability(renewed.taskSecrets[f.runId].grants[0].capability, f.binding, f.now.getTime() + 5, env)
-    assert.equal(claims.secretId, f.saved.id)
-    assert.equal(claims.secret, f.value)
-    assert.ok(!JSON.stringify(renewed).includes(f.value))
-    const { db } = await import('../lib/db')
-    const ordinary = await runtime.taskSecretMetadata(f.ws.id, f.binding.repository, f.owner, db, [f.name])
-    assert.equal(ordinary[0]?.id, f.shadow.id, 'the unselected repository row would win only for an ordinary all-vault Task')
-    const unselectedGrant = issueEgressCapability({ ...f.grantInput, secretId: f.shadow.id, revision: ordinary[0].revision, secret: 'unselected-repository-rotated' }, f.now.getTime(), env)
-    await denied(f, { runs: f.report(unselectedGrant.capability) })
-    await pool.query(`update agent_runs set "agentDefinition"=jsonb_set("agentDefinition",'{projectExecution,environment,secretIds}','[]') where id=$1`, [f.runId])
-    await denied(f, { runs: f.report(f.grant.capability) })
-    await denied(f, { runs: f.report(unselectedGrant.capability) })
-  })
-
-  await t.test('selected Environment security changes stop consumers despite an unselected repository override and cannot renew stale grants', async () => {
-    for (const mutation of ['rotation', 'deletion', 'delivery', 'scope', 'legacy_rotation'] as const) {
-      const f = await fixture({ environment: true, legacy: mutation === 'legacy_rotation' })
-      assert.equal(await runtime.runWorkspaceId(f.runId), f.ws.id, 'masking and invalidation use the same canonical Environment workspace')
-      if (mutation === 'rotation' || mutation === 'legacy_rotation') await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, value: f.value + '-rotated' })
-      if (mutation === 'deletion') await store.deleteWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id })
-      if (mutation === 'delivery') await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, delivery: { mode: 'direct', exposeToAgent: true } })
-      if (mutation === 'scope') await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, value: f.value, scope: { type: 'repository', repository: 'acme/other' } })
-      const { rows: [stopped] } = await pool.query('select "stopRequestedAt" is not null as stopped,"leaseExpiresAt"<=now() as expired from agent_runs where id=$1', [f.runId])
-      assert.deepEqual(stopped, { stopped: true, expired: true }, mutation)
-      await denied(f)
-      await f.activeAgain() // A stale control response still has to pass current metadata provenance.
-      await denied(f)
+  await t.test('rotating or deleting the Secret stops its consumers, so the old capability is refused at use', async () => {
+    for (const mutation of ['rotation', 'deletion'] as const) {
+      const f = await fixture()
+      assert.equal(await f.use(), true)
+      if (mutation === 'rotation') await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, value: f.value + '-rotated' })
+      else await store.deleteWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id })
+      assert.equal(await f.use(), false, mutation)
     }
   })
 

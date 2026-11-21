@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { consumeDeviceEnrollment } from '@/lib/device-enrollment'
 
 export async function POST(request: Request) {

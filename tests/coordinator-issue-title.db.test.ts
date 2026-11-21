@@ -13,7 +13,7 @@ if (enabled) {
   assert.equal(process.env.DATABASE_URL, connection)
 }
 
-test('a typed title stays full while its derived short title obeys the navigation limit, whatever the model passes', { skip: !enabled }, async () => {
+test('a typed title stays full and no task gets a generated short title, whatever the model passes', { skip: !enabled }, async () => {
   const { db, pool } = await import('../lib/db')
   const { eq } = await import('drizzle-orm')
   const { issues, coordinatorEvents } = await import('../lib/db/schema')
@@ -28,11 +28,11 @@ test('a typed title stays full while its derived short title obeys the navigatio
   }
   const read = async (issueId: string) => (await db.select({ title: issues.title, shortTitle: issues.shortTitle, shortTitleFrom: issues.shortTitleFrom }).from(issues).where(eq(issues.id, issueId)))[0]
   try {
-    // The person typed a title: it wins over the model's, and lists show it as typed.
+    // The person typed a title: it wins over the model's. No task is given a short title (Capy names conversations, not tasks).
     const typed = await event({ taskTitle: '修复登录后回跳丢前缀' })
     const first = await createIssueFromRequest(owner, { sourceEventId: typed, title: 'The model\'s own longer title for this task' })
     assert.equal(first.title, '修复登录后回跳丢前缀')
-    assert.deepEqual(await read(first.issueId), { title: '修复登录后回跳丢前缀', shortTitle: '修复登录后回跳丢前缀', shortTitleFrom: '修复登录后回跳丢前缀' })
+    assert.deepEqual(await read(first.issueId), { title: '修复登录后回跳丢前缀', shortTitle: null, shortTitleFrom: null })
     // A replay returns the same task and cannot rename it.
     assert.deepEqual(await createIssueFromRequest(owner, { sourceEventId: typed, title: 'Replay cannot rename' }), first)
 
@@ -40,9 +40,9 @@ test('a typed title stays full while its derived short title obeys the navigatio
     const longEvent = await event({ taskTitle: longTitle })
     const long = await createIssueFromRequest(owner, { sourceEventId: longEvent, title: 'Ignore this model title' })
     assert.equal(long.title, longTitle)
-    assert.deepEqual(await read(long.issueId), { title: longTitle, shortTitle: [...longTitle].slice(0, 12).join(''), shortTitleFrom: longTitle })
+    assert.deepEqual(await read(long.issueId), { title: longTitle, shortTitle: null, shortTitleFrom: null })
 
-    // No title typed: the model's title is used and no short title is set here (the short-title job writes it).
+    // No title typed: the model's title is used.
     const untitled = await event({})
     const second = await createIssueFromRequest(owner, { sourceEventId: untitled, title: '  Implement requested change  ' })
     assert.equal(second.title, 'Implement requested change')

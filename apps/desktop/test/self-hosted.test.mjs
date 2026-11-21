@@ -13,3 +13,15 @@ test('packaged desktop only accepts the exact disposable image and generated ide
   for (const change of [{ GITHUB_ACTIONS: 'false' }, { GITHUB_REPOSITORY: 'other/repo' }, { GITHUB_SHA: 'main' },
     { MIKKA_DESKTOP_EXECUTABLE: '' }]) assert.throws(() => validateSelfHostedDesktopTarget(fixture, { ...env, ...change }))
 })
+
+test('the second desktop identity must be an independent verified disposable account', () => {
+  const member = { id: 'other', email: 'selfhost-20000000-0000-4000-8000-000000000002@selfhost.example.test', password: 'c'.repeat(32) }
+  const official = { ...env, MIKKA_UI_OVERLAY_SHA: 'c'.repeat(40) }
+  assert.throws(() => validateSelfHostedDesktopTarget(fixture, official))
+  assert.throws(() => validateSelfHostedDesktopTarget({ ...fixture, member }, official))
+  validateSelfHostedDesktopTarget({ ...fixture, member: { ...member, invitation: { id: uuid, organizationId: uuid } } }, official)
+  for (const change of [{ id: fixture.ownerId }, { id: '' }, { email: fixture.email }, { password: fixture.password },
+    { email: 'somebody@example.com' }, { password: 'short' }]) {
+    assert.throws(() => validateSelfHostedDesktopTarget({ ...fixture, member: { ...member, ...change } }, env))
+  }
+})

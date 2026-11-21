@@ -27,7 +27,9 @@ test('the probe finds and the scrub removes exactly the credential paths, in a r
 })
 
 test('the list covers coding-CLI logins, run GitHub tokens and live brokers, and refuses an unsafe path', () => {
-  for (const path of ['/home/*/.claude/.credentials.json', '/home/*/.codex/auth.json', '/root/.claude/.credentials.json', '/root/.codex/auth.json', '/home/user/.mikka/worker/adapters/runs/*/github', '/home/user/.mikka/worker/adapters/native-brokers/*'])
+  for (const path of ['/home/*/.claude/.credentials.json', '/home/*/.codex/auth.json', '/root/.claude/.credentials.json', '/root/.codex/auth.json',
+    '/home/user/.mikka/worker/adapters/runs/*/github', '/home/user/.mikka/worker/adapters/native-brokers/*',
+    '/home/user/.mikka/bootstrap.json', '/home/user/.mikka/anonymous-claude.json', '/home/user/.mikka/anonymous-codex.json'])
     assert.ok(SNAPSHOT_CREDENTIAL_GLOBS.includes(path), path)
   assert.throws(() => credentialProbeCommand(['/tmp/x; rm -rf /']), /Unsafe/)
 })

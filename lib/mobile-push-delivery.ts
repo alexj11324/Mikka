@@ -1,4 +1,6 @@
 import 'server-only'
+import english from '@/messages/en.json'
+import chinese from '@/messages/zh-CN.json'
 import { randomUUID } from 'node:crypto'
 import { pool } from '@/lib/db'
 import { isCloudEdition } from '@/lib/edition'
@@ -22,7 +24,7 @@ const knownFailure = (value: unknown): value is FailureCode => typeof value === 
 export function phonePushPayload(message: Notification, content: 'full' | 'reminder', locale: 'zh-CN' | 'en'): Notification {
   if (content === 'full') return message
   const { serverUrl, userId, botId } = message.data
-  return { ...message, title: 'Mikka', body: locale === 'en' ? 'New message' : '新消息', data: { serverUrl, userId, botId } }
+  return { ...message, title: 'Mikka', body: (locale === 'en' ? english : chinese).MobilePush.genericNotification, data: { serverUrl, userId, botId } }
 }
 
 async function expo(path: 'send' | 'getReceipts', body: unknown) {
@@ -38,7 +40,8 @@ async function removeTokens(userId: string, tokens: string[]) {
   if (tokens.length) await pool.query('DELETE FROM mobile_push_tokens WHERE "userId"=$1 AND token=ANY($2::text[])', [userId, tokens])
 }
 
-export async function deliverPhonePush(userId: string, notification: Notification, locale: 'zh-CN' | 'en'): Promise<void> {
+export async function deliverPhonePush(userId: string, notification: Notification, locale: 'zh-CN' | 'en') {
+  let accepted = 0, invalid = 0
   const hosted = isCloudEdition(), provider = hosted ? 'expo' : 'cloud'
   const content = hosted ? 'full' : await cloudClient.pushContent()
   const message = phonePushPayload(notification, content, locale)
@@ -63,7 +66,7 @@ export async function deliverPhonePush(userId: string, notification: Notificatio
       try { result = await readCloudJson(await cloudRequest(userId, 'push', '/v1/push', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...message, to: batch }) })) }
       catch (error) {
         // A disconnected or unselected optional service has no outbound request.
-        if (error instanceof CloudServiceError && ['cloud_not_connected', 'cloud_scope_missing'].includes(error.code)) return
+        if (error instanceof CloudServiceError && ['cloud_not_connected', 'cloud_scope_missing'].includes(error.code)) return { accepted, invalid }
         throw error
       }
       const failures = result.failures ?? []
@@ -73,6 +76,8 @@ export async function deliverPhonePush(userId: string, notification: Notificatio
         || failures.some(item => !object(item) || typeof item.token !== 'string' || !batch.includes(item.token) || !knownFailure(item.code))) throw new CloudServiceError('cloud_unavailable', 'protocol')
       delivery = { invalidTokens: result.invalidTokens as string[], tickets: result.tickets as Receipt[], failures: failures as Delivery['failures'] }
     }
+    invalid += delivery.invalidTokens.length
+    accepted += delivery.tickets.length
     await removeTokens(userId, delivery.invalidTokens)
     if (delivery.tickets.length) {
       const id = randomUUID()
@@ -97,6 +102,7 @@ export async function deliverPhonePush(userId: string, notification: Notificatio
   // Accepted tickets are durable before reporting partial failure. This path
   // never resends notifications that Expo has already accepted.
   if (rejected) throw new CloudServiceError(rejected === 'rate_limited' ? 'cloud_rate_limited' : rejected === 'message_too_big' ? 'cloud_invalid_request' : 'cloud_unavailable', 'response')
+  return { accepted, invalid }
 }
 
 /** The Workflow fast path and existing safety sweep share one fenced receipt lease. */

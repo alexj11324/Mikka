@@ -93,7 +93,7 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 
 实现边界是**后台调研尚未接入**。没有对应的 cron 端点，`lib/feature-flags.ts` 的
 `mikka-proactive-research` 仍为预留。Cloudflare Worker `cloudflare/suggestions-cron`
-只有一个每分钟触发的 cron（`* * * * *`），按 UTC 时间分发简报、建议补漏和画像合并。
+每个 UTC 小时的 0、15、30、45 分由同一条 Cloudflare Cron Trigger 触发，按 UTC 时间分发简报、建议补漏和画像合并。
 `/api/cron/reconcile` 每 15 分钟作为补漏，Coordinator 唤醒、定时任务和运行恢复的主要入口
 是提交事件和 durable timers。完整时序见 [定时任务说明](../suggestions-cron.md)。
 后台调研的 Worker 接线仍属方案。

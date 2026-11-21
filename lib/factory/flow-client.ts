@@ -71,7 +71,7 @@ export function approveSpecError(code: string | null, status: number | null, det
   switch (code) {
     case 'factoryStale': case 'factoryReplayMismatch': return failure('stale')
     case 'factoryTransition': return failure('transition')
-    case 'factoryEvidenceRequired': return failure('evidence')
+    case 'factoryEvidenceRequired': case 'factory_visual_evidence_required': case 'factory_public_evidence_required': return failure('evidence')
     case 'factoryHumanRequired': case 'originRejected': return failure('signedOut')
     case 'factoryNotFound': return failure('notFound')
     case 'agentProfileModelUnavailable': return failure('profileModel')

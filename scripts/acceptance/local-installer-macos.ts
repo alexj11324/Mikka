@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, open, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { SshInstaller, runProcess, quote, type SshInstallState } from '../../apps/desktop/src/main/ssh-install'
 import { InstallProcessError, nodeDiscoveryScript, redactInstallLog } from '../../apps/desktop/src/main/local-install'
@@ -126,18 +126,24 @@ try {
   } else {
     assert.equal(state.status, 'online')
     assert.ok(registrations >= 1 && heartbeats >= 1 && enrollments === 1)
-    const plist = JSON.parse(await runProcess('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(home, 'Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist')]))
+    const plistPath = join(home, 'Library/LaunchAgents/com.aspectlylabs.mikka.daemon.plist')
+    const serviceTarget = `gui/${process.getuid!()}/com.aspectlylabs.mikka.daemon`
+    const plist = JSON.parse(await runProcess('/usr/bin/plutil', ['-convert', 'json', '-o', '-', plistPath]))
     const serviceArgs = plist.ProgramArguments as string[]
     assert.equal(await realpath(serviceArgs[0]), await realpath(process.execPath), 'LaunchAgent must use the selected Node 22 binary')
     assert.equal(await realpath(serviceArgs[1]), await realpath(join(home, '.mikka/npm/lib/node_modules/@aspectlylabs/mikka/mikka.js')), 'npm bin symlink must resolve to the tested private package')
     assert.equal(serviceArgs[serviceArgs.indexOf('--data-dir') + 1], dataDir, 'LaunchAgent and login must share the isolated data directory')
     const manifest = JSON.parse(await readFile(join(home, '.mikka/npm/lib/node_modules/@aspectlylabs/mikka/package.json'), 'utf8'))
     assert.equal(manifest.engines.node, '>=22')
+    await runProcess('launchctl', ['print', serviceTarget])
+    const installedAt = (await stat(plistPath, { bigint: true })).mtimeNs
     done = new Promise<void>(resolve => { finish = resolve })
     await installer.restartLocal('fixture-owner')
     await done
     assert.equal(installer.state()?.status, 'online')
     assert.equal(enrollments, 1, 'reconnect must not re-enroll')
+    await runProcess('launchctl', ['print', serviceTarget])
+    assert.equal((await stat(plistPath, { bigint: true })).mtimeNs, installedAt, 'unchanged reconnect must reuse the registered LaunchAgent')
   }
   const result = { ...evidence(), result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect' }
   await mkdir('artifacts/local-installer', { recursive: true })

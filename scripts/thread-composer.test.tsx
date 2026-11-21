@@ -6,7 +6,7 @@ import type { Root } from 'react-dom/client'
 import type { State } from 'swr'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Window } from 'happy-dom'
-import { IntlProvider } from 'next-intl'
+import { IntlProvider } from '@/lib/intl/i18n-client'
 import * as actualViewState from '../lib/hooks/view-state'
 import * as actualAppBuild from '../lib/app-build'
 import type { FactoryTask } from '../components/workspace/factory-acceptance-pane'
@@ -19,15 +19,24 @@ const messages = JSON.parse(readFileSync(new URL('../messages/en.json', import.m
 const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 let draftText = ''
+let draftQuote: string | null = null
+let storedMessages: { id: string; text: string; at: Date; mine: boolean }[] = []
+let runContext: import('../lib/context-usage').ContextUsage | undefined
+let shownThread: import('../components/slots/thread-contract').ThreadScreenProps | undefined
 let pageChecks = 0
+let buildGate: Promise<boolean> | undefined
+let postReply = async (_request: { requestId: string; text: string }) => ({ sent: true })
 let acceptance: FactoryTask | null = null
 const browser = new Window({ url: 'https://mikka.example/en' })
 for (const key of ['window', 'document', 'navigator', 'location', 'customElements', 'HTMLElement', 'Element', 'Node', 'CSS', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0), cancelAnimationFrame: (id: number) => clearTimeout(id) })
 const actualSWR = await import('swr')
+let versionScenario: { read: () => Promise<unknown[]>; write: (request: { change: { requestId: string } }) => Promise<unknown> } | null = null
 let liveRead = false
 let readFailure: unknown = null
 let readHold: Promise<void> | null = null
+let observeChanges = false
+let changesReads = 0
 let changesRead: { state: string; changes?: object } | null = null
 let issueReads = 0
 const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
@@ -36,29 +45,39 @@ mock.module('sonner', { namedExports: { toast: {
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
 mock.module('swr', {
-  defaultExport: (key: unknown, fetcher: never, options: never) => liveRead && Array.isArray(key) && key[0] === 'issue-thread'
+  defaultExport: (key: unknown, fetcher: never, options: never) => (
+    versionScenario && (key === null || Array.isArray(key)) ||
+    liveRead && Array.isArray(key) && (key[0] === 'issue-thread' || observeChanges && key[0] === 'thread-changes')
+  )
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
-    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
+    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: storedMessages, context: runContext }, mutate: () => {} }
     // Where the thread runs is its own read (thread-run-place.tsx); none here.
     : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
     : Array.isArray(key) && key[0] === 'thread-changes' ? { data: changesRead, mutate: () => {} }
+    // The task's work read behind the Artifact tab (thread-artifacts.tsx): not loaded here.
+    : Array.isArray(key) && key[0] === 'issue-threads' ? { data: undefined, mutate: () => {} }
     : { data: [], mutate: () => {} },
   namedExports: { useSWRConfig: () => liveRead ? actualSWR.useSWRConfig() : ({ mutate: () => {}, cache: new Map() }), unstable_serialize: actualSWR.unstable_serialize },
 })
-mock.module('next/dynamic', { defaultExport: () => () => null })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => () => null })
 mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
-  useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
+  useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : key.endsWith(':quote') && draftQuote ? draftQuote as T : initial),
 } })
-mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return true } } })
-mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
+mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return buildGate ?? true } } })
+mock.module(at('app/actions/agents.ts'), { namedExports: {
+  getThreadContinuationModels: async () => null,
+  changeQueuedThreadReply: async () => { throw new Error('Composer interactions must not change a queue') },
+  getThreadReplyVersions: async () => versionScenario?.read() ?? [],
+  createThreadReplyVersion: async (request: {change: {requestId: string}}) => { if (versionScenario) return versionScenario.write(request); throw new Error('Composer interactions must not start a new version') },
+  retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
   issueReads++
   if (readHold) await readHold
   if (readFailure) throw readFailure
   return { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [], chunksAppend: false }
-}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
-mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
+}, getThreadChanges: async () => { changesReads++; return { state: 'none' } }, getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async (request: { requestId: string; text: string }) => { replyCalls++; return postReply(request) }, stopRun: async () => ({}) } })
+mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [], listTaskArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
     acceptance?.issueId === issueId && acceptance.candidateRunId === runId ? acceptance : null,
@@ -76,6 +95,22 @@ mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { Ch
   return <><textarea data-composer="" aria-label={props.label} value={props.value} onChange={event => props.onChange(event.currentTarget.value)} /><button data-composer-send="" disabled={props.submitDisabled}>Send</button></>
 } } })
 
+// The bare pane mounted below is the shared Artifact/Review transcript and composer.
+const { ChatComposer } = await import('../components/coordinator/chat-composer')
+mock.module(at('components/slots/thread.tsx'), { namedExports: {
+  ThreadScreen: (props: import('../components/slots/thread-contract').ThreadScreenProps) => {
+    shownThread = props
+    return <section data-required-thread-screen="">
+      <div ref={props.scrollRef}><ol>{props.entries?.map(entry => <li key={entry.id} data-delivery-status={entry.role === 'person' ? entry.status : undefined}>
+        {entry.role === 'person' ? <>{entry.attachments?.map(item => <span key={item.id} data-slot={item.id} aria-label={item.name}>{item.name}</span>)}{entry.body ?? entry.text}
+          {entry.deliveryMessage && <span role="alert">{entry.deliveryMessage}</span>}{entry.onRetry && <button onClick={entry.onRetry}>Retry</button>}</>
+          : entry.parts.map((part, index) => part.kind === 'text' ? <div key={index}>{part.node}</div> : null)}
+        {entry.actions}
+      </li>)}</ol></div>
+      {!props.readOnly && <div data-slot="thread-composer"><ChatComposer {...props.composer} />{props.notices}</div>}
+    </section>
+  },
+} })
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
 let createRoot: typeof import('react-dom/client')['createRoot']
 let root: Root | null = null
@@ -85,12 +120,24 @@ before(async () => { ({ createRoot } = await import('react-dom/client')); ({ Iss
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+beforeEach(() => { draftQuote = null; storedMessages = []; shownThread = undefined; versionScenario = null; buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; observeChanges = false; changesReads = 0; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
-  <IssueThreadPanel issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
+  <IssueThreadPanel bare issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
+
+test('a recorded model stays available to the composer without a context estimate in the thread', () => {
+  runContext = { used: 6, promptUsed: 6, promptBudget: 25_000, estimated: true, segments: [], unmeasured: [], model: null,
+    compactAtTokens: null, windowTokens: null, composerModel: { selected: 'gpt-5.1', served: null } }
+  try {
+    const html = render({ issueId: null })
+    assert.doesNotMatch(html, /data-slot="thread-context-usage"|25K/)
+    assert.match(renderToStaticMarkup(shownThread?.composer.model), /GPT-5\.1/)
+  } finally {
+    runContext = undefined
+  }
+})
 
 function ReadControl() {
   const { mutate } = actualSWR.useSWRConfig()
@@ -118,6 +165,22 @@ async function failRead(error: unknown) {
   readFailure = error
   await act(async () => { await refreshRead().catch(() => {}) })
 }
+
+test('an opened thread reads changes once alongside detail and refreshes when its status becomes known or changes', async () => {
+  observeChanges = true
+  let resolveDetail!: () => void
+  readHold = new Promise(resolve => { resolveDetail = resolve })
+  await renderLive('owner:workspace', { bare: false })
+  assert.equal(changesReads, 1, 'start one diff read in parallel with a slow detail read')
+  await act(async () => { resolveDetail(); await readHold })
+  readHold = null
+  assert.equal(changesReads, 2, 'the known status may include a checkpoint committed after the first read')
+  thread = { ...base, status: 'running' }
+  await act(async () => { await refreshRead() })
+  assert.equal(changesReads, 3)
+  await act(async () => { await refreshRead() })
+  assert.equal(changesReads, 3, 'an unchanged status is already current')
+})
 
 test('a background thread read failure preserves transcript, scroll, composer focus and unsent draft', async () => {
   await renderLive()
@@ -217,8 +280,8 @@ test('an open thread ends in the composer whether it runs or has ended', () => {
 })
 
 test('the Artifact window and the thread column keep the composer', () => {
-  assert.match(render({ bare: true }), /data-composer=""/, 'Artifact window (bare)')
-  assert.match(render({ issueId: null, onOpenTask: undefined }), /data-composer=""/, 'thread column, a thread with no task')
+  assert.match(render({ bare: true }), /data-required-thread-screen=""[\s\S]*data-composer=""/, 'Artifact window uses the same screen')
+  assert.match(render({ bare: false, issueId: null, onOpenTask: undefined }), /data-required-thread-screen=""[\s\S]*data-composer=""/, 'the full thread column without a Task uses the required screen')
 })
 
 test('a thread the viewer cannot read in full has no composer', () => {
@@ -227,8 +290,10 @@ test('a thread the viewer cannot read in full has no composer', () => {
 })
 
 test('every conversation container draws the shared composer, directly or through the thread panel', () => {
-  const direct = ['components/coordinator/coordinator-chat.tsx', 'components/workspace/group-chat-view.tsx', 'components/workspace/issue-thread-panel.tsx']
-  for (const file of direct) assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /<ChatComposer\b/, file)
+  for (const file of ['components/coordinator/coordinator-chat.tsx', 'components/workspace/issue-thread-panel.tsx']) {
+    assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /<ThreadScreen\b/, file)
+  }
+  assert.match(readFileSync(new URL('../components/workspace/group-chat-view.tsx', import.meta.url), 'utf8'), /<ChatComposer\b/)
   const threads = ['components/artifacts/artifact-window.tsx', 'components/workspace/task-thread-pane.tsx', 'components/workspace/thread-column.tsx']
   for (const file of threads) assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /<IssueThreadPanel\b/, file)
   // The task page's thread is TaskThreadPane: the run panel, or the task-conversation slot built from it.
@@ -247,6 +312,16 @@ test('an open thread lets the agent’s words be quoted and every message be cop
   assert.match(html, /data-slot="reply-quote"[^>]*aria-label="[^"]*Done\.[^"]*"/)
   assert.doesNotMatch(html, /&gt; Done\./)
   assert.equal(html.match(/data-copy-state="idle"/g)?.length, 2)
+})
+
+test('the full thread labels a selected quote and restores its words separately from the saved follow-up', () => {
+  draftQuote = 'Selected words'
+  storedMessages = [{ id: 'follow-up', text: '> Selected words\n\nContinue here.', at: new Date(1), mine: true }]
+  render({ bare: false })
+  assert.equal(shownThread?.pending.find(item => item.id === 'reply-quote')?.meta, messages.AiElements.message.quote)
+  const followUp = shownThread?.entries?.find(item => item.role === 'person' && item.text === 'Continue here.')
+  assert.ok(followUp?.role === 'person')
+  assert.deepEqual(followUp.attachments, [{ id: 'reply-quote', name: 'Selected words', meta: messages.AiElements.message.quote }])
 })
 
 test('the original thread shows the latest failed continuation and its existing Retry control', () => {
@@ -269,7 +344,7 @@ test('a historical failure does not offer Retry while the latest continuation wo
 
 test('an ended independent check hides generic Retry and preserves an editable composer with Send disabled', () => {
   draftText = 'Keep this unsent draft'
-  thread = { ...base, status: 'failed', error: 'The selected Agent Profile changed or is no longer available.', replyAvailable: false, retryAvailable: false }
+  thread = { ...base, kind: 'factory_verify', status: 'failed', error: 'The selected Agent Profile changed or is no longer available.', replyAvailable: false, retryAvailable: false }
   const html = render()
   assert.match(html, /data-slot="thread-failure"/)
   assert.doesNotMatch(html, /<button[^>]*>Retry<\/button>/)
@@ -290,6 +365,14 @@ test('a strict question recovery on a check keeps Retry while ordinary Send rema
   assert.match(html, /data-composer-send="" disabled=""/)
 })
 
+test('a historical failed root retains its diagnostic but cannot offer Retry or a composer', () => {
+  thread = { ...base, status: 'failed', error: 'An earlier run failed', retryAvailable: true }
+  const html = render({ transcriptOnly: true })
+  assert.match(html, /An earlier run failed/)
+  assert.doesNotMatch(html, /data-slot="thread-composer"|>Retry</)
+  assert.match(render(), />Retry</)
+})
+
 test('a failed queued question wake retains its explicit Retry without reopening ordinary Send', () => {
   thread = { ...base, status: 'stopped', latestRunId: 'run-2', question: 'resuming', replyAvailable: true, retryAvailable: true,
     continuation: { id: 'run-2', status: 'queued', stopping: false }, questionWake: { generation: 'generation', error: 'Original task machine unavailable' } }
@@ -300,10 +383,14 @@ test('a failed queued question wake retains its explicit Retry without reopening
 
 test('the ordinary producer and a current check question keep their composer controls', () => {
   for (const question of [null, 'waiting']) {
-    thread = { ...base, status: question ? 'stopped' : 'failed', error: question ? null : 'Execution failed', question, replyAvailable: true, retryAvailable: !question }
+    thread = { ...base, kind: question ? 'factory_verify' : 'implement', status: question ? 'stopped' : 'failed', error: question ? null : 'Execution failed', question, replyAvailable: true, retryAvailable: !question }
+    for (const bare of [true, false]) {
+      const html = render({ bare })
+      assert.match(html, /data-composer-send=""(?! disabled="")/)
+      assert.match(html, /aria-label="Tell Claude Code what to do next…"/)
+      assert.equal(shownThread?.readOnly, false)
+    }
     const html = render()
-    assert.doesNotMatch(html, /data-composer-send="" disabled=""/)
-    assert.match(html, /aria-label="Tell Claude Code what to do next…"/)
     if (!question) assert.match(html, /<button[^>]*>Retry<\/button>/)
   }
 })
@@ -315,6 +402,15 @@ const acceptedTask = (patch: Partial<FactoryTask> = {}): FactoryTask => ({
 function expectStatusBadge(html: string, group: string, message?: string) {
   assert.match(html, new RegExp(`<span\\b(?=[^>]*data-slot="badge")(?=[^>]*data-group="${group}")[^>]*>`), message)
 }
+
+test('finished work without a request for input shows its duration without a waiting badge', () => {
+  for (const kind of ['implement', 'acceptance']) {
+    thread = { ...base, kind, finishedAt: new Date(12_000) }
+    const html = render()
+    assert.match(html, /Worked for 12s/)
+    assert.doesNotMatch(html, /data-group="waiting"/)
+  }
+})
 
 test('acceptance resolves the current producer badge without rewriting its outcome or disabling its ordinary composer', () => {
   draftText = 'Keep this producer follow-up draft'
@@ -392,3 +488,198 @@ for (const scenario of retainedPanelStates) {
     assert.equal(replyCalls, 0)
   })
 }
+
+test('an offline bundled renderer still submits its thread reply once', async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('thread delivery'))
+  await act(async () => composer!.onSubmit())
+  assert.equal(replyCalls, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sent"]').length, 1)
+})
+
+test('Thread releases the draft before version preflight and retries an unknown ACK using the same immutable command', async () => {
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  let release!: (value: boolean) => void
+  buildGate = new Promise(resolve => { release = resolve })
+  const writes: { requestId: string; text: string }[] = []
+  postReply = async request => {
+    writes.push(request)
+    if (writes.length === 1) throw new TypeError('connection closed after write')
+    return { sent: true }
+  }
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('same words'))
+  await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
+  assert.equal(composer!.value, '')
+  assert.equal(container.querySelectorAll('[data-delivery-status="sending"]').length, 1)
+  assert.equal(replyCalls, 0)
+  await act(async () => composer!.onChange('next draft'))
+  await act(async () => release(true))
+  const failed = container.querySelector<HTMLElement>('[data-delivery-status="failed"]')
+  assert.match(failed?.textContent ?? '', /same words/)
+  const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
+  assert.ok(retry, 'the retry belongs to this failed message')
+  await act(async () => retry.click())
+  assert.equal(writes.length, 2)
+  assert.equal(writes[0].requestId, writes[1].requestId)
+  assert.equal(writes[1].text, 'same words')
+  assert.equal(composer!.value, 'next draft')
+  assert.equal(container.querySelectorAll('[data-delivery-status="sent"]').length, 1)
+})
+
+test('Review retries the original candidate and event in place after the approval response is lost', async t => {
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  const binding = { taskId: crypto.randomUUID(), issueId: crypto.randomUUID(), attemptId: crypto.randomUUID(), candidateId: crypto.randomUUID(), revision: 3 }
+  const calls: { url: string; operation: string; input: { eventId: string; note: string; binding: typeof binding } }[] = []
+  const originalFetch = globalThis.fetch
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL, options?: RequestInit) => {
+    if (!String(url).endsWith('/api/factory/tasks/' + binding.taskId + '/approval')) return originalFetch(url, options)
+    const body = JSON.parse(String(options?.body))
+    calls.push({ url: String(url), ...body })
+    if (calls.length === 1) throw new TypeError('response lost after the ledger committed')
+    return Response.json({ replayed: true })
+  })
+  let release!: (ok: boolean) => void
+  let canceled = 0
+  buildGate = new Promise(resolve => { release = resolve })
+  await renderLive('owner:workspace', { runId, changeRequest: { binding, label: 'Request changes', onCancel: () => { canceled++ } } })
+  await act(async () => composer!.onChange('Fix the original candidate'))
+  await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
+  assert.equal(composer!.value, '')
+  assert.equal(canceled, 1)
+  assert.equal(calls.length, 0)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sending"]').length, 1)
+  await act(async () => release(true))
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('Separate next draft'))
+  const failed = container.querySelector('[data-delivery-status="failed"]')
+  assert.match(failed?.textContent ?? '', /Fix the original candidate/)
+  const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  assert.equal(replyCalls, 0, 'a Review command must reach its candidate ledger')
+  assert.equal(calls.length, 2)
+  assert.deepEqual(calls[0], calls[1])
+  assert.equal(calls[1].operation, 'reject')
+  assert.equal(calls[1].url.endsWith('/api/factory/tasks/' + binding.taskId + '/approval'), true)
+  assert.match(calls[1].input.eventId, /^[\da-f-]{36}$/i)
+  assert.deepEqual(calls[1].input.binding, binding)
+  assert.equal(calls[1].input.note, 'Fix the original candidate')
+  assert.equal(composer!.value, 'Separate next draft')
+  assert.equal(container.querySelectorAll('[data-delivery-status="sent"]').length, 1)
+})
+
+test('Inbox waiting replies keep the original thread, viewer, workspace and request ID across an unknown result and remount', async () => {
+  const { useInboxThreadReply } = await import('../lib/hooks/chat-delivery')
+  const issueId = crypto.randomUUID(), runId = crypto.randomUUID(), laterRunId = crypto.randomUUID()
+  const viewer = { ownerId: crypto.randomUUID(), workspaceId: crypto.randomUUID() }
+  let submit!: ReturnType<typeof useInboxThreadReply>
+  function InboxReply({ current }: { current: typeof viewer | null }) {
+    submit = useInboxThreadReply(current)
+    return null
+  }
+  container = browser.document.createElement('div') as unknown as HTMLDivElement
+  document.body.append(container)
+  root = createRoot(container)
+  const renderInbox = (current: typeof viewer | null, visible = true) => act(async () => root!.render(
+    <actualViewState.ViewStateProvider scope={current ? current.ownerId + ':' + current.workspaceId : 'no-scope'}>
+      <IntlProvider locale="en" timeZone="UTC" messages={messages}>{visible && <InboxReply current={current} />}</IntlProvider>
+    </actualViewState.ViewStateProvider>,
+  ))
+  const calls: unknown[] = []
+  postReply = async request => {
+    calls.push(request)
+    if (calls.length === 1) throw new TypeError('lost response')
+    return { sent: true }
+  }
+  await renderInbox(null)
+  assert.equal((await submit(issueId, runId, 'Original answer')).status, 'unavailable')
+  buildGate = Promise.resolve(false)
+  thread = { ...base, id: runId, latestRunId: runId }
+  await renderLive(viewer.ownerId + ':' + viewer.workspaceId, { issueId, runId })
+  await act(async () => composer!.onChange('Draft on an old build'))
+  await act(async () => { composer!.onSubmit() })
+  const reason = container.querySelector('[data-delivery-status="failed"] [role="alert"]')?.firstChild?.textContent
+  assert.equal(reason, messages.Coordinator.sendUpdateRequired)
+  await renderInbox(viewer)
+  await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Draft on an old build'), { status: 'failed', error: reason }) })
+  assert.equal(calls.length, 0)
+  buildGate = undefined
+  await act(async () => { assert.equal((await submit(issueId, runId, 'Original answer')).status, 'uncertain') })
+  await act(async () => { assert.equal((await submit(issueId, runId, 'Independent answer')).status, 'accepted') })
+  await renderInbox(viewer, false)
+  await renderInbox(viewer)
+  await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
+  assert.equal(calls.length, 3)
+  assert.deepEqual(calls[0], calls[2])
+  assert.notEqual((calls[1] as { requestId: string }).requestId, (calls[0] as { requestId: string }).requestId)
+  const original = calls[2] as { requestId: string }
+  assert.match(original.requestId, /^[\da-f-]{36}$/i)
+  assert.deepEqual(original, { issueId, runId, text: 'Original answer', requestId: original.requestId,
+    expectedOwnerId: viewer.ownerId, expectedWorkspaceId: viewer.workspaceId })
+  await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
+  assert.notEqual((calls[3] as { requestId: string }).requestId, original.requestId, 'an acknowledged answer must not consume a later independent answer')
+  const { DesktopTransportError } = await import('../apps/desktop/src/renderer/read-batch')
+  for (const [status, expected] of [[401, messages.Errors.authRequired], [403, messages.Coordinator.sendAccessDenied],
+    [426, messages.Coordinator.sendUpdateRequired], [429, messages.Coordinator.sendRateLimited]] as const) {
+    postReply = async () => { throw new DesktopTransportError('desktop_rpc_request_rejected', { status }) }
+    await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Denied ' + status), { status: 'failed', error: expected }) })
+  }
+})
+
+test('a version with a lost confirmation or stale read-back keeps its request until the same anchor and result run are visible', async () => {
+  const { ThreadReplyVersions } = await import('../components/workspace/thread-reply-versions')
+  const issueId = crypto.randomUUID(), runId = crypto.randomUUID(), versionId = crypto.randomUUID(), resultId = crypto.randomUUID()
+  const anchorKey = 'reply-1', ids: string[] = []
+  let rows: { id: string; anchorKey: string; anchorRunId: string; resultRunId: string; text: string }[] = []
+  let refreshes = 0
+  versionScenario = {
+    read: async () => rows,
+    write: async ({ change }) => {
+      ids.push(change.requestId)
+      if (ids.length === 1) throw new Error('lost response')
+      return { versionId, runId: resultId }
+    },
+  }
+  container = document.createElement('div')
+  document.body.append(container)
+  root = createRoot(container)
+  const { SWRConfig } = actualSWR
+  await act(async () => root!.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
+    <IntlProvider locale="en" timeZone="UTC" messages={messages}>
+      <ThreadReplyVersions issueId={issueId} runId={runId} anchorRunId={runId} anchorKey={anchorKey} operation="rerun"
+        text="Original answer" canRun refresh={() => { refreshes++ }} />
+    </IntlProvider>
+  </SWRConfig>))
+  async function click(label: string) {
+    const button = [...document.querySelectorAll('button')].find(el => el.textContent === label)
+    assert.ok(button, label)
+    assert.equal(button.disabled, false)
+    await act(async () => button.click())
+  }
+  await click(messages.IssueThreads.versionRerun)
+  await click(messages.IssueThreads.versionRun)
+  assert.equal(refreshes, 0)
+  const row = { id: versionId, anchorKey, anchorRunId: runId, resultRunId: resultId, text: 'Retried answer' }
+  for (const stale of [[], [{ ...row, resultRunId: crypto.randomUUID() }], [{ ...row, anchorKey: 'another-reply' }]]) {
+    rows = stale
+    await click(messages.IssueThreads.versionRun)
+    assert.equal(refreshes, 0, 'an incomplete or unrelated version must not confirm the write')
+    assert.ok(document.body.textContent?.includes(messages.Errors.threadSubmissionOutcomeUnconfirmed))
+  }
+  rows = [row]
+  await click(messages.IssueThreads.versionRun)
+  assert.equal(refreshes, 1)
+  assert.equal(ids.length, 5)
+  assert.equal(new Set(ids).size, 1, 'each retry recovers the original operation')
+})

@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { ownerListChanged } from '@/lib/live/lists'
 import { botChatChanged } from '@/lib/live/chats'
+import { applyCliFold, applyExternalFold, foldCliRunPolicy, foldExternalWritePermissions } from '@/lib/operations/workspace-policy-fold'
 
 /**
  * The person's Coordinator is an ordinary bot (glossary), one per person per
@@ -26,21 +27,55 @@ const backfilled = new Map<string, number>()
 const backfillFresh = (ownerId: string) => Date.now() - (backfilled.get(ownerId) ?? -Infinity) < BACKFILL_MS
 
 /** The person's personal workspace, created when they have none yet (as the app does on their first page). */
-export async function personalWorkspaceId(ownerId: string): Promise<string> {
-  const { pool } = await import('@/lib/db')
-  const found = (await pool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
+async function activePersonalWorkspaceId(ownerId: string): Promise<string | undefined> {
+  const { workspacePool } = await import('@/lib/workspace-db')
+  return (await workspacePool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
       JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=$1 AND m.status='active'
     WHERE w."userId"=$1 AND w.kind='personal' LIMIT 1`, [ownerId])).rows[0]?.id
-  if (found) return found
+}
+
+async function createPersonalWorkspace(ownerId: string): Promise<string> {
+  const { pool } = await import('@/lib/db')
   const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
   if (!person) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
   return (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
 }
 
+export async function personalWorkspaceId(ownerId: string): Promise<string> {
+  return await activePersonalWorkspaceId(ownerId) ?? await createPersonalWorkspace(ownerId)
+}
+
+async function personalCoordinatorForBackfill(ownerId: string): Promise<CoordinatorBot | null> {
+  // Membership belongs to the Workspace database. Read the legacy rows and
+  // coordinator in the application database only after finding the authorized Personal workspace.
+  const workspaceId = await activePersonalWorkspaceId(ownerId)
+  if (!workspaceId) return ensureFor(ownerId, await createPersonalWorkspace(ownerId))
+  const { pool } = await import('@/lib/db')
+  const found = (await pool.query<{ botId: string; legacyWork: boolean }>(`SELECT c."botId",
+      (EXISTS (SELECT 1 FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=c."workspaceId" AND "botKey"='coordinator')
+        OR EXISTS (SELECT 1 FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator')
+        OR EXISTS (SELECT 1 FROM user_schedules WHERE owner_id=$1 AND bot_id IS NULL)
+        OR EXISTS (SELECT 1 FROM suggestions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM pending_actions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM agent_kit_heads old_head WHERE old_head.owner_id=$1 AND old_head.bot_key='coordinator'
+          AND NOT EXISTS (SELECT 1 FROM agent_kit_heads current_head
+            WHERE current_head.owner_id=$1 AND current_head.bot_key=c."botId"::text))) AS "legacyWork"
+    FROM coordinator_bots c WHERE c."ownerId"=$1 AND c."workspaceId"=$2`, [ownerId, workspaceId])).rows[0]
+  if (found?.botId && found.legacyWork === false) return null
+  return ensureFor(ownerId, workspaceId)
+}
+
 async function ensureFor(ownerId: string, workspaceId: string): Promise<CoordinatorBot> {
-  const [{ pool }, { ensureCoordinatorBot }] = await Promise.all([import('@/lib/db'), import('@/lib/computer/auto-runtime')])
+  const [{ pool }, { workspacePool }, { ensureCoordinatorBot }] = await Promise.all([
+    import('@/lib/db'), import('@/lib/workspace-db'), import('@/lib/computer/auto-runtime'),
+  ])
   // Only a workspace the person is an active member of gets their Coordinator.
-  const member = await pool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [workspaceId, ownerId])
+  const member = await workspacePool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [workspaceId, ownerId])
   if (!member.rowCount) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
   return { botId: await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId }), workspaceId }
 }
@@ -63,8 +98,8 @@ export async function coordinatorBot(ownerId: string, workspaceId: string | null
     // locks now (lock_timeout) is retried on the next read; the chat stays usable meanwhile.
     try {
       const { pool } = await import('@/lib/db')
-      const personal = workspaceId ? await ensureFor(ownerId, await personalWorkspaceId(ownerId)) : bot
-      await backfillCoordinatorChat(pool, ownerId, personal)
+      const personal = workspaceId ? await personalCoordinatorForBackfill(ownerId) : bot
+      if (personal) await backfillCoordinatorChat(pool, ownerId, personal)
       backfilled.set(ownerId, Date.now())
     } catch (error) { console.error('Coordinator chat move deferred', { code: (error as { code?: string }).code }) }
   }
@@ -91,11 +126,14 @@ export async function openChatBotId(user: { id: string; email: string; name: str
  * workspace with this workspace's Coordinator first, marked `coordinator`.
  */
 export async function listOwnerBots(ownerId: string, workspaceId: string) {
-  const [{ db }, { bots }, { and, asc, desc, eq, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
+  const [{ db }, { bots }, { and, asc, desc, eq, isNull, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
   const { botId } = await coordinatorBot(ownerId, workspaceId)
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
-  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId)))
+  // The row menu's Share and Move to show the current access and Environment (lib/bot-access.ts).
+  const visibility = sql<'shared' | 'private'>`coalesce((select p.visibility from resource_access_policies p where p.kind='bot' and p.id="bots"."id"),'private')`
+  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator, environmentId: bots.environmentId, visibility }).from(bots)
+    // An archived bot leaves the person's lists (lib/bot-lifecycle.ts); its chat stays reachable by address.
+    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), isNull(bots.archivedAt)))
     .orderBy(desc(isCoordinator), asc(bots.createdAt))
 }
 
@@ -265,7 +303,7 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
 
 /**
  * A compacted summary is signed for its chat ([userId, botId], workflows/coordinator/steps.ts
- * preparePrompt), so the moved one is signed again for the Coordinator's bot row; otherwise
+ * product instruction preparation), so the moved one is signed again for the Coordinator's bot row; otherwise
  * the next turn would drop it as unverified. One that does not verify stays as it was.
  */
 async function movedSummary(ownerId: string, botId: string, summary: string): Promise<string> {
@@ -276,8 +314,8 @@ async function movedSummary(ownerId: string, botId: string, summary: string): Pr
 }
 
 async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, workspaceId }: CoordinatorBot) {
-  await client.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel")
-      SELECT "ownerId","workspaceId",$3,"bindingId","apiKeyId","apiKeyModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"='coordinator'
+  await client.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel","creditsModel")
+      SELECT "ownerId","workspaceId",$3,"bindingId","apiKeyId","apiKeyModel","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"='coordinator'
       ON CONFLICT ("ownerId","workspaceId","botKey") DO NOTHING`, [ownerId, workspaceId, botId])
   await client.query(`DELETE FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"='coordinator'`, [ownerId, workspaceId])
   await client.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted,"updatedAt")
@@ -294,22 +332,36 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
 }
 
 /**
- * The Coordinator's agent definition and its two run policies (computer use,
- * external writes) were kept on the account's 'coordinator' head. Versions are
- * immutable history, so the active definition is copied as the row's first
- * version and the policies with it (Plugins › GitHub's two writes among
- * them, lib/github/plugin-permissions.ts); the old head stays as history.
+ * The Coordinator's agent definition is kept on the account's 'coordinator'
+ * head; versions are immutable history, so the active definition is copied as
+ * the new row's first version. The two policy columns are not copied: a Bot has
+ * no permission layer. The legacy head's deny/ask choices are folded into the
+ * workspace policy first, so no restriction is lost.
  */
 async function copyAgentHead(client: PoolClient, ownerId: string, botId: string, workspaceId: string) {
-  const old = (await client.query(`SELECT h.cli_run_policy, h.cli_run_policy_version, h.external_write_permissions, h.external_write_policy_version,
+  const old = (await client.query(`SELECT h.cli_run_policy, h.external_write_permissions,
       v.definition, v.digest, v.source
     FROM agent_kit_heads h LEFT JOIN agent_kit_versions v ON v.owner_id=h.owner_id AND v.bot_key=h.bot_key AND v.id=h.active_version
     WHERE h.owner_id=$1 AND h.bot_key='coordinator'`, [ownerId])).rows[0]
   if (!old) return
-  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy,cli_run_policy_version,external_write_permissions,external_write_policy_version)
-      VALUES ($1,$2,$8,$3,$4,$5,$6,$7) ON CONFLICT (owner_id,bot_key) DO NOTHING`,
-  [ownerId, botId, workspaceId, old.cli_run_policy, old.cli_run_policy_version, old.external_write_permissions, old.external_write_policy_version, botId])
-  if (!created.rowCount || !old.definition) return
+  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id)
+      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, botId, workspaceId])
+  // Fold only when this head is first created. A later backfill must not
+  // re-apply the legacy ceiling over an admin's newer workspace choice.
+  if (!created.rowCount) return
+  // The same locks the workspace policy writers take, before the row read.
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-external-write:${workspaceId}`])
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-cli-policy:${workspaceId}`])
+  const policy = (await client.query<{ external_write_permissions: unknown; cli_run_policy: unknown }>(
+    'SELECT external_write_permissions,cli_run_policy FROM workspace_computer_policies WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
+  const external = applyExternalFold(policy?.external_write_permissions, foldExternalWritePermissions([old.external_write_permissions, policy?.external_write_permissions]))
+  const cli = applyCliFold(policy?.cli_run_policy, foldCliRunPolicy([old.cli_run_policy, policy?.cli_run_policy]))
+  await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version,cli_run_policy)
+      VALUES ($1,'allow',$2,case when $2::jsonb='{}'::jsonb then 0 else 1 end,$3)
+      ON CONFLICT ("workspaceId") DO UPDATE SET external_write_permissions=excluded.external_write_permissions,cli_run_policy=excluded.cli_run_policy
+      WHERE workspace_computer_policies.external_write_permissions IS DISTINCT FROM excluded.external_write_permissions
+         OR workspace_computer_policies.cli_run_policy IS DISTINCT FROM excluded.cli_run_policy`, [workspaceId, external, cli])
+  if (!old.definition) return
   const versionId = crypto.randomUUID()
   await client.query(`INSERT INTO agent_kit_versions (id,owner_id,bot_key,version,definition,digest,source,request_key,base_version)
       VALUES ($1,$2,$3,1,$4,$5,$6,'coordinator-bot-backfill',NULL)`, [versionId, ownerId, botId, old.definition, old.digest, old.source])

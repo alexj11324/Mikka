@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
+import type { z } from 'zod'
+import type { addProjectRepositoriesBody } from '../lib/project-resources/contracts'
 import { dbUrl, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl }, async t => {
@@ -10,6 +12,7 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
   const { withRunProjectExecution } = await import('../lib/project-resources/run-lease')
   const { environmentConfiguration } = await import('../lib/project-resources/contracts')
   const { ActionFailureError } = await import('../lib/action-error')
+  const { registerProjectAccess } = await import('../lib/resource-access/projects')
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { tokenWorkspace } = await import('../lib/tokens/principal')
@@ -22,6 +25,7 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
   const projectId = randomUUID()
   await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
     values($1,$2,$3,'Shared project','','','planned','none','','','','','[]',1)`, [projectId, owner, workspace.id])
+  await registerProjectAccess(owner, projectId, workspace.id)
   await seedProjectTasks(connection, projectId, [issueId])
   const repoA = 'v2/github.com/acme/application', repoB = 'v2/github.com/acme/service', repoC = 'v2/github.com/elsewhere/private'
   const request = { userId: owner, workspaceId: workspace.id, issueId, repositoryKey: repoA, baseBranch: 'main', runtime: 'local' as const, harness: 'codex' }
@@ -52,6 +56,9 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     assert.equal(value.baseBranch, 'develop', 'the project target branch is frozen instead of the device default')
     assert.equal(value.environment?.id, environmentId)
     assert.equal(value.environment?.variables.FEATURE_MODE, 'test')
+    assert.deepEqual(await resources.readProjectEnvironmentVariable(owner, { workspaceId: workspace.id, projectId, name: 'FEATURE_MODE' }),
+      { name: 'FEATURE_MODE', value: 'test' })
+    assert.equal(await resources.readProjectEnvironmentVariable(owner, { workspaceId: workspace.id, projectId, name: 'UNCONFIGURED' }), null)
     assert.equal((await admission(repoB)).repositoryKey, repoB)
     await rejects(admission(repoC), 'projectRepositoryDenied')
     await resources.saveWorkspaceRepositoryPolicy(owner, { workspaceId: workspace.id, revision: 0, mode: 'restricted', repositoryKeys: [repoA, repoC] })
@@ -60,12 +67,72 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     await rejects(resources.withProjectExecution({ ...request, runtime: 'cloud' }, async value => value), 'projectEnvironmentUnavailable')
     await rejects(resources.withProjectExecution({ ...request, harness: 'claude_code' }, async value => value), 'projectEnvironmentUnavailable')
   })
+  await t.test('Organization reads the current Project variable through its active Workspace attachment', async () => {
+    const governance = await import('../lib/governance/organizations')
+    const { rows: [user] } = await connection.query('select id,name,email from "user" where id=$1', [owner])
+    const org = await governance.createOrganization(user, { name: 'Environment variable scope' })
+    const input = { organizationId: org.id, projectId, name: 'FEATURE_MODE' }
+    await governance.attachOrganizationWorkspace(org.id, workspace.id, owner)
+    assert.deepEqual(await resources.readOrganizationProjectEnvironmentVariable(owner, input), { name: 'FEATURE_MODE', value: 'test' })
+    const { GovernanceError } = await import('../lib/governance/errors')
+    const missing = (error: unknown) => error instanceof GovernanceError && error.detail === 'not_found'
+    await assert.rejects(resources.readOrganizationProjectEnvironmentVariable(member, input), missing)
+    await governance.addOrganizationMember(org.id, owner, { userId: member, role: 'member' })
+    assert.deepEqual(await resources.readOrganizationProjectEnvironmentVariable(member, input), { name: 'FEATURE_MODE', value: 'test' })
+    await governance.detachOrganizationWorkspace(org.id, workspace.id, owner)
+    await assert.rejects(resources.readOrganizationProjectEnvironmentVariable(owner, input), missing)
+  })
+  await t.test('incremental repository adds keep existing metadata and serialize without duplicate revisions or audits', async () => {
+    const id = randomUUID()
+    await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+      values($1,$2,$3,'Add repositories','','','planned','none','','','','','[]',1)`, [id, owner, workspace.id])
+    await registerProjectAccess(owner, id, workspace.id)
+    const scope = { workspaceId: workspace.id, projectId: id }
+    await resources.saveProjectResources(owner, { ...scope, revision: 1,
+      repositories: [{ repositoryKey: repoA, isPrimary: true, baseBranch: 'release', environmentId }],
+      environmentIds: [environmentId], defaultEnvironmentId: environmentId })
+    const before = await resources.listProjectResources(owner, workspace.id, id)
+    const add = (repos: z.input<typeof addProjectRepositoriesBody>['repos']) => resources.saveProjectResources(owner, { ...scope, repos })
+    const [a, b, c] = [repoA, repoB, repoC].map(key => ({ repoFullName: key.slice('v2/github.com/'.length) }))
+    const revisions = await Promise.all([add([a, { ...b, baseBranch: 'release/b' }]), add([c])])
+    assert.deepEqual(revisions.map(result => result.revision).sort(), [3, 4])
+    const replay = await add([{ ...b, repoFullName: b.repoFullName.toUpperCase() }, b, c])
+    assert.ok('repos' in replay)
+    assert.equal(replay.id, id)
+    assert.equal(replay.name, 'Add repositories')
+    assert.equal(replay.revision, 4)
+    assert.equal(replay.repos.find(row => row.repoFullName === b.repoFullName)?.baseBranch, 'release/b')
+    assert.deepEqual(await add([]), replay)
+    await rejects(add([{ ...b, baseBranch: 'conflicts' }]), 'projectResourceConflict')
+    await rejects(add([{ repoFullName: 'acme/new-primary', mode: 'primary' }]), 'projectResourceConflict')
+    await assert.rejects(add([{ repoFullName: 'acme/new' }, { ...c, mode: 'lazy' }]), { detail: 'feature_unavailable' })
+    const updated = await resources.listProjectResources(owner, workspace.id, id)
+    assert.deepEqual(updated.environmentBindings, before.environmentBindings)
+    assert.deepEqual(updated.policy, before.policy)
+    assert.deepEqual(updated.repositories.find(row => row.repositoryKey === repoA), before.repositories[0])
+    assert.deepEqual(updated.repositories.map(row => row.repositoryKey).sort(), [repoA, repoB, repoC].sort())
+    const extra = Array.from({ length: 98 }, (_, index) => ({ repoFullName: 'acme/extra-' + index }))
+    await assert.rejects(add(extra), { name: 'ZodError' })
+    const { rows: [row] } = await connection.query(`select revision,
+      (select count(*)::int from workspace_resource_events where "resourceId"=$1 and kind='project_resources.changed') as audits
+      from workspace_projects where id=$1`, [id])
+    assert.deepEqual(row, { revision: 4, audits: 3 })
+    assert.deepEqual((await resources.listProjectResources(owner, workspace.id, id)).repositories, updated.repositories)
+    await resources.saveProjectResources(owner, { ...scope, revision: 4, repositories: [], environmentIds: [], defaultEnvironmentId: null })
+    const first = await add([{ ...a, mode: 'primary', baseBranch: 'trunk' }])
+    assert.ok('repos' in first)
+    assert.deepEqual(first.repos, [{ ...a, repositoryKey: repoA, isPrimary: true, baseBranch: 'trunk', environmentId: null }])
+
+  })
+
   await t.test('two Projects in one Workspace select the same repository independently across a binding change', async () => {
     const issueA = await seedIssue(connection, owner, workspace.id), issueB = await seedIssue(connection, owner, workspace.id)
     const projectA = randomUUID(), projectB = randomUUID()
     await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
       values($1,$3,$4,'Repository Project A','','','planned','none','','','','','[]',1),
         ($2,$3,$4,'Repository Project B','','','planned','none','','','','','[]',1)`, [projectA, projectB, owner, workspace.id])
+    await registerProjectAccess(owner, projectA, workspace.id)
+    await registerProjectAccess(owner, projectB, workspace.id)
     await seedProjectTasks(connection, projectA, [issueA])
     await seedProjectTasks(connection, projectB, [issueB])
     const environmentA = await resources.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Repository A',

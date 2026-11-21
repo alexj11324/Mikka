@@ -9,8 +9,8 @@ import type { ActivityActor } from '@/lib/activity-actor'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { issueListChanged } from './live/lists'
-import { scheduleShortTitle } from './short-title-schedule'
 import { requireTaskWorkspace } from './task-workspace'
+import { registerTaskResourceAccess } from './task-resource-registration'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -29,7 +29,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
   const workspace = await requireTaskWorkspace(userId, options.workspaceId)
   const id = options?.id ?? crypto.randomUUID()
   const number = await allocateIssueNumbers(tx, userId)
-  const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
+  const metadata = { ...readIssueMetadata({ type: 'doc' }), number, delegateSelection: 'dispatch' as const }
   const [issue] = await tx.insert(issues).values({
     ...parsed.data,
     content: withIssueMetadata(parsed.data.content, metadata),
@@ -43,6 +43,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     revision: 1,
     linearSyncBlocked: options.linearSyncBlocked ?? true,
   }).returning()
+  await registerTaskResourceAccess(tx, { id, ownerId: userId, workspaceId: workspace.id, workspaceKind: workspace.kind })
   await tx.insert(issueVersions).values({
     id: crypto.randomUUID(),
     issueId: id,
@@ -55,7 +56,5 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     ...actor,
   })
   await issueListChanged(tx, id)
-  // A short title for the lists, written once after this commits (lib/short-title-schedule.ts).
-  scheduleShortTitle(tx, id, userId)
   return issueView(issue, tx)
 }

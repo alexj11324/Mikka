@@ -15,7 +15,7 @@ import { readWorkspaceReceipt } from '../../packages/daemon/src/coding-workspace
 import type { JournalEntry } from '../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(disposableDatabase(process.env, url), E2E_DB_RULE)
@@ -29,7 +29,7 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
   const database = `coding_workspace_${randomUUID().replaceAll('-', '')}_e2e`
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'coding workspace acceptance requires PostgreSQL 17')
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8, connectionTimeoutMillis: 5000 })
   const root = await mkdtemp(join(tmpdir(), 'mikka-workspace-db-'))
@@ -43,10 +43,10 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     for (const name of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, directory), 'utf8'))
     // Supply Next's request context without replacing API authentication.
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
     // Only external gateway delivery is replaced. SQL, LISTEN/NOTIFY, source
     // authority, secret masking and the daemon filesystem handler stay real.
     const wakes: string[] = [], wakeBarriers = new Map<string, Promise<void>>()
@@ -228,13 +228,13 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     await t.test('files GET accepts real session/PAT authority and rejects missing, revoked, tenant and member credentials', async () => {
       const f = await fixture()
       const { auth } = await import('../auth')
-      const { createPersonalAccessToken } = await import('../tokens/store')
+      const { createLegacyPersonalAccessToken } = await import('../tokens/store')
       const { GET } = await import('../../app/api/runs/[runId]/workspace/files/route')
       const session = await (await auth.$context).internalAdapter.createSession(owner)
       assert.ok(session)
-      const ownerToken = await createPersonalAccessToken(owner, workspaceId, { name: 'Workspace fixture owner' })
-      const memberToken = await createPersonalAccessToken(member, workspaceId, { name: 'Workspace fixture member' })
-      const otherToken = await createPersonalAccessToken(owner, otherWorkspace, { name: 'Workspace fixture other tenant' })
+      const ownerToken = await createLegacyPersonalAccessToken(owner, workspaceId, { name: 'Workspace fixture owner' })
+      const memberToken = await createLegacyPersonalAccessToken(member, workspaceId, { name: 'Workspace fixture member' })
+      const otherToken = await createLegacyPersonalAccessToken(owner, otherWorkspace, { name: 'Workspace fixture other tenant' })
       const endpoint = `http://127.0.0.1:3199/api/runs/${f.runId}/workspace/files?repoId=${f.repoId}&workspaceId=${workspaceId}&kind=file&path=src%2Fexample.ts`
       const get = (credential?: string, signal?: AbortSignal) => GET(new Request(endpoint, { headers: credential ? { authorization: `Bearer ${credential}` } : {}, signal }), { params: Promise.resolve({ runId: f.runId }) })
       // Both credentials use their real database verifiers. A session bearer
@@ -773,14 +773,14 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
 
     await t.test('mention create and resolve reauthenticate real sessions and PATs after a pending device read', async () => {
       const f = await fixture(), { auth } = await import('../auth')
-      const { createPersonalAccessToken } = await import('../tokens/store')
+      const { createLegacyPersonalAccessToken } = await import('../tokens/store')
       const { POST } = await import('../../app/api/runs/[runId]/workspace/mentions/route')
       const { value: mention } = await exchange(f, signal => createFileMention(pool, pool, actor, f.runId, f.repoId,
         { kind: 'file', path: 'src/example.ts', range: { startLine: 1, endLine: 1 } }, signal))
       const origin = 'http://127.0.0.1:3199', endpoint = `${origin}/api/runs/${f.runId}/workspace/mentions`
       for (const action of ['create', 'resolve'] as const) for (const type of ['session', 'pat'] as const) {
         const session = type === 'session' ? await (await auth.$context).internalAdapter.createSession(owner) : null
-        const pat = type === 'pat' ? await createPersonalAccessToken(owner, workspaceId, { name: `Workspace in-flight ${action}` }) : null
+        const pat = type === 'pat' ? await createLegacyPersonalAccessToken(owner, workspaceId, { name: `Workspace in-flight ${action}` }) : null
         const credential = session?.token ?? pat?.token
         assert.ok(credential)
         const body = { action, repoId: f.repoId, workspaceId, ...(action === 'create'

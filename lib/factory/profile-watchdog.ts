@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import { entryKey } from '@/lib/model-order-plan'
 import { factoryEventId } from './event-id'
-import { isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile-definition'
+import { isBuiltinAgentProfileSelection, profileFixedModel, type AgentProfileSelection } from './agent-profile-definition'
 
 export type ProfileFactoryContext = { attemptId: string; sourceEventId: string; runId?: string }
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -68,7 +68,7 @@ export async function watchdogProfileAdmission(query: Query, input: {
       original.targetEntry.harness !== input.harness || original.targetEntry.model !== input.model ||
       !isDeepStrictEqual({ ...original, targetEntry: undefined }, { ...input.selection, targetEntry: undefined })) return 'invalid'
   if ((original.source === 'default' || original.profileId === 'default') && !isBuiltinAgentProfileSelection(original)) return 'invalid'
-  if ((original.definition.model.mode === 'fixed' || source.agentDefinition.modelDispatch?.mode === 'picked') &&
+  if ((profileFixedModel(original) || source.agentDefinition.modelDispatch?.mode === 'picked') &&
       entryKey(original.targetEntry) !== entryKey(input.selection.targetEntry)) return 'invalid'
   const observedId = factoryEventId('task-watchdog', `${source.originAttemptId}:${current.sourceEventId}`)
   const retryId = factoryEventId('watchdog-retry', observedId)

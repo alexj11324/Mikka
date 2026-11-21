@@ -47,7 +47,7 @@ def identity_receipt(raw, environ):
     value = json.loads(raw)
     if (not isinstance(value, dict) or set(value) != {'version', 'sourceCommit', 'runId', 'runAttempt', 'templates'}
             or type(value['version']) is not int or value['version'] != 1
-            or value['sourceCommit'] != environ['GITHUB_SHA'] or value['runId'] != environ['GITHUB_RUN_ID']
+            or value['sourceCommit'] != builder.runtime_source(environ) or value['runId'] != environ['GITHUB_RUN_ID']
             or not isinstance(value['runAttempt'], str) or not re.fullmatch(r'[1-9][0-9]*', value['runAttempt'])
             or int(value['runAttempt']) > int(environ['GITHUB_RUN_ATTEMPT'])
             or not isinstance(value['templates'], dict) or set(value['templates']) != set(builder.KINDS)):
@@ -126,7 +126,7 @@ def main():
     parser.add_argument('--sandboxes-only', action='store_true')
     args = parser.parse_args()
     metadata, candidates, errors = cleanup_plan(os.environ, args.report, args.identities_file, args.identities_required)
-    receipt = {'sourceCommit': os.environ['GITHUB_SHA'], 'runId': os.environ['GITHUB_RUN_ID'],
+    receipt = {'sourceCommit': builder.runtime_source(os.environ), 'runId': os.environ['GITHUB_RUN_ID'],
                'sandboxes': [], 'templates': [], 'errors': errors}
     api_key = os.environ['E2B_API_KEY']
     try:

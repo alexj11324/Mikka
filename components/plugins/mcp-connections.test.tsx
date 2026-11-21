@@ -8,7 +8,7 @@ import type { McpWorkspacePage } from '@/lib/plugins/contracts'
 import { withBasePath } from '@/lib/base-path'
 
 const translate = (key: string, args?: Record<string, string>) => args ? `${key} ${Object.values(args).join(' ')}` : key
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
 mock.module(new URL('./connected-apps.tsx', import.meta.url).href, { namedExports: {
   AppTile: () => <span data-app-icon="mcp" />,
 } })
@@ -126,4 +126,67 @@ test('read failure remains visible and an unexpected workspace response is rejec
   await act(async () => button('checkAgain')!.click())
   assert.ok(container.textContent?.includes('loadFailed'))
   assert.equal(mutate.mock.callCount(), 0)
+})
+
+test('an empty connections list still offers the native MCP form and clears credentials on close', async () => {
+  page!.servers = []
+  await act(async () => render())
+  assert.ok(container.textContent?.includes('empty'))
+  await act(async () => button('add')!.click())
+  assert.ok(document.querySelector('#mcp-url'))
+  assert.equal(document.querySelector('#mcp-command'), null)
+  const select = document.querySelector<HTMLSelectElement>('#mcp-transport')!
+  await act(async () => {
+    select.value = 'stdio'
+    select.dispatchEvent(new browser.Event('change', { bubbles: true }) as unknown as Event)
+  })
+  assert.equal(document.querySelector('#mcp-url'), null)
+  assert.ok(document.querySelector('#mcp-command'))
+  assert.ok(document.querySelector('#mcp-args'))
+  assert.ok(document.querySelector('#mcp-cwd'))
+  assert.ok(document.body.textContent?.includes('taskReadable'))
+  await act(async () => button('addVariable')!.click())
+  assert.equal(document.querySelector('input[aria-label="variableValue 1"]')?.getAttribute('type'), 'password')
+  await act(async () => button('cancel')!.click())
+  await act(async () => button('add')!.click())
+  assert.equal(document.querySelector('input[type="password"]'), null)
+  assert.equal(requests.length, 0)
+})
+
+test('the owner opens a live tool page, follows its cursor and retries a fresh read without changing the connection', async () => {
+  const serverId = fixture().servers[0].id
+  let names = ['first'], unavailable = false
+  respond = async (method, body) => {
+    assert.equal(method, 'POST')
+    assert.equal((body as { serverId: string }).serverId, serverId)
+    if (unavailable) return new Response(null, { status: 503 })
+    const following = (body as { cursor?: string }).cursor === 'two'
+    return Response.json({ serverId, tools: (following ? ['last'] : names).map(name => ({ name })), nextCursor: following ? null : 'two' })
+  }
+  await act(async () => render())
+  assert.equal(requests.length, 0)
+  await act(async () => button('viewTools')!.click())
+  assert.ok(document.body.textContent?.includes('first'))
+  await act(async () => button('nextTools')!.click())
+  assert.ok(document.body.textContent?.includes('last'))
+  assert.equal(button('nextTools'), undefined)
+  unavailable = true
+  await act(async () => button('refreshTools')!.click())
+  assert.ok(document.body.textContent?.includes('toolsFailed'))
+  assert.ok(!document.body.textContent?.includes('last'))
+  unavailable = false; names = []
+  await act(async () => button('checkAgain')!.click())
+  assert.ok(document.body.textContent?.includes('emptyTools'))
+  assert.deepEqual(requests.map(row => row.body), [{ serverId }, { serverId, cursor: 'two' }, { serverId }, { serverId }])
+  assert.ok(requests.every(row => row.url === withBasePath('/api/integrations/mcp/refresh')))
+})
+
+test('shared, disabled and machine-local MCP installations have no owner remote-discovery control', async () => {
+  for (const state of [{ mine: false, shared: true }, { enabled: false }, { transport: 'stdio' as const }]) {
+    page = fixture()
+    Object.assign(page.servers[0], state)
+    await act(async () => render())
+    assert.equal(button('viewTools'), undefined)
+  }
+  assert.equal(requests.length, 0)
 })

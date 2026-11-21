@@ -10,8 +10,8 @@ import { useApi } from '@/lib/useApi'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { ReviewBar } from '../components/review-bar'
 import { useReview } from '../components/use-review'
-import { CANNOT_SEND, denial, lineNumber, lineSide, parsePatch, type DiffLine, type PendingComment, type ReviewFileRead, type ReviewSentComment } from '../model/review'
-import { filePath } from '../model/review-api'
+import { CANNOT_SEND, VERSIONED_READ_ONLY, denial, lineNumber, lineSide, parsePatch, type DiffLine, type PendingComment, type ReviewFileRead, type ReviewSentComment } from '../model/review'
+import { filePath, readFilePath } from '../model/review-api'
 import { batchHref, noteHref } from '../model/routes'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
@@ -26,13 +26,14 @@ export function FileScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const r = useReview(id)
-  const read = useApi<ReviewFileRead>(id && path ? filePath(id, path) : null)
+  const ref = r.review?.diff.reviewRef
+  const read = useApi<ReviewFileRead>(id && path && r.review && ref !== null ? filePath(id, path, ref) : null, { read: readFilePath })
   const file = read.data?.file ?? r.review?.diff.files.find(item => item.path === path)
   const hunks = useMemo(() => parsePatch(read.data?.file.patch ?? null), [read.data])
   const sentComments = read.data?.comments ?? []
   const name = path?.slice(path.lastIndexOf('/') + 1) ?? ''
   const pending = r.batch.comments.filter(comment => comment.path === path)
-  const canComment = Boolean(r.permissions?.canSend) && !r.merged
+  const canComment = Boolean(r.permissions?.canSend) && !r.versioned && !r.merged
   const openLine = (line: DiffLine) => {
     if (!canComment) return
     router.push({ pathname: '/task/[id]/comment', params: { id, path, line: String(lineNumber(line)), side: lineSide(line), quote: `${line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' '} ${line.text}` } })
@@ -43,7 +44,7 @@ export function FileScreen() {
     <View style={styles.screen}>
       <NavBar title={name} />
       <ScrollView {...underBar} contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}>
-        {file ? <Text style={styles.counts}><Text style={{ color: colors.success }}>+{file.additions}</Text>  <Text style={{ color: colors.danger }}>−{file.deletions}</Text>  <Text style={{ color: colors.secondary }}>{path}</Text></Text> : null}
+        {file ? <Text style={styles.counts}>{file.additions !== null && <Text style={{ color: colors.success }}>+{file.additions}  </Text>}{file.deletions !== null && <Text style={{ color: colors.danger }}>−{file.deletions}  </Text>}  <Text style={{ color: colors.secondary }}>{path}</Text></Text> : null}
         <ReadNotice error={read.error} hasData={Boolean(read.data)} label="改动" onRetry={read.reload} />
         {read.loading && !read.data ? <View style={styles.center}><Spinner /></View> : null}
         {hunks.map((hunk, h) => (
@@ -71,7 +72,7 @@ export function FileScreen() {
         {read.data && !hunks.length ? <Text style={styles.empty}>{read.data.file.tooLarge ? '改动太大，没法在手机上显示' : '没有改动'}</Text> : null}
       </ScrollView>
       {r.review && !r.merged ? <ReviewBar line={r.line} note={r.batch.note} canSend={r.canSend} busy={r.sending}
-        blocked={r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : undefined}
+        blocked={r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : r.versioned ? VERSIONED_READ_ONLY : undefined}
         onOpenBatch={() => router.push(batchHref(id))} onOpenNote={() => router.push(noteHref(id))} onSend={() => void r.send()} /> : null}
     </View>
   )

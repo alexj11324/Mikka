@@ -3,7 +3,7 @@ import { after, afterEach, before, beforeEach, test } from 'node:test'
 import { act, StrictMode, useCallback, type Dispatch, type SetStateAction } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
-import { ViewStateProvider, useViewScroll, useViewState } from './view-state'
+import { createViewStore, ViewStateProvider, useViewScroll, useViewState } from './view-state'
 import { clearChatDrafts } from '../chat-drafts'
 
 const browser = new Window({ url: 'https://mikka.example/en' })
@@ -27,6 +27,32 @@ function Reader({ id, initial = '' }: { id: string; initial?: string }) {
   return <p>{value}</p>
 }
 const renderReader = (scope = 'person:workspace', id = 'thread-a') => act(async () => root.render(<ViewStateProvider scope={scope}><Reader id={id} /></ViewStateProvider>))
+
+test('a write to one cell wakes only that cell\'s readers, and the whole-store escape hatch still hears every write', () => {
+  const store = createViewStore(null)
+  let draftA = 0
+  let draftB = 0
+  let everything = 0
+  const stopA = store.subscribeKey('draft:thread-a', () => { draftA += 1 })
+  const stopB = store.subscribeKey('draft:thread-b', () => { draftB += 1 })
+  const stopEverything = store.subscribe(() => { everything += 1 })
+  store.set('draft:thread-a', 'typed')
+  assert.deepEqual([draftA, draftB, everything], [1, 0, 1], 'the other draft cell must not wake')
+  // A scroll cell saves many times a second; unrelated readers stay asleep.
+  store.set('scroll:list', { top: 120, left: 0 })
+  assert.deepEqual([draftA, draftB, everything], [1, 0, 2])
+  store.reset('draft:thread-b', 'replaced')
+  assert.deepEqual([draftA, draftB, everything], [1, 1, 3])
+  store.set('draft:thread-b', 'late', store.generation('draft:thread-b') - 1)
+  assert.deepEqual([draftA, draftB, everything], [1, 1, 3], 'a stale generation never notifies')
+  stopA()
+  store.set('draft:thread-a', 'typed again')
+  assert.deepEqual([draftA, draftB, everything], [1, 1, 4], 'an unsubscribed cell stops hearing its own writes')
+  stopB()
+  stopEverything()
+  store.set('draft:thread-a', 'after both')
+  assert.deepEqual([draftA, draftB, everything], [1, 1, 4])
+})
 
 test('switching threads reads each draft immediately and an old callback only updates its own thread', async () => {
   await renderReader()

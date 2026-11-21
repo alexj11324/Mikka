@@ -1,9 +1,10 @@
 'use client'
 
+import { useDecisionSubmission } from '@/hooks/use-decision-submission'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { useLocale, useTranslations } from 'next-intl'
-import { createContext, use, useRef, useState, type ReactElement, type ReactNode } from 'react'
-import { Check, ChevronRight, ExternalLink } from 'lucide-react'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
+import { createContext, use, useState, type ReactElement, type ReactNode } from 'react'
+import { Check, ChevronRight, ExternalLink } from '@/components/icons'
 import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
 import { Link } from '@/i18n/navigation'
 import { useIsStreaming } from '@openuidev/react-lang'
@@ -28,34 +29,25 @@ import { setDeviceEnabled } from '@/app/actions/agents'
 export function useAgentDecision() {
   const agentCopy = useAgentCopy()
 
-  const { busy, continueFromAnswer } = useAgentInteraction()
+  const { busy, continueFromAnswer, answer } = useAgentInteraction()
   const streaming = useIsStreaming()
-  const locked = useRef(false)
-  const [pending, setPending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
+  const operation = useDecisionSubmission()
+  const receipt = operation.state('reply')
+  const pending = receipt.status === 'submitting'
+  const sent = receipt.status === 'accepted'
 
   async function send(prompt: string) {
-    if (busy || streaming || locked.current || sent) return
-    if (!prompt.trim() || prompt.length > 8000) {
-      setError(agentCopy.theQuestionIsEmptyOrTooLong2)
-      return
-    }
-    locked.current = true
-    setPending(true)
-    setError('')
-    try {
-      if (await continueFromAnswer(prompt)) setSent(true)
-      else setError(agentCopy.unableToContinueYourChoicesAndAnswers)
-    } catch {
-      setError(agentCopy.submissionFailedYourChoicesAndAnswersAre)
-    } finally {
-      locked.current = false
-      setPending(false)
-    }
+    if (busy || streaming) return
+    await operation.submit('reply', async () => {
+      if (!prompt.trim() || prompt.length > 8000) return { status: 'failed', error: agentCopy.theQuestionIsEmptyOrTooLong2 }
+      // The card says why the answer did not go when the chat knows (offline, refresh needed, the server's reason);
+      // the general sentence is only for a send that gives none.
+      const outcome = answer ? await answer(prompt) : { sent: await continueFromAnswer(prompt) }
+      return outcome.sent ? { status: 'accepted' } : { status: 'failed', error: ('reason' in outcome && outcome.reason) || agentCopy.unableToContinueYourChoicesAndAnswers }
+    }, agentCopy.submissionFailedYourChoicesAndAnswersAre)
   }
 
-  return { send, sent, pending, error, status: (sent ? 'answered' : pending || busy || streaming ? 'submitting' : 'pending') as ApprovalCardStatus }
+  return { send, sent, pending, error: 'error' in receipt ? receipt.error : '', status: (sent ? 'answered' : pending || busy || streaming ? 'submitting' : 'pending') as ApprovalCardStatus }
 }
 
 export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) => {
@@ -244,7 +236,7 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
           onClick={() => { if (option.action === 'allowAutoSchedule') void allowAutoSchedule(option.value, label); else { setPicked(option.value); void send(label) } }} />} />
       })}
     </div>
-    {(error || autoError) && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error || autoError}</AlertDescription></Alert></div>}
+    {(error || autoError) && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-(--motion-fast) motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error || autoError}</AlertDescription></Alert></div>}
     <ConnectDeviceDialog open={dialog === 'mac'} onOpenChange={open => setDialog(open ? 'mac' : null)} hideTrigger />
     {e2bDialog.value && <E2BKeyDialog open={e2bDialog.open} onOpenChangeComplete={e2bDialog.onOpenChangeComplete} configured={false} onClose={changed => {
       setDialog(null)

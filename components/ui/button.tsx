@@ -1,8 +1,12 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+import { Spinner } from "@/components/ui/spinner"
 import { touchTarget } from "@/lib/touch-target"
 import { statusTones, type StatusTone } from '@/lib/status-appearance'
+
+/** R-31's one secondary surface: `outline` and `secondary` are two names for it. */
+const CONTROL_SURFACE = "bg-control text-foreground hover:bg-control-hover aria-expanded:bg-control-hover"
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity,translate] outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -13,11 +17,11 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
         // R-31: the secondary button is a grey fill with no stroke, like Claude desktop's
         // 「Add folder…」. `control` is a translucent overlay so it reads on white and grey alike.
-        outline:
-          "bg-control text-foreground hover:bg-control-hover aria-expanded:bg-control-hover",
-        // R-31: same grey as outline. Settings and the composer used `secondary` for the same role, so one row showed two greys.
-        secondary:
-          "bg-control text-foreground hover:bg-control-hover aria-expanded:bg-control-hover",
+        outline: CONTROL_SURFACE,
+        // R-31: the same surface under a second name. Settings and the composer reached for
+        // `secondary` for that role, so one row showed two greys; they share one constant so
+        // the two names cannot drift apart again.
+        secondary: CONTROL_SURFACE,
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50 in-data-desktop-translucent:hover:bg-control in-data-desktop-translucent:aria-expanded:bg-control dark:in-data-desktop-translucent:hover:bg-control",
         destructive:
@@ -29,18 +33,18 @@ const buttonVariants = cva(
       },
       size: {
         default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
+          "h-(--control-md) gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        xs: "h-(--control-xs) gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-(--control-sm) gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-(--control-lg) gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        icon: "size-(--control-md)",
         "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-compact": "size-6",
+          "size-(--control-xs) rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
+        "icon-compact": "size-(--control-xs)",
         // Every size grows to a 44px hit area on a coarse pointer (touchTarget).
         "icon-sm":
-          "relative size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
+          "relative size-(--control-sm) rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
+        "icon-lg": "size-(--control-lg)",
         // No height or padding: the trigger's own classes set them (beUI's rows line up with their content).
         bare: "",
       },
@@ -52,21 +56,49 @@ const buttonVariants = cva(
   }
 )
 
+/** The square the size variant draws its glyph at, so the busy spinner takes the same one. */
+const BUSY_SPINNER_SIZE: Record<string, string | undefined> = {
+  xs: "size-3",
+  sm: "size-3.5",
+  "icon-xs": "size-3",
+  "icon-sm": "size-3.5",
+}
+
+interface ButtonProps extends ButtonPrimitive.Props, VariantProps<typeof buttonVariants> {
+  tone?: StatusTone
+  /**
+   * The press is still running. The button says so (`aria-busy`), draws a
+   * spinner in place of its leading glyph, and takes no second press.
+   */
+  busy?: boolean
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
   tone,
+  busy = false,
+  disabled,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { tone?: StatusTone }) {
+}: ButtonProps) {
+  // An icon size has no label to sit beside: the spinner takes the glyph's place instead.
+  const glyphOnly = (size ?? "default").startsWith("icon")
   return (
     <ButtonPrimitive
       data-slot="button"
       data-button-variant={tone ? undefined : variant}
       data-tone={tone}
-      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], touchTarget(className), className)}
+      aria-busy={busy || undefined}
+      disabled={busy || disabled}
+      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], touchTarget(className), className, busy && 'disabled:opacity-100')}
       {...props}
-    />
+    >
+      {/* The spinner is a picture of the state `aria-busy` already announces, and its own label is not translated. */}
+      {busy ? <Spinner data-icon="inline-start" aria-hidden="true" className={BUSY_SPINNER_SIZE[size ?? "default"]} /> : null}
+      {busy && glyphOnly ? null : children}
+    </ButtonPrimitive>
   )
 }
 

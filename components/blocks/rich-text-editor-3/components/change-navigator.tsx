@@ -2,7 +2,7 @@ import { useState } from "react"
 import type { Editor } from "@tiptap/react"
 import { readChanges, type RichTextChangesPosition } from "./rich-text-changes"
 import { RichTextButton, RichTextToolbarGroup } from "./rich-text-toolbar"
-import { ChevronUpIcon, ChevronDownIcon } from "lucide-react"
+import { ChevronUp, ChevronDown } from "@/components/icons"
 
 interface ChangeNavigatorProps {
   editor: Editor | null
@@ -51,7 +51,7 @@ export function ChangeNavigator({
         disabled={!editor || total === 0}
         onClick={() => step(-1)}
       >
-        <ChevronUpIcon aria-hidden="true" />
+        <ChevronUp aria-hidden="true" />
       </RichTextButton>
       <span className="text-muted-foreground min-w-12 px-1 text-center text-xs whitespace-nowrap tabular-nums">
         {total === 0
@@ -68,7 +68,7 @@ export function ChangeNavigator({
         disabled={!editor || total === 0}
         onClick={() => step(1)}
       >
-        <ChevronDownIcon aria-hidden="true" />
+        <ChevronDown aria-hidden="true" />
       </RichTextButton>
     </RichTextToolbarGroup>
   )

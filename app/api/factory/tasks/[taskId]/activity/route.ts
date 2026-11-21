@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
@@ -8,8 +8,6 @@ import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http'
 import { factoryLiveScopes } from '@/lib/live/factory'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 export const GET = withRequestLog('/api/factory/tasks/[taskId]/activity', async (request: Request, context: { params: Promise<{ taskId: string }> }) => {
   const session = await auth.api.getSession({ headers: request.headers })

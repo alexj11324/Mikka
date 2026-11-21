@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["../../*"],
+      "server-only": ["../../lib/server-only.ts"]
+    }
+  },
+  "include": ["agent/**/*.ts"],
+  "exclude": ["node_modules", ".eve", ".output"]
+}

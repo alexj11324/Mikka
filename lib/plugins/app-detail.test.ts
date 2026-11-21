@@ -51,6 +51,13 @@ test('an app\'s page says how it connects, with Composio\'s form when it takes t
   }
   const detail = await readAppDetail(exa, 'exa')
   assert.deepEqual(detail.auth, { kind: 'credentials', guideUrl: 'https://dashboard.exa.ai/api-keys', forms: [{ scheme: 'API_KEY', fields: [{ name: 'generic_api_key', label: 'API Key', description: '', secret: true, required: true, defaultValue: null }] }] })
+  const oauthOnly: AppDetailSource = {
+    retrieve: async () => ({ slug: 'snowflake', name: 'Snowflake', composio_managed_auth_schemes: [], auth_config_details: [{ mode: 'OAUTH2' }] }),
+    listTools: async () => ({ items: [] }),
+  }
+  assert.deepEqual((await readAppDetail(oauthOnly, 'snowflake')).auth, { kind: 'oauthSetupRequired', forms: [], guideUrl: null })
+  const dcr: AppDetailSource = { retrieve: async () => ({ slug: 'dcr', name: 'Provider MCP', composio_managed_auth_schemes: [], auth_config_details: [{ mode: 'DCR_OAUTH' }] }), listTools: async () => ({ items: [] }) }
+  assert.deepEqual((await readAppDetail(dcr, 'dcr')).auth, { kind: 'managed', forms: [], guideUrl: null })
   const free: AppDetailSource = { retrieve: async () => ({ slug: 'hackernews', name: 'Hacker News', no_auth: true, auth_guide_url: 'http://insecure.example' }), listTools: async () => ({ items: [] }) }
   assert.deepEqual((await readAppDetail(free, 'hackernews')).auth, { kind: 'none', forms: [], guideUrl: null })
   resetAppDetailCache()

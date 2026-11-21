@@ -4,7 +4,6 @@ import { dispatchVerifiedGitHubWebhook, readGitHubWebhookBody } from '@/lib/gith
 import { relayOfficialGitHubWebhook } from '@/lib/github/official-cloud-relay'
 import { CloudServiceError } from '@/lib/cloud-services/errors'
 
-export const runtime = 'nodejs'
 const noStore = { 'Cache-Control': 'no-store' }
 
 async function handlePOST(request: Request) {
@@ -13,7 +12,7 @@ async function handlePOST(request: Request) {
   const rawBody = await readGitHubWebhookBody(request)
   if (rawBody === null) return new Response('Webhook payload is too large.', { status: 413, headers: noStore })
   if (!verifyGitHubSignature(rawBody, request.headers.get('x-hub-signature-256'), secret)) return new Response('Invalid webhook.', { status: 401, headers: noStore })
-  const response = await dispatchVerifiedGitHubWebhook(request.headers.get('x-github-event'), rawBody, { defer: true })
+  const response = await dispatchVerifiedGitHubWebhook(request.headers.get('x-github-event'), rawBody, { defer: true, deliveryId: request.headers.get('x-github-delivery') })
   if (response.status >= 400) return response
   try {
     await relayOfficialGitHubWebhook({ event: request.headers.get('x-github-event'), deliveryId: request.headers.get('x-github-delivery'), signature: request.headers.get('x-hub-signature-256'), body: rawBody })

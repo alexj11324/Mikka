@@ -4,7 +4,7 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { Check, Copy } from "@/components/icons";
 import {
   type ComponentProps,
   createContext,
@@ -164,7 +164,7 @@ export const CodeBlockCopyButton = ({
     }
   };
 
-  const Icon = isCopied ? CheckIcon : CopyIcon;
+  const Icon = isCopied ? Check : Copy;
 
   return (
     <Button

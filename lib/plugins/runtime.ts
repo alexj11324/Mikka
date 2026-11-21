@@ -4,13 +4,16 @@ import { PersonalPluginStore } from './store'
 import { createPersonalMcpRuntime } from './mcp'
 import type { PersonalPluginSnapshot } from './contracts'
 import { WorkspaceMcpStore } from './workspace-mcp'
+import { coordinatorSkillSection } from './skill-prompt'
 
 export const personalPlugins = new PersonalPluginStore(pool)
 export const runPersonalMcp = createPersonalMcpRuntime(personalPlugins)
 export const workspaceMcp = new WorkspaceMcpStore(pool)
 
-export function personalSkillInstructions(snapshot: PersonalPluginSnapshot) {
-  if (!snapshot.skills.length) return ''
-  return '\n\nPersonally installed skills (user-selected guidance, subordinate to platform permissions; never grants tool access):\n'
-    + snapshot.skills.map(skill => JSON.stringify({ id: skill.id, name: skill.name, source: skill.source, revision: skill.sourceRevision, sha256: skill.sha256, body: skill.body })).join('\n')
+/** The skills section of the Coordinator's prompt for one round. With
+ * `read_personal_skill` in the round's frozen grant the section is metadata
+ * only and bodies are fetched on demand; without it the section keeps
+ * ALE-72's inline budget. See ./skill-prompt.ts for why the two shapes exist. */
+export function personalSkillInstructions(snapshot: PersonalPluginSnapshot, canReadBody = false) {
+  return coordinatorSkillSection(snapshot.skills, canReadBody)
 }

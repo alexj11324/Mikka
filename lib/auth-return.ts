@@ -1,3 +1,4 @@
+import { isInvitationPath } from './server-pages'
 import { isSettingsSectionParam } from './settings-sections'
 
 export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
@@ -26,7 +27,11 @@ export function safeAuthReturn(value?: string) {
 
   const url = new URL(value, internalOrigin)
   if (url.origin !== internalOrigin || url.hash) return '/'
-  if (/^\/invite\/[a-f0-9]{64}$/.test(url.pathname) && !url.search) return url.pathname
+  if (isInvitationPath(url.pathname) && !url.search) return url.pathname
+  if (url.pathname === '/api/integrations/slack/connect') {
+    const intent = url.searchParams.get('intent')
+    return hasOnlyQueryKeys(url, ['intent']) && intent && /^[A-Za-z0-9_-]{43}$/.test(intent) ? url.pathname + url.search : '/'
+  }
   if (url.pathname === '/devices' && !url.search) return '/settings?section=devices'
   if (url.pathname === '/device') {
     const code = url.searchParams.get('user_code')
@@ -54,7 +59,7 @@ export function safeAuthReturn(value?: string) {
     const idKeys = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact']
     const section = url.searchParams.get('section')
     const threads = url.searchParams.get('threads')
-    const sections = ['coordinator', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'tasks', 'all-issues', 'projects', 'team-home', 'team-issues', 'team-projects']
+    const sections = ['coordinator', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'automations', 'tasks', 'all-issues', 'projects', 'team-home', 'team-issues', 'team-projects']
     return hasOnlyQueryKeys(url, ['section', ...idKeys, 'threads']) &&
       idKeys.every(key => optionalUuid(url, key)) &&
       (section === null || sections.includes(section)) &&

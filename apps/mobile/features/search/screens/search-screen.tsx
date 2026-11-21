@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { SectionList, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Search } from 'lucide-react-native'
 import { ChatRowView, rowKey, useChatRows, type ChatRow } from '@/components/ChatList'
 import { NavBar, underBar } from '@/components/NavBar'
-import { Text } from '@/components/Text'
-import { TaskRowView, useTasks } from '@/features/tasks/components/task-list'
+import { ReadNotice } from '@/components/ReadNotice'
+import { mobileMessages } from '@/lib/messages'
+import { TaskListContinuation, TaskRowView, useTasks } from '@/features/tasks/components/task-list'
 import { botPath } from '@/lib/pins'
 import type { Task } from '@/lib/types'
 import { colors } from '@/lib/theme'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import { ListSectionHeader } from '@/shared/components/list-section'
 
 type Section = { title: string; data: ({ kind: 'chat'; row: ChatRow } | { kind: 'task'; task: Task })[] }
@@ -22,12 +25,14 @@ export function SearchScreen() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
-  const { rows } = useChatRows(needle)
+  const chats = useChatRows(needle)
   const tasks = useTasks(Boolean(needle))
+  const loading = chats.loading || tasks.loading
+  const complete = !loading && !chats.error && !tasks.error && !tasks.paging.hasMore
   const sections: Section[] = needle ? [
-    { title: 'Bot', data: rows.filter(row => row.kind === 'bot').map(row => ({ kind: 'chat' as const, row })) },
-    { title: '群聊', data: rows.filter(row => row.kind === 'group').map(row => ({ kind: 'chat' as const, row })) },
-    { title: '任务', data: (tasks.data?.tasks ?? []).filter(task => `${task.identifier ?? ''} ${task.title}`.toLowerCase().includes(needle)).map(task => ({ kind: 'task' as const, task })) },
+    { title: 'Bot', data: chats.rows.filter(row => row.kind === 'bot').map(row => ({ kind: 'chat' as const, row })) },
+    { title: '群聊', data: chats.rows.filter(row => row.kind === 'group').map(row => ({ kind: 'chat' as const, row })) },
+    { title: '任务', data: tasks.paging.items.filter(task => `${task.identifier ?? ''} ${task.title}`.toLowerCase().includes(needle)).map(task => ({ kind: 'task' as const, task })) },
   ].filter(section => section.data.length) : []
   return (
     <View style={styles.screen}>
@@ -40,7 +45,13 @@ export function SearchScreen() {
         keyboardShouldPersistTaps="handled"
         stickySectionHeadersEnabled={false}
         contentContainerStyle={{ paddingBottom: 24 }}
-        ListEmptyComponent={needle ? <Text style={styles.none}>没有匹配的结果</Text> : undefined}
+        ListHeaderComponent={needle ? <>
+          <ReadNotice error={chats.error} hasData={chats.rows.length > 0} label={mobileMessages.MobileCore.chatList} onRetry={chats.reload} />
+          <ReadNotice error={tasks.error} hasData={Boolean(tasks.data)} label={mobileMessages.Nav.tasks} onRetry={tasks.reload} />
+        </> : undefined}
+        ListFooterComponent={needle ? <TaskListContinuation paging={tasks.paging} /> : undefined}
+        ListEmptyComponent={!needle ? undefined : loading ? <ListLoading />
+          : complete ? <EmptyState icon={<Search size={20} color={colors.secondary} strokeWidth={1.8} />} title={mobileMessages.Shell.searchEmpty} /> : undefined}
         renderSectionHeader={({ section }) => <ListSectionHeader title={section.title} count={section.data.length} />}
         renderItem={({ item }) => item.kind === 'chat'
           ? <ChatRowView row={item.row} onPress={() => router.push(item.row.kind === 'bot' ? botPath(item.row.bot) : `/groups/${item.row.group.id}`)} />
@@ -52,5 +63,4 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  none: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
 })

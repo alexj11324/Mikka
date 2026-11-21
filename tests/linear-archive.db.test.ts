@@ -1,5 +1,4 @@
 import './fixtures/scope-request-runtime.mjs'
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -176,7 +175,21 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
     const number = await allocateIssueNumbers(tx, owner)
     await tx.insert(issues).values({ id: pendingIssue, userId: owner, workspaceId: workspace, ownershipState: 'bound', scope: 'workspace', scopeSetBy: 'user', linearSyncPolicy: 'explicit', linearSyncBlocked: false, title: 'Unknown Linear publication', content: { type: 'doc', content: [], attrs: { mikka: { number } } }, status: 'todo', priority: 'normal' })
   })
-  await pool.query('update linear_team_syncs set active=false where id=$1', [syncId])
+  await t.test('pausing a Linear team twice preserves the first pause even with concurrent retries', async () => {
+    const { disableLinearTeam } = await import('../app/actions/linear-sync')
+    const state = async () => (await pool.query('SELECT active, "updatedAt"::text AS modified, xmin::text AS version FROM linear_team_syncs WHERE id=$1', [syncId])).rows[0]
+    const pause = (who: string) => actInWorkspace(who, () => disableLinearTeam(syncId, workspace))
+    const before = await state()
+    assert.equal(before.active, true)
+    await assert.rejects(pause(member), /workspaceAccessDenied/)
+    assert.deepEqual(await state(), before)
+    assert.deepEqual(await pause(owner), { success: true })
+    const paused = await state()
+    assert.equal(paused.active, false)
+    assert.notEqual(paused.version, before.version)
+    assert.deepEqual(await Promise.all([pause(owner), pause(owner)]), [{ success: true }, { success: true }])
+    assert.deepEqual(await state(), paused)
+  })
   await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName",active,"workspaceId") values($1,$2,$3,\'OLD\',\'Unresolved fixture\',true,$4)', [pendingSync, owner, randomUUID(), workspace])
   await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,1,$5,true)', [pendingPublication, pendingIssue, owner, pendingSync, pendingRemote])
   await pool.query('update linear_team_syncs set active=false where id=$1', [pendingSync])

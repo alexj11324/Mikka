@@ -19,7 +19,7 @@ import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceIsOnline } from '@/lib/device-presence'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -157,7 +157,8 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
     try {
-      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined)
+      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined,
+        async id => issueResult(unwrap(await getIssue(id)).issue))
       if (!teamId) return created
       const requestId = requestIdFor(userId, toolCallId)
       const [prior] = await db.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).limit(1)
@@ -212,13 +213,12 @@ export async function searchIssues(userId: string, input: { query: string; statu
 }
 
 export async function listAgents(userId: string) {
-  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses })
+  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, sessionOpenedAt: devices.sessionOpenedAt, sessionClosedAt: devices.sessionClosedAt, harnesses: devices.harnesses })
     .from(agents).innerJoin(devices, eq(devices.id, agents.deviceId))
     .where(and(eq(agents.userId, userId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(asc(devices.name), asc(agents.harness))
-  const presence = await deviceOnlineStates(rows.map(row => ({ id: row.deviceId, lastSeenAt: row.lastSeenAt })))
   return rows.filter(row => localExecutionHarnesses(row.harnesses).includes(row.harness)).map(row => ({
     id: row.id, harness: row.harness, deviceId: row.deviceId, device: row.deviceName,
-    deviceOnline: Boolean(row.enabled && presence.get(row.deviceId)),
+    deviceOnline: Boolean(row.enabled && deviceIsOnline(row)),
   }))
 }
 
@@ -238,7 +238,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, { source: 'mcp', origin: 'api', originRef: { kind: 'api' } })) }),
   }))
 }
 
@@ -259,7 +259,7 @@ async function mcpRunModel(userId: string, input: { issueId: string; agentId: st
     { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId },
     { issueId: input.issueId, stage: 'execute', location: 'local', agentId: agent.id, deviceId: agent.deviceId, asked: { harness: agent.harness } })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
-  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
     ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
     ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
 }
@@ -269,14 +269,18 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 }
 
 export async function stopRun(userId: string, runId: string) {
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
-  if (!run) return { error: 'runNotFound' }
   return attempt(async () => ({ stopRequested: true, ...(await requestRunStop(userId, runId)) }))
 }
 
 /** A page of the run's event stream, by sequence number. */
 export async function getRunEvents(userId: string, input: { runId: string; after?: number; limit?: number }) {
-  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1)
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  const { runVisibilityPredicate } = await import('@/lib/agent-runs')
+  const visible = await runVisibilityPredicate(userId)
+  // Run metadata may be shared with a teammate. Raw events are owner-only.
+  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status }).from(agentRuns)
+    .leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId), visible)).limit(1)
   if (!run) return null
   const limit = input.limit ?? 50
   const rows = await db.select({ seq: runChunks.seq, chunk: runChunks.chunk, createdAt: runChunks.createdAt }).from(runChunks)

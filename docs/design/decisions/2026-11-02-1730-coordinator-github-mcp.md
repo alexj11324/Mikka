@@ -15,6 +15,8 @@ comment; open or merge pull requests) go through `github_tools` and
 `github_call`, which connect to `https://api.githubcopilot.com/mcp/` with the
 caller's own GitHub App user token as `Authorization: Bearer`, its default
 toolsets plus `actions`. Mikka writes no GitHub API wrapper of its own.
+(Update 2026-11-17: the URL is `https://api.githubcopilot.com/mcp/x/all`,
+every toolset GitHub offers; Plugins › GitHub lists the same live catalogue.)
 
 What follows:
 

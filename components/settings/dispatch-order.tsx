@@ -1,9 +1,9 @@
 'use client'
 
 import { Fragment } from 'react'
-import Link from 'next/link'
-import { useTranslations } from 'next-intl'
-import { ChevronRight } from 'lucide-react'
+import Link from '@/lib/client-runtime/link'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ChevronRight } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import type { OrderView } from '@/lib/model-order'
@@ -31,7 +31,7 @@ export function DispatchOrder({ data, workspaceId, e2bConfigured }: { data: Pick
   const { tiers, stageWord } = useDispatchTiers({ data, e2bConfigured })
   return <span role="list" aria-label={t('placesLabel')} className="mt-1 flex flex-wrap items-center gap-0.5" data-slot="dispatch-order">
     {tiers.map((tier, index) => <Fragment key={tier.key}>
-      {index > 0 && <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground/70" />}
+      {index > 0 && <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-tertiary" />}
       <span role="listitem">
         <HoverCard>
           <HoverCardTrigger render={<Button variant="ghost" size="sm" className={cn('h-7 gap-1.5 px-2 font-normal text-muted-foreground', tier.first && 'bg-muted font-medium text-foreground')}

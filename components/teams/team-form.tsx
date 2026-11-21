@@ -1,8 +1,8 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, SquareUserRound } from 'lucide-react'
+import { ChevronLeft, SquareUserRound } from '@/components/icons'
 import posthog from 'posthog-js'
 import { saveTeam } from '@/app/actions/teams'
 import { SettingsContent, SettingsGroup, SettingsRow } from '@/components/ui/settings-layout'

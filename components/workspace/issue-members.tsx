@@ -1,11 +1,11 @@
 'use client'
 
 import { useRef, useState, type FormEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
-import { CheckCircle2, Mail, Search, ShieldCheck, UserPlus, Users } from 'lucide-react'
+import { CircleCheck, Mail, Search, ShieldCheck, UserPlus, Users } from '@/components/icons'
 import { inviteMember, listMembers, removeMember, setMemberRole, setMemberSubscribed } from '@/app/actions/collaboration'
 import { useActionError } from '@/lib/use-action-error'
 import { Badge } from '@/components/reui/badge'
@@ -134,7 +134,7 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
             <Button type="submit" disabled={pending || !email.trim()}>{pending && !removing ? <Spinner data-icon="inline-start" /> : <UserPlus data-icon="inline-start" />}{pending && !removing ? t('adding') : t('addMember')}</Button>
           </FieldGroup>
         </form>}
-      {message && <Alert role="status"><CheckCircle2 /><AlertTitle>{t('successTitle')}</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
+      {message && <Alert role="status"><CircleCheck /><AlertTitle>{t('successTitle')}</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
       {data && <div className="flex flex-col gap-4">
         <FieldGroup><Field><FieldLabel htmlFor="member-search" className="sr-only">{t('searchMembers')}</FieldLabel><SearchInput id="member-search" placeholder={t('searchPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></Field></FieldGroup>
         <ItemGroup aria-label={t('memberList')}>

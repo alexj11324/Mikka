@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { assertConservation, assertReleaseEvidence, currentWorkerSha, pairEnv, publicationInputFromFile, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
 import { reportDigest, templateModelsDigest } from './runtime-report.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
+import { cloudflareRuntimeConfiguration } from './cloudflare-runtime-config.mjs'
+import { applicationEnvironment } from '../../cloudflare/api/ingress/environment.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
@@ -16,7 +18,7 @@ const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [rep
 const TEMPLATES = { desktop: 'tpl-desktop', claude: 'tpl-claude', codex: 'tpl-codex' }
 const PROOF = { entries: 100, sha256: 'd'.repeat(64) }
 const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))).digest('hex')
-const SHARED = { verified: true, access: 'workspace_share', requesterHash: '1'.repeat(16), payerHash: '2'.repeat(16), workspaceHash: '3'.repeat(64),
+const OWNER = { verified: true, access: 'owner', requesterHash: '1'.repeat(16), payerHash: '1'.repeat(16), workspaceHash: '3'.repeat(64),
   connectionHash: '4'.repeat(16), bindingHash: '5'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: '6'.repeat(64) }
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
@@ -48,9 +50,9 @@ const bootstrapAcceptance = (runId, harness) => {
       phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 0, endMs: 300, ms: 300, outcome: 'ok' },
         { name: 'daemon.adapter.cli_init', startMs: 490, endMs: 500, ms: 10, outcome: 'ok' }] } }
 }
-const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'shared_smoke', workspaceRestored: true,
-  requesterHash: SHARED.requesterHash, payerHash: SHARED.payerHash,
-  team: { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamWorkspaceHash: SHARED.workspaceHash } },
+const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'smoke_owner', workspaceRestored: true,
+  requesterHash: OWNER.requesterHash, payerHash: OWNER.payerHash,
+  personal: { personalWorkspaceConfirmed: true, personalWorkspaceHash: OWNER.workspaceHash } },
   templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
   templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
   conservation: conservation(kind), models: MODELS[kind],
@@ -65,7 +67,7 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { acco
   runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
     hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
     mcpHttpTiming: mcpTiming(`run-${kind}`, harness), observedProviderEvents: 1, officialDelivery: 'best_effort_not_a_complete_call_count' },
-  sharedScope: { ...SHARED },
+  ownerScope: { ...OWNER },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
@@ -84,6 +86,19 @@ test('publication reads complete file evidence and retains independently bound m
   const expected = { sha256: reportDigest(bytes), modelsSha256: templateModelsDigest(evidence), templates: TEMPLATES,
     sourceSha: SHA, sourceCommit: COMMIT, runId: '123', runAttempt: '2' }
   const input = publicationInputFromFile(path, expected)
+  const expectedRelease = { ...expected, workerSha: SHA }
+  const cloud = cloudflareRuntimeConfiguration(path, expectedRelease)
+  assert.deepEqual(cloud, { ...Object.fromEntries(pairEnv(input).map(({ key, value }) => [key, value])), MIKKA_CLOUD_WORKER_SOURCE_COMMIT: COMMIT })
+  assert.equal(runtimeConfigurationSha(cloud), SHA)
+  const cli = spawnSync(process.execPath, [fileURLToPath(new URL('./cloudflare-runtime-config.mjs', import.meta.url)), path, COMMIT, SHA, '123', '2', expected.sha256], { encoding: 'utf8' })
+  assert.equal(cli.status, 0, cli.stderr)
+  assert.deepEqual(JSON.parse(cli.stdout), cloud)
+  assert.ok(!cli.stdout.includes('providerManifest') && !cli.stdout.includes('subscriptionAcceptance'))
+  assert.deepEqual(applicationEnvironment({ PUBLIC_ORIGIN: 'https://app.example', ...cloud, E2B_API_KEY: 'platform-only' }), {
+    BETTER_AUTH_URL: 'https://app.example', MIKKA_API_INGRESS: 'cloudflare', ...cloud,
+  })
+  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, runAttempt: '3' }), /attempt_mismatch/)
+  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, sha256: 'c'.repeat(64) }), /digest_mismatch/)
   assert.deepEqual(input.releaseEvidence, evidence)
   assert.deepEqual(input.models, MODELS)
   assert.doesNotThrow(() => assertReleaseEvidence(input))
@@ -91,10 +106,6 @@ test('publication reads complete file evidence and retains independently bound m
   assert.throws(() => publicationInputFromFile(path, { ...expected, runAttempt: '3' }), /attempt_mismatch/)
   assert.throws(() => publicationInputFromFile(path, { ...expected, sha256: 'c'.repeat(64) }), /digest_mismatch/)
   assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, templates: { ...TEMPLATES, codex: 'other' } })), /template_invalid/)
-  delete evidence.subscriptionAcceptance.claude
-  const invalid = Buffer.from(JSON.stringify(evidence))
-  writeFileSync(path, invalid)
-  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_shared_scope_invalid claude/)
 })
 
 test('the publisher CLI reports a closed parse error without printing the report cause', t => {
@@ -418,10 +429,10 @@ test('GitHub-only build timeline waits for source upload before the single runti
       if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: COMMIT } })
       if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) return Response.json({ workflow_runs: [{
         id: 70, run_attempt: 1, head_sha: COMMIT, head_branch: 'main', path: '.github/workflows/web-deploy.yml',
-        repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' }, event: 'push',
+        repository: { id: 1427517699, full_name: 'alexj11324/Mikka' }, head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka' }, event: 'push',
         status: elapsed < 200 ? 'in_progress' : 'completed', conclusion: elapsed < 200 ? null : 'success',
       }] })
-      assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/1/jobs')
+      assert.equal(url.pathname, '/repositories/1427517699/actions/runs/70/attempts/1/jobs')
       return Response.json({ total_count: 1, jobs: [{ name: 'deploy', head_sha: COMMIT, status: 'completed', conclusion: 'success',
         steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
           'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),
@@ -455,36 +466,8 @@ test('GitHub-only build timeline waits for source upload before the single runti
 })
 
 
-test('publication requires both real subscriptions on these exact candidates before any network request', async () => {
+test('publication requires these exact public candidates before any network request', async () => {
   for (const mutate of [
-    evidence => { delete evidence.acceptanceScope },
-    evidence => { evidence.acceptanceScope.account = 'owner_login' },
-    evidence => { evidence.acceptanceScope.workspaceRestored = false },
-    evidence => { evidence.subscriptionAcceptance.claude.sharedScope.payerHash = SHARED.requesterHash },
-    evidence => { evidence.subscriptionAcceptance.codex.sharedScope.access = 'owner' },
-    value => { delete value.subscriptionAcceptance.codex },
-    value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
-    value => { value.subscriptionAcceptance.codex.model = 'other-model' },
-    value => { value.subscriptionAcceptance.claude.workerSha = OTHER },
-    value => { delete value.subscriptionAcceptance.codex.officialBinarySha256 },
-    value => { value.subscriptionAcceptance.claude.agentAcceptance.kind = 'claude_system_init' },
-    value => { value.subscriptionAcceptance.codex.agentAcceptance.runIdHash = 'f'.repeat(16) },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.extraRemoteCalls = 1 },
-    value => { delete value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.runIdHash = 'f'.repeat(16) },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.remoteMcpServerCount = 1 },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.childLifecycleComplete = true },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].sequence = 2 },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].status = 503 },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.allFirstPartyHttpComplete = true },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.basis = 'all_mikka_http_sends_during_execution_counted' },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.observedProviderEvents = 0 },
-    value => { delete value.subscriptionAcceptance.codex.replyVerifiedAfterTool },
-    value => { value.subscriptionAcceptance.codex.replyVerifiedAfterTool = false },
-    value => { delete value.subscriptionAcceptance.claude.toolEvidence },
-    value => { value.subscriptionAcceptance.claude.toolEvidence.outcome = 'error' },
-    value => { value.subscriptionAcceptance.claude.toolEvidence.toolCallHash = 'raw-id' },
-    value => { value.subscriptionAcceptance.claude.toolEvidence.providerText = 'must-not-pass' },
     value => { value.templates.codex.models[0].models = ['unmeasured-model'] },
     value => { value.templates.desktop.conservation.after = { ...PROOF, sha256: 'e'.repeat(64) } },
     value => { value.templates.codex.public = false },
@@ -497,19 +480,3 @@ test('publication requires both real subscriptions on these exact candidates bef
   }
 })
 
-test('publication requires the same bounded bootstrap adoption proof after the native subscription passed', () => {
-  for (const mutate of [
-    row => { delete row.bootstrapAcceptance },
-    row => { row.bootstrapAcceptance.preparationTiming.source = 'prepared_agent_start' },
-    row => { row.bootstrapAcceptance.preparationTiming.claimAuthentication = 'ordinary_path' },
-    row => { row.bootstrapAcceptance.preparationTiming.observedAuthSource = 'oauth_descriptor' },
-    row => { row.bootstrapAcceptance.preparationTiming.phases.push({ ...row.bootstrapAcceptance.preparationTiming.phases[0] }) },
-    row => { row.bootstrapAcceptance.runIdHash = 'f'.repeat(16) },
-    row => { row.bootstrapAcceptance.hintSha256 = '' },
-    row => { row.bootstrapAcceptance.preparationTiming.phases[0].outcome = 'error' },
-  ]) {
-    const value = structuredClone(EVIDENCE); mutate(value.subscriptionAcceptance.claude)
-    assert.throws(() => assertReleaseEvidence({ sourceCommit: COMMIT, sourceSha: SHA, templates: TEMPLATES, models: MODELS,
-      releaseEvidence: value }), /runtime_release_subscription_missing claude/)
-  }
-})

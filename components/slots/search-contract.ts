@@ -2,7 +2,7 @@
 // (components/nav/global-search.tsx) reads, filters and pages the results (useSiteSearch, GET /api/search) and hands a
 // layer the open state, the query and the sections to draw; a row's `select` does what picking it does (open, close,
 // load more, retry).
-import type { LucideIcon } from 'lucide-react'
+import type { IconGlyph } from '@/components/icons'
 import type { StatusTone } from '@/lib/status-appearance'
 
 /** What leads a row: the Coordinator's or a bot's avatar, a name's letter, the thread mark, or an icon. */
@@ -12,9 +12,9 @@ export type SearchLead =
   | { kind: 'letter'; name: string }
   | { kind: 'thread' }
   /** A plain glyph: actions, 加载更多 and 重试. */
-  | { kind: 'glyph'; icon: LucideIcon }
+  | { kind: 'glyph'; icon: IconGlyph }
   /** An icon on a round tile: group chats, tasks and projects. */
-  | { kind: 'icon'; icon: LucideIcon }
+  | { kind: 'icon'; icon: IconGlyph }
 
 export type SearchRow = {
   /** Unique within the palette. */
@@ -24,7 +24,7 @@ export type SearchRow = {
   identifier?: string
   /** The second line: the Coordinator's last line, a conversation's preview, a task's assignee, a thread's last reply, a project's summary. */
   detail?: string
-  /** A task's one state (localTaskState) or board status, in words. */
+  /** The authorized TaskPresentation for this hit, once available. */
   status?: { label: string; tone: StatusTone }
   /** Words on the row's end: 重试 on the retry row. */
   trailing?: string

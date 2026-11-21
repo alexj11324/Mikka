@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { resolve, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
@@ -17,8 +17,8 @@ async function assetFiles(directory) {
   return result
 }
 
-export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true } = {}) {
-  const config = await frontendConfig({ target, outdir, clean })
+export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true, serverPages = false, publicTestFixture = false } = {}) {
+  const config = await frontendConfig({ target, outdir, clean, serverPages, publicTestFixture })
   outdir = resolve(config.root, config.build.outDir)
   // This directory belongs to the build. Complete its removal before Vite
   // writes anything, then verify the emitted inventory before publishing it.
@@ -33,23 +33,30 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
     const name = relative(outdir, path).split(sep).join('/')
     if (clean && !assets.has(name)) throw new Error(`FRONTEND_ASSET_UNEXPECTED: ${name}`)
   }
-  const fingerprint = createHash('sha256')
   // Incremental desktop development retains old chunks for existing windows,
   // but only this build's emitted assets identify the current application.
+  //
+  // The identity is the emitted *content* alone. A chunk file name already
+  // encodes that chunk's own hash, so folding the name back in counts the same
+  // bytes twice and makes the identity depend on how the bundler happened to
+  // split and order modules; an equivalent chunking split then changes the
+  // identity of an application that did not change. Sorting the per-asset
+  // digests keeps the result independent of emission order as well.
+  const digests = []
   for (const name of [...assets.keys()].sort()) {
     const asset = assets.get(name)
     const content = await readFile(resolve(outdir, name))
     const emitted = Buffer.from(asset.type === 'chunk' ? asset.code : asset.source)
     if (!content.equals(emitted)) throw new Error(`FRONTEND_ASSET_CONTENT_MISMATCH: ${name}`)
-    fingerprint.update(name)
-    fingerprint.update(content)
+    digests.push(createHash('sha256').update(content).digest('hex'))
   }
+  digests.sort()
+  const fingerprint = createHash('sha256')
+  for (const digest of digests) fingerprint.update(digest)
   const rendererBuild = fingerprint.digest('hex')
   const result = { ...inventory, rendererBuild }
   await writeFile(resolve(outdir, 'renderer-build.js'), `export const rendererBuild = ${JSON.stringify(rendererBuild)};\n`)
   await writeFile(resolve(outdir, 'renderer-manifest.json'), `${JSON.stringify(result, null, 2)}\n`)
-  // Next served this source icon as metadata; retain it in the static build.
-  await cp(resolve(repository, 'app/icon.svg'), resolve(outdir, 'icon.svg'))
   if (target === 'desktop') {
     const directory = resolve(repository, 'apps/desktop/dist')
     await mkdir(directory, { recursive: true })
@@ -63,6 +70,6 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const target = process.argv.includes('--desktop') ? 'desktop' : 'web'
-  const result = await buildFrontend({ target })
+  const result = await buildFrontend({ target, serverPages: process.argv.includes('--server-pages'), publicTestFixture: process.argv.includes('--public-test-fixture') })
   process.stdout.write(`${JSON.stringify({ target, rendererBuild: result.rendererBuild, actions: result.usedActions.length, exports: result.exports, serverModules: result.serverModules })}\n`)
 }

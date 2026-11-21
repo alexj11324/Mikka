@@ -10,7 +10,7 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { Pool } from 'pg'
 import { backupIsolated, isolatedTarget, restoreIsolated } from './isolated-recovery.mjs'
-import { actionableAlerts, databaseSignals, notifyAlerts } from './monitor.mjs'
+import { databaseSignals, notifyAlerts, operationalAlertAssessment } from './monitor.mjs'
 import { repairDrillFaults } from './drill-state.mjs'
 
 const container = process.env.OPS_POSTGRES_CONTAINER ?? 'mikka-aggregate-number-postgres'
@@ -30,6 +30,7 @@ const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' 
 const toolSourcesSha256 = createHash('sha256').update(Buffer.concat(await Promise.all(['scripts/ops/drill.mjs', 'scripts/ops/drill-state.mjs', 'scripts/ops/isolated-recovery.mjs', 'scripts/ops/monitor.mjs', 'lib/request-log.ts'].map(file => readFile(file))))).digest('hex')
 const sourcePatchSha256 = createHash('sha256').update(execFileSync('git', ['diff', 'HEAD'])).digest('hex')
 const { applyAccountDeletionManifest, exportAccountDeletionManifest, requestAccountDeletion, resumeAccountDeletion } = await import('../../lib/account/deletion-jobs.ts')
+const { registeredTask } = await import('../../tests/helpers/registered-task.ts')
 const main = new Pool({ connectionString: targets[0].url, max: 5 }), workspace = new Pool({ connectionString: targets[1].url, max: 5 })
 const survivor = `ops-survivor-${suffix}`, deleted = `ops-deleted-${suffix}`, ws = randomUUID(), deletedWs = randomUUID(), issue = randomUUID(), agent = randomUUID(), run = randomUUID(), approval = randomUUID(), token = randomUUID(), effect = randomUUID()
 const objectsDirectory = join(root, 'source-objects'), backupDirectory = join(root, 'backup'), restoredObjects = join(root, 'restored-objects')
@@ -50,7 +51,9 @@ try {
     await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,$3)', [id, owner, 'Controlled recovery workspace'])
     await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\')', [id, owner, `${owner}@example.invalid`])
   }
-  await main.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'Original backup task\',\'{}\',\'todo\',\'normal\')', [issue, survivor])
+  await registeredTask(main, survivor, ws, issue, client => client.query(`INSERT INTO issues
+    (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+    VALUES($1,$2,$3,'bound','workspace','disabled',true,'Original backup task','{}','todo','normal')`, [issue, survivor, ws]))
   await main.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',\'Recovery fixture\')', [agent, survivor])
   await main.query('INSERT INTO agent_runs(id,"userId","agentId","issueId",status,"createdAt","leaseExpiresAt") VALUES($1,$2,$3,$4,\'running\',now()-interval \'10 minutes\',now()-interval \'5 minutes\')', [run, survivor, agent, issue])
   await main.query('INSERT INTO pending_actions(id,"userId",action,input) VALUES($1,$2,\'controlled.noop\',\'{}\')', [approval, survivor])
@@ -60,10 +63,11 @@ try {
   await main.query('INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,"createdAt") VALUES($1::uuid,$2,\'user_message\',$1::text,\'{}\',now()-interval \'10 minutes\')', [randomUUID(), survivor])
   const metrics = await databaseSignals(main)
   assert.equal(metrics.databaseAvailable, 1); assert.equal(metrics.staleWake, 1); assert.equal(metrics.expiredRunLease, 1); assert.equal(metrics.staleEffect, 1)
-  const fired = await notifyAlerts(actionableAlerts({ requests: {}, database: metrics }), { sink })
+  const firing = operationalAlertAssessment({ requests: {}, database: metrics })
+  const fired = await notifyAlerts(firing.alerts, { sink, assessed: firing.assessed })
   assert.equal(fired.healthy, true)
   const deliveredBeforeRepeat = receivedAlerts.length
-  assert.equal((await notifyAlerts(actionableAlerts({ requests: {}, database: metrics }), { sink, state: fired.state })).healthy, true)
+  assert.equal((await notifyAlerts(firing.alerts, { sink, state: fired.state, assessed: firing.assessed })).healthy, true)
   assert.equal(receivedAlerts.length, deliveredBeforeRepeat)
   const backup = await backupIsolated({ targets, objectsDirectory, outputDirectory: backupDirectory, key, sourceSha, migrationsDirectory: 'drizzle', vaultProbe: async () => true, quiesced: { writersStopped: true, workersStopped: true }, onFailure })
   await main.query('UPDATE issues SET title=\'Committed after backup\' WHERE id=$1', [issue])
@@ -88,7 +92,9 @@ try {
   const restoredResult = await restoreIsolated(input)
   const checkMain = new Pool({ connectionString: restored[0].url }), checkWorkspace = new Pool({ connectionString: restored[1].url })
   try {
-    assert.equal((await checkMain.query('SELECT title FROM issues WHERE id=$1', [issue])).rows[0].title, 'Original backup task')
+    assert.deepEqual((await checkMain.query('SELECT title,"workspaceId","ownershipState" FROM issues WHERE id=$1', [issue])).rows[0], {
+      title: 'Original backup task', workspaceId: ws, ownershipState: 'bound',
+    })
     assert.equal((await checkMain.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [deleted])).rows[0].n, 0)
     assert.equal((await checkWorkspace.query('SELECT count(*)::int n FROM mikka_workspaces WHERE id=$1', [deletedWs])).rows[0].n, 0)
     assert.equal((await checkMain.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [survivor])).rows[0].n, 1)
@@ -105,18 +111,19 @@ try {
   try { dbFailure = await databaseSignals(unreachable) } catch { dbFailure = { databaseAvailable: 0 } } finally { await unreachable.end() }
   assert.equal(dbFailure.databaseAvailable, 0)
   sinkRefuse = true
-  const sinkFailure = await notifyAlerts(actionableAlerts({ requests: {}, database: dbFailure }), { sink }); assert.equal(sinkFailure.healthy, false)
+  const unavailable = operationalAlertAssessment({ requests: {}, database: dbFailure })
+  const sinkFailure = await notifyAlerts(unavailable.alerts, { sink, assessed: unavailable.assessed }); assert.equal(sinkFailure.healthy, false)
   sinkRefuse = false
-  const dbAlert = await notifyAlerts(actionableAlerts({ requests: {}, database: dbFailure }), { sink, state: sinkFailure.state }); assert.equal(dbAlert.healthy, true)
+  const dbAlert = await notifyAlerts(unavailable.alerts, { sink, state: sinkFailure.state, assessed: unavailable.assessed }); assert.equal(dbAlert.healthy, true)
   // Repair only this run's controlled fault fixtures. No provider was ever called for this injected operation,
   // so failed is definitive no-effect evidence here; this is not a recipe for clearing a real uncertain action.
   await repairDrillFaults(main, { ownerId: survivor, runId: run, effectIds: [effect] })
   const recoveredMetrics = await databaseSignals(main)
   assert.equal(recoveredMetrics.databaseAvailable, 1)
   assert.equal(recoveredMetrics.staleWake, 0); assert.equal(recoveredMetrics.expiredRunLease, 0); assert.equal(recoveredMetrics.staleEffect, 0)
-  const recoveredAlerts = actionableAlerts({ requests: {}, database: recoveredMetrics })
+  const { alerts: recoveredAlerts, assessed } = operationalAlertAssessment({ requests: {}, database: recoveredMetrics })
   assert.deepEqual(recoveredAlerts.map(alert => alert.id), ['dispatch-start'], 'the live faults recover, but the failed dispatch remains in its SLO window')
-  const recovery = await notifyAlerts(recoveredAlerts, { sink, state: { ...fired.state, ...dbAlert.state } }); assert.equal(recovery.healthy, true)
+  const recovery = await notifyAlerts(recoveredAlerts, { sink, assessed, state: { ...fired.state, ...dbAlert.state } }); assert.equal(recovery.healthy, true)
   const report = { version: 1, sourceSha, sourcePatchSha256, toolSourcesSha256, environment: 'Linux, local PostgreSQL 17 existing Docker loopback; no application or worker connected',
     databaseNames: [...targets, ...restored].map(target => target.database), objectives, backupManifestSha256: backup.manifestSha256,
     deletionManifestSha256, failureAt: failureAt.toISOString(), rpoObservedMs: failureAt.getTime() - Date.parse(backup.manifest.capturedAt),

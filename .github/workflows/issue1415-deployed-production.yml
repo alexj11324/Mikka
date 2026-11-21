@@ -4,15 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       application_sha:
-        description: Exact immutable application commit already serving the production alias
-        required: true
-        type: string
-      web_run_id:
-        description: Successful real Web deploy run for this application commit
-        required: true
-        type: string
-      deployment_id:
-        description: Exact READY production deployment currently attached to the fixed alias
+        description: Exact application commit the live /mikka/api/version already serves
         required: true
         type: string
 
@@ -49,10 +41,12 @@ jobs:
       - name: Run the original and explicit-target offline guards before credentials
         run: pnpm test:read-cache
 
+      - name: Prepare Ubuntu package mirrors
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install Chromium before loading production credentials
         run: pnpm exec playwright install --with-deps --only-shell chromium
 
-      - name: Read the existing platform token only for read-only target and managed evidence
+      - name: Read the existing platform token only for read-only managed evidence
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -65,13 +59,11 @@ jobs:
           recursive: false
           include-imports: false
 
-      - name: Attest the real driver and the immutable deployed target before owner credentials
+      - name: Attest the real driver and the live deployed build before owner credentials
         run: node --import tsx scripts/acceptance/read-cache-production.mjs --attest --migration-1415
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
-          WEB_DEPLOY_RUN_ID: ${{ inputs.web_run_id }}
-          VERCEL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           GH_TOKEN: ${{ github.token }}
 
       - name: Read the existing smoke owner email only
@@ -106,8 +98,6 @@ jobs:
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
-          WEB_DEPLOY_RUN_ID: ${{ inputs.web_run_id }}
-          VERCEL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           GH_TOKEN: ${{ github.token }}
           SMOKE_BASE_URL: https://app.aspectlylabs.com
           SMOKE_EXPECT_ON: credentialVault,cloudComputer
@@ -118,8 +108,6 @@ jobs:
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
-          WEB_DEPLOY_RUN_ID: ${{ inputs.web_run_id }}
-          VERCEL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           GH_TOKEN: ${{ github.token }}
 
       - name: Verify normal mobile and source daemon HTTP and exact cleanup
@@ -128,8 +116,6 @@ jobs:
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
-          WEB_DEPLOY_RUN_ID: ${{ inputs.web_run_id }}
-          VERCEL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           GH_TOKEN: ${{ github.token }}
 
       - name: Verify the owner-managed PKCE MCP session and exact cleanup
@@ -138,8 +124,6 @@ jobs:
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
-          WEB_DEPLOY_RUN_ID: ${{ inputs.web_run_id }}
-          VERCEL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           GH_TOKEN: ${{ github.token }}
 
       - name: Require every business report and cleanup then recheck the live target
@@ -149,8 +133,6 @@ jobs:
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
-          WEB_DEPLOY_RUN_ID: ${{ inputs.web_run_id }}
-          VERCEL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           GH_TOKEN: ${{ github.token }}
 
       - name: Retain only closed target and business evidence

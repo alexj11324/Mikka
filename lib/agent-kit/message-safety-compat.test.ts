@@ -16,13 +16,15 @@ import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../personal-agent-message'
 overrideDeploymentSwitch('factoryRouting',false)
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
-const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
+const saved: unknown[][] = [], forwarded: unknown[][] = []
 let modelCalls = 0
-stub('../coordinator/store.ts', { loadConversation: async () => conversation, loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: '' }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
-stub('../coordinator/native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
+stub('../coordinator/store.ts', { loadConversation: async () => conversation, loadProductPromptContext: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('../coordinator/prompt-context.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }) })
+stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('../coordinator/bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
 stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })
-stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') } })
+const forbidDatabase = () => { throw Error('No database transaction in prompt fixture') }
+stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidDatabase, withDatabaseTransaction: forbidDatabase })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
 stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
 stub('../search/index.ts', { webSearch: () => {} })
@@ -39,13 +41,13 @@ stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
 mock.module('ai', { namedExports: { streamText: () => { throw Error('Unexpected subscription model in legacy fixture') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)', finishReason:'stop' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
-let sdk: typeof import('../../workflows/coordinator/steps'), native: typeof import('../../workflows/coordinator/native-steps')
+let composer: typeof import('../coordinator/product-instructions')
 const secret = 'pure-test-existing-host-secret-0000000'
-before(async () => { sdk = await import('../../workflows/coordinator/steps'); native = await import('../../workflows/coordinator/native-steps') })
+before(async () => { composer = await import('../coordinator/product-instructions') })
 
 // Regression for composition with a revision frozen before the host policy was
 // introduced. Platform policy still applies; the revision itself stays intact.
-test('frozen SDK, CC and Codex prompts retain current host message policy without rewriting the snapshot', async () => {
+test('Eve product instructions for historical SDK, CC and Codex revisions retain current host message policy without rewriting the snapshot', async () => {
   const old = process.env.BETTER_AUTH_SECRET
   try {
     process.env.BETTER_AUTH_SECRET = secret
@@ -62,19 +64,11 @@ test('frozen SDK, CC and Codex prompts retain current host message policy withou
         {...DEFAULT_AGENT_DEFINITION, instructions: 'Synthetic saved guidance'},
         'Historical host policy without the later message policy', {harness, model: 'frozen-model'})
       const before = JSON.stringify(snapshot)
-      const prompt = await sdk.preparePrompt('owner', 'private-bot', snapshot)
-      assert.ok(prompt.instructions.includes(PERSONAL_MESSAGE_INSTRUCTIONS), `${harness}: current host policy missing`)
-      assert.ok(prompt.instructions.includes(snapshot.hostInstructions))
-      assert.ok(prompt.instructions.includes(snapshot.definition.instructions))
-      assert.equal(prompt.messages[1].content, human.payload.text)
-      assert.equal(JSON.parse(prompt.messages[0].content as string).authority, 'coordination_data_only')
-      if (harness !== 'ai_sdk') {
-        await native.enqueue('owner', 'holder', 0, {harness: harness as 'claude_code' | 'codex', deviceId: 'synthetic-device'}, [], 'private-bot', snapshot)
-        const input = enqueued.at(-1)![4] as {context: string; instructions: string}
-        assert.deepEqual(JSON.parse(input.context).messages, prompt.messages)
-        assert.equal(input.instructions, prompt.instructions)
-        assert.ok(!input.context.includes(secret))
-      }
+      const prompt = await composer.composeEveInstructions('owner', 'private-bot', snapshot)
+      assert.ok(prompt.includes(PERSONAL_MESSAGE_INSTRUCTIONS), `${harness}: current host policy missing`)
+      assert.ok(prompt.includes(snapshot.hostInstructions))
+      assert.ok(prompt.includes(snapshot.definition.instructions))
+      assert.ok(!prompt.includes(secret))
       assert.equal(JSON.stringify(snapshot), before)
     }
     assert.equal(modelCalls, 0)

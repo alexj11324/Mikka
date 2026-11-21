@@ -1,0 +1,6 @@
+{
+  "name": "@mikka/cloudflare-litellm",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@cloudflare/containers": "0.3.7" }
+}

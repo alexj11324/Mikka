@@ -1,14 +1,13 @@
 import { withRequestLog } from '@/lib/request-log'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { requireUser } from '@/lib/issue-access'
 import { exchangeLinearCode, LINEAR_OAUTH_CALLBACK_PATH, LINEAR_OAUTH_STATE_COOKIE } from '@/lib/linear-sync/oauth'
 import { withBasePath } from '@/lib/base-path'
 import { bootstrapSuggestions } from '@/lib/suggestions/sources'
 import { linearSyncDisabledResponse, linearSyncEnabled } from '@/lib/linear-sync/flags'
 
-export const runtime = 'nodejs'
 
 async function handleGET(request: Request) {
   if (!await linearSyncEnabled()) return linearSyncDisabledResponse()

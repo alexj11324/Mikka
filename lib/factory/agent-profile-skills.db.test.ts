@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 import { dbUrl, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { WorkspaceSkillStore } from '@/lib/plugins/workspace-skill'
 import { AgentProfileStore } from './agent-profile-store'
-import { agentProfileDigest, AgentProfileError, parseAgentProfile } from './agent-profile-definition'
+import { agentProfileDigest, AgentProfileError, contentOnlyAgentProfile, parseAgentProfile } from './agent-profile-definition'
 import { agentProfileSkillAvailability, agentProfileSkillCatalog, resolveAgentProfileSkillsFor } from './agent-profile-skills'
 
 const sha = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -90,7 +90,8 @@ test('Profile Skills: personal and workspace sources stay owner/workspace scoped
     const created = await store.create(scope, definition)
     const createdSkills = await rowSkills(created.id)
     assert.equal(createdSkills[0].content, personalBody.trim())
-    assert.equal(agentProfileDigest(definition, createdSkills), created.digest)
+    // A Profile holds content only (decision 2026-11-15-1630): the stored, hashed definition drops roles.
+    assert.equal(agentProfileDigest(contentOnlyAgentProfile(definition), createdSkills), created.digest)
     // A source edit does not change the saved Profile's pinned envelope.
     const changedBody = 'Changed after the profile was saved.\n'
     await pool.query('UPDATE personal_skills SET body=$2,sha256=$3 WHERE id=$1', [personalId, changedBody, sha(changedBody)])

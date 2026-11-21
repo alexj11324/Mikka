@@ -27,7 +27,7 @@ async function back(page: Page) {
 test('rail pages are steps in history: back and forward walk them one at a time', async ({ page }) => {
   await register(page)
   await expect(chat(page)).toBeVisible()
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'all-issues')
   await rail(page, '建议').click()
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'suggestions')
@@ -110,7 +110,7 @@ test('board → task → back lands on the board; rail → back after a task lan
   const title = `看板任务 ${randomUUID()}`
   await seedTask(page, title)
   await page.goto(app('/?section=all-issues'))
-  await hydrated(rail(page, '看板'))
+  await hydrated(rail(page, '任务'))
   // Nobody is on the seeded task: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
   await expect(board(page)).toBeVisible()
   await expect(board(page).getByText(title, { exact: true })).toHaveCount(0)
@@ -508,7 +508,7 @@ test('a project from ⌘K opens under 看板 with its address; back returns to t
   expect(query(page).get('section')).toBe('projects')
   expect(query(page).get('project')).toBe(projectId)
   // Projects live under 看板 (R-82): its rail item is current and no bot list sits beside the page.
-  await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  await expect(rail(page, '任务')).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('list', { name: 'Bot', exact: true })).toHaveCount(0)
 
   await page.reload()
@@ -530,17 +530,17 @@ test('a team page keeps its address: its 项目 page survives a reload and back 
   await page.goto(app(`/?team=${teamId}`))
   const home = page.getByRole('heading', { name, exact: true, level: 1 })
   await expect(home).toBeVisible()
-  await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
-  await hydrated(rail(page, '看板'))
+  await expect(rail(page, '任务')).toHaveAttribute('aria-current', 'page')
+  await hydrated(rail(page, '任务'))
 
   await page.getByRole('complementary').getByRole('button', { name: /^项目/ }).click()
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'team-projects' && url.searchParams.get('team') === teamId)
   await page.reload()
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'team-projects')
   await expect(home).toHaveCount(0)
-  await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  await expect(rail(page, '任务')).toHaveAttribute('aria-current', 'page')
   // Back is the person's next step once the reloaded page works, as after the first load above.
-  await hydrated(rail(page, '看板'))
+  await hydrated(rail(page, '任务'))
   await back(page)
   await expect(home).toBeVisible()
   expect([...query(page).keys()]).toEqual(['team'])
@@ -617,7 +617,7 @@ test('board → task: ↑↓ step through the board and the crumb says 看板; �
   await seedTask(page, first)
   await seedTask(page, second)
   await page.goto(app('/?section=all-issues'))
-  await hydrated(rail(page, '看板'))
+  await hydrated(rail(page, '任务'))
   // Nobody is on the seeded tasks: 负责人 我 leaves them out, 我创建的 shows them (decision 2026-11-02-0302).
   await expect(board(page)).toBeVisible()
   await expect(board(page).getByText(first, { exact: true })).toHaveCount(0)

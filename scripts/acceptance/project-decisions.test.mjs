@@ -20,7 +20,7 @@ const env = (mode = 'preflight') => ({
 const event = mode => ({ inputs: { mode: mode ?? 'preflight' } })
 const attestation = (mode = 'preflight') => ({
   status: 'ready', issue: 1245, repository: REPOSITORY, revision: SHA, mode, workerReleaseSha: SHA,
-  webDeployRunId: 11, workerReleaseRunId: 12, checkedAt: new Date(EPOCH).toISOString(),
+  workerReleaseRunId: 12, checkedAt: new Date(EPOCH).toISOString(),
 })
 const release = kind => ({
   id: kind === 'web' ? 11 : 12, name: kind === 'web' ? 'Web deploy' : 'E2B official instance runtime',
@@ -72,14 +72,15 @@ test('attestation never reads account credentials or forwards the GitHub token t
     assert.equal(parsed.origin, 'https://api.github.com')
     assert.equal(init.headers.authorization, 'Bearer private-github-token')
     assert.equal(parsed.searchParams.get('head_sha'), SHA)
-    return Response.json({ workflow_runs: [release(parsed.pathname.includes('web-deploy') ? 'web' : 'worker')] })
+    assert.ok(parsed.pathname.endsWith('/e2b-official-runtime.yml/runs'))
+    return Response.json({ workflow_runs: [release('worker')] })
   }
   assert.equal((await attestDeployment({ env: input, event: event(), fetchImpl, now: () => EPOCH })).status, 'ready')
-  assert.ok(calls.length >= 5)
+  assert.ok(calls.length >= 4)
   await assert.rejects(attestDeployment({ env: input, event: event(), now: () => EPOCH,
     fetchImpl: async () => Response.json({ build: 'b'.repeat(40) }) }), /build_mismatch/)
   await assert.rejects(attestDeployment({ env: input, event: event(), now: () => EPOCH,
-    fetchImpl: async url => new URL(url).origin === ORIGIN ? Response.json({ build: SHA }) : Response.json({ workflow_runs: [] }) }), /web_deploy/)
+    fetchImpl: async url => new URL(url).origin === ORIGIN ? Response.json({ build: SHA }) : Response.json({ workflow_runs: [] }) }), /worker_release/)
 })
 
 test('decision proof rejects forged identity, substituted models, reconstructed records and ungrounded changes', () => {
@@ -286,8 +287,8 @@ test('task prompt uses the structured issue and leaves the future live direction
 test('workflow attests before OIDC and uploads only two explicit sanitized reports', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/project-decisions-acceptance.yml', import.meta.url), 'utf8')
   assert.ok(workflow.indexOf('project-decisions.mjs --attest') < workflow.indexOf('Infisical/secrets-action'))
-  assert.ok(workflow.includes('contains(github.event.workflow_run.head_commit.message, \'[project-map-acceptance]\')'))
-  assert.ok(workflow.includes('ref: ' + '$' + '{{ github.event.workflow_run.head_sha || github.sha }}'))
+  assert.ok(!workflow.includes('workflow_run'), 'per-service releases publish no Web deploy run to follow')
+  assert.ok(workflow.includes('ref: ' + '$' + '{{ github.sha }}'))
   assert.ok(workflow.includes('secret-path: /'))
   assert.ok(workflow.includes('recursive: false'))
   assert.ok(workflow.includes('project-decisions-report/attestation.json'))
@@ -295,7 +296,7 @@ test('workflow attests before OIDC and uploads only two explicit sanitized repor
   assert.ok(!workflow.includes('path: .cache'))
 })
 
-function fixture({ active = false, noWorking = false, providerFailureAtChat = false } = {}) {
+function fixture({ active = false, noWorking = false, providerFailureAtChat = false, submitStatus = 202, invalidSubmitReceipt = false } = {}) {
   let tick = EPOCH, counter = 100, orderCounter = 500
   const ids = () => id(counter++)
   const sources = CASES.map((item, index) => ({
@@ -425,11 +426,13 @@ function fixture({ active = false, noWorking = false, providerFailureAtChat = fa
         failure: failed ? { kind: 'failed' } : null, items: failed ? [{ from: 'person', text: 'private-user-message-sentinel' }] : [],
         sources: {}, artifacts: {}, reactions: {} })
     }
-    if (path === '/api/mobile/chat' && method === 'POST') {
-      const bot = bots.find(bot => bot.id === body.botId)
-      bot.sent = true; bot.botRecord = body.text.includes('"title":"' + bot.name + ' bot"')
+    if (path === '/api/agents/eve/v1/session' && method === 'POST') {
+      const bot = bots.find(bot => bot.id === url.searchParams.get('botId'))
+      assert.deepEqual(body.clientContext, { expectedOwnerId: OWNER, expectedWorkspaceId: WS })
+      assert.match(new Headers(init.headers).get('x-mikka-submission-id'), /^[a-f0-9-]{36}$/)
+      bot.sent = true; bot.botRecord = body.message.includes('"title":"' + bot.name + ' bot"')
       sequence.push('sent:' + bot.item.id)
-      return Response.json({ queued: true }, { status: 202 })
+      return Response.json(invalidSubmitReceipt ? { queued: true } : { ok: true, sessionId: 'wrun_project', deliveryId: 'delivery_fixture' }, { status: submitStatus })
     }
     if (path === '/api/factory/tasks') {
       const bot = bots.find(bot => bot.issueId === url.searchParams.get('issueId'))
@@ -565,4 +568,14 @@ test('an ended thread cannot pass as mid-run steering and does not stop the othe
 test('artifact download enforces a small byte bound before retaining arbitrary model output', async () => {
   assert.equal((await smallArtifactBytes(new Response('ok'))).toString(), 'ok')
   await assert.rejects(smallArtifactBytes(new Response('x'.repeat(4097))), /artifact_content/)
+})
+
+test('native message admission requires HTTP 202 and its actual receipt', async () => {
+  for (const options of [{ submitStatus: 200 }, { invalidSubmitReceipt: true }]) {
+    const f = fixture({ active: true, ...options })
+    const report = await runProjectDecisionsAcceptance({ env: env('active'), event: event('active'), attestation: attestation('active'), ...f })
+    assert.equal(report.cases.slice(1).every(row => row.status === 'blocked'), true)
+    assert.equal(report.cases.slice(1).every(row => row.code === (options.submitStatus ? 'http_refused' : 'response_invalid')), true)
+    assert.equal(report.sessionClosed, true)
+  }
 })

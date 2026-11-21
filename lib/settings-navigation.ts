@@ -32,6 +32,14 @@ export function isLocalSettingsNavigation(current: URL, destination: URL, _works
     appPaths.has(currentRoute.pathname) && appPaths.has(destinationRoute.pathname)
 }
 
+/** Pin the entry being left so Back can restore an initially implicit workspace. */
+export function rememberWorkspaceBeforeSwitch(workspaceId: string) {
+  const url = new URL(window.location.href)
+  if (url.searchParams.has('workspace')) return
+  url.searchParams.set('workspace', workspaceId)
+  window.history.replaceState(window.history.state, '', url)
+}
+
 export function pushSettingsHistory(href: string, workspaceId?: string, basePath = BASE_PATH) {
   const current = new URL(window.location.href)
   const requested = new URL(href, current)

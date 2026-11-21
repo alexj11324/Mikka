@@ -1,5 +1,6 @@
+import { taskReviewRef, readSchema, fileReadSchema, checksSchema, checkObservationSchema, sameReviewReference } from '../../../../../lib/code-review/read-contract'
 import { api, ApiError } from '@/lib/api'
-import type { ReviewCheck, ReviewFileRead, ReviewRead } from './contract'
+import type { ReviewCheck, ReviewFileRead, ReviewRead, ReviewSummary } from './contract'
 import { sendBody, type Batch } from './review'
 
 /**
@@ -7,14 +8,39 @@ import { sendBody, type Batch } from './review'
  * /api/tasks/:taskId/review*, the same shapes the web reads. The phone's bearer is accepted there like on the other
  * shared routes.
  */
+type TaskReviewRef = NonNullable<ReviewSummary['reviewRef']>
 const task = (taskId: string) => `/api/tasks/${encodeURIComponent(taskId)}/review`
 export const reviewPath = task
-export const checksPath = (taskId: string) => `${task(taskId)}/checks`
-export const filePath = (taskId: string, path: string) => `${task(taskId)}/file?path=${encodeURIComponent(path)}`
+function withReference(path: string, reference?: TaskReviewRef | null, file?: string) {
+  const params = new URLSearchParams()
+  if (file !== undefined) params.set('path', file)
+  if (reference) { params.set('snapshotId', reference.snapshotId); params.set('sourceVersion', reference.sourceVersion) }
+  const query = params.toString()
+  return query ? path + '?' + query : path
+}
+export const checksPath = (taskId: string, reference?: TaskReviewRef | null) => withReference(task(taskId) + '/checks', reference)
+export const filePath = (taskId: string, path: string, reference?: TaskReviewRef | null) => withReference(task(taskId) + '/file', reference, path)
+export const readReviewPath = async (path: string): Promise<ReviewRead | null> => readSchema.nullable().parse(await api<unknown>(path))
 
-export const readReview = (taskId: string) => api<ReviewRead>(reviewPath(taskId))
-export const readChecks = (taskId: string) => api<ReviewCheck[]>(checksPath(taskId))
-export const readFile = (taskId: string, path: string) => api<ReviewFileRead>(filePath(taskId, path))
+function requestedSource(path: string) {
+  const params = new URL(path, 'https://mikka.invalid').searchParams
+  return params.has('snapshotId') ? taskReviewRef.parse({ snapshotId: params.get('snapshotId'), sourceVersion: params.get('sourceVersion') }) : null
+}
+export async function readChecksPath(path: string): Promise<ReviewCheck[]> {
+  const ref = requestedSource(path), result = await api<unknown>(path)
+  if (!ref) return checksSchema.parse(result)
+  const observation = checkObservationSchema.parse(result)
+  if (!sameReviewReference(ref, observation.reviewRef)) throw new Error('Review reference changed')
+  return observation.checks
+}
+export async function readFilePath(path: string): Promise<ReviewFileRead> {
+  const ref = requestedSource(path), file = fileReadSchema.parse(await api<unknown>(path))
+  if (ref && (!sameReviewReference(ref, file.reviewRef) || file.file.path !== new URL(path, 'https://mikka.invalid').searchParams.get('path'))) throw new Error('Review file changed')
+  return file
+}
+export const readReview = (taskId: string) => readReviewPath(reviewPath(taskId))
+export const readChecks = (taskId: string) => readChecksPath(checksPath(taskId))
+export const readFile = (taskId: string, path: string) => readFilePath(filePath(taskId, path))
 
 export type ActionResult = { kind: 'done' } | { kind: 'needs_confirm' } | { kind: 'denied'; reason: string }
 

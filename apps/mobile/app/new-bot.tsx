@@ -20,7 +20,7 @@ const colorLabels: Record<string, string> = {
 }
 
 /**
- * 新建 Bot (Comma design 06), a form sheet from 对话's 新建: a name, a shape and a colour, as on the web
+ * 新建 Bot (Comma design 06), a form sheet from 线程's 新建: a name, a shape and a colour, as on the web
  * (components/nav/new-bot-dialog.tsx); the bot's chat opens once it exists.
  */
 export default function NewBot() {

@@ -32,7 +32,7 @@ export class DeployedBrowserError extends Error {
 }
 const check = (ok, code) => { if (!ok) throw new DeployedBrowserError(code) }
 const BINDING_FIELDS = ['targetMode', 'applicationSha', 'driverRevision', 'driverRunId',
-  'driverRunAttempt', 'webDeployRunId', 'webAttempt', 'deploymentId']
+  'driverRunAttempt']
 const projectBinding = proof => Object.fromEntries(BINDING_FIELDS.map(key => [key, proof[key]]))
 const TEAM_FIELDS = ['teamWorkspaceConfirmed', 'teamWorkspaceHash', 'teamAdminMembershipVerified',
   'teamSelectionBasis', 'teamOwnerAttribution']

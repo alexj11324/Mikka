@@ -89,7 +89,7 @@ async function main() {
       void (async () => {
         const input = JSON.parse((await bytes(request)).toString('utf8')) as EgressHttpRequest
         const result = await executeEgressRequest(input, { runId: 'fixture-run' }, {
-          env, resolve: async () => { dnsDecisions++; return [{ address: '93.184.216.34', family: 4 }] }, transport: fixtureTransport,
+          env, bindingActive: async () => true, resolve: async () => { dnsDecisions++; return [{ address: '93.184.216.34', family: 4 }] }, transport: fixtureTransport,
         })
         response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify(result))
       })().catch(() => { response.writeHead(500); response.end('{"error":"benchmark_failure"}') })

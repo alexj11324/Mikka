@@ -72,7 +72,12 @@ export class AgentKitStore {
     for (let depth = 0; chosen.source === 'improvement' && chosen.base_version && depth < 100; depth++) chosen = await this.version(client,scope,chosen.base_version)
     return { source: chosen.source, createdAt: chosen.created_at, tools: current.definition.tools }
   }
-  async active(scope: AgentScope, defaults: AgentDefinition) { return this.transaction(client => this.head(client,scope,defaults)) }
+  async active(scope: AgentScope, defaults: AgentDefinition) {
+    return this.transaction(async client => {
+      const current = await this.head(client, scope, defaults)
+      return { ...current, effectiveTools: platformEffectiveTools(await this.toolSource(client, scope, current), defaults.tools) }
+    })
+  }
   async history(scope: AgentScope) {
     return this.transaction(async client => {
       await this.authority(client,scope)
@@ -142,13 +147,16 @@ export class AgentKitStore {
       return { id,snapshot,status:'running' }
     })
   }
-  private async execution(client: PoolClient, scope: AgentScope, id: string, lock = false): Promise<AgentExecution> {
-    await this.authority(client,scope)
-    const { rows } = await client.query<AgentExecution>(`select id,snapshot,status from agent_kit_executions where owner_id=$1 and bot_key=$2 and id=$3${lock ? ' for update' : ''}`,[...params(scope),uuid(id)])
-    if (!rows[0]) throw new AgentKitError('agentExecutionNotFound',404)
-    return rows[0]
+  async readExecution(scope: AgentScope, id: string, runningExecutionKey?: string): Promise<AgentExecution> {
+    return this.transaction(async client => {
+      await this.authority(client, scope)
+      const { rows } = await client.query<AgentExecution>(`select id,snapshot,status from agent_kit_executions
+        where owner_id=$1 and bot_key=$2 and id=$3 and ($4::text is null or (execution_key=$4 and status='running'))`,
+        [...params(scope), uuid(id), runningExecutionKey ?? null])
+      if (rows[0]) return rows[0]
+      throw new AgentKitError(runningExecutionKey === undefined ? 'agentExecutionNotFound' : 'agentExecutionClosed', 404)
+    })
   }
-  async readExecution(scope: AgentScope, id: string) { return this.transaction(client => this.execution(client,scope,id)) }
   /** The checks a hook makes, without the snapshot. The snapshot is immutable
    * (agent_kit_snapshot_guard), so these facts are read from the row itself
    * under the same lock, never from a cached copy; status is always fresh. */

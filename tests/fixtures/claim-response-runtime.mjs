@@ -86,7 +86,8 @@ export const claimWorkspacePool = { async query(sql, args) {
   p.membershipReads.push(args)
   return { rows: p.workspaceMemberAllowed ? args[1].map(userId => ({ userId })) : [] }
 } }
-const nextServer = import.meta.resolve('next/server')
+const realServer = new URL('../../lib/server-runtime/server.ts', import.meta.url).href
+const nextServer = realServer
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const actionError = new URL('../../lib/action-error.ts', import.meta.url).href
 const mailboxCapability = new URL('../../lib/personal-mailbox-capability.ts', import.meta.url).href
@@ -197,6 +198,10 @@ let checkedOutClient
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
+  if (sql === 'SELECT 1 FROM thread_reply_versions WHERE "resultRunId"=$1 AND "userId"=$2 AND "workspaceId"=$3') {
+    assert.deepEqual(args,[p.run.id,p.run.userId,p.run.workspaceId])
+    return {rows:p.historicalReplyVersion ? [{}] : [],rowCount:p.historicalReplyVersion ? 1 : 0}
+  }
   assert.equal(p.appActive,1,'execution identity remains inside the checked-out APP transaction')
   assert.equal(sql,'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1')
   assert.deepEqual(args,[p.device.id]);return {rows:[p.device]}
@@ -222,8 +227,10 @@ export async function withDatabaseClient(client,operation){
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
+  // The claim transaction's session check (decision 2026-11-17-2215) reads the probe's device.
+  ['/lib/device-session.ts', 'export async function deviceSessionHeld(tx,deviceId){const p=globalThis.claimResponseProbe;if(typeof tx?.query!=="function"||deviceId!==p.device.id)throw new Error("unexpected session check");return Boolean(p.device.sessionOpenedAt)&&!p.device.sessionClosedAt}'],
   ['/lib/project-resources/run-lease.ts', projectExecutionSource],
-  ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
+  ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertLiteLLMModelTransport(scope,model,endpoint){const p=globalThis.claimResponseProbe;(p.liteLLMAdmissionCalls??=[]).push({scope,model,endpoint});await assertUnmanagedModelTransport(scope,model)};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
   ['/lib/workspace-db.ts', `export {claimWorkspaceDatabase as workspaceDb, claimWorkspacePool as workspacePool} from ${JSON.stringify(import.meta.url)}`],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
@@ -235,7 +242,7 @@ const sources = new Map([
   ['/lib/run-publications.ts', 'export async function prepareRunPublication(){const p=globalThis.claimResponseProbe;p.preparation.push("publication");return structuredClone(p.publication)};export async function persistRunCompletion(_owner,_run,completion){const p=globalThis.claimResponseProbe;if(completion.stopReason==="error"&&completion.report.summary==="The task is no longer available to this thread."){p.preparation.push("issue-unavailable");return}if(!p.run.retryOf||completion.stopReason!=="blocked")throw new Error("unexpected publication failure");p.preparation.push("blocked-recovery");p.run.status="stopped";p.run.stopReason="blocked"}'],
   ['/lib/issue-team-access.ts', 'export async function issueTeamAccess(){return {allowed:globalThis.claimResponseProbe.memberAllowed}}'],
   ['/lib/issue-access.ts', 'export async function issueForUser(){const p=globalThis.claimResponseProbe;if(p.issueAccessError)throw p.issueAccessError;return p.memberAllowed&&!p.issue?.content?.attrs?.mikka?.deletedAt?p.issue:null}'],
-  ['/lib/mcp/worker.ts', 'export async function issueRunToken(){const p=globalThis.claimResponseProbe;p.preparation.push("token");await p.beforeToken?.();if(p.tokenError)throw new Error("synthetic token refusal");return {token:"synthetic-only"}}'],
+  ['/lib/mcp/worker.ts', 'export async function issueRunToken(){const p=globalThis.claimResponseProbe;p.preparation.push("token");await p.beforeToken?.();if(p.tokenError)throw Object.assign(new Error("synthetic token refusal"),{name:"FixtureRunTokenRefusal"});return {token:"synthetic-only"}}'],
   // These claims have no frozen mailbox grant. Validate that fact through the
   // real capability contract instead of accidentally failing its module load.
   ['/lib/personal-mailbox-runtime.ts', `import assert from 'node:assert/strict'
@@ -340,6 +347,9 @@ registerHooks({
     if(specifier==='server-only')return {url:'claim-fixture:empty',shortCircuit:true}
     if(specifier==='next/server')return {url:'claim-fixture:next-server',shortCircuit:true}
     const result=next(specifier,context)
+    // tsx resolves the `@/` alias first, so match the resolved path, not the specifier.
+    // The stub itself imports the real classes; let that one through.
+    if(result.url===realServer&&context.parentURL!=='claim-fixture:next-server')return {url:'claim-fixture:next-server',shortCircuit:true}
     for(const [suffix,source] of sources)if(result.url.endsWith(suffix))return {url:`claim-fixture:${encodeURIComponent(source)}`,shortCircuit:true}
     return result
   },

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act, type ReactNode } from 'react'
+import { act, createContext, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import { SWRConfig } from 'swr'
 import { ViewStateProvider } from '@/lib/hooks/view-state'
 import { Button } from '@/components/ui/button'
+import type { BoardMenuItem, BoardScreenProps } from '@/components/slots/board-contract'
 import type { listIssues } from '@/app/actions/issues'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -13,27 +15,33 @@ const translate = Object.assign((key: string) => key, { has: () => false })
 const nothing = () => {}
 const empty = () => null
 const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
-mock.module('swr', { defaultExport: () => ({ data: undefined }) })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
+const syncReads: (string | undefined)[] = []
+let mappedWorkspace: string | undefined
+mock.module('@/hooks/use-task-collection', { namedExports: { TaskPresentationsContext: createContext({}) } })
 mock.module('@/hooks/use-live-lists', { namedExports: { useLiveTaskRunList: () => ({ data: undefined }) } })
 mock.module('@/hooks/use-list-expiry', { namedExports: { useListExpiry: nothing } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
-mock.module('@/app/actions/linear-sync', { namedExports: { getLinearBoardSync: async () => ({ synced: false }) } })
-mock.module('@/components/person-avatar', { namedExports: { PersonAvatar: empty } })
+mock.module('@/app/actions/linear-sync', { namedExports: { getLinearBoardSync: async (workspace?: string) => {
+  syncReads.push(workspace)
+  return { synced: !!workspace && workspace === mappedWorkspace }
+} } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { CoordinatorAvatar: empty } })
 mock.module('@/components/nav/conversation-pill', { namedExports: { ConversationPill: empty } })
 mock.module('@/components/coordinator/coordinator-chat', { namedExports: { CoordinatorChat: empty } })
 mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: empty } })
-mock.module('./issue-assignee-menu', { namedExports: { AgentSphere: empty } })
-mock.module('./issue-metadata-controls', { namedExports: { LabelDot: empty } })
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: Pass, SheetHeader: Pass, SheetTitle: Pass } })
-mock.module('@/components/ui/dropdown-menu', { namedExports: {
-  DropdownMenu: Pass, DropdownMenuContent: Pass, DropdownMenuGroup: Pass, DropdownMenuSub: Pass, DropdownMenuSubContent: Pass, DropdownMenuSubTrigger: Pass, DropdownMenuTrigger: Pass,
-  DropdownMenuCheckboxItem: ({ children, checked, onCheckedChange }: { children?: ReactNode; checked: boolean; onCheckedChange: (checked: boolean) => void }) => <Button role="menuitemcheckbox" aria-checked={checked} onClick={() => onCheckedChange(!checked)}>{children}</Button>,
-} })
-mock.module('./issue-board', { namedExports: { IssueBoard: ({ issues }: { issues: Issue[] }) => <div data-board-view="board">{issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}</div> } })
-mock.module('./issue-list', { namedExports: { IssueList: ({ issues }: { issues: Issue[] }) => <div data-board-view="list">{issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}</div> } })
-mock.module('./board-screen', { namedExports: { BoardScreen: null, BoardScreenView: empty } })
+// The test adapter exposes the public slot callbacks. The official renderer
+// is exercised in the companion repository without copying its implementation.
+mock.module('./board-screen', { namedExports: { BoardScreenView: ({ issues, view, onView, filterItems, tools }: Pick<BoardScreenProps, 'view' | 'onView' | 'filterItems' | 'tools'> & { issues: Issue[] }) =>
+  <div data-board-view={view}>{tools}
+    <Button aria-label="viewList" aria-pressed={view === 'list'} onClick={() => onView('list')}>List</Button>
+    {filterItems.map((group: BoardMenuItem) => <div key={group.label}>
+      {group.submenu?.map(item => <Button key={item.label} role="menuitemcheckbox" aria-checked={item.checked} onClick={item.onSelect}>{item.label}</Button>)}
+      {group.submenu?.some(item => item.checked) && <span role="group" aria-label={group.label}>{group.submenu.filter(item => item.checked).map(item => item.label).join(', ')}</span>}
+    </div>)}
+    {issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}
+  </div> } })
 
 let BoardPage: typeof import('./board-page')['BoardPage']
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -55,15 +63,61 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.happyDOM.close())
 function issue(owner: string, workspace: string, suffix: string): Issue {
   const prefix = owner === 'owner-one' ? workspace : `${owner}:${workspace}`
-  return { id: `${workspace}-${suffix}`, title: `${prefix} task ${suffix}`, ownerId: owner, scope: 'workspace', status: 'todo', priority: 'normal',
+  return { id: `${workspace}-${suffix}`, title: `${prefix} task ${suffix}`, ownerId: owner, scope: 'workspace', status: 'todo', priority: 'normal', projectId: `${workspace}-project-${suffix}`,
     createdAt: '2026-11-07T00:00:00Z', updatedAt: '2026-11-07T00:00:00Z', checklist: { total: 0, checked: 0 },
-    metadata: { assignee: { id: owner, kind: 'user', name: owner }, project: `${prefix} private project ${suffix}`, labels: [{ name: `${prefix} private label ${suffix}`, color: null }], pullRequests: [] } } as unknown as Issue
+    metadata: { assignee: { id: owner, kind: 'member', name: owner, image: null } satisfies NonNullable<Issue['metadata']['assignee']>, project: `${prefix} private project ${suffix}`, labels: [{ name: `${prefix} private label ${suffix}`, color: null }], pullRequests: [] } } as unknown as Issue
 }
 async function render({ owner = 'owner-one', workspace = 'workspace-one', visible = true, remount = false } = {}) {
   await act(async () => root.render(<ViewStateProvider scope={`${owner}:${workspace}`}>
-    {visible && <BoardPage key={remount ? `${owner}:${workspace}` : 'board'} issues={[issue(owner, workspace, 'one'), issue(owner, workspace, 'two')]} userId={owner} workspaceId={workspace} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />}
+    {visible && <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} key={remount ? `${owner}:${workspace}` : 'board'} issues={[issue(owner, workspace, 'one'), issue(owner, workspace, 'two')]} userId={owner} workspaceId={workspace} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />}
   </ViewStateProvider>))
 }
+test('the Board reads Linear for the displayed workspace and account, including on manual refresh', async () => {
+  const cache = new Map()
+  const show = async (userId: string, workspaceId?: string) => act(async () => root.render(
+    <SWRConfig value={{ provider: () => cache }}>
+      <BoardPage issues={[]} userId={userId} workspaceId={workspaceId} presentationRead={{ isLoading: false, mutate: async () => undefined }}
+        onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
+    </SWRConfig>))
+  const button = (label: string) => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+  syncReads.length = 0
+  mappedWorkspace = 'workspace-one'
+  await show('owner-one')
+  assert.deepEqual(syncReads, [])
+  await show('owner-one', 'workspace-one')
+  assert.ok(button('synced'))
+  await show('owner-one', 'workspace-two')
+  assert.ok(button('refresh'))
+  mappedWorkspace = 'workspace-two'
+  await show('owner-two', 'workspace-two')
+  assert.ok(button('synced'))
+  mappedWorkspace = undefined
+  await act(async () => button('synced')!.click())
+  assert.ok(button('refresh'))
+  assert.deepEqual(syncReads, ['workspace-one', 'workspace-two', 'workspace-two', 'workspace-two'])
+})
+
+test('a Board with an unresolved or failed Task presentation waits for the authorized projection before rendering cards', async () => {
+  const task = issue('owner-one', 'workspace-one', 'one')
+  let reads = 0
+  const mutate = async () => { reads++ }
+  const show = async (isLoading: boolean, error?: Error) => {
+    await act(async () => root.render(<BoardPage issues={[task]} userId="owner-one" workspaceId="workspace-one"
+      presentationRead={{ isLoading, error, mutate }} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />))
+  }
+  await show(true)
+  assert.equal(container.querySelector('[role="status"]')?.textContent, 'loading')
+  assert.deepEqual(shown(), [])
+  await show(false, new Error('temporarily unavailable'))
+  const alert = container.querySelector('[role="alert"]')
+  assert.match(alert?.textContent ?? '', /taskStatesReadFailed/)
+  assert.deepEqual(shown(), [])
+  await act(async () => alert!.querySelector('button')!.click())
+  assert.equal(reads, 1)
+  await show(false)
+  assert.deepEqual(shown(), ['workspace-one task one'])
+})
+
 async function pick(label: string) {
   const choice = [...container.querySelectorAll<HTMLButtonElement>('button[role="menuitemcheckbox"]')].find(button => button.textContent === label)
   assert.ok(choice, `filter option ${label} exists in this workspace`)
@@ -92,6 +146,34 @@ for (const change of [{ owner: 'owner-one', workspace: 'workspace-two' }, { owne
   assert.deepEqual(shown(), ['workspace-one task one'])
 })
 
+test('the Board shows every task by default, and a stored copy of the retired 负责人：我 default no longer hides tasks a bot holds', async () => {
+  const held = { ...issue('owner-one', 'workspace-one', 'held'), metadata: { ...issue('owner-one', 'workspace-one', 'held').metadata, assignee: null } } as Issue
+  const show = async () => act(async () => root.render(<ViewStateProvider scope="owner-one:workspace-one">
+    <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={[held]} userId="owner-one" workspaceId="workspace-one" onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
+  </ViewStateProvider>))
+  await show()
+  assert.deepEqual(shown(), ['workspace-one task held'])
+  assert.equal(!!chip('assignee'), false)
+  await act(async () => root.unmount()); root = createRoot(container)
+  browser.sessionStorage.setItem('mikka:view:v1:owner-one:workspace-one:board:filters', JSON.stringify({ assignee: ['me'] }))
+  await show()
+  assert.deepEqual(shown(), ['workspace-one task held'], 'the old default is not a saved choice')
+  await act(async () => root.unmount()); root = createRoot(container)
+  browser.sessionStorage.setItem('mikka:view:v1:owner-one:workspace-one:board:filters', JSON.stringify({ assignee: ['me'], priority: ['normal'] }))
+  await show()
+  assert.deepEqual(shown(), [], 'a selection the person changed is kept')
+  assert.ok(chip('assignee'))
+})
+
+test('a personal task sits on the Board with the workspace\'s other tasks, whatever scope an old browser preference names', async () => {
+  browser.localStorage.setItem('mikka:board-v2', JSON.stringify({ scope: 'workspace', view: 'board' }))
+  const personal = { ...issue('owner-one', 'workspace-one', 'personal'), scope: 'personal' } as Issue
+  await act(async () => root.render(<ViewStateProvider scope="owner-one:workspace-one">
+    <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={[issue('owner-one', 'workspace-one', 'one'), personal]} userId="owner-one" workspaceId="workspace-one" onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
+  </ViewStateProvider>))
+  assert.deepEqual(shown(), ['workspace-one task one', 'workspace-one task personal'])
+})
+
 test('legacy unscoped filter names are discarded while durable view and display preferences remain', async () => {
   const display = { sort: 'created', completed: 'all', showEmpty: false, properties: ['labels'], hidden: ['canceled'] }
   browser.localStorage.setItem('mikka:board-v2', JSON.stringify({ scope: 'workspace', view: 'list', filters: { project: ['Legacy private project'], labels: ['Legacy private label'] }, display }))
@@ -102,7 +184,8 @@ test('legacy unscoped filter names are discarded while durable view and display 
   assert.deepEqual(shown(), ['workspace-one task one', 'workspace-one task two'])
   const saved = JSON.parse(browser.localStorage.getItem('mikka:board-v2')!)
   assert.equal(saved.filters, undefined)
-  assert.deepEqual({ scope: saved.scope, view: saved.view, display: saved.display }, { scope: 'workspace', view: 'list', display })
+  assert.equal(saved.scope, undefined, 'the retired 全部 / 工作区 / 个人 segment is not kept')
+  assert.deepEqual({ view: saved.view, display: saved.display }, { view: 'list', display })
 })
 
 test('changing browser display preferences never writes scoped filter names back into the shared preference key', async () => {

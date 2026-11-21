@@ -15,11 +15,11 @@ import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import type { RunModel } from '@/lib/computer/run-model'
-import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, bots, coordinatorEvents, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceSessionOpen } from '@/lib/device-presence'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
@@ -34,6 +34,11 @@ import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { runBotName, threadNameHead } from '@/lib/run-bot-name'
 import { requireTaskWorkspace } from '@/lib/task-workspace'
+import { resolveRunOrigin, type RunOrigin, type RunOriginRef } from '@/lib/run-origin'
+
+/** Which entry asked for the run. `source` keeps its own legacy meaning
+ * ('mcp' only); `origin`/`originRef` are the evidence-only provenance. */
+export interface RunDispatchOrigin { source?: 'mcp' | null; origin?: RunOrigin; originRef?: RunOriginRef | null }
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -73,7 +78,7 @@ export interface RunDetail {
   decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date }[]
+  messages: { id: string; text: string; createdAt: Date; sourceRunId?: string | null; editable?: boolean; submissionId?: string | null }[]
 }
 
 export const runViewColumns = {
@@ -123,14 +128,16 @@ type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note
   apiKeyId?: string
   /** Exact server-selected identity; reauthorized for this owner, Agent and workspace at queue time. */
   subscriptionBindingId?: string }
-export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null) {
-  return queueAdmittedRun(userId, input, botId, execution, requestEventId, source)
+export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, dispatch: RunDispatchOrigin = {}) {
+  return queueAdmittedRun(userId, input, botId, execution, requestEventId, { source: dispatch.source ?? null, origin: dispatch.origin ?? 'web', originRef: dispatch.originRef ?? null })
 }
 
 /** Only the Factory/Skill host calls this with an already-open transaction.
  * Repository ids identify prior scheduling metadata; they confer no authority. */
 /** What the host already decided for a Factory run: its model and credential (lib/computer/run-model.ts), the computer it is pinned to, read-only. */
-export type FactoryRunSelection = { threadRunId?: string; model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: RunModel['agentProfile']; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
+export type FactoryRunSelection = { threadRunId?: string; model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: RunModel['agentProfile']; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution
+  /** Entry provenance the host already knows; not part of any dispatch digest. */
+  origin?: RunOrigin; originRef?: RunOriginRef | null }
 export async function queueFactoryRun(tx: import('pg').PoolClient, userId: string, input: DispatchInput,
   botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string, selection: FactoryRunSelection = {}): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
@@ -171,10 +178,12 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     }
     // One place picks the model (lib/computer/run-model.ts): the host's choice, else a rerun's source run's own,
     // else 优先使用的模型 for this computer's Agent. A Factory run is never queued without one.
-    const { execution, ...chosen } = selection
+    const { execution, origin: selectedOrigin, originRef: selectedOriginRef, ...chosen } = selection
     const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
       ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId, tx)
-    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(profileStage === 'spec' || chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId, factoryContext: context })
+    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(profileStage === 'spec' || chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId,
+      { source: null, ...resolveRunOrigin({ explicit: selectedOrigin ? { origin: selectedOrigin, originRef: selectedOriginRef } : null, defaultOrigin: 'factory' }) },
+      { executor, repo, client: tx, sourceRunId, factoryContext: context })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -219,7 +228,11 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
       requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
       readOnly: current.agentDefinition.readOnly,
-    }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
+    }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId,
+    // A provider fallback continues the same entry. A legacy source has no
+    // recoverable entry: only the accurate 'mcp' => 'api' signal is used,
+    // never a guess of 'web'; the host's own automatic recovery is recorded.
+    { source: current.source, ...resolveRunOrigin({ sourceRun: current, defaultOrigin: current.source === 'mcp' ? 'api' : 'automation' }) },
     // The wrapper authorizes the failed source above. All target policy,
     // credential, task-destination and publication checks still run normally.
     { executor, repo, client: tx, workspaceHint: originalIdentity.data.workspaceId, frozenSourceRunId: current.id })
@@ -238,7 +251,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
 }
 
 async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
-  requestEventId?: string, source: 'mcp' | null = null,
+  requestEventId?: string, dispatch: { source: 'mcp' | null; origin: RunOrigin; originRef: RunOriginRef | null } = { source: null, origin: 'web', originRef: null },
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; frozenSourceRunId?: string; workspaceHint?: string | null; factoryContext?: { sourceEventId: string; attemptId: string } }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
@@ -277,7 +290,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   if (!model) throw new ActionFailureError('runModelMissing')
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
   // A subscription's identity is its provider model, including at the CLI boundary.
-  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, workspaceId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
+  const { subscription, apiKey, credits } = await localRunCredential(internal?.client ?? pool, userId, botId, workspaceId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
   const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
@@ -287,7 +300,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
     mailboxScope = { botId, workspaceId }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, credits, model, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   if (agentDefinition && input.modelDispatch && !botId) {
     // Bot-less preferences belong to the actual execution workspace. Persist
@@ -297,7 +310,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId, frozenSourceRunId: internal.frozenSourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, promptTaskLength, source: dispatch.source, origin: dispatch.origin, originRef: dispatch.originRef, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId, frozenSourceRunId: internal.frozenSourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
@@ -324,7 +337,7 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
     { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } }, { transaction })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
   return { model: target.model, agentProfile,
-    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
     ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
     ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}),
     ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
@@ -338,7 +351,7 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
-async function runVisibilityPredicate(reader: IssueReader) {
+export async function runVisibilityPredicate(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
   // Current tenant membership and the joined Task authorize the Run. Team
   // naming rows and a preliminary Run-to-Task lookup do not enter this gate.
@@ -356,52 +369,85 @@ async function runVisibilityPredicate(reader: IssueReader) {
  * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
  * as `workspaceRunView` does. No report, error or provenance.
  */
-export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; hasIssue: boolean; agentName: string; harness: string; promptHead: string | null; title: string | null }[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
   const visible = await runVisibilityPredicate(reader)
-  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
-    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
+  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, hasIssue: sql<boolean>`agent_runs."issueId" is not null`, agentName: runBotName, harness: runViewColumns.harness,
+    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end`,
+    // The conversation's own stored title, for its owner only, as its prompt is.
+    title: sql<string | null>`case when agent_runs."userId" = ${userId} then agent_runs.title end` }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(visible, inArray(agentRuns.id, runIds))).limit(Math.max(1, Math.min(runIds.length, 100)))
   return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
+}
+
+type RunListFilter = { issueId?: string; activeOnly?: boolean; limit?: number }
+
+function runListFilter(input: RunListFilter) {
+  return and(
+    input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
+    input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
+  )
+}
+
+/** The run states returned by MCP lists, including the list nested in a Task.
+ * As in workspaceRunView, teammates see the harness label and no private stop reason. */
+export async function visibleRunStates(userId: string, input: RunListFilter) {
+  if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
+  const visible = await runVisibilityPredicate(userId)
+  return db.select({
+    id: agentRuns.id, issueId: agentRuns.issueId, status: agentRuns.status, createdAt: agentRuns.createdAt,
+    agentName: sql<string>`case when ${agentRuns.userId}=${userId} then ${runBotName} else ${runViewColumns.harness} end`,
+    stopReason: sql<RunView['stopReason']>`case when ${agentRuns.userId}=${userId} then ${agentRuns.stopReason} end`,
+  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(visible, runListFilter(input))).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id))
+    .limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,
  * personal agent/session access, or raw transcript access.
  * `teams` remains a legacy compatibility hint with no authorization role.
  * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
-export async function visibleRuns(reader: IssueReader, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
+export async function visibleRuns(reader: IssueReader, input: RunListFilter & { runIds?: string[]; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns),
-    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, deviceOnline: sql<boolean>`coalesce(${deviceSessionOpen}, false)`, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       visible,
-      input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
+      runListFilter(input),
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
-      input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
-  const presence = await deviceOnlineStates(rows.flatMap(row => row.ownerId === userId && row.status === 'queued' && row.waitDeviceId
-    ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
-  return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
-    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled, deviceOnline: waitDeviceId ? presence.get(waitDeviceId) : undefined })
+  return rows.map(({ ownerId, waitDeviceId, deviceOnline, deviceEnabled, ...run }) => {
+    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, deviceEnabled, deviceOnline })
     return ownerId === userId ? { ...run, failureDetails: input.brief ? readCompactRunFailure(run.failureDetails) : readRunFailure(run.failureDetails), ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
   })
 }
 
-export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
+/** The caller has authorized these run IDs. Only the reader's own sends include a retry identity. */
+export function readRunMessages(userId: string, runIds: string[]) {
+  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt, sourceRunId:runMessages.runId,
+    editable:sql<boolean>`${runMessages.userId}=${userId} AND ${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
+    submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'` })
+    .from(runMessages).leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id),
+      eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message')))
+    .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
+}
+
+export async function readRun(userId: string, runId: string, history: 'full' | 'latest-events' = 'full'): Promise<RunDetail | null> {
   const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
   if (!run) return null
   // Empty agentId is the deliberately restricted teammate projection.
   if (!run.agentId) return { run, chunks: [], messages: [] }
-  const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
-    .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
-    .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
+  const chunksForRun = db.select({ chunk: runChunks.chunk }).from(runChunks).where(eq(runChunks.runId, run.id))
+  const chunks = history === 'full'
+    ? await chunksForRun.orderBy(asc(runChunks.seq))
+    : (await chunksForRun.orderBy(desc(runChunks.seq)).limit(5)).reverse()
+  const messages = history === 'full' ? await readRunMessages(userId, [run.id]) : []
   const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
   return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }
@@ -513,7 +559,7 @@ export async function requestRunStop(userId: string, runId: string): Promise<{ s
   const stoppedRunIds: string[] = []
   for (const runId of target.runIds) {
     try {
-      if (await stopOwnedRun(db, userId, runId)) await afterRunEnded(userId, runId)
+      if (await stopOwnedRun(db, userId, runId, true)) await afterRunEnded(userId, runId)
       else {
         // A refused startup may have no lifecycle/daemon to acknowledge this
         // stop. Reuse the scoped host acknowledgement after the stop commits.

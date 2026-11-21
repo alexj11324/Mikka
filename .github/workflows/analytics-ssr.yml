@@ -3,6 +3,11 @@ name: Analytics SSR
 # is the build check; repeating this one on main added nothing.
 on:
   workflow_call:
+    inputs:
+      selected:
+        description: The parent CI already selected Analytics using the trusted policy
+        type: boolean
+        default: false
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,12 +22,17 @@ env:
 
 jobs:
   changes:
+    if: ${{ !inputs.selected }}
     uses: ./.github/workflows/ci-selection.yml
 
   analytics-ssr-full:
-    name: Analytics SSR (full)
+    # The real job owns the historical check name. Its native failure result
+    # reaches the parent gate without allocating another summary runner.
+    name: analytics-ssr
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.analytics == 'true'
+    # Only an explicit trusted false may omit this optional lane. Missing or
+    # malformed selection reaches the first step and fails before checkout.
+    if: ${{ !cancelled() && (inputs.selected || needs.changes.outputs.analytics != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -38,27 +48,27 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       CI: 'true'
-      # This existing UI regression targets the frozen compatibility app.
-      # The self-hosted image separately verifies backend mode by default.
-      MIKKA_COMMUNITY_UI: '1'
+      # The root, sign-in redirects and analytics are exercised on the Web client.
+      MIKKA_EDITION: cloud
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3186
       BETTER_AUTH_SECRET: synthetic-ssr-regression-secret-not-a-real-credential
       NEXT_PUBLIC_POSTHOG_KEY: phc_synthetic_ssr_regression
-      NEXT_TELEMETRY_DISABLED: '1'
       MIGRATE: '0'
     steps:
+      - name: Require a successful trusted selection
+        env:
+          CHANGES_RESULT: ${{ inputs.selected && 'success' || needs.changes.result }}
+          RUN_ANALYTICS: ${{ inputs.selected && 'true' || needs.changes.outputs.analytics }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          test "$RUN_ANALYTICS" = true
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: ./.github/actions/pnpm-install
         with:
-          version: 10.34.3
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          skip-electron: 'true'
       - name: Apply tracked SQL only to the disposable CI database
         run: MIGRATE=1 node scripts/migrate.mjs
       - run: pnpm build
@@ -68,6 +78,7 @@ jobs:
         run: |
           export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mikka-analytics-browsers"
           printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
           pnpm exec playwright install --with-deps chromium
       - name: Permit the installed Chromium sandbox in this disposable runner
         run: |
@@ -77,26 +88,3 @@ jobs:
           sudo apparmor_parser --replace /etc/apparmor.d/mikka-analytics-chromium
       - name: Render real compiled HTTP pages with browser analytics enabled
         run: node scripts/check-analytics-ssr.mjs
-
-  analytics-ssr:
-    # Preserve the historical status-check name even for docs-only PRs.
-    name: analytics-ssr
-    needs: [changes, analytics-ssr-full]
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require classification and full regression unless docs-only
-        env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          RUN_ANALYTICS: ${{ needs.changes.outputs.analytics }}
-          FULL_RESULT: ${{ needs.analytics-ssr-full.result }}
-        run: |
-          if [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi
-          if [ "$RUN_ANALYTICS" = 'false' ]; then
-            test "$FULL_RESULT" = 'skipped'
-          elif [ "$RUN_ANALYTICS" = 'true' ]; then
-            test "$FULL_RESULT" = 'success'
-          else
-            exit 1
-          fi

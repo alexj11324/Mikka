@@ -8,7 +8,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { createFactoryStore } from "./store";
-import { dropTestDatabase } from "../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -21,7 +21,7 @@ else if (process.env.REQUIRE_DB === "1") assert.fail("REQUIRE_DB=1 needs E2E_DAT
 test("list: candidate sha + newest publication of the current candidate only", { skip: !url, timeout: 180000 }, async () => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_list_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 4 });

@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { ensureBotRuntime } from './bot-runtime'
 import { ensureRecordedBotHarnessRuntime } from './bot-runtime-records'
 
@@ -23,7 +23,7 @@ if (url) {
 test('a bot runtime follows its computer to a new device and survives an unbound agent', { skip: !url, timeout: 120000 }, async () => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `bot_runtime_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
   try {

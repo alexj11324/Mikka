@@ -25,7 +25,7 @@ export type ChatFailure = (
   // line's own code, then the turn failure behind a wake code. Never the words.
 ) & { raw?: string; failureDetails?: RunFailure }
 
-export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; failureDetails?: unknown; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; failureDetails?: unknown; items?: readonly { from: string; pending?: true; native?:true }[] }): ChatFailure | null {
   const details = chat.working || !chat.error ? null : readRunFailure(chat.failureDetails)
   const legacy = failureOf(chat) ?? (details ? { kind: 'failed' as const } : null)
   const failure = legacy && details ? { ...legacy, failureDetails: details } : legacy
@@ -48,10 +48,10 @@ const CODE = /(?:^|: )([a-z][a-z0-9_]*(?: \([a-z][a-z0-9_]*\))?)$/
 // establish a cloud refusal, provider fallback or credential health.
 const CLOUD_STREAM_STEP = /^Step "step\/\/@ai-sdk\/workflow@\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?(?:\+[a-z0-9.-]+)?\/\/doStreamStep" failed after \d+ retries:\s*/
 
-function failureOf(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+function failureOf(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true; native?:true }[] }): ChatFailure | null {
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
-  if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending ? { kind: 'failed' } : null
+  if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending && !chat.items.at(-1)?.native ? { kind: 'failed' } : null
   const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error.trim().replace(CLOUD_STREAM_STEP, ''))?.code)
   if (cloudCode) return { kind: 'failed', cloudCode }
   const hosted = hostedRefusal(chat.error)

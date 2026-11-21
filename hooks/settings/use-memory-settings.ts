@@ -2,10 +2,15 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { getMemory, removeFact, setMemory, updateFact } from '@/app/actions/memory'
+import { getMemory, removeFact, reviewFact, setMemory, updateFact } from '@/app/actions/memory'
 
 export type MemoryData = Awaited<ReturnType<typeof getMemory>>
 export type MemoryFact = MemoryData['facts'][number]
+
+type MemoryChange = {
+  save: () => Promise<unknown>
+  apply: (current: MemoryData) => MemoryData
+}
 
 /**
  * 记忆 (R-73): the person's facts, the switch, and correcting or deleting a
@@ -14,27 +19,63 @@ export type MemoryFact = MemoryData['facts'][number]
  */
 export function useMemorySettings() {
   const { data, error, mutate } = useSWR('memory', getMemory)
-  const [failed, setFailed] = useState(false)
+  const [failedChange, setFailedChange] = useState<MemoryChange | null>(null)
 
-  async function run(change: () => Promise<unknown>, next: (current: MemoryData) => MemoryData) {
+  async function run(change: MemoryChange) {
     const shown = data
     if (!shown) return
-    setFailed(false)
+    setFailedChange(null)
     try {
-      await mutate(async current => { await change(); return next(current ?? shown) }, { optimisticData: current => next(current ?? shown), rollbackOnError: true, revalidate: false })
+      await mutate(async current => {
+        // Fact writes return false when the saved fact can no longer be changed.
+        if (await change.save() === false) throw new Error('Memory change refused')
+        return change.apply(current ?? shown)
+      }, { optimisticData: current => change.apply(current ?? shown), rollbackOnError: true, revalidate: false })
     } catch {
-      setFailed(true)
+      setFailedChange(change)
+      return
     }
+    // A correction may merge facts and remove the edited id. Keep the server's
+    // surviving rows; a failed confirmation remains a read error, not a refused write.
+    await mutate().catch(() => undefined)
   }
 
   return {
-    data, error, failed,
-    setEnabled: (enabled: boolean) => run(() => setMemory(enabled), current => ({ ...current, enabled })),
+    data, error, failed: failedChange !== null,
+    // Both memory surfaces call reload from their Retry button. Re-read after a
+    // read failure; after a refused save, retry the person's original edit.
+    reload: () => failedChange ? run(failedChange) : mutate(),
+    setEnabled: (enabled: boolean) => run({
+      save: () => setMemory(enabled),
+      apply: current => ({ ...current, enabled }),
+    }),
     /** Corrects a fact; an empty text changes nothing. */
     correct: async (id: string, subject: string) => {
       if (!subject.trim()) return
-      await run(() => updateFact(id, subject), current => ({ ...current, facts: current.facts.map(fact => fact.id === id ? { ...fact, subject: subject.trim(), userEdited: true } : fact) }))
+      await run({
+        save: () => updateFact(id, subject),
+        apply: current => ({ ...current, facts: current.facts.map(fact => fact.id === id ? { ...fact, subject: subject.trim(), userEdited: true } : fact) }),
+      })
     },
-    remove: (id: string) => run(() => removeFact(id), current => ({ ...current, facts: current.facts.filter(item => item.id !== id) })),
+    remove: (id: string) => run({
+      save: () => removeFact(id),
+      apply: current => ({ ...current, facts: current.facts.filter(item => item.id !== id) }),
+    }),
+    /**
+     * 待确认 facts: every fact Mikka learns arrives as `pending` and is invisible to the
+     * person until it is approved (lib/profile/store.ts writes `reviewStatus: 'pending'`;
+     * lib/profile/memory.ts returns them in their own `pending` list). Approving moves one
+     * into `facts`; rejecting removes it, as reviewMemoryFact does.
+     */
+    review: (id: string, decision: 'approve' | 'reject') => run({
+      save: () => reviewFact(id, decision),
+      apply: current => {
+        const fact = current.pending.find(item => item.id === id)
+        if (!fact) return current
+        return decision === 'approve'
+          ? { ...current, pending: current.pending.filter(item => item.id !== id), facts: [fact, ...current.facts] }
+          : { ...current, pending: current.pending.filter(item => item.id !== id) }
+      },
+    }),
   }
 }

@@ -1,4 +1,3 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -45,20 +44,15 @@ test('group read routes advance actual group history without opening private DMs
   const list = await import('../app/api/conversations/route')
   const links = await import('../app/api/conversation-links/[id]/messages/route')
   const messages = await import('../app/api/conversations/[id]/messages/route')
-  const { AfterContext } = await import('next/dist/server/after/after-context')
-  const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
-  const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
-  const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
-  const { NextRequest } = await import('next/server')
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+  const { NextRequest } = await import('../lib/server-runtime/server')
   const history = async (query = '', conversationId: string = group) => {
     const request = new NextRequest(`http://127.0.0.1/api/conversations/${conversationId}/messages${query}`)
-    const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
-    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { closes.push(callback) }, onTaskError: error => { errors.push(error) } })
-    const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
-    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+    const scope = createRequestScope(request)
+    return runRequestScope(scope, async () => {
       try { return await messages.GET(request, { params: Promise.resolve({ id: conversationId }) }) }
-      finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
-    }))
+      finally { await scope.after.finish() }
+    })
   }
   const linked = (id: string = exchangeLink, query = '') => links.GET(new Request(`http://127.0.0.1/api/conversation-links/${id}/messages${query}`), { params: Promise.resolve({ id }) })
   const call = (method: 'GET' | 'POST', id: string = group, messageId?: string, origin?: string) => route[method](new Request(`http://127.0.0.1/api/conversations/${id}/read`, {

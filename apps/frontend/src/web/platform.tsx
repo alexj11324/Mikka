@@ -10,6 +10,7 @@ import { PostHogAnalytics } from '@/components/posthog-analytics'
 import { posthogConfig } from '@/lib/posthog-config'
 import { authClient, cloudAuthClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
+import { isInvitationPath, serverDocumentKind } from '@/lib/server-pages'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { navigate, useLocation, withoutLocale } from '../../../desktop/src/renderer/location'
 import type { DesktopSession } from '../../../desktop/src/renderer/host'
@@ -21,15 +22,29 @@ import { currentWebServers, subscribeWebServers } from '@/lib/web-connection/bro
 export { authenticatedReturn } from './auth-routing'
 export const platform = 'web' as const
 
+function isInvitationHandoff(location: URL): boolean {
+  const path = withoutLocale(location.pathname)
+  if (path !== '/sign-in' && path !== '/sign-up') return isInvitationPath(path)
+  // The two links on the invitation card supply exactly one validated return destination.
+  const next = webAuthentication(location).next
+  return !location.hash && location.searchParams.size === 1
+    && next === location.searchParams.get('next') && isInvitationPath(next)
+}
+
+/** Invitation acceptance and the sign-in or sign-up return require only the current session. */
 export function bootstrapScope(location: URL): BootstrapScope {
-  return typeof window !== 'undefined' && !bridgeFromWindow(window) && isDesktopHandoffPage(location)
+  const documentKind = serverDocumentKind()
+  const invitation = (documentKind === null || documentKind === 'authentication') && isInvitationHandoff(location)
+  return typeof window !== 'undefined' && !bridgeFromWindow(window) && (isDesktopHandoffPage(location) || invitation)
     ? 'authentication' : 'workspace'
 }
 
 export function AuthForm(props: ComponentProps<typeof ExistingAuthForm>) {
   const location = useLocation()
-  const { oauthResume: _oauth, composioResume: _composio, desktopRefused: _refused, ...auth } = webAuthentication(location)
-  return <ExistingAuthForm {...props} {...auth} />
+  // A refusal is a step decision, not a notice: pass it through as its own
+  // prop so this route keeps the same refusal as the served sign-in page.
+  const { oauthResume: _oauth, composioResume: _composio, desktopRefused, ...auth } = webAuthentication(location)
+  return <ExistingAuthForm {...props} {...auth} handoffRefused={desktopRefused} />
 }
 
 // Better Auth owns the web's cookie session store. Bootstrap's safe projection

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { createWorkspaceInvitation } from '@/app/actions/workspace'
 import {
   InvitationCsvError,
@@ -12,17 +12,15 @@ import {
   validateInvitationEmails,
 } from '@/lib/invitation-csv'
 import { useActionError } from '@/lib/use-action-error'
-import { publicAppOrigin } from '@/lib/platform/public-origin'
-import { withBasePath } from '@/lib/base-path'
+import { publicServiceLink } from '@/lib/platform/public-origin'
 
 export type InviteLink = { email: string; url: string }
 /** An address of the batch that got no link, and why (ALE-28). */
 export type InviteSkip = { email: string; reason: 'alreadyMember' | 'duplicate' }
 
 /**
- * 邀请成员 as data, for a UI layer that draws its own invite (slot `settings-members`): the same
- * emails, CSV import, role, invite links and copy as InviteMembersDialog. Nothing is emailed; the
- * links are handed over by hand and last 7 days.
+ * The settings-members slot uses this hook to import recipients, choose their role, and create
+ * invitation links. The issuer shares the links directly, and they expire after seven days.
  */
 export function useInviteMembers(workspaceId: string | undefined, onCreated: () => Promise<unknown>) {
   const t = useTranslations('Invite')
@@ -90,7 +88,7 @@ export function useInviteMembers(workspaceId: string | undefined, onCreated: () 
     if (!workspaceId) return null
     const result = await createWorkspaceInvitation({ workspaceId, emails: list, role: asRole })
     if (!result.ok) { setError(translateError(result.error)); return null }
-    const created = result.data.map(link => ({ email: link.email, url: new URL(withBasePath(link.path), publicAppOrigin()).href }))
+    const created = result.data.map(link => ({ email: link.email, url: publicServiceLink(link.path) }))
     if (!replacing) {
       setLinks(created)
       // One answer per address: a batch that skipped some still returns its links.

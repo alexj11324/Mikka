@@ -1,281 +1,128 @@
-# Production web deploy
+# Web deployment: current source contract and legacy compatibility
 
-GitHub Actions builds the shared Vite frontend and independent Nitro API.
-Vercel hosts their Build Output API artifact and serves `app.aspectlylabs.com`.
+**Current build ownership:** Official product code and build entry belong to public `Mikka`. A trusted build checks out the exact private UI Overlay under `.hosted-ui` using a limited read-only identity; untrusted public PRs receive neither UI secret nor customer config. See [build source of truth](build-source-of-truth.md).
+
+The [release owner](https://github.com/alexj11324/Mikka/issues/1954) selects and promotes a verified public build through the protected Cloudflare deployment workflow. Use the recorded serving receipt to identify the active public/UI pair and Cloudflare version. The [release ledger](https://github.com/alexj11324/Mikka/issues/1954#issuecomment-6868288411) distinguishes the promoted gateway and retained versions from later source merges. Preserve Cloudflare's version rollback and the recorded legacy workflow and callback obligations for their respective owners.
+
+Company-hosted deployment and credential operations are maintained in the
+[private operations repository](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
+Authorized operators start with its `AGENTS.md` and `docs/operations/README.md`.
+
+Public self-hosting and product setup remain in [the documentation index](../README.md).
+
+Existing section links are retained as navigation only.
 
 ## Flow
 
-`.github/workflows/web-deploy.yml` runs on every push to `main`, on manual
-dispatch, and as the reusable build for a verified official runtime refresh.
-Its deploy job holds `web-deploy-production` through environment publication,
-build, upload and public-version verification. `queue: max` retains pending
-jobs instead of allowing a late old runtime refresh to replace a queued new
-main deploy. The queue orders jobs by when they start waiting, not by commit
-order; source guards reject jobs whose full SHA is no longer current `main`.
-See [GitHub's concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
-
-1. **Source and token.** Checks the current `main` SHA before release work,
-   then reads `VERCEL_DEPLOY_TOKEN` from Infisical `prod:/platform`
-   through the existing GitHub OIDC identity. This is a dedicated Mikka-team
-   token, so it can be rotated without touching `VERCEL_TOKEN` or
-   `VERCEL_TEAM_TOKEN`.
-2. **Build selection.** Every main push builds public main plus private main,
-   including documentation changes, so the private/public compatibility check
-   covers every main update. Manual overlay/runtime refreshes also always
-   build. Ordinary manual dispatch retains the documentation-only rule
-   (`scripts/vercel-ignore-build.mjs`), comparing with the source production
-   serves now rather than the previous push.
-3. **Environment.**
-   - `vercel pull` fetches project settings and the production environment.
-     Vercel returns sensitive values empty.
-   - The job reads `prod:/vercel` from Infisical. This is the source that
-     Vercel production is synced from.
-   - `scripts/release/web-deploy.mjs env` fills only the keys that production
-     defines and Vercel withheld. It pins `VERCEL_GIT_COMMIT_REF=main` and the
-     commit SHA, which the migration guard requires.
-   - It refuses to build if a required value is missing. The error names the
-     variable, never its value.
-4. **Build.** Runs `node scripts/release/build-vercel.mjs`. The wrapper requires
-   Node 24, pnpm 10.34.3, the exact checked-out SHA and a unique deployment ID.
-   It selects `NITRO_PRESET=vercel` and runs the normal `pnpm build`: subscription
-   worker, agent UI generation, Vite frontend, Nitro API, typecheck, then
-   migrations against the production databases. It checks the resulting
-   `.vercel/output/config.json`; it does not invoke `vercel build` or Next.
-5. **Deploy.** Rechecks current `main` immediately before
-   `vercel deploy --prebuilt --prod --archive=tgz`. The Git metadata (org,
-   repo, ref, SHA) lets the device gateway release
-   (`docs/operations/device-gateway-release.md`) identify the serving commit.
-6. **Verify.** Before releasing the queue, requires the unauthenticated public
-   `/mikka/api/version` response's `build` to equal the complete commit SHA.
-
-The deployment's runtime environment comes from the Vercel project as before.
-The workflow uploads build output only. The local acceptance switches
-`MIGRATE=0` and `MIKKA_BUILD_BYOS_WORKER=0` do not prove the production migration
-and worker build; keep the normal production settings for this release path.
-
-`vercel.json` sets `framework: null` (Other), overriding the dashboard framework
-preset, and keeps Git-triggered deployments disabled. The prebuilt workflow
-therefore needs no Vercel source build or second dependency installation. See
-[the framework override](https://vercel.com/docs/project-configuration/vercel-json#framework)
-and [prebuilt uploads](https://vercel.com/docs/cli/deploy#prebuilt).
-
-`apps/api/scripts/finalize-build.mjs` preserves Nitro and Workflow function
-metadata, requires Node 24, adds the tracing entry before the application,
-and copies the runtime resources. `.vercel/output/mikka-build.json` records
-the source SHA, function contracts and resource hashes. These build checks do
-not prove hosted queue delivery or production OAuth callbacks.
-
-Keep **Automatically expose System Environment Variables** enabled in the
-existing project. Workflow uses the platform's runtime `VERCEL_DEPLOYMENT_ID`,
-project ID, OIDC and encryption configuration; the custom client deployment
-ID below does not replace them. Production must not inherit the local
-`WORKFLOW_TARGET_WORLD=local` or `WORKFLOW_LOCAL_*` configuration. See the
-[Workflow Vercel World contract](https://workflow-sdk.dev/worlds/vercel#system-environment-variables).
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Skew Protection
 
-A page left open across a deploy must load its remaining assets and call the
-API from the same deployment. The shared frontend implements these pins
-explicitly; it does not rely on Next's Server Action or RSC transport.
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
-A prebuilt upload has no Vercel deployment id at build time, so the workflow's
-**Choose the deployment id** step sets `MIKKA_DEPLOYMENT_ID` from
-`lib/deployment-id.mjs`: `<first 12 of the sha>-<run id>-<run attempt>`, at
-most 32 characters, never starting with `dpl_`. Each run attempt gets a new id,
-because Vercel fails a deploy that reuses one. The build writes the same value
-to `.vercel/output/config.json`'s `deploymentId` and the frontend bundle:
+## Cloudflare Web release candidates
 
-- `apps/frontend/scripts/deployment-plugin.mjs` adds `?dpl=` to the HTML's local
-  asset links and emitted JavaScript and CSS asset references, including lazy
-  chunks. The renderer-build module URL uses the same ID.
-- `apps/frontend/src/web/deployment-fetch.ts` adds `x-deployment-id` to browser
-  fetches for the same origin's `/mikka/api/*` routes, including JSON RPC.
-- `/mikka/api/version` deliberately has no deployment pin. The existing
-  `VersionGuard` and explicit-action build checks can therefore detect a new
-  public build and require refresh. Full document navigations load the current
-  deployment.
+The Cloudflare gateway maps each retained Mikka deployment ID to a private
+release Worker. That Worker binds the official Vite output, the matching Node
+API and the private Cloud service. The gateway reads the browser's asset and API
+pins. A version check or document navigation uses the current release. A stale
+API mutation returns 409 when its release has retired. The gateway never retries
+it on the current API. Release retention and rollback belong to #1953/#1954.
 
-Vercel supports custom IDs for the
-[Build Output API](https://vercel.com/docs/skew-protection#build-output-api).
-The project's Skew Protection setting must still be enabled for the platform
-to honor the pins. Verify that setting and its retention window on the actual
-project; the presence of pins in a local artifact is not a platform routing
-test. Builds without `MIKKA_DEPLOYMENT_ID` omit the pins; the production wrapper
-requires it.
+Build the official public/overlay pair using the checkout and version checks
+above. Set the browser's `MIKKA_DEPLOYMENT_ID` before building. From the
+repository root, generate the Wrangler inputs in the release working directory:
+
+```sh
+node cloudflare/web/prepare.mjs release release-input.json release-wrangler.json
+node cloudflare/web/prepare.mjs gateway gateway-input.json gateway-wrangler.json
+```
+
+The release input takes `id`, the full `sourceSha` and `overlaySha`, `assets` (the built `apps/frontend/dist/web`
+directory), `api` and `cloud` (private service names selected by the release).
+Preparation checks the hosted slot inventory, source-map boundary and the
+shell's asset pins. The gateway input takes `current` and a `retained` array of
+deployment IDs including the current release. A release service is named
+`mikka-app-release-<id>`. Keep its code, bindings and assets immutable while
+retained. A corrected build gets a new ID. Both generated configurations keep
+workers.dev and version previews disabled and have no public route. Bind the
+production domain only through #1954 after testing assets, callbacks, cookies,
+streaming and rollback on the same source pair.
 
 ## Official runtime configuration
 
-The official runtime workflow keeps its existing disposable-instance validation,
-worker hash, measured model catalogue and unchanged-file proofs. After validation,
-a read-only job waits up to 90 minutes for the same source's latest Web run to
-succeed, including its actual build/upload/version steps, and for the public
-version to match. The job has a 95-minute limit. This budget allows for an active
-Web build followed by a queued build; each Web deploy job has a 45-minute limit.
-The latest matching run must succeed even when an older run already succeeded.
-A failed, cancelled or skipped run cannot satisfy this gate. If `main` advances,
-the old release stops. This wait is outside the shared deployment queue so it
-cannot block the Web job it is waiting for. Desktop's Web wait and direct callers
-keep their existing 40-minute default.
+Changed template inputs require Cloudflare to serve the exact current main
+commit before the E2B release takes its lock or allocates builders. A push only
+reports changed inputs in its run summary and builds nothing; the paused Vercel
+publisher is never awaited. The release rechecks the live version after
+building and publishes template IDs that passed the build-time checks (the template
+builds, both CLIs start, the execution fence opens). E2B runs on the user's own
+key, so there is no subscription run before publication.
 
-Changes to release-control paths in `RUNTIME_RELEASE_PATHS`, including the release
-workflows, `scripts/release/web-deploy.mjs` and
-`scripts/e2b/publish-template-env.mjs` also require the full runtime validation
-and reusable publication, even when the worker hash is unchanged. The check
-compares the actual complete push (`github.event.before` to `github.sha`) with
-full history; missing or invalid endpoints fail instead of counting as unchanged.
-These paths are included in the runtime workflow's `runtime_paths` list. Documentation
-and test-only changes do not force paid instance validation.
+The release starts by itself. When a run of the Cloudflare application
+deployment workflow finishes with a serving-release observation
+(`gateway-observe` after a cutover, or a per-service Web `service-production`),
+the runtime workflow and Desktop release run on that
+`workflow_run` event. Each one goes ahead only when the observed product is
+current main. Otherwise it records why in its run summary and ends green.
+E2B also compares the worker inputs with the last release that made templates
+public and skips an unchanged worker. Desktop skips a commit whose installer is
+already the latest release. Both use `actions:RUN_ID:ATTEMPT` of that observation
+as their receipt, and every gate rechecks it as below.
 
-The E2B caller checks failed runtime input fingerprints before taking the distinct
-`e2b-official-runtime-release` queue. A matching failed build or subscription gate
-makes an automatic push succeed with `skipped: same inputs as failed run <id>`;
-it creates no E2B machine and takes no publication queue. The fingerprint covers
-the workflow's `runtime_paths` Git entries, including the dependency lock. Failure
-artifacts last 90 days; a missing or expired artifact allows the ordinary worker
-comparison, while an Actions API error fails the check.
+To retry by hand, dispatch the official runtime workflow on current main with
+its retry reason and `cloudflare_receipt`. A dispatch without a receipt fails
+before any builder starts. For a Cloudflare-to-Cloudflare
+promotion, run the existing Cloudflare application deployment workflow with phase
+`gateway-observe` on the reviewed operations commit containing the prepared
+checklist. The observer only reads the provider and canonical application.
+Use `actions:RUN_ID:ATTEMPT` from that successful observation in the consumer
+dispatch. Its original job identifies the 100% gateway version, product, overlay
+and Web client pin. Each signing or publication gate rechecks the live gateway
+fingerprint, product, overlay, pinned client and current product main.
+The first Vercel-to-Cloudflare transition keeps its historical issue #1954
+comment/body hash, approval window and DNS TXT verification.
+The same release produces the immutable template report for the private
+Cloudflare API deployment.
 
-Only `e2b-runtime-release.yml` runs under that non-cancelling `queue: max` lock,
-through candidate validation, Web wait, subscriptions, publication and cleanup.
-It checks failure history again after entering the queue. A failure is remembered
-only if its source is still current main after cleanup; supersession, cancellation,
-Web and cleanup-only failures do not suppress a later attempt. PRs run only the
-offline tests outside the publication queue. Existing exact-source fences remain.
+Desktop uses its existing signed and notarized macOS workflow. A push records
+in its run summary that no installer was built. The serving-release observation
+starts it as described above; a manual dispatch on main with a fresh
+`cloudflare_receipt` still works.
+It verifies the serving Web version and exact overlay before allocating the
+Mac, before loading credentials, and immediately before publishing the sealed
+installer. The approved backend must contain the installer commit.
 
-The runtime workflow then calls `web-deploy.yml` at its own commit with
-`runtime-refresh: true`. Inside the shared deploy job, the original Infisical
-identity reads the existing `VERCEL_TEAM_TOKEN`. The publisher verifies current
-`main`, the production alias and public version, reads the six runtime values,
-checks `main` again, and submits at most one environment upsert followed by exact
-readback. The ordinary GitHub build and prebuilt upload follow in that same job.
-The publisher does not create a Vercel deployment or request a source rebuild.
-
-If env publication succeeds but the later build fails, use Actions' **Re-run
-failed jobs** on that runtime run while its source is still current `main`. It
-reuses the successful validation outputs. The explicit runtime refresh builds
-even when the env values already match; it also bypasses the docs-only skip.
-An uncertain environment POST is never automatically retried. A failed-job rerun
-reads back before deciding whether one new upsert is needed. For a full refresh or a retry after an external service recovers, dispatch
-**E2B additive runtime release** on current `main` and supply `reason`. The dispatch
-event retains that reason. Manual dispatch bypasses both the failed-input and
-matching-worker skips and runs the original validation and publication gates.
-Changed runtime inputs naturally get a new fingerprint; an unrelated push does
-not retry a recorded failure.
-
-The source fences and queue protect application upload order; they do not make
-the Git ref and Vercel environment one atomic transaction. A newer push during
-the build prevents the obsolete upload. Its normal main release proceeds next.
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Logs are public
 
-Actions logs on this repository are public. Infisical values are masked by the
-action, and `vercel pull` output is discarded. Do not add steps that print the
-environment or `.vercel/.env.production.local`.
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Rollback
 
-Fix forward in a new PR, or revert through a PR. The resulting `main` commit
-uses the same GitHub build, prebuilt upload and public-version verification.
-Do not restore Vercel source builds, delete deployments or revoke shared tokens
-as a recovery step.
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Official private UI overlay
 
-Builds without `mikka-hosted-ui`, including every public/fork PR check, leave
-`MIKKA_UI_OVERLAY_DIR` unset and use the public slot implementations. Only the
-trusted `main` official release jobs check out `alexj11324/mikka-hosted-ui`.
-They read `HOSTED_UI_READ_KEY` from Infisical `prod:/platform` with the existing
-GitHub OIDC identity. This is a GitHub
-**read-only deploy key**, registered on **mikka-hosted-ui only** (`read_only:
-true` verified through the repository API); it is not a public-repository
-secret. The existing native-runner administration identity used for one-off
-registration is never delivered to public build jobs.
-Checkout uses SSH without persisting credentials in Git configuration. The
-record step clears the key from subsequent job steps before any build runs.
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
-Web checks out private `main` into ignored `.hosted-ui/`, records the exact
-commit in `MIKKA_UI_OVERLAY_SHA`, then exports `MIKKA_UI_OVERLAY_DIR` before
-building. Private runtime dependencies are installed with `--ignore-workspace
---prod --ignore-scripts --frozen-lockfile`: the library remains standalone and
-its license-writing postinstall never runs. Install diagnostics stay on the
-ephemeral runner. Nitro inlines that SHA into `/mikka/api/version` as `overlaySha`;
-Vercel deployment metadata also records `mikkaUiOverlaySha`. An open-source
-server reports `overlaySha: null`. Runtime Vercel environment changes cannot
-mislabel a previously built overlay. After upload, the public route must match
-both the public source and the overlay before the Web queue is released.
-The existing runtime-refresh caller follows the same official build path.
-
-The disposable official Linux runner removes only its unused preinstalled
-Android, .NET and GHC SDKs before the build. It retains the workspace,
-dependencies, Node/pnpm and Docker resources. The build uses a 4096 MB V8 heap;
-the original compile, typecheck and migration sequence remains unchanged.
-Filesystem space/inode counts and aggregate function-output size are recorded
-without listing private output files or emitting compiler diagnostics.
-
-Private `main` pushes trigger its `official-mikka.yml`. Through the same
-Infisical identity (bound to the private repository's numeric ID and immutable
-main subject) it reads the existing dispatch identity at `dev:/github/GH_TOKEN`
-and dispatches Web with `overlay-refresh: true`, bypassing the documentation
-skip. No scheduled polling is used. Every public main build and private push
-therefore validates the combination of public main and private main; external
-PRs need no private access. The private workflow also dispatches the normal
-official desktop release when bundled UI or release inputs change. Private
-documentation-only pushes refresh Web without publishing an installer; manual
-private workflow dispatches release both, following the existing desktop rule.
-During the initial rollout it detects an unmerged public pipeline and makes no
-production change.
-
-Desktop preflight waits for the successful production Web build using the
-existing source-compatibility gate, then reads its overlay SHA. macOS checks
-out that exact private commit rather than moving private main. A private-push
-dispatch also requires Web to serve that push's overlay before selection.
-Before release, the source gate and overlay equality run again. The signed
-installers, SBOM, checksums and `mikka-ui-overlay.json` are sealed, verified and
-published in the **same macOS job**; no Actions artifact transports a paid
-bundle between jobs. The latter JSON is covered by the existing release
-manifest digest and is also embedded in the signed app’s `dist/` for inspection
-after installation. Existing signing, notarization and skip-notarization draft
-rules still apply. A new preflight cancels an obsolete Linux Web wait. macOS
-signing/notarization runs one candidate at a time, preserves an active signer,
-and keeps only the latest pending candidate. This lets a valid signed build
-finish when a newer Web contains its source. Before waiting on that Web at
-publication, a changed production overlay rejects the old installer immediately;
-the normal Web-source proof, final overlay equality and sealed-candidate checks
-remain required. Do not classify two Web runs as duplicates from the public SHA
-alone: their recorded overlay SHAs may differ.
+Public builds verify the server, protocol and authentication code without private UI or credentials. The official release linker requires every declared workspace provider and named runtime export before either client can be distributed.
 
 ### Public output boundary
 
-- No official workflow uploads private source, build logs, renderer graphs,
-  Web output or desktop bundles as GitHub Actions artifacts. Only the intended
-  compiled Web assets go to Vercel; signed installers go to GitHub Releases.
-- Official compiler diagnostics are captured on the ephemeral runner, because
-  errors may quote private source. They are neither printed nor uploaded.
-  A failed build emits only a closed receipt: public and overlay revisions,
-  exit status, allowlisted signal/error codes, the last observed public build
-  phase, and protected-log byte count/SHA256. The phase can be `unknown`, and
-  SIGKILL alone is not an OOM diagnosis. No raw output, message or stack is emitted.
-  `processErrorCode` describes only a process-launch error. The independent
-  `observedSystemCode` records the last allowlisted system-code candidate in a
-  protected child-log `code` property or standard `Error: CODE:` header, including
-  when the child exits nonzero without a launch error. It is an observation, not
-  proof of the terminating cause; absent or unrecognized codes remain `null`.
-  No associated message, path or source line is included.
-  `lastTypecheckCommand` observes only the fixed root/API combined command or
-  frontend command; it does not distinguish which root/API compiler failed.
-  `typescriptCodes` contains at most 16 unique diagnostic identifiers, without
-  filenames, source or error messages. The fixed `migrate: starting` marker
-  observes entry into a requested migration command before its guards; it does
-  not prove any SQL ran. An explicit `MIGRATE=0` skip does not emit that marker.
-- The live Web builder is Vite + Nitro, both with `sourcemap: false`; there is
-  no Next compiler in the build path. Before upload, `hosted-ui.mjs audit`
-  checks Vercel's public static tree for raw UI source, `.map`, inline
-  source-map directives and `sourcesContent`.
-- The desktop production renderer and main/preload emit no source maps.
-  Installers include their bundled `dist/` and package metadata, explicitly
-  excluding hoisted workspace `node_modules/` and its development source/maps.
-  After signing, the complete actual ASAR is extracted and audited
-  before publication. The private checkout remains outside the package.
-- Do not print environment files, credentials or private source while debugging.
-  Rotate a checkout key through Infisical and the same repository’s read-only
-  deploy-key registration; never broaden its repository or permission scope
-  to get a build through.
+See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
+
+The current release serves GET/HEAD `/mikka/api/version` from the five-field public version document first returned by its own bound API. A cold isolate verifies the public and private revisions before reusing those values. Every response carries `Cache-Control: no-store`. Release Workers and API services are immutable while retained. Publish a new release ID for a change in the minimum native client version. Deployment acceptance also probes the Node health endpoint and the version directly on the bound API before promotion, then exercises an authenticated read through the gateway.
+
+## Acceptance after a per-service release
+
+A per-service release (private operations `service-release`) publishes no
+`Web deploy` run, and nothing waits for one. The production acceptance
+workflows that used to follow it (`read-cache-production`,
+`self-hosted-production`, `task-attachment-production`,
+`project-decisions-acceptance`, `model-provider-fallback-acceptance` and
+`issue1415-deployed-production`) are dispatched on main after the release
+instead. Their only release check is that the live `/mikka/api/version` serves
+the expected build. `factory-visual-evidence-acceptance` still follows the E2B
+runtime release.

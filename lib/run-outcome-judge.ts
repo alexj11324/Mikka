@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, count, eq, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { runChanged } from '@/lib/live/panels'
 import { agentRuns, issues, type RunOutcome } from '@/lib/db/schema'
@@ -74,8 +74,8 @@ async function evidenceOf(runId: string): Promise<{ userId: string; botId: strin
 export async function judgeRunOutcome(runId: string, judges: OutcomeJudges = defaultJudges, claimed = false): Promise<RunOutcome | null> {
   if (!claimed) {
     const [claim] = await db.update(agentRuns).set({ outcomeAt: new Date() })
-      .where(and(eq(agentRuns.id, runId), sql`${agentRuns.outcome} IS NULL AND ${agentRuns.status} IN ('succeeded', 'stopped', 'failed', 'cancelled')
-        AND (${agentRuns.outcomeAt} IS NULL OR ${sql.raw(RETRY_DUE)})`))
+      .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, ENDED_RUN_STATUSES),
+        sql`${agentRuns.outcome} IS NULL AND (${agentRuns.outcomeAt} IS NULL OR ${sql.raw(RETRY_DUE)})`))
       .returning({ id: agentRuns.id })
     if (!claim) return null
   }

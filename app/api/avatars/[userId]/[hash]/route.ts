@@ -1,6 +1,5 @@
 import { readAvatar } from '@/lib/account/avatar'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `GET /api/avatars/:userId/:sha256`: an uploaded profile picture. Avatars show

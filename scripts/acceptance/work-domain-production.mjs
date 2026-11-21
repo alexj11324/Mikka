@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
+import { observeEveSession, submitEveMessage } from './eve-session.mjs'
 /** Epic #1687. Ordinary shared-account APIs, only inside the existing OIDC job.
  * Preflight sends no model prompt. Active retains useful Tasks and reports.
  * No database/provider credentials, startup timing, settings preparation or UI.
@@ -62,7 +64,7 @@ export function publicFailure(error) {
 export function domainOptions(env = process.env) {
   check(!env.DOMAIN_OTHER_AUDIT_SHA && (!env.DOMAIN_OTHER_AUDIT_LEASE || env.DOMAIN_OTHER_AUDIT_LEASE === 'false')
     && (!env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN || env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN === 'none'), 'inputs_conflict')
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env)
     && env.GITHUB_REF === 'refs/heads/main' && env.GITHUB_EVENT_NAME === 'workflow_dispatch'
     && SHA.test(env.DOMAIN_MODEL_SHA ?? '') && env.GITHUB_SHA === env.DOMAIN_MODEL_SHA, 'target_refused')
   const mode = env.DOMAIN_MODEL_MODE ?? 'preflight'
@@ -134,7 +136,7 @@ async function inventory(client, shared) {
   chatFallback(keys)
   check(management.profiles.length < 101, 'profile_inventory_truncated')
   const sources = order.candidates.filter(row => row.source?.kind === 'subscription' && uuid(row.source.connectionId)
-    && row.credentialOwnerId === shared.adminId && CASES.some(item => row.harness === item.harness && row.model === item.model))
+    && row.credentialOwnerId === shared.ownerId && CASES.some(item => row.harness === item.harness && row.model === item.model))
   return { projects, bots, resources, github, management, sources, keys }
 }
 const sameSource = (row, item, connectionId) => row?.harness === item.harness && row?.model === item.model
@@ -359,14 +361,6 @@ function modelSource(state, scope, item) {
 }
 function modelReady(state, scope, item) { check(modelSource(state, scope, item).available === true, 'source_unavailable') }
 
-// The normal tool preview may end after 200 characters. Only a complete UUID
-// field from that exact tool call is a receipt; prose/Task-wide search is not.
-function previewId(text, key) {
-  if (typeof text !== 'string') return null
-  const match = new RegExp('"' + key + '"\\s*:\\s*"([0-9a-f-]{36})"', 'i').exec(text)
-  return uuid(match?.[1]) ? match[1] : null
-}
-
 async function dispatch(client, record, scope, item, timeoutMs) {
   const caseRef = '[1687:' + record.submissionId + ']'
   const input = { issueId: record.issueId, repo: scope.repositoryKey.slice('v2/github.com/'.length), target: 'cloud',
@@ -375,41 +369,29 @@ async function dispatch(client, record, scope, item, timeoutMs) {
   const text = '执行已有 Task ' + record.issueId + '，保留其 Project 关联。只调用一次 dispatch_run，参数：'
     + JSON.stringify(input) + '。不创建新 Task、不换 Profile、模型、订阅或运行位置；派发后仅确认已派发。'
   record.submitted = true
-  await client.rpc('coordinator.sendCoordinatorMessage', [text, null, scope.botId, record.submissionId,
-    { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, record.profileId])
-  const response = await client.request('/api/coordinator/stream?botId=' + scope.botId + '&wait=1', {}, timeoutMs)
-  check(response.ok && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'stream_invalid')
-  const reader = response.body.getReader(), decoder = new TextDecoder()
-  let buffer = '', call, bytes = 0
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      bytes += value?.length ?? 0; check(bytes <= 4000000, 'stream_invalid')
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        let event
-        try { event = JSON.parse(line) } catch { throw new DomainError('stream_invalid') }
-        if (event.type !== 'tool' || event.name !== 'dispatch_run') continue
-        if (event.state === 'running' && previewId(event.input, 'issueId') === record.issueId) {
-          const profileId = previewId(event.input, 'profileId'), requestKey = previewId(event.input, 'requestKey')
-          // quote preserves the dispatch note independently of the truncated
-          // input preview. An unrelated turn can use the same Task/Profile.
-          if (requestKey !== record.submissionId && !(typeof event.quote === 'string' && event.quote.startsWith(caseRef + ' '))) continue
-          check((!profileId || profileId === record.profileId) && (!requestKey || requestKey === record.submissionId), 'run_scope_mismatch')
-          check(!call || call === event.call, 'dispatch_multiple'); call = event.call
-        }
-        if (!call || event.call !== call || event.state === 'running') continue
-        if (event.state !== 'done') { record.dispatchSettled = true; const error = new DomainError('dispatch_refused'); error.serverCode = event.errorCode; throw error }
-        const runId = previewId(event.output, 'runId')
-        check(runId, 'dispatch_missing')
-        record.dispatchSettled = true; record.runId = runId; record.placement = { kind: 'cloud' }; record.harness = item.harness
-        return
+  await submitEveMessage(client, scope.botId, text, record.submissionId,
+    { taskDestination: { kind: 'cloud' }, profileId: record.profileId, expectedWorkspaceId: scope.workspaceId })
+  let call, completed = false
+  await observeEveSession(client, scope.botId, { timeoutMs, fail: () => { throw new DomainError('stream_invalid') },
+    onEvent: event => {
+      if (event.type === 'call.requested' && event.data.capability?.name === 'dispatch_run') {
+        const input = event.data.input
+        if (input?.issueId !== record.issueId || input.requestKey !== record.submissionId && !input.note?.startsWith(caseRef + ' ')) return false
+        check(!input.requestKey || input.requestKey === record.submissionId, 'run_scope_mismatch')
+        check(input.profileId === record.profileId, 'run_scope_mismatch')
+        check(!call || call === event.data.callId, 'dispatch_multiple'); call = event.data.callId
       }
-      if (done) throw new DomainError('dispatch_missing')
-    }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+      if (event.type !== 'call.settled' || !call || event.data.callId !== call) return false
+      const code = event.data.error?.code ?? event.data.output?.error ?? (event.data.output?.ok === false ? event.data.output.code : undefined)
+      if (event.data.outcome !== 'completed' || code) { record.dispatchSettled = true; const error = new DomainError('dispatch_refused'); error.serverCode = typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(code) ? code : undefined; throw error }
+      const runId = event.data.output?.runId
+      check(uuid(runId), 'dispatch_missing')
+      record.dispatchSettled = true; record.runId = runId; record.placement = { kind: 'cloud' }; record.harness = item.harness
+      completed = true
+      return true
+    },
+  })
+  check(completed, 'dispatch_missing')
 }
 
 async function factoryState(client, record, shared) {
@@ -457,8 +439,8 @@ export function runReceipt(evidence, shared, scope, issueId) {
     && identity.executionPrincipal === shared.ownerId && identity.outputOwner === shared.ownerId
     && identity.botOwner === shared.ownerId && identity.botId === shared.botId
     && identity.personalResourcePolicy === 'requester_only' && uuid(device?.id) && device.ownerId === shared.ownerId && device.access === 'owner'
-    && subscriptions.length === 1 && subscriptions[0].ownerId === shared.adminId && subscriptions[0].access === 'workspace_share'
-    && identity.billingAccount?.model?.kind === 'subscription' && identity.billingAccount.model.ownerId === shared.adminId
+    && subscriptions.length === 1 && subscriptions[0].ownerId === shared.ownerId && subscriptions[0].access === 'owner'
+    && identity.billingAccount?.model?.kind === 'subscription' && identity.billingAccount.model.ownerId === shared.ownerId
     && identity.billingAccount.model.resourceId === subscriptions[0].id && identity.billingAccount?.runtime?.kind === 'e2b'
     && identity.billingAccount.runtime.ownerId === shared.ownerId, 'run_scope_mismatch')
   return { runId: run.id, harness: run.harness, model: run.model, credentialType: run.credentialType,
@@ -560,6 +542,13 @@ async function cleanupCase(client, record, shared) {
   record.runIds = [...runIds]
 }
 
+/** The strict normal RPC transports tenant scope in the existing header. */
+export function createDomainIssue(client, shared, item, document) {
+  return client.rpc('issues.saveIssue', [{ title: item.title,
+    status: 'todo', priority: 'normal', content: document.content }],
+  { headers: { 'x-mikka-workspace-id': shared.workspaceId } })
+}
+
 async function runCase(client, shared, options, item, deps, pin) {
   const document = caseDocument(options, item)
   const record = { case: item.id, harness: item.harness, model: item.model, status: 'blocked', phase: 'preflight',
@@ -571,14 +560,13 @@ async function runCase(client, shared, options, item, deps, pin) {
     const state = await inventory(client, shared), selected = await selectedScope(client, shared, state, options.scope)
     record.selection = selected.summary
     check(['any', item.harness].includes(selected.environment.configuration.harness), 'environment_incompatible')
-    const chat = await client.rpc('coordinator.getCoordinatorChat', [shared.botId])
+    const chat = await client.rpc('coordinator.pollCoordinatorChat', [shared.botId])
     check(chat.botId === shared.botId && chat.enabled === true && chat.working === false && !chat.streamRunId, 'bot_busy')
     await refuseDuplicate(client, shared, item, document.fingerprint)
     const profile = await profileFor(client, state, options.scope, item, document.fingerprint, record)
     await basicScope(client, shared, await inventory(client, shared), options.scope)
     record.phase = 'task_create'
-    const { issue } = await client.rpc('issues.saveIssue', [{ workspaceId: shared.workspaceId, title: item.title,
-      status: 'todo', priority: 'normal', content: document.content }])
+    const { issue } = await createDomainIssue(client, shared, item, document)
     check(uuid(issue?.id) && Number.isInteger(issue.revision), 'task_invalid'); record.issueId = issue.id
     await client.rpc('projects.moveIssueToProject', [{ workspaceId: shared.workspaceId, issueId: issue.id, revision: issue.revision, projectId: options.scope.projectId }])
     const saved = (await client.rpc('issues.getIssue', [issue.id])).issue

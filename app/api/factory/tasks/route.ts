@@ -2,7 +2,7 @@ import { factoryWorkspaceReader } from '@/lib/factory/workspace-reader';
 import { taskReaderScope } from '@/lib/task-workspace';
 import { factoryMembershipResponse, factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
-import { NextResponse } from "next/server";
+import { NextResponse } from "@/lib/server-runtime/server";
 import { z } from "zod";
 import { issueForUser } from "@/lib/issue-access";
 import { singleFlight } from "@/lib/single-flight";
@@ -13,7 +13,6 @@ import { factoryDispatchEnabled, handleFactoryDispatch } from "@/lib/factory/dis
 import { issueMutationsEnabled } from "@/lib/coordinator/issue-tools-enabled";
 import { factoryDispatchSchema } from '@/lib/factory/dispatch';
 
-export const dynamic = "force-dynamic";
 /** GET /api/factory/tasks?issueId=...: session-owned task discovery, no writes. */
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });

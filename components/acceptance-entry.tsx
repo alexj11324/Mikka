@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type MouseEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'

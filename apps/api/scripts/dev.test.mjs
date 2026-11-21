@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { Agent } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
+import { waitForApiReady } from '../../../scripts/dev-local/shutdown.mjs'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, openPublicPort, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -24,11 +25,31 @@ test('development shutdown waits for the real close and preserves failure as a n
 })
 
 test('development keeps one explicit browser origin and accepts existing port/host switches', () => {
-  assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, origin: 'http://localhost:3000' })
-  assert.deepEqual(developmentOptions(['-p', '3100', '--hostname', '0.0.0.0'], {}), { host: '0.0.0.0', port: 3100, origin: 'http://localhost:3100' })
-  assert.deepEqual(developmentOptions(['--port=3102', '--host=::1'], {}), { host: '::1', port: 3102, origin: 'http://[::1]:3102' })
+  assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, allowStaleRoutes: false, origin: 'http://localhost:3000' })
+  assert.deepEqual(developmentOptions(['-p', '3100', '--hostname', '0.0.0.0'], {}), { host: '0.0.0.0', port: 3100, allowStaleRoutes: false, origin: 'http://localhost:3100' })
+  assert.deepEqual(developmentOptions(['--port=3102', '--host=::1'], {}), { host: '::1', port: 3102, allowStaleRoutes: false, origin: 'http://[::1]:3102' })
   assert.equal(developmentOptions([], { MIKKA_DEV_PORT: '3103' }).port, 3103)
-  for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack']]) assert.throws(() => developmentOptions(args, {}))
+  // The stale-route guard's escape hatch is explicit and composes with the existing switches.
+  assert.equal(developmentOptions(['--allow-stale-routes'], {}).allowStaleRoutes, true)
+  assert.equal(developmentOptions(['--allow-stale-routes', '-p', '3104'], {}).port, 3104)
+  for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack'], ['--allow-stale-route']]) assert.throws(() => developmentOptions(args, {}))
+})
+
+test('a dev start refuses a route manifest the checkout does not contain', () => {
+  const expected = new Map([['routes.json', '{"version":1}\n'], ['routes.ts', 'export const routes = []\n']])
+  // Identical bytes: the generator rewrites unconditionally, but git compares
+  // content, so a same-bytes rewrite leaves the tree clean and must not block.
+  assert.deepEqual(staleRouteFiles(expected, new Map(expected)), [])
+  // Real content difference: serving would run a route table nobody committed.
+  const changed = staleRouteFiles(new Map([['routes.json', '{"version":1,"routes":[]}\n'], ['routes.ts', expected.get('routes.ts')]]), new Map(expected))
+  assert.deepEqual(changed, [{ path: 'apps/api/generated/routes.json', missing: false }])
+  // A generated file the checkout never had is a missing commit, not a change.
+  const added = staleRouteFiles(expected, new Map([['routes.json', expected.get('routes.json')]]))
+  assert.deepEqual(added, [{ path: 'apps/api/generated/routes.ts', missing: true }])
+  const refusal = staleRoutesRefusal([...changed, ...added])
+  assert.equal(refusal.code, 'API_DEV_ROUTES_STALE')
+  for (const text of ['apps/api/generated/routes.json', 'apps/api/generated/routes.ts', 'Changed:', 'Not in this checkout:',
+    'node apps/api/scripts/generate-routes.mjs', 'git add apps/api/generated && git commit', '--allow-stale-routes']) assert.ok(refusal.message.includes(text), text)
 })
 
 test('only machine paths proxy, retaining the browser Host and exact encoded path', t => {
@@ -130,6 +151,30 @@ test('a worker ready message arriving before the wait is retained', async () => 
   await worker.wait(new AbortController().signal)
   assert.equal(api.listenerCount, 0)
   worker.dispose()
+})
+
+test('the public port opens only after the worker has an address', async () => {
+  // A browser reaching the port during the first build gets the runner's own
+  // six-second wait as a 500 ("Runner did not become ready in time") and shows a
+  // failed thread for a server that is merely still starting.
+  const api = workerMessages(), worker = developmentWorkerReady(api), opened = []
+  const pending = openPublicPort(worker, async () => { opened.push('listen') }, AbortSignal.timeout(30_000))
+  api.emit({ event: 'compiled' })
+  await Promise.resolve()
+  assert.deepEqual(opened, [], 'compiled is not an address; nothing may listen yet')
+  api.emit({ address: { host: '127.0.0.1', port: 43003 } })
+  await pending
+  assert.deepEqual(opened, ['listen'])
+  worker.dispose()
+})
+
+test('a worker that never becomes ready never opens the public port', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api), opened = []
+  const pending = openPublicPort(worker, async () => { opened.push('listen') }, AbortSignal.timeout(30_000))
+  api.emit({ event: 'init-error', error: 'private initialization detail' })
+  await assert.rejects(pending, { code: 'API_DEV_WORKER_INIT_FAILED' })
+  assert.deepEqual(opened, [], 'a server with no worker behind it must not accept requests')
+  assert.equal(api.listenerCount, 0)
 })
 
 test('a real worker init error fails immediately without an HTTP retry or raw error disclosure', async () => {
@@ -254,4 +299,17 @@ test('worker disposal rejects an outstanding wait and HTTP failure remains fatal
     async () => { calls++; return new Response('unavailable', { status: 503 }) }),
   { code: 'API_DEV_STARTUP_RESPONSE_INVALID' })
   assert.equal(calls, 1)
+})
+
+test('owned API readiness ignores unrelated IPC and preserves failure before ready', async t => {
+  const origin = 'http://localhost:3110'
+  const child = program => {
+    const proc = spawn(process.execPath, ['-e', program], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] })
+    t.after(() => { if (proc.exitCode === null && proc.signalCode === null) proc.kill() })
+    return proc
+  }
+  await waitForApiReady(child(`process.send({ type: 'other' });process.send({ type: 'api-ready', origin: '${origin}' })`), origin, AbortSignal.timeout(10_000))
+  await assert.rejects(waitForApiReady(child('process.exit(23)'), origin, AbortSignal.timeout(10_000)), /exited before readiness: 23/)
+  await assert.rejects(waitForApiReady(child("process.send({ type: 'api-ready', origin: 'http://localhost:9000' })"), origin, AbortSignal.timeout(10_000)), /API_DEV_ORIGIN_MISMATCH/)
+  await assert.rejects(waitForApiReady(child('setTimeout(() => {}, 10000)'), origin, AbortSignal.timeout(100)), { name: 'TimeoutError' })
 })

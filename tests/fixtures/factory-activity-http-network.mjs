@@ -27,6 +27,16 @@ net.Socket.prototype.connect = function (...input) {
 const read = globalThis.fetch
 globalThis.fetch = (input,init) => {
   const url = new URL(input instanceof Request ? input.url : input)
+  const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+  // Eve's compiler eagerly reads public model metadata even though this CRUD
+  // fixture starts no model work. Keep that one credential-free read offline:
+  // the supported unavailable-catalog fallback leaves model execution untested.
+  if (url.href === 'https://ai-gateway.vercel.sh/v1/models/catalog' && method === 'GET'
+    && !headers.has('authorization') && !headers.has('cookie') && init?.body == null) {
+    appendFileSync(receipt,'model-catalog-offline\n',{mode:0o600})
+    return Promise.resolve(new Response(null,{status:503}))
+  }
   if (!['http:','https:'].includes(url.protocol) || !local(url.hostname)) refuse()
   return read(input,init)
 }

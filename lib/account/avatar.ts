@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { userAvatars } from '@/lib/db/schema'
@@ -16,30 +16,60 @@ const sha256Hex = (bytes: Uint8Array) => createHash('sha256').update(bytes).dige
 
 /** Stores the picture and returns the path to put in user.image. Replaces any earlier upload. */
 export async function saveAvatar(userId: string, contentType: AvatarContentType, bytes: Uint8Array): Promise<string> {
-  const saved = await withAccountWrite(userId, () => saveWritableAvatar(userId, contentType, bytes))
-  if (saved.retired) {
-    try {
-      await deleteArtifactObject(saved.retired)
-      await db.execute(sql`delete from account_storage_retirements where "userId"=${userId} and "storageKey"=${saved.retired}`)
-    } catch { console.warn('avatar_object_cleanup_failed') }
+  const sha256 = sha256Hex(bytes)
+  const storageKey = artifactStorage() === 'r2'
+    ? `avatars/${userId}/${randomUUID()}.${AVATAR_EXTENSIONS[contentType]}` : null
+  // Commit the deletion intent before the external PUT. A process can disappear
+  // between PUT and the avatar row commit; account deletion must still find it.
+  if (storageKey) await withAccountWrite(userId, () => queueAvatarObject(userId, storageKey))
+  let retired: string | null
+  try {
+    retired = await withAccountWrite(userId, async () => {
+      await lockAvatar(userId)
+      const [previous] = await db.select({ storageKey: userAvatars.storageKey }).from(userAvatars).where(eq(userAvatars.userId, userId)).limit(1)
+      if (storageKey) await putArtifactObject(storageKey, new Uint8Array(bytes), contentType)
+      const row = {
+        sha256, contentType, size: bytes.length, storageKey,
+        inlineContent: storageKey ? null : Buffer.from(bytes), updatedAt: new Date(),
+      }
+      await db.insert(userAvatars).values({ userId, ...row }).onConflictDoUpdate({ target: userAvatars.userId, set: row })
+      if (storageKey) await forgetAvatarObject(userId, storageKey)
+      if (previous?.storageKey) await queueAvatarObject(userId, previous.storageKey)
+      return previous?.storageKey ?? null
+    })
+  } catch (error) {
+    // COMMIT acknowledgement can be lost. Check the committed pointer before DELETE.
+    if (storageKey) await retireAvatarObject(userId, storageKey)
+    throw error
   }
-  return saved.path
+  if (retired) await retireAvatarObject(userId, retired)
+  return avatarPath(userId, sha256)
 }
 
-async function saveWritableAvatar(userId: string, contentType: AvatarContentType, bytes: Uint8Array): Promise<{ path: string; retired: string | null }> {
+async function lockAvatar(userId: string) {
   await db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'avatar:'} || ${userId},0))`)
-  const sha256 = sha256Hex(bytes)
-  const storage = artifactStorage()
-  const storageKey = storage === 'r2' ? `avatars/${userId}/${sha256}.${AVATAR_EXTENSIONS[contentType]}` : null
-  if (storageKey) await putArtifactObject(storageKey, new Uint8Array(bytes), contentType)
-  const [previous] = await db.select({ storageKey: userAvatars.storageKey }).from(userAvatars).where(eq(userAvatars.userId, userId)).limit(1)
-  const row = {
-    sha256, contentType, size: bytes.length, storageKey,
-    inlineContent: storageKey ? null : Buffer.from(bytes), updatedAt: new Date(),
-  }
-  if (previous?.storageKey && previous.storageKey !== storageKey) await db.execute(sql`insert into account_storage_retirements("userId","storageKey") values(${userId},${previous.storageKey}) on conflict do nothing`)
-  await db.insert(userAvatars).values({ userId, ...row }).onConflictDoUpdate({ target: userAvatars.userId, set: row })
-  return { path: avatarPath(userId, sha256), retired: previous?.storageKey && previous.storageKey !== storageKey ? previous.storageKey : null }
+}
+
+async function queueAvatarObject(userId: string, storageKey: string) {
+  await db.execute(sql`insert into account_storage_retirements("userId","storageKey") values(${userId},${storageKey}) on conflict do nothing`)
+}
+
+async function forgetAvatarObject(userId: string, storageKey: string) {
+  await db.execute(sql`delete from account_storage_retirements where "userId"=${userId} and "storageKey"=${storageKey}`)
+}
+
+async function retireAvatarObject(userId: string, storageKey: string) {
+  try {
+    await withAccountWrite(userId, async () => {
+      await lockAvatar(userId)
+      const pending = await db.execute(sql`select 1 from account_storage_retirements
+        where "userId"=${userId} and "storageKey"=${storageKey}
+        and not exists (select 1 from user_avatars where "userId"=${userId} and "storageKey"=${storageKey})`)
+      if (!pending.rows.length) return
+      await deleteArtifactObject(storageKey)
+      await forgetAvatarObject(userId, storageKey)
+    })
+  } catch { console.warn('avatar_object_cleanup_failed') }
 }
 
 export interface AvatarFile { contentType: AvatarContentType; bytes: Uint8Array }

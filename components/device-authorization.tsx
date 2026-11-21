@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { DAEMON_CLIENT_ID } from '@mikka/protocol/auth'
 import { AuthLogo } from '@/components/blocks/auth-19/components/auth-logo'
 import { Button } from '@/components/ui/button'
@@ -14,14 +14,22 @@ import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
 
 /** What the machine asking to connect reports about itself (lib/daemon-authorization.ts). */
-type ClientInfo = { name: string | null; platform: string | null; version: string | null }
+type ClientInfo = { name: string | null; platform: string | null; arch: string | null; version: string | null; expiresAt: string | null }
 const PLATFORMS: Record<string, string> = { darwin: 'macOS', linux: 'Linux', win32: 'Windows' }
 
-type State = 'entry' | 'loading' | 'review' | 'approving' | 'denying' | 'approved' | 'denied' | 'invalid' | 'rateLimited' | 'error'
+type State = 'entry' | 'loading' | 'review' | 'approving' | 'denying' | 'approved' | 'denied' | 'invalid' | 'expired' | 'rateLimited' | 'error'
 const primary = 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90'
+
+async function failureState(response: Response): Promise<'invalid' | 'expired' | 'rateLimited' | 'error'> {
+  if (response.status === 429) return 'rateLimited'
+  if (response.status >= 500) return 'error'
+  const body = await response.json().catch(() => null)
+  return body?.error === 'expired_token' ? 'expired' : 'invalid'
+}
 
 export function DeviceAuthorization({ account, initialCode }: { account: string; initialCode: string }) {
   const t = useTranslations('DeviceAuthorization')
+  const format = useFormatter()
   const [code, setCode] = useState(initialCode)
   const [state, setState] = useState<State>(initialCode ? 'loading' : 'entry')
   const [client, setClient] = useState<ClientInfo | null>(null)
@@ -42,13 +50,17 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
       })
       if (signal?.aborted) return
       // Better Auth allows 5 lookups per 30 minutes from one address (its expiresIn): 429 is that, not a bad code (review C3).
-      if (!response.ok) { setState(response.status === 429 ? 'rateLimited' : response.status < 500 ? 'invalid' : 'error'); return }
-      const data = await response.json() as { client_id?: string; status?: string; device_name?: string | null; device_platform?: string | null; client_version?: string | null }
+      if (!response.ok) {
+        const state = await failureState(response)
+        if (!signal?.aborted) setState(state)
+        return
+      }
+      const data = await response.json() as { client_id?: string; status?: string; device_name?: string | null; device_platform?: string | null; device_arch?: string | null; client_version?: string | null; expires_at?: string | null }
       if (signal?.aborted) return
       // Better Auth binds review to the signed-in owner. A grant owned by
       // someone else does not disclose client_id and cannot be approved here.
       if (data.client_id !== DAEMON_CLIENT_ID) { setState('invalid'); return }
-      setClient({ name: data.device_name ?? null, platform: data.device_platform ?? null, version: data.client_version ?? null })
+      setClient({ name: data.device_name ?? null, platform: data.device_platform ?? null, arch: data.device_arch ?? null, version: data.client_version ?? null, expiresAt: data.expires_at ?? null })
       setMatched(false)
       setState(data.status === 'pending' ? 'review' : data.status === 'approved' ? 'approved' : data.status === 'denied' ? 'denied' : 'invalid')
     } catch {
@@ -71,13 +83,14 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userCode: code }),
       })
-      setState(response.ok ? (allow ? 'approved' : 'denied') : response.status < 500 ? 'invalid' : 'error')
+      setState(response.ok ? (allow ? 'approved' : 'denied') : await failureState(response))
     } catch { setState('error') }
   }
 
   const title = state === 'approved' ? t('approved') : state === 'denied' ? t('denied') : t('title')
   return <main className="flex min-h-svh w-full flex-col bg-background text-foreground">
     <header className="flex items-center px-5 py-5 sm:px-8 sm:py-6 lg:px-10"><AuthLogo /></header>
+    {/* control-size-exempt: a centring section around one card, not a row of controls. */}
     <section className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-16" aria-label={t('title')}>
       <Card className="w-full max-w-[24.5rem] gap-5 p-6">
         <CardHeader className="gap-1 p-0">
@@ -96,11 +109,18 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         {(state === 'review' || state === 'approving' || state === 'denying') && <>
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm" data-slot="device-request">
             <dt className="text-muted-foreground">{t('device')}</dt>
-            <dd className="min-w-0 break-words">{client?.name
-              ? <><span className="font-medium">{client.name}</span>{[client.platform && (PLATFORMS[client.platform] ?? client.platform), client.version && t('clientVersion', { version: client.version })].filter(Boolean).map(part => <span key={part} className="text-muted-foreground"> · {part}</span>)}</>
-              : <span className="text-muted-foreground">{t('deviceUnreported')}</span>}</dd>
+            <dd className="min-w-0 break-words">
+              {client?.name ? <span className="font-medium">{client.name}</span> : <span className="text-muted-foreground">{t('deviceUnreported')}</span>}
+              {client?.platform && <span className="text-muted-foreground"> · {PLATFORMS[client.platform] ?? client.platform}</span>}
+              {client?.arch && <span className="text-muted-foreground"> · {client.arch}</span>}
+              {client?.version && <span className="text-muted-foreground"> · {t('clientVersion', { version: client.version })}</span>}
+            </dd>
             <dt className="text-muted-foreground">{t('code')}</dt>
             <dd className="font-mono text-2xl leading-none">{code}</dd>
+            {client?.expiresAt && <>
+              <dt className="text-muted-foreground">{t('expires')}</dt>
+              <dd><time dateTime={client.expiresAt}>{format.dateTime(new Date(client.expiresAt), { dateStyle: 'short', timeStyle: 'short' })}</time></dd>
+            </>}
             <dt className="text-muted-foreground">{t('access')}</dt>
             <dd>{t('scope')}</dd>
           </dl>
@@ -116,12 +136,12 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         {state === 'approved' && <p className="text-sm">{t('returnToTerminal')}</p>}
         {(state === 'approved' || state === 'denied') && <Button size="sm" className={primary + ' self-start'} render={<Link href="/settings?section=computers" />}>{t('done')}</Button>}
         {state === 'rateLimited' && <FieldError>{t('rateLimited')}</FieldError>}
-        {(state === 'invalid' || state === 'error') && <>
-          <FieldError>{state === 'invalid' ? t('invalid') : t('failed')}</FieldError>
+        {(state === 'invalid' || state === 'expired' || state === 'error') && <>
+          <FieldError>{state === 'error' ? t('failed') : t(state)}</FieldError>
           <Button size="sm" variant="outline" className="self-start" onClick={() => {
-            if (state === 'invalid') { setCode(''); setFromLink(false); setState('entry') }
+            if (state !== 'error') { setCode(''); setFromLink(false); setState('entry') }
             else void review(code)
-          }}>{state === 'invalid' ? t('enterAgain') : t('retry')}</Button>
+          }}>{state === 'error' ? t('retry') : t('enterAgain')}</Button>
         </>}
         </CardContent>
       </Card>

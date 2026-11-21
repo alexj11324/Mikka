@@ -5,7 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 
 test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, flag: process.env.MIKKA_BYO_E2B_KEY }
@@ -51,7 +51,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
   // Output writes belong to a claimed live run, including its active lease.
   const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,$5,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, ws.id, claimTokenId])).rows[0].id as string
-  const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'x-mikka-device-session': '1', 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
   const noPlain = (label: string, text: string) => {
@@ -63,6 +63,29 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   await t.test('C: the workspace E2B key is masked like a secret', async () => {
     const mask = await runtime.workspaceSecretMasker(ws.id)
     assert.equal(mask(`key ${E2B_KEY}`), 'key [secret:E2B_API_KEY]')
+  })
+
+  await t.test('preparation telemetry and a replay keep the claimed Run preparing until a fresh execution event', async () => {
+    const { persistRunEventBatch } = await import('../lib/secrets/run-events')
+    const { identityMasker } = await import('../lib/secrets/mask')
+    const runId = await newRun()
+    const prepare = () => pool.query("UPDATE agent_runs SET status='preparing' WHERE id=$1", [runId])
+    const status = async () => (await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status
+    await prepare()
+    const preparing = [{ type: 'data-run-state', transient: true, data: { state: 'preparing' } }]
+    await persistRunEventBatch(runId, 1, preparing, identityMasker)
+    assert.equal(await status(), 'preparing', 'reporting preparation must not announce execution')
+    await persistRunEventBatch(runId, 2, [{ type: 'start', messageId: 'progress' },
+      { type: 'data-run-stage', data: { stage: 'repository', ms: 15, ok: true } }], identityMasker)
+    assert.equal(await status(), 'preparing', 'a message opened for repository timing is still preparation')
+    const execution = [{ type: 'text-delta', id: 'turn', delta: 'Fixture reply' }]
+    await persistRunEventBatch(runId, 4, execution, identityMasker)
+    assert.equal(await status(), 'running', 'older daemons can establish execution with agent output')
+    await prepare()
+    await persistRunEventBatch(runId, 4, execution, identityMasker)
+    assert.equal(await status(), 'preparing', 'a previously stored batch must not reapply its transition')
+    await persistRunEventBatch(runId, 5, [{ type: 'data-run-state', transient: true, data: { state: 'running' } }], identityMasker)
+    assert.equal(await status(), 'running', 'an explicit running state still establishes execution')
   })
 
   await t.test('mobile steps read masked tool output and source timing through a retried event batch', async () => {
@@ -251,7 +274,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const base = new URL(dbUrl!)
     const name = `mailbox_mask_${randomBytes(8).toString('hex')}_e2e`
     const throwaway = new URL(base); throwaway.pathname = `/${name}`
-    await pool.query(`create database ${name}`)
+    await createTestDatabase(pool, name)
     const mailboxPool = new Pool({ connectionString: throwaway.toString(), max: 3 })
     try {
       execFileSync(process.execPath, ['scripts/setup-e2e-db.mjs'], { env: { ...process.env, E2E_DATABASE_URL: throwaway.toString() }, stdio: 'ignore' })

@@ -3,7 +3,7 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { activityEntries, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, activityEntryId, boundary, conversationReplyRun, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -101,6 +101,15 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
 })
 
+test('opening another segment keeps the reply target, and a read-only response has no composer', () => {
+  const run = (runId: string, n: number, stage: 'review' | 'implement' | 'verify') => ({ kind: 'attempt' as const, runId, n, stage, group: 'idle' as const, harness: 'codex', createdAt: '', failed: false })
+  const activity = [run('review', 3, 'review'), run('write', 2, 'implement'), run('verify', 1, 'verify')]
+  assert.equal(conversationReplyRun({ replyRunId: 'write' }, activity), 'write')
+  assert.equal(conversationReplyRun({ replyRunId: null }, activity), null)
+  assert.equal(conversationReplyRun({}, activity), 'write')
+  assert.equal(conversationReplyRun({}, activity.filter(row => row.runId !== 'write')), null)
+})
+
 // Alex 2026-11-09: a task is one conversation; no 「尝试」, no numbering and no switch verb (as Warp): where the Agent changed, the next Agent itself.
 test('runs with the same Agent read as one; where the Agent changed, the divider is the next Agent', () => {
   const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
@@ -180,4 +189,45 @@ test('an Agent brand mark is the package\'s own markup, sized by its caller, wit
   assert.match(file('codex-color.svg'), /fill="#fff"/)
   assert.doesNotMatch(agentMark(file('codex-color.svg')), /fill="#fff"/)
   assert.match(agentMark(file('cursor.svg')), /currentColor/)
+})
+
+test('native task activity interleaves discussion and history facts with runs, once and oldest first', () => {
+  const at = '2026-11-01T09:00:00Z'
+  const later = '2026-11-01T09:01:00Z'
+  const run = { kind: 'attempt' as const, runId: 'a', n: 1, group: 'running' as const, harness: 'Codex', createdAt: later, failed: false }
+  const discussion = { kind: 'reply' as const, id: 'discussion:t:m2', threadId: 't', messageId: 'm2', at, author: 'Alex', authorId: 'u', body: 'Ack', resolved: false }
+  const history = { kind: 'history' as const, id: 'history:created-v1', at, event: { id: 'created-v1', at, kind: 'created' as const } }
+  const activity = [run, { kind: 'created' as const, by: 'Alex', createdAt: at }]
+  assert.deepEqual(activityEntries(activity, [history, discussion]).map(activityEntryId), ['discussion:t:m2', 'history:created-v1', 'run:a'])
+  assert.deepEqual(activityEntries(activity).map(activityEntryId), ['created', 'run:a'])
+})
+
+test('Native Activity keeps canonical Bot progress as a real comment once while the transition stays in Factory progress', () => {
+  const at = '2026-11-15T00:00:00Z'
+  const bot = { kind: 'comment' as const, actor: 'bot' as const, id: 'discussion:f:s', threadId: 'f', messageId: 's', at, author: 'Coordinator', authorId: null, body: 'Ready for review', resolved: false }
+  const reply = { ...bot, actor: undefined, kind: 'reply' as const, id: 'discussion:f:h', messageId: 'h', author: 'Ada' }
+  const gate = { kind: 'factory_gate' as const, id: 'gate:f:raw', factoryTaskId: 'f', sourceId: 'raw', at, revision: 7,
+    stage: 'review', status: 'pending', attemptId: null, runId: null, candidateId: null }
+  const result = activityEntries([], [gate, bot, reply])
+  assert.deepEqual(result.map(activityEntryId), ['discussion:f:h', 'discussion:f:s'])
+  assert.equal(result.find(item => item.kind === 'comment'), bot)
+})
+
+
+test('Native uses Capy activity sentences, conversation identity and the shared comment filters', async () => {
+  const { filteredTaskActivity, nativeHistoryPieces } = await import('../features/tasks/model/task-conversation.ts')
+  const at = '2026-11-15T01:00:00Z'
+  const event = { id: 'revision', at, kind: 'created' as const, actor: { type: 'agent' as const, id: 'agent', name: 'Claude Code', avatarUrl: null } }
+  const stretch = { at, runId: 'owned-thread', agentId: 'agent', linked: true, title: 'Investigate the queue' }
+  const subject = { taskId: 'task', code: 'ENG-1' }
+  assert.deepEqual(nativeHistoryPieces(event, subject, [stretch])[0], { kind: 'thread', text: stretch.title, runId: stretch.runId, title: stretch.title })
+  assert.ok(!nativeHistoryPieces(event, subject, [{ ...stretch, linked: false }]).some(piece => piece.kind === 'thread'))
+  assert.equal(nativeHistoryPieces({ ...event, actor: null }, subject)[0]?.text, 'Mikka')
+  const history = { kind: 'history' as const, id: 'history:1', at, event }
+  const bot = { kind: 'comment' as const, actor: 'bot' as const, id: 'comment:1', threadId: 't', messageId: 'b', at, author: 'Coordinator', authorId: null, body: 'Ready', resolved: false }
+  const reply = { ...bot, kind: 'reply' as const, id: 'reply:2', actor: undefined }
+  const entries = [history, bot, reply]
+  assert.deepEqual(filteredTaskActivity(entries, 'comments'), [bot, reply])
+  assert.deepEqual(filteredTaskActivity(entries, 'agents'), [history, bot])
+  assert.deepEqual(filteredTaskActivity(entries, 'all'), entries)
 })

@@ -127,12 +127,20 @@ export async function verifyWorkspaceGovernance({ accounts, pool, progress, sign
   const peerSession = await request(accounts.peer, '/api/auth/get-session')
   assert.equal(peerSession.user?.id, accounts.peer.userId)
   assert.equal(typeof peerSession.user.email, 'string')
-  const invitations = await workspaceAction(accounts.owner, 'createWorkspaceInvitation', { workspaceId: a.workspaceId, emails: [peerSession.user.email], role: 'member' })
+  const peerEmail = peerSession.user.email.toLowerCase()
+  const batch = await rpc(accounts.owner, 'workspace.createWorkspaceInvitation', {
+    workspaceId: a.workspaceId, emails: [peerEmail, peerEmail.toUpperCase()], role: 'member',
+  })
+  assert.equal(batch?.ok, true, 'the administrator can invite a member')
+  assert.deepEqual(batch.outcomes.map(outcome => outcome.created ? 'created' : outcome.reason), ['created', 'duplicate'])
+  const invitations = batch.data
   assert.equal(invitations.length, 1)
   const token = /^\/invite\/([a-f0-9]{64})$/.exec(invitations[0].path)?.[1]
   assert.ok(token, 'the server must issue an ordinary invitation')
   await recordSecrets([token])
   assert.equal((await workspaceAction(accounts.peer, 'acceptWorkspaceInvitation', token)).workspaceId, a.workspaceId)
+  const deniedInvite = await rpc(accounts.peer, 'workspace.createWorkspaceInvitation', { workspaceId: a.workspaceId, emails: [peerEmail], role: 'admin' })
+  assert.equal(deniedInvite.ok, false, 'a workspace member cannot issue an administrator invitation')
   const peerTask = await createTask(accounts.peer, 'member-a', a.workspaceId)
   await views(accounts.peer, [taskA, peerTask], [personalTask, taskB])
   assert.equal((await rpc(accounts.peer, 'workspace.switchWorkspace', b.workspaceId)).ok, false, 'membership in A cannot select B')

@@ -6,11 +6,13 @@
 // thread still gets a message; nobody but the thread's owner can send.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { observePoolCommits } from '../lib/db/commit-effects'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -23,6 +25,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const coordinator = await isolateCoordinatorWakes(t)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
+  observePoolCommits(pool)
   const steps = await import('../workflows/coordinator/steps')
   const { readRunChain } = await import('../lib/run-chain')
   const { sendThreadMessage } = await import('../lib/thread-continue')
@@ -51,7 +54,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
-  const person = async () => {
+  const person = async (registerTask = false) => {
     const id = await seedUser(pool, 'thread-continue')
     users.push(id)
     const githubAccountId = String(++githubAccount)
@@ -66,24 +69,133 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id, ws.id)
+    const issueId = await seedIssue(pool, id, ws.id, { registered: registerTask })
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2000 + users.length } } })])
     // A computer that takes part (参与调度) and runs gpt-5.
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3)`, [deviceId, id, JSON.stringify(mac)])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3,now())`, [deviceId, id, JSON.stringify(mac)])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), id, deviceId, `codex-${deviceId.slice(0, 8)}`])
     const botId = await chatBotId(id, null, ws.id)
-    return { id, issueId, botId, ws }
+    return { id, issueId, botId, ws, connection, deviceId }
   }
   const end = (runId: string, status: string) => pool.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1`, [runId, status])
 
+  // This suite covers continuation identity, not the separate quota-age gate.
+  // Earlier subtests can take over a minute on a loaded CI worker; renew the
+  // synthetic provider observation before each case, just as its live meter
+  // would. Preserve all allowance fields and production's strict 60 s gate.
+  t.beforeEach(async () => {
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota, '{observedAt}', to_jsonb(now()::text)) WHERE "ownerId"=ANY($1)`, [users])
+  })
+
+  async function observeFixtureAllowance(account: { id: string; connection: string }) {
+    const result = await pool.query(
+      `UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($3::text))
+       WHERE id=$1 AND "ownerId"=$2 AND state='connected'`,
+      [account.connection, account.id, new Date().toISOString()],
+    )
+    assert.equal(result.rowCount, 1)
+  }
+
   const a = await person()
-  const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
+  const first = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
+
+  await t.test('explicit interrupt fences exactly the selected live attempt and survives a lost owner acknowledgement', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const run = initial.runId, requestId = randomUUID(), text = 'Stop this attempt and use the revised target.'
+    await pool.query("UPDATE agent_runs SET status='running' WHERE id=$1", [run])
+    const { threadDeliveryView } = await import('../lib/thread-delivery-queue')
+    const { deviceWork } = await import('../lib/device-link')
+    const taskState = async () => (await pool.query(`SELECT t.id,t."attemptId",t."sourceEventId",t.revision,t.status FROM factory_tasks t
+      JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [run, owner.id])).rows[0]
+    const queuedRequest = randomUUID()
+    await sendThreadMessage(owner.id, run, 'Retain this pending input for the old request only.', 'user', queuedRequest, 'queue')
+    const pending = async () => (await pool.query('SELECT status,"failureCode","sentRunId",text FROM thread_queued_messages WHERE "userId"=$1 AND "requestId"=$2', [owner.id, queuedRequest])).rows[0]
+    const previous = await taskState()
+    assert.ok((await threadDeliveryView(appPool, owner.id, run, run)).modes.includes('interrupt'))
+    await assert.rejects(sendThreadMessage(a.id, run, text, 'user', requestId, 'interrupt'), { code: 'runNotFound' })
+    assert.deepEqual(await taskState(), previous)
+    assert.equal((await pending()).status, 'queued', 'a refused interrupt cannot change pending input')
+    const accepted = await sendThreadMessage(owner.id, run, text, 'user', requestId, 'interrupt')
+    assert.deepEqual(accepted, { runId: run, continued: false })
+    const heldInput = { status: 'failed', failureCode: 'threadDeliveryUnavailable', sentRunId: null, text: 'Retain this pending input for the old request only.' }
+    assert.deepEqual(await pending(), heldInput, 'an admitted replacement closes only the old waiting input before another worker starts')
+    const replacement = await taskState()
+    assert.notEqual(replacement.sourceEventId, previous.sourceEventId)
+    assert.notEqual(replacement.attemptId, previous.attemptId)
+    const { rows: [old] } = await pool.query(`SELECT a.status,a.output,r."stopRequestedAt" FROM factory_attempts a
+      JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1`, [previous.attemptId])
+    assert.equal(old.status, 'cancelled')
+    assert.equal(old.output.supersededBy, replacement.sourceEventId)
+    assert.ok(old.stopRequestedAt)
+    assert.ok((await deviceWork(owner.deviceId, [])).commands.some(command => command.kind === 'stop' && command.runId === run))
+    const { rows: [receipt] } = await pool.query(`SELECT request FROM factory_events WHERE "taskId"=$1 AND request->>'sourceEventId'=$2
+      AND request->>'kind'='request_epoch'`, [replacement.id, replacement.sourceEventId])
+    assert.deepEqual(receipt.request.supersededRunIds, [run])
+    assert.equal(receipt.request.previousRunId, run)
+    assert.equal(receipt.request.previousEpoch, previous.sourceEventId)
+    assert.ok(!(await threadDeliveryView(appPool, owner.id, run, run)).modes.includes('interrupt'))
+    await pool.query(`UPDATE coordinator_events SET payload=payload #- '{threadSubmission,result}' WHERE id=$1`, [replacement.sourceEventId])
+    assert.deepEqual(await sendThreadMessage(owner.id, run, text, 'user', requestId, 'interrupt'), accepted)
+    assert.deepEqual(await pending(), heldInput)
+    await assert.rejects(sendThreadMessage(owner.id, run, 'Late second window.', 'user', randomUUID(), 'interrupt'), { code: 'threadDeliveryUnavailable' })
+    assert.deepEqual(await taskState(), replacement)
+    const messages = (await pool.query('SELECT text,"deliveredAt" FROM run_messages WHERE "runId"=$1', [run])).rows
+    assert.deepEqual(messages.map(message => message.text), [text])
+    assert.ok(messages[0].deliveredAt)
+    await end(run, 'stopped')
+    await assert.rejects(sendThreadMessage(owner.id, run, 'Late queued request.', 'user', randomUUID(), 'queue'), { code: 'threadDeliveryUnavailable' })
+    assert.deepEqual(await taskState(), replacement)
+  })
+
+  await t.test('a supported continuation freezes the selected model and subscription, including across a lost acknowledgement', async () => {
+    const b = await person()
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: 'picked:' + randomUUID() }, undefined, b.botId) as unknown as { runId: string }
+    const second = 'gpt-5.1', id = randomUUID()
+    const choice = { model: second, source: { kind: 'subscription' as const, connectionId: b.connection } }
+    const { threadModelMenu } = await import('../lib/thread-model-menu')
+    assert.equal(await threadModelMenu(b.id, b.ws.id, b.issueId, initial.runId), null)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Running stays frozen.', 'user', randomUUID(), undefined, choice), /threadCannotContinue/)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Queued model stays frozen.', 'user', randomUUID(), 'queue', choice), /threadCannotContinue/)
+    await end(initial.runId, 'succeeded')
+    await pool.query(`UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1`, [b.connection, JSON.stringify({ revision: '1', models: ['gpt-5', second] })])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa',$5)`, [randomUUID(), b.id, b.ws.id, b.connection, second])
+    await pool.query(`UPDATE devices SET harnesses=$2 WHERE id=$1`, [b.deviceId, JSON.stringify(mac.map(h => ({ ...h, modelSlots: [...h.modelSlots, { slot: second, model: second, name: second }] })))])
+    const menu = await threadModelMenu(b.id, b.ws.id, b.issueId, initial.runId)
+    assert.ok(menu?.groups.some(group => group.options.some(option => option.modelId === second)))
+    assert.equal(await threadModelMenu(a.id, a.ws.id, b.issueId, initial.runId), null)
+    assert.equal(await threadModelMenu(b.id, b.ws.id, a.issueId, initial.runId), null)
+    await assert.rejects(threadModelMenu(b.id, a.ws.id, b.issueId, initial.runId), (error: {code?: string}) => error.code === 'workspaceAccessDenied')
+    const receipt = await sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, undefined, choice)
+    assert.equal(receipt.continued, true)
+    const {rows: [frozen]} = await pool.query(`SELECT "agentDefinition" FROM agent_runs WHERE id=$1`, [receipt.runId])
+    assert.equal(frozen.agentDefinition.model, second)
+    assert.equal(frozen.agentDefinition.modelDispatch.entry.source.connectionId, b.connection)
+    assert.equal(frozen.agentDefinition.modelDispatch.mode, 'picked')
+    assert.deepEqual(await sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, undefined, choice), receipt)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, undefined, { ...choice, model: 'gpt-5' }), /submissionConflict/)
+  })
+
+  await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
+    const c = await person()
+    const originRef = { kind: 'telegram' as const, chatId: '42', messageId: 7 }
+    const initial = await steps.dispatchRun(c.id, { model: { harness: 'codex' as const },
+      issueId: c.issueId, repo: 'octo/repo', requestKey: `origin:${randomUUID()}`, origin: 'telegram', originRef,
+    }, undefined, c.botId) as unknown as { runId: string }
+    const [stored] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [initial.runId])).rows
+    assert.deepEqual(stored, { origin: 'telegram', originRef })
+    await end(initial.runId, 'succeeded')
+    const next = await sendThreadMessage(c.id, initial.runId, 'Continue the same task from the app.')
+    assert.equal(next.continued, true)
+    const [continued] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [next.runId])).rows
+    assert.deepEqual(continued, { origin: 'web', originRef: null }, 'a person’s continuation is the app entry, not the old one')
+  })
 
   await t.test('a lost reply and concurrent retries reuse one owner submission, epoch, run and message', async () => {
     const b = await person()
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `submission:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `submission:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     await end(initial.runId, 'succeeded')
     const requestId = randomUUID(), text = 'Continue with exactly 74 bytes; this is one submitted request.'
     const accepted = await sendThreadMessage(b.id, initial.runId, text, 'user', requestId)
@@ -108,7 +220,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed payload.', 'user', requestId), { code: 'submissionConflict' })
     const otherIssue = await seedIssue(pool, b.id, b.ws.id)
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [otherIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 9000 + users.length } } })])
-    const other = await steps.dispatchRun(b.id, { issueId: otherIssue, repo: 'octo/repo', requestKey: `other:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const other = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: otherIssue, repo: 'octo/repo', requestKey: `other:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     assert.ok(other.runId, JSON.stringify(other))
     await assert.rejects(sendThreadMessage(b.id, other.runId, text, 'user', requestId), { code: 'submissionConflict' })
     const nextId = randomUUID()
@@ -133,6 +245,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     let deliveries = 0
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; throw new Error('synthetic interruption') }), /synthetic interruption/)
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; return { runId: first.runId, continued: false } }), /threadSubmissionOutcomeUnconfirmed/)
+    const { runAction } = await import('../lib/action-error')
+    const retry = await runAction(() => submitThreadOnce(pool, input, async () => {
+      deliveries++
+      return { runId: first.runId, continued: false }
+    }))
+    assert.equal(retry.error, 'threadSubmissionOutcomeUnconfirmed', 'the user-facing action can explain the pending receipt')
     assert.equal(deliveries, 1)
   })
 
@@ -162,7 +280,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
         await finishQuestionWake(pool, actor, runId, intent, workflowId, false)
         return workflowId
       })
-      const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `question:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+      const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `question:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
       // Preserve the historical personal task path with its null Bot scope.
@@ -184,8 +302,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
         subscription: { id: originRun.agentDefinition.subscription.bindingId,
           modelId: originRun.agentDefinition.subscription.modelId, route: originRun.agentDefinition.subscription.route },
       })
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses)
-        VALUES ($1,$2,'Question task VM','cloud',true,now(),$3)`, [childDevice, b.id, JSON.stringify(mac)])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt")
+        VALUES ($1,$2,'Question task VM','cloud',true,now(),$3,now())`, [childDevice, b.id, JSON.stringify(mac)])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch")
         VALUES ($1,$2,$3,$4,NULL,'main')`, [childRepo, childDevice, b.id, `/isolated/question-${initial.runId}`])
       await pool.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=$4,"baseBranch"=\'main\' WHERE id=$1',
@@ -252,6 +370,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed answer.', human, requestId), { code: 'submissionConflict' })
       await assert.rejects(sendThreadMessage(a.id, initial.runId, text, human, requestId), { code: 'runNotFound' })
       await pool.query('UPDATE thread_machines SET "workerLeaseUntil"=NULL WHERE "runId"=$1', [initial.runId])
+      await observeFixtureAllowance(b)
       const retried = await Promise.all(Array.from({ length: 3 }, () => sendThreadMessage(b.id, initial.runId, text, human, requestId)))
       const accepted = retried[0]
       for (const result of retried) assert.deepEqual(result, accepted)
@@ -361,10 +480,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'candidate', runId: next.id,
         candidate: { kind: 'deliverable', sha: null, repository: worktree, environment: `device:${childDevice}`, scope: 'Question artifact' } })).task
       const candidate = { id: current.candidateId!, executionSha: head, producerExecution: { runId: next.id, sessionId: nativeSessionId } }
+      await addFactoryVisualEvidence(pool, next.id)
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'finish', status: 'passed',
         reason: 'Synthetic producer submitted its artifact', output: { runId: next.id },
         evidence: [{ artifact: `run-report:${next.id}`, kind: 'report', runId: next.id, sessionId: nativeSessionId,
           candidateId: candidate.id, sha: null, environment: `device:${childDevice}`, recordedAt: new Date().toISOString() }] })).task
+      assert.equal(current.status, 'passed', 'the submitted producer already has ready same-run visual evidence')
       const producerAttemptId = current.attemptId
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), {
         action: 'advance', stage: 'review', reason: 'Independent review remains required' })).task
@@ -423,6 +544,138 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     })
   })
 
+  await t.test('working thread queue persists owner input, fences cancellation and dispatches once after completion', async () => {
+    const { cancelQueuedThreadReply, deliverQueuedThreadReply, threadDeliveryView } = await import('../lib/thread-delivery-queue')
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const run = initial.runId
+    const push = (text: string, id = randomUUID()) => sendThreadMessage(owner.id, run, text, 'user', id, 'queue')
+    const req = randomUUID()
+    await Promise.all([push('Later, one.',req), push('Later, one.',req)])
+    await assert.rejects(push('Changed.',req), { code: 'submissionConflict' })
+    await assert.rejects(sendThreadMessage(owner.id, run, 'Later, one.', 'user', req, 'interrupt'), { code: 'submissionConflict' })
+    assert.deepEqual(await sendThreadMessage(owner.id, run, 'Later, one.', 'user', req.toUpperCase(), 'queue'), { runId: run, continued: false })
+    await push('Later, two.')
+    const view = await threadDeliveryView(appPool, owner.id, run, run)
+    assert.deepEqual(view.queued.map(row => row.text), ['Later, one.', 'Later, two.'])
+    assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), false)
+    await assert.rejects(cancelQueuedThreadReply(appPool, a.id, run, view.queued[0].id))
+    assert.equal(await cancelQueuedThreadReply(appPool, owner.id, run, view.queued[0].id), 'cancelled')
+    assert.equal(await cancelQueuedThreadReply(appPool, owner.id, run, view.queued[0].id), 'cancelled')
+    assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "runId"=$1 AND text=ANY($2::text[])', [run,['Later, one.','Later, two.']])).rows[0].n, 0)
+    await end(run, 'succeeded')
+    await deliverQueuedThreadReply(appPool, owner.id, run)
+    assert.equal((await threadDeliveryView(appPool, owner.id, run, run)).queued.length, 0)
+    assert.equal(await cancelQueuedThreadReply(appPool, owner.id, run, view.queued[1].id), 'tooLate')
+    assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), false)
+    assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [owner.id, 'Later, two.'])).rows[0].n, 1)
+    // Crash after ordinary admission but before acknowledging the same queue
+    // entry. Replaying the old completion must recover its existing receipt.
+    await pool.query("UPDATE thread_queued_messages SET status='delivering' WHERE id=$1",[view.queued[1].id])
+    assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), true)
+    assert.equal((await pool.query('SELECT status FROM thread_queued_messages WHERE id=$1',[view.queued[1].id])).rows[0].status, 'sent')
+    assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [owner.id, 'Later, two.'])).rows[0].n, 1)
+  })
+
+  await t.test('native steer requires current device support and exposes refused or acknowledged delivery on that same device', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const run = initial.runId
+    const { rows: [row] } = await pool.query(`UPDATE agent_runs SET status='running',"agentDefinition"=coalesce("agentDefinition",'{}'::jsonb)||'{"harness":"codex"}'::jsonb WHERE id=$1 RETURNING "deviceId"`,[run])
+    const { threadDeliveryView } = await import('../lib/thread-delivery-queue')
+    const { deviceWork, ackCommands } = await import('../lib/device-link')
+    const view = () => threadDeliveryView(appPool, owner.id, run, run)
+    const submit = (text: string) => sendThreadMessage(owner.id, run, text, 'user', randomUUID(), 'steer')
+    assert.ok(!(await view()).modes.includes('steer'))
+    await assert.rejects(submit('Unsupported device.'), { code: 'threadDeliveryUnavailable' })
+    await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true,"activeTurnSteer":true}]' WHERE id=$1`, [row.deviceId])
+    assert.ok((await view()).modes.includes('steer'))
+    await submit('In this turn, once.')
+    const first = (await view()).queued.find(message => message.text === 'In this turn, once.')!
+    assert.equal(first.status,'delivering')
+    assert.ok(!(await deviceWork(row.deviceId, [])).commands.some(command => 'messageId' in command && command.messageId === first.id))
+    assert.ok((await deviceWork(row.deviceId, [], { activeTurnSteer:true })).commands.some(command => command.kind === 'steer' && command.messageId === first.id))
+    await ackCommands(randomUUID(), [], [first.id])
+    assert.equal((await view()).queued.find(message => message.id === first.id)?.status,'delivering')
+    await ackCommands(row.deviceId, [], [first.id])
+    assert.equal((await view()).queued.find(message => message.id === first.id)?.status,'failed')
+    assert.ok(!(await deviceWork(row.deviceId, [], { activeTurnSteer:true })).commands.some(command => 'messageId' in command && command.messageId === first.id))
+    await submit('Second native input.')
+    const second = (await view()).queued.find(message => message.text === 'Second native input.')!
+    await ackCommands(row.deviceId, [second.id])
+    assert.ok(!(await view()).queued.some(message => message.id === second.id))
+  })
+
+  await t.test('editing and rerunning preserve original output, bind the new run before claim and switch without dispatch', async () => {
+    const { createReplyVersion,readReplyVersions } = await import('../lib/thread-reply-versions')
+    const owner=await person()
+    const initial=await steps.dispatchRun(owner.id,{ model: { harness: 'codex' as const },issueId:owner.issueId,repo:'octo/repo',requestKey:`dispatch:${randomUUID()}`},undefined,owner.botId) as unknown as {runId:string}
+    const run=initial.runId, anchor=randomUUID()
+    await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt","createdAt") VALUES($1,$2,$3,'Original instructions.','owner',now(),now()-interval '2 minutes')`,[anchor,run,owner.id])
+    await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,'{"type":"text-delta","id":"answer1","delta":"Original answer."}',now()-interval '1 minute')`,[randomUUID(),run])
+    await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt") VALUES($1,$2,$3,'LATER_MARKER','owner',now())`,[randomUUID(),run,owner.id])
+    await end(run,'succeeded')
+    await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,'{"type":"text-delta","id":"later","delta":"Later answer."}',now()+interval '1 second')`,[randomUUID(),run])
+    await pool.query(`UPDATE agent_runs SET "lastReply"='Later answer.' WHERE id=$1`,[run])
+    const pr='https://github.com/octo/repo/pull/18'
+    await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest")
+      VALUES($1,$2,$3,'https://github.com/octo/repo','octo/repo','published',$4)
+      ON CONFLICT("runId") DO UPDATE SET status='published',"pullRequest"=excluded."pullRequest"`,[run,owner.id,owner.issueId,JSON.stringify({url:pr})])
+    const edit={operation:'edit' as const,anchorRunId:run,anchorKey:anchor,text:'Revised instructions.',requestId:randomUUID()}
+    await assert.rejects(createReplyVersion(appPool,a.id,run,edit))
+    const edited=await createReplyVersion(appPool,owner.id,run,edit)
+    assert.notEqual(edited.runId,run)
+    assert.deepEqual(await createReplyVersion(appPool,owner.id,run,edit),edited)
+    await assert.rejects(createReplyVersion(appPool,owner.id,run,{...edit,text:'A different request.'}),{code:'submissionConflict'})
+    const [saved]=await readReplyVersions(appPool,owner.id,run)
+    assert.equal(saved.resultRunId,edited.runId)
+    assert.equal(saved.originalText,'Original instructions.')
+    assert.equal(saved.text,'Revised instructions.')
+    assert.equal(saved.originalOutput,'Original answer.')
+    assert.equal(saved.originalPullRequest,pr)
+    const {rows:[fresh]}=await pool.query(`SELECT r.prompt,r."continuesRunId",r."agentDefinition",r."workspaceId",v."executionNote" FROM agent_runs r JOIN thread_reply_versions v ON v."resultRunId"=r.id WHERE r.id=$1`,[edited.runId])
+    assert.equal(fresh.continuesRunId,run)
+    assert.equal(fresh.workspaceId,owner.ws.id)
+    assert.equal(fresh.agentDefinition.modelDispatch.entry.source.connectionId,owner.connection)
+    assert.equal(fresh.agentDefinition.model,'gpt-5')
+    assert.ok(fresh.prompt.includes('Revised instructions.'))
+    assert.ok(!fresh.executionNote.includes('LATER_MARKER'))
+    assert.equal((await pool.query('SELECT text FROM run_messages WHERE id=$1',[anchor])).rows[0].text,'Original instructions.')
+    await end(edited.runId,'succeeded')
+    const rerun=await createReplyVersion(appPool,owner.id,run,{operation:'rerun',anchorRunId:run,anchorKey:'answer1',requestId:randomUUID()})
+    assert.notEqual(rerun.runId,edited.runId)
+    const { rows: [rerunRow] }=await pool.query('SELECT "continuesRunId","agentDefinition" FROM agent_runs WHERE id=$1',[rerun.runId])
+    assert.equal(rerunRow.continuesRunId,edited.runId)
+    assert.equal(rerunRow.agentDefinition.modelDispatch.entry.source.connectionId,owner.connection)
+    const counts=async ()=>(await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1',[owner.id])).rows[0].count
+    const n=await counts()
+    const versionList=await readReplyVersions(appPool,owner.id,run)
+    assert.deepEqual(versionList.map(version=>version.resultRunId),[edited.runId,rerun.runId])
+    assert.equal(versionList[1].originalText,'Original answer.')
+    assert.equal(versionList[1].text,'Original instructions.')
+    assert.deepEqual(await readReplyVersions(appPool,owner.id,run),versionList)
+    assert.equal(await counts(),n)
+    await assert.rejects(readReplyVersions(appPool,a.id,run))
+  })
+
+  await t.test('concurrent immediate and queued requests with the same ID commit one intent', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const requestId = randomUUID(), text = 'Same client request from two windows.'
+    const results = await Promise.allSettled([
+      sendThreadMessage(owner.id, initial.runId, text, 'user', requestId, 'queue'),
+      sendThreadMessage(owner.id, initial.runId, text, 'user', requestId),
+    ])
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1)
+    const rejected = results.find(result => result.status === 'rejected')
+    assert.equal(rejected?.reason.code, 'submissionConflict')
+    const { rows: [counts] } = await pool.query(`SELECT
+      (SELECT count(*) FROM coordinator_events WHERE "userId"=$1 AND payload#>>'{threadSubmission,requestId}'=$2::text)
+      + (SELECT count(*) FROM thread_queued_messages WHERE "userId"=$1 AND "requestId"=$2::uuid) AS total`,
+    [owner.id, requestId])
+    assert.equal(Number(counts.total), 1)
+  })
+
   await t.test('an ordinary owned live message is acknowledged once even after its run ends', async () => {
     const runId = randomUUID(), requestId = randomUUID(), text = 'One ordinary owner message.'
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,prompt,"botId")
@@ -451,6 +704,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   })
 
   await t.test('repeated owner text is a fresh request after an intervening target', async () => {
+    await observeFixtureAllowance(a)
     const epochs: string[] = [];
     for (const text of ['Use exactly 74 bytes.', 'Use exactly 77 bytes.', 'Use exactly 74 bytes.']) {
       await sendThreadMessage(a.id, first.runId, text);
@@ -465,6 +719,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     // executor. End the current run, while keeping the original thread URL.
     let last = (await readRunChain(pool, a.id, first.runId))!.latestRunId
     for (const status of ['succeeded', 'failed', 'stopped', 'cancelled']) {
+      await observeFixtureAllowance(a)
       await end(last, status)
       const text = `Go on after ${status}.`
       // Sent from the thread as it was opened: the first run's id, never the newest.
@@ -486,9 +741,77 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     }
   })
 
+  await t.test('a teammate\'s Bot with canSteer wakes an ended thread in the same thread, once (decision 2026-11-19-2200)', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await end(initial.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const teammate = await seedUser(pool, 'thread-continue-peer')
+    users.push(teammate)
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [owner.ws.id, teammate, `${teammate}@example.invalid`])
+    const peerBot = await seedBot(pool, owner.ws.id, teammate)
+    const { botPrincipal } = await import('../lib/interop/principal')
+    const { runInteropTool } = await import('../lib/interop/tools')
+    const asPeer = await botPrincipal(teammate, peerBot)
+    const send = { runId: initial.runId, text: 'The parser API changed; rebase on it.', key: 'peer-wake-1' }
+    assert.deepEqual(await runInteropTool(asPeer, 'send_to_thread', send), { error: 'interop_not_found' }, 'no grant, no send')
+    await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) VALUES ('thread',$1,'bot',$2,'{canSteer}')`, [initial.runId, peerBot])
+    const woke = await runInteropTool(asPeer, 'send_to_thread', send) as { runId: string; continued: boolean }
+    assert.equal(woke.continued, true)
+    assert.notEqual(woke.runId, initial.runId)
+    const { rows: [next] } = await pool.query('SELECT status,"continuesRunId","userId",prompt FROM agent_runs WHERE id=$1', [woke.runId])
+    // It runs as the thread owner's own continuation, on the owner's admission.
+    assert.deepEqual([next.status, next.continuesRunId, next.userId], ['queued', initial.runId, owner.id])
+    assert.match(next.prompt, new RegExp(`\\[From bot ${peerBot}\\]`), 'the peer is named; it never reads as the owner')
+    const { rows: shown } = await pool.query('SELECT origin FROM run_messages WHERE "runId"=$1', [woke.runId])
+    assert.deepEqual(shown.map(row => row.origin), ['peer'])
+    // The host's own dispatch provenance (source host_dispatch, bound to the thread's Bot) is expected;
+    // no owner turn or thread submission may carry the peer's words.
+    const { rows: ownerTurns } = await pool.query(`SELECT "dedupeKey",payload->>'source' AS source FROM coordinator_events WHERE "userId"=$1 AND kind='user_message'
+      AND payload->>'text' LIKE '%parser API changed%' AND (payload->>'source' IS DISTINCT FROM 'host_dispatch' OR "botId" IS NULL)`, [owner.id])
+    assert.deepEqual(ownerTurns, [], 'peer text never becomes an owner request')
+    assert.deepEqual(await runInteropTool(asPeer, 'send_to_thread', send), woke, 'a retried tool call never starts a second continuation')
+    assert.equal((await readRunChain(pool, owner.id, initial.runId))?.latestRunId, woke.runId)
+  })
+
+  await t.test('a mailbox message from a teammate\'s Bot to an ended run continues that thread (decision 2026-11-19-2200)', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '10 minutes' WHERE id=$1`, [initial.runId])
+    const { SessionMailbox } = await import('../lib/session-mailbox')
+    const store = new SessionMailbox(pool, owner.ws.id)
+    const runBox = await store.run(owner.id, initial.runId)
+    await end(initial.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const teammate = await seedUser(pool, 'thread-continue-mail')
+    users.push(teammate)
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [owner.ws.id, teammate, `${teammate}@example.invalid`])
+    const peerBot = await seedBot(pool, owner.ws.id, teammate)
+    const sender = await store.conversation(teammate, 'bot', peerBot)
+    const message = { to: runBox.mailboxId, key: randomUUID(), text: 'Schema changed; please regenerate.' }
+    await assert.rejects(store.send(sender, message), /Recipient unavailable/, 'no canSteer, no delivery')
+    // Shared visibility gives canSteer, but continuing an ended run needs the owner's explicit grant.
+    await pool.query(`UPDATE resource_access_policies SET visibility='shared' WHERE kind='thread' AND id=$1`, [initial.runId])
+    await assert.rejects(store.send(sender, message), /explicit grant/)
+    assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE "dedupeKey"=$1', [message.key])).rowCount, 0, 'a refused envelope leaves nothing')
+    await pool.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='thread' AND id=$1`, [initial.runId])
+    await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) VALUES ('thread',$1,'bot',$2,'{canSteer}')`, [initial.runId, peerBot])
+    const receipt = await store.send(sender, message)
+    assert.ok(receipt.continuationRunId, JSON.stringify(receipt))
+    const { rows: [next] } = await pool.query('SELECT status,"continuesRunId","userId",prompt FROM agent_runs WHERE id=$1', [receipt.continuationRunId])
+    assert.deepEqual([next.status, next.continuesRunId, next.userId], ['queued', initial.runId, owner.id])
+    assert.match(next.prompt, /Schema changed; please regenerate\./)
+    const { rows: shown } = await pool.query('SELECT origin FROM run_messages WHERE "runId"=$1', [receipt.continuationRunId])
+    assert.deepEqual(shown.map(row => row.origin), ['peer'])
+    const again = await store.send(sender, message)
+    assert.equal(again.duplicate, true)
+    assert.equal(again.continuationRunId, undefined, 'a retried envelope never starts a second continuation')
+    assert.equal((await readRunChain(pool, owner.id, initial.runId))?.latestRunId, receipt.continuationRunId)
+  })
+
   await t.test('ordinary text cannot cancel a blocked original-session task or queue a fresh continuation', async () => {
     const b = await person()
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `strict:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `strict:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
     const failedId = randomUUID(), failedAttemptId = randomUUID(), questionId = randomUUID(), originalSession = `original:${initial.runId}`
     const continuation = { questionId, originRunId: initial.runId, originSessionId: originalSession, followUp: 'Previously answered question', requireSessionResume: true }
@@ -527,7 +850,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const { latestTaskRun } = await import('../lib/thread-dispatch')
     const fixture = async (executeCount: number, atExecution = false, legacyReview = false) => {
       const b = await person()
-      const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+      const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
       if (legacyReview) {
@@ -539,6 +862,9 @@ test('a message to an ended thread runs it again in the same thread; only its ow
         const route = { ...task.route }; delete route.flowVersion
         const legacy = await createLegacyFactoryStore(pool, factoryAuthorize, b.botId).route(b.id, route)
         assert.equal(legacy.task.id, task.id)
+        const dispatchReceipt = await pool.query(`SELECT result->>'runId' AS "runId" FROM factory_events
+          WHERE "taskId"=$1 AND request ? 'digest' AND request ? 'sourceEventId'`, [task.id])
+        assert.deepEqual(dispatchReceipt.rows, [{ runId: initial.runId }])
         task.route = legacy.task.route
       }
       assert.equal(task.route.flowVersion, legacyReview ? undefined : 2)
@@ -689,7 +1015,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(Buffer.byteLength(newText), 74)
     const body = { type: 'doc', attrs: { mikka: { number: 4400 } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Initial exact 53-byte file: ' + JSON.stringify(oldText) }] }] }
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [b.issueId, JSON.stringify(body)])
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `first:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `first:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     const oldTask = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
     const oldCandidateId = randomUUID()
     // A synthetic accepted ledger is the immutable first-epoch fixture. Only
@@ -722,10 +1048,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(event.payload.postedToChat, true)
     assert.equal(event.tier, 'background')
     assert.ok(event.deliveredAt, 'provenance only: never a second Bot inbox turn')
-    const { createWakeRecovery } = await import('../lib/coordinator/wake-recovery')
-    const wake = createWakeRecovery(pool)
-    const claimed = await wake.claim({ userId: b.id, botId: b.botId })
-    assert.equal(claimed?.ids.includes(event.id) ?? false, false, 'wake recovery cannot claim the provenance event')
+    const { wakingChats } = await import('../lib/coordinator/store')
+    assert.ok(!(await wakingChats(b.id)).includes(b.botId), 'the current Coordinator does not wake for delivered provenance')
     const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [sent.runId])).rows[0].prompt
     assert.match(prompt, /Current owner request for this Factory task/)
     assert.ok(prompt.indexOf(request) < prompt.indexOf('Initial exact 53-byte file'))
@@ -776,7 +1100,13 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(repairQueues, 1, 'same automatic repair/source replay does not queue another execute')
     const repaired = (await pool.query('SELECT t."sourceEventId",r.prompt FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1', [task.id, repairId])).rows[0]
     assert.equal(repaired.sourceEventId, event.id)
-    assert.ok(repaired.prompt.startsWith('Current owner request for this Factory task:'))
+    const validationEnd = repaired.prompt.indexOf('\n\n')
+    const validationBrief = repaired.prompt.slice(0, validationEnd)
+    assert.match(validationBrief, /^Factory implementation owns validation\./)
+    assert.match(validationBrief, /Every implementation must produce at least one ready visual capture, video by default\./)
+    assert.match(validationBrief, /Text logs, a report, and an unverified label never replace visual evidence\./)
+    assert.ok(repaired.prompt.slice(validationEnd + 2).startsWith('Current owner request for this Factory task:'),
+      'the current owner request immediately follows required visual validation guidance')
     assert.ok(repaired.prompt.indexOf(request) < repaired.prompt.indexOf('Historical issue:'))
     await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [repairId, sent.runId])
     await end(repairId, 'failed')
@@ -823,7 +1153,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('a thread another thread replaced cannot run again', async () => {
     const b = await person()
-    const old = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const old = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     await end(old.runId, 'succeeded')
     // A newer thread on the same task (the person asked for a new one).
     const newer = randomUUID()
@@ -831,4 +1161,19 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`UPDATE agent_runs SET "threadReplacedBy"=$1 WHERE id=$2`, [newer, old.runId])
     await assert.rejects(sendThreadMessage(b.id, old.runId, 'Again.'), { code: 'threadReplaced' })
   })
+  await t.test('a scheduled occurrence resumes its completed standing thread once and replays the same Run', async () => {
+    const owner = await person(true)
+    const original = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await end(original.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const { continueStandingTask } = await import('../lib/schedules/standing-task')
+    const occurrence = randomUUID()
+    const send = () => continueStandingTask(owner.id, owner.ws.id, owner.issueId, 'Continue the completed standing Task.', occurrence)
+    const first = await send()
+    assert.notEqual(first.runId, original.runId)
+    assert.deepEqual(await send(), first)
+    const { rows } = await pool.query('SELECT id,status,"continuesRunId" FROM agent_runs WHERE "issueId"=$1 AND "continuesRunId"=$2', [owner.issueId, original.runId])
+    assert.deepEqual(rows, [{ id: first.runId, status: 'queued', continuesRunId: original.runId }])
+  })
+
 })

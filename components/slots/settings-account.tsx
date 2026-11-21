@@ -1,8 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
-import { Camera } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Camera } from '@/components/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { ProfileName } from '@/components/settings/profile-name'
-import { DesktopServerSettings } from '@/components/settings/desktop-server-settings'
 import { avatarImageSrc } from '@/lib/default-avatar'
 import { FieldError } from '@/components/ui/field'
 import { useAccount } from '@/hooks/settings/use-account'
@@ -34,6 +33,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: SettingsAccount
   return <>
     <SettingsSection id="account-heading" title={t('heading')}>
       <SettingRow title={t('avatar')}>
+        {/* control-size-exempt: an avatar and its name block, no control in this row. */}
         <div className="flex items-center gap-3">
           <Avatar className="size-10">
             {shownImage && <AvatarImage src={shownImage} alt="" />}
@@ -51,7 +51,6 @@ export function AccountSettings({ user, onSignOut, signingOut }: SettingsAccount
     </SettingsSection>
 
     {/* Desktop only: which server this account is on (#1557). Renders nothing on the web. */}
-    <DesktopServerSettings />
 
     {/* The row names the thing, the button the action; deleting the account sits alone in 危险操作 (settings-pages). */}
     <SettingsSection id="session-heading">

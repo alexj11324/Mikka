@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Button, HStack, Host, Image, Popover, Text, VStack } from '@expo/ui/swift-ui'
-import { buttonStyle, controlSize, font, foregroundStyle, padding, tint } from '@expo/ui/swift-ui/modifiers'
+import { accessibilityHidden, accessibilityLabel, buttonStyle, controlSize, font, foregroundStyle, padding, tint } from '@expo/ui/swift-ui/modifiers'
 import { api } from '@/lib/api'
+import { mobileMessages } from '@/lib/messages'
 import { colors } from '@/lib/theme'
 import { MACHINE_SYMBOL, machineLines, type ThreadMachine, type ThreadMachineKind } from '@/lib/thread-machine'
 
@@ -23,8 +24,8 @@ export function ThreadPlace({ threadId, kind }: { threadId: string; kind: Thread
     <Host matchContents>
       <Popover isPresented={open} onIsPresentedChange={setOpen} arrowEdge="top">
         <Popover.Trigger>
-          <Button onPress={() => { void show() }} modifiers={[buttonStyle('borderless'), controlSize('mini'), tint(colors.secondary)]}>
-            <Image systemName={MACHINE_SYMBOL[kind]} size={11} />
+          <Button onPress={() => { void show() }} modifiers={[buttonStyle('borderless'), controlSize('mini'), tint(colors.secondary), accessibilityLabel(mobileMessages.ThreadRunPlace.kinds[kind])]}>
+            <Image systemName={MACHINE_SYMBOL[kind]} size={11} modifiers={[accessibilityHidden()]} />
           </Button>
         </Popover.Trigger>
         <Popover.Content>
@@ -38,10 +39,10 @@ export function ThreadPlace({ threadId, kind }: { threadId: string; kind: Thread
               {lines.rows.map(([label, value]) => (
                 <HStack key={label} spacing={10}>
                   <Text modifiers={[font({ textStyle: 'subheadline' }), foregroundStyle({ type: 'hierarchical', style: 'secondary' })]}>{label}</Text>
-                  <Text modifiers={[font({ textStyle: 'subheadline', design: label === 'ID' || label === '模板' ? 'monospaced' : 'default' })]}>{value}</Text>
+                  <Text modifiers={[font({ textStyle: 'subheadline', design: label === mobileMessages.ThreadRunPlace.id || label === mobileMessages.ThreadRunPlace.template ? 'monospaced' : 'default' })]}>{value}</Text>
                 </HStack>
               ))}
-              {machine?.cloud ? <Button label="复制 ID" systemImage="doc.on.doc" onPress={() => { void Clipboard.setStringAsync(machine.cloud!.sandboxId) }} /> : null}
+              {machine?.cloud ? <Button label={mobileMessages.ThreadRunPlace.copyId} systemImage="doc.on.doc" onPress={() => { void Clipboard.setStringAsync(machine.cloud!.sandboxId) }} /> : null}
             </> : <Text modifiers={[foregroundStyle({ type: 'hierarchical', style: 'secondary' })]}>{machine === null ? '读取失败' : '读取中'}</Text>}
           </VStack>
         </Popover.Content>

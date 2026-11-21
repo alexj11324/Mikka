@@ -28,17 +28,17 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   }
   let currentHeaders = new Headers()
   let cookieReads = 0
-  mock.module('next/headers', { namedExports: {
+  mock.module('@/lib/server-runtime/headers', { namedExports: {
     headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: other.id } : undefined }),
   } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => {
     cookieReads++
     return currentHeaders.has('cookie') ? { user: { id: owner }, session: { id: 'browser-session' } } : null
   } } } } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: () => {} } })
   mock.module('@/app/actions/coordinator', { namedExports: Object.fromEntries(['getCoordinatorChat', 'pollCoordinatorChat', 'coordinatorHistory', 'sendCoordinatorMessage'].map(name => [name, async () => { throw new Error('PAT must not use cookie action') }])) })
   const store = await import('../lib/tokens/store')
   const { getApiSession } = await import('../lib/api-auth')
@@ -54,8 +54,8 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   const mobileImage = await import('../app/api/mobile/chat/image/route')
   const pullRequestStatusRoute = await import('../app/api/github/pull-request-status/route')
   const computerRunsRoute = await import('../app/api/bots/[botId]/computer/runs/route')
-  const token = await store.createPersonalAccessToken(owner, ws.id, { name: 'API test' })
-  const memberToken = await store.createPersonalAccessToken(member, ws.id, { name: 'Member API test' })
+  const token = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'API test' })
+  const memberToken = await store.createLegacyPersonalAccessToken(member, ws.id, { name: 'Member API test' })
   const server = createServer(async (req, res) => {
     try {
       const url = `http://127.0.0.1:${(server.address() as { port: number }).port}${req.url}`
@@ -160,22 +160,15 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&after=${first.continuation.after}&cursor=${first.continuation.cursor}&prefix=${first.continuation.prefix}`)).status, 200)
     assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&after=1&cursor=1&prefix=nothex`)).status, 400)
     assert.equal((await callMobile(`/api/mobile/chat?bot=${otherBot}&through=1`)).status, 404)
-    assert.equal((await callMobile('/api/mobile/chat', { text: 'PAT mobile message', botId: ownBot })).status, 202)
-    assert.equal((await callMobile('/api/mobile/chat', { text: 'must not send', botId: otherBot })).status, 404)
-    const messages = (await pool.query(`SELECT "userId","botId",payload FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'='PAT mobile message'`, [owner])).rows
-    assert.equal(messages.length, 1)
-    assert.equal(messages[0].botId, ownBot)
+    assert.equal((await callMobile('/api/mobile/chat', { text: 'retired PAT message', botId: ownBot })).status, 410)
+    const messages = (await pool.query(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'='retired PAT message'`, [owner])).rows
+    assert.equal(messages.length, 0)
   })
-  await t.test('mobile photos are stored with the message and read back only by their sender', async () => {
+  await t.test('stored mobile photos can be read back only by their sender', async () => {
     // The smallest valid PNG (1×1), as the app sends a photo.
     const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
     const dataUrl = `data:image/png;base64,${png}`
     const callMobile = (path: string, body?: unknown) => fetch(`${origin}${path}`, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token.token}`, origin, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
-    assert.equal((await callMobile('/api/mobile/chat', { text: '', botId: ownBot, images: [{ dataUrl }] })).status, 202)
-    assert.equal((await callMobile('/api/mobile/chat', { text: '', botId: ownBot })).status, 400)
-    assert.equal((await callMobile('/api/mobile/chat', { text: 'not an image', botId: ownBot, images: [{ dataUrl: 'data:image/png;base64,AAAA' }] })).status, 400)
-    const [event] = (await pool.query(`SELECT payload FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND payload ? 'images'`, [owner, ownBot])).rows
-    assert.equal(event.payload.images[0].dataUrl, dataUrl)
     const own = randomUUID(), others = randomUUID()
     const photoMessage = { role: 'user', content: [{ type: 'text', text: '' }, { type: 'file', data: dataUrl, mediaType: 'image/png' }] }
     await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,$3,9001,$4),($5,$6,NULL,9001,$4)`, [own, owner, ownBot, photoMessage, others, member])
@@ -199,13 +192,28 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     currentHeaders = new Headers({ authorization: `Bearer ${token.token}` })
     assert.equal(await (await import('../lib/session')).getSession(), null)
   })
+  await t.test('audience: legacy tokens cannot enter v1; scoped tokens cannot enter legacy routes', async () => {
+    const { DEFAULT_API_SCOPES } = await import('../lib/tokens/format')
+    const legacy = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Legacy audience test' })
+    const v1 = await store.createPersonalAccessToken(owner, ws.id, { name: 'v1 audience test', scopes: DEFAULT_API_SCOPES })
+    const legacyHeaders = new Headers({ authorization: `Bearer ${legacy.token}` })
+    const v1Headers = new Headers({ authorization: `Bearer ${v1.token}` })
+    assert.equal(await getApiSession({ headers: legacyHeaders, audience: 'v1' }), null)
+    assert.equal(await getApiSession({ headers: v1Headers }), null)
+    assert.equal((await getApiSession({ headers: legacyHeaders }))?.tokenId, legacy.id)
+    const v1Session = await getApiSession({ headers: v1Headers, audience: 'v1' })
+    assert.equal(v1Session?.tokenId, v1.id)
+    assert.deepEqual(v1Session?.tokenScopes, [...DEFAULT_API_SCOPES])
+    assert.notEqual((await call(v1.token)).status, 200, 'a v1 token cannot use a legacy route')
+  })
+
   await t.test('bad, expired and revoked PATs fail and never fall back to a browser cookie', async () => {
     const before = cookieReads
     for (const invalid of ['mkp_invalid', 'mkp_' + 'A'.repeat(43)]) {
       assert.equal(await getApiSession({ headers: new Headers({ authorization: `Bearer ${invalid}`, cookie: 'valid-browser-cookie' }) }), null)
     }
     assert.equal(cookieReads, before)
-    const expired = await store.createPersonalAccessToken(owner, ws.id, { name: 'Expired API test' })
+    const expired = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Expired API test' })
     await pool.query('UPDATE personal_access_tokens SET "createdAt"=now()-interval \'2 minutes\', "expiresAt"=now()-interval \'1 minute\' WHERE id=$1', [expired.id])
     assert.equal((await call(expired.token)).status, 403)
     await store.revokePersonalAccessToken(owner, ws.id, { id: token.id })

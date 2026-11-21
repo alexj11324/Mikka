@@ -41,15 +41,16 @@ export function comparisonWindows(before, after, now = Date.now()) {
 }
 
 // Body follows the current Vercel CLI's canonical /metrics/v1 query; verified against live CPU/count aggregates.
-export function metricQuery(metric, aggregation, id, window) {
+export function metricQuery(id, window) {
   if (!/^dpl_[A-Za-z0-9]+$/.test(id)) fail('deployment_id_invalid')
   return { scope: SCOPE, timeRange: { start: iso(window.start), end: iso(window.end) }, bucketSeconds: 300,
     groupBy: ['route', 'httpStatus'], filter: `environment:production AND deploymentId:"${id}"`,
-    metrics: { value: { metric, aggregation } }, outputs: ['value'],
-    seriesSelection: { limit: GROUP_LIMIT, mode: 'exact', rankBy: [{ metric: 'value', direction: 'desc' }] } }
+    metrics: { requests: { metric: COUNT, aggregation: 'count' }, cpu: { metric: CPU, aggregation: 'sum' } },
+    outputs: ['requests', 'cpu'],
+    seriesSelection: { limit: GROUP_LIMIT, mode: 'exact', rankBy: [{ metric: 'requests', direction: 'desc' }] } }
 }
 
-export function metricRows(response, metric) {
+export function metricRows(response, metric, column = metric === COUNT ? 'requests' : 'cpu') {
   if (!Array.isArray(response?.summary) || response.summary.length >= GROUP_LIMIT) fail('metric_groups_missing_or_truncated')
   const rows = new Map()
   for (const point of response.summary) {
@@ -57,13 +58,33 @@ export function metricRows(response, metric) {
     // Only route templates and status codes leave the API boundary; never request paths or payloads.
     if (typeof row?.route !== 'string' || !/^\/[A-Za-z0-9_./[\]()-]{0,250}$/.test(row.route) ||
         !/^[1-5]\d\d$/.test(String(row.httpStatus))) fail('metric_dimensions_invalid')
-    const value = point.values?.value
+    const value = point.values?.[column]
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (metric === COUNT && !Number.isSafeInteger(value))) fail('metric_value_invalid')
     const key = JSON.stringify([row.route, String(row.httpStatus)])
     if (rows.has(key)) fail('metric_duplicate_group')
     rows.set(key, { route: row.route, httpStatus: String(row.httpStatus), value })
   }
   return rows
+}
+
+async function readWindowMetrics(read, id, window) {
+  const query = metricQuery(id, window)
+  let response
+  try {
+    response = await read('/metrics/v1', query)
+  } catch (error) {
+    // An API deployment that rejects multiple outputs can still qualify both
+    // measurements using the original independent, identically scoped reads.
+    if (!['vercel_api_http_400', 'vercel_api_http_422'].includes(error?.message)) throw error
+    const separate = await Promise.all(['cpu', 'requests'].map(async column => {
+      const single = { ...query, metrics: { value: query.metrics[column] }, outputs: ['value'],
+        seriesSelection: { ...query.seriesSelection, rankBy: [{ metric: 'value', direction: 'desc' }] } }
+      const result = await read('/metrics/v1', single)
+      return metricRows(result, query.metrics[column].metric, 'value')
+    }))
+    return { metrics: aggregate(...separate), queryMode: 'separate' }
+  }
+  return { metrics: aggregate(metricRows(response, CPU), metricRows(response, COUNT)), queryMode: 'combined' }
 }
 
 export function aggregate(cpu, counts) {
@@ -170,8 +191,7 @@ export async function run({ token, event = {}, eventName, now = Date.now(), fetc
     report.windows = windows
     const values = await Promise.all(['before', 'after'].map(async name => {
       const id = report.deployments[name].id, window = windows[name]
-      const [cpu, counts] = await Promise.all([read('/metrics/v1', metricQuery(CPU, 'sum', id, window)), read('/metrics/v1', metricQuery(COUNT, 'count', id, window))])
-      return aggregate(metricRows(cpu, CPU), metricRows(counts, COUNT))
+      return readWindowMetrics(read, id, window)
     }))
     // Re-read after queries so a deployment completed during the run cannot be silently accepted.
     const [latest, activeAfter, metadataAfter] = await Promise.all([
@@ -182,7 +202,8 @@ export async function run({ token, event = {}, eventName, now = Date.now(), fetc
     if ((latest.deployments?.[0]?.uid ?? latest.deployments?.[0]?.id) !== after.id ||
         activeAfter.deploymentId !== active.deploymentId || activeAfter.updatedAt !== active.updatedAt ||
         metadataAfter.sha !== after.sha || metadataAfter.assignedAt !== after.assignedAt) fail('deployment_changed_during_comparison')
-    Object.assign(report, compare(...values))
+    report.metricQueryMode = { before: values[0].queryMode, after: values[1].queryMode }
+    Object.assign(report, compare(values[0].metrics, values[1].metrics))
   } catch (error) {
     const code = error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : 'comparison_unavailable'
     report.status = 'insufficient'; report.reasons = [code]

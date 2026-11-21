@@ -11,6 +11,7 @@ import { MAX_IMAGES, pickImages, pickText, pickChatFile, uploadPickedFile, paste
 import { withChatFiles, CHAT_FILE_MAX_COUNT, type ChatFileScope } from '@mikka/protocol/chat-attachments'
 import { api } from '@/lib/api'
 import { tap } from '@/lib/haptics'
+import { mobileMessages } from '@/lib/messages'
 import { colors, font, plainColor } from '@/lib/theme'
 import { ChatAttachmentCard, ChatAttachmentPlus, useAttachmentCard } from './chat-attachment-card'
 import { cardAnchor } from '@/features/chat/model/chat-attachment-card'
@@ -20,11 +21,11 @@ import { cardAnchor } from '@/features/chat/model/chat-attachment-card'
  * its left when the chat takes attachments (`attach`). It rides on the
  * keyboard (react-native-keyboard-controller) and grows to six lines. Picked
  * photos and files wait as thumbnails above the field; each can be removed.
- * The text and attachments stay until `onSend` resolves true (the server took
+ * The text and attachments stay until `onSend` resolves true (the sender took
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, sendDisabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, sendDisabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope, onCaretChange }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -33,6 +34,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   sendDisabled?: boolean
   value?: string
   onChangeText?: (text: string) => void
+  onCaretChange?: (position: number) => void
   attach?: boolean
   attachmentScope?: ChatFileScope
   /** Float over the end of the list, the content fading out beneath it; `onHeight` reports its height so the list leaves room. */
@@ -57,6 +59,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const insets = useSafeAreaInsets()
   const [own, setOwn] = useState(initial)
   const [sending, setSending] = useState(false)
+  const sendLock = useRef(false)
   const [files, setFiles] = useState<Attachment[]>([])
   const [problem, setProblem] = useState<string | null>(null)
   const scopeKey = attachmentScope ? `${attachmentScope.kind}:${attachmentScope.id}` : ''
@@ -72,7 +75,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const sendBlocked = blocked || filesBlocked || empty || sendDisabled
   const quoted = (words: string) => quote ? `${quote.split('\n').map(line => `> ${line}`).join('\n')}\n\n${words}` : words
   const send = async () => {
-    if (sendBlocked) return
+    if (sendLock.current || sendBlocked) return
+    sendLock.current = true
     setSending(true)
     tap()
     try {
@@ -80,6 +84,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
       const ok = await onSend?.(withChatFiles(quoted(text.trim()), ready), files.filter(file => file.kind !== 'file'))
       if (ok !== false) { setText(''); setFiles([]); onClearQuote?.() }
     } finally {
+      sendLock.current = false
       setSending(false)
     }
   }
@@ -91,7 +96,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
       const uploaded = await uploadPickedFile(item, attachmentScope)
       if (currentScope.current === original) setFiles(list => list.map(file => file.key === item.key ? { ...item, uploaded, state: 'ready' } : file))
     } catch (error) {
-      const message = error instanceof Error && error.message === 'audioKeyRequired' ? '请先添加可用的 OpenAI API Key' : '上传失败'
+      const message = error instanceof Error && error.message === 'audioKeyRequired' ? mobileMessages.MobileCore.audioKeyRequired : mobileMessages.MobileCore.uploadFailed
       if (currentScope.current === original) setFiles(list => list.map(file => file.key === item.key ? { ...item, state: 'error', error: message } : file))
     }
   }
@@ -99,12 +104,17 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     if (blocked) return
     setProblem(null)
     try {
-      if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem('最多添加 10 个文件'); return }
+      if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem(mobileMessages.MobileCore.addFileLimit.replace('{count}', String(CHAT_FILE_MAX_COUNT))); return }
       if (source === 'file') {
-        if (attachmentScope) { const item = await pickChatFile(); if (item) void upload(item); return }
+        if (attachmentScope) {
+          const item = await pickChatFile()
+          if (typeof item === 'string') setProblem(mobileMessages.Shell.attachments.errors[item])
+          else if (item) void upload(item)
+          return
+        }
         const file = await pickText()
-        if (file === 'notText') setProblem('只能发文本文件')
-        else if (file === 'tooLong') setProblem('文件太长')
+        if (file === 'notText') setProblem(mobileMessages.MobileCore.textFilesOnly)
+        else if (file === 'tooLong') setProblem(mobileMessages.MobileCore.fileTooLong)
         else if (file) setFiles(list => [...list, file])
         return
       }
@@ -113,7 +123,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
         for (const photo of picked) if (photo.kind === 'image') void upload({ key: photo.key, kind: 'file', name: `photo-${photo.key}.jpg`, uri: photo.uri, mediaType: 'image/jpeg', size: Math.floor((photo.dataUrl.split(',')[1]?.length ?? 0) * 3 / 4), state: 'uploading' })
       } else if (picked) setFiles(list => [...list, ...picked])
     } catch {
-      setProblem('无法添加文件')
+      setProblem(mobileMessages.MobileCore.cannotAddFile)
     }
   }
   const card = useAttachmentCard()
@@ -126,7 +136,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     if (!composer || !plus) return
     composer.measureInWindow((cx, cy, _cw, ch) => plus.measureInWindow((px, py, _pw, ph) => card.setAnchor(cardAnchor({ x: px, y: py, height: ph }, { x: cx, y: cy, height: ch }))))
   }
-  const pasteImage = attachmentScope ? async (image: ClipboardImage) => { if (!blocked && files.length < CHAT_FILE_MAX_COUNT) { try { void upload(await pastedChatImage(image)) } catch { setProblem('无法粘贴图片') } } } : undefined
+  const pasteImage = attachmentScope ? async (image: ClipboardImage) => { if (!blocked && files.length < CHAT_FILE_MAX_COUNT) { try { void upload(await pastedChatImage(image)) } catch { setProblem(mobileMessages.MobileCore.cannotPasteImage) } } } : undefined
   return (
     <KeyboardStickyView offset={{ opened: Math.max(insets.bottom, 12) - 8 }} style={overlay ? styles.overlay : undefined}>
       <View ref={wrap} collapsable={false} onLayout={event => onHeight?.(event.nativeEvent.layout.height)} style={[styles.composerWrap, overlay && fade(scheme), { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -135,9 +145,9 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {files.map(file => (
               <View key={file.key} style={file.kind === 'image' ? styles.thumb : styles.fileChip}>
                 {file.kind === 'image'
-                  ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel="照片" />
-                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? '上传中' : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={`重试上传 ${file.name}`} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} style={styles.attachmentAction} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
-                <Pressable accessibilityRole="button" accessibilityLabel={file.kind === 'image' ? '移除照片' : `移除 ${file.name}`} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
+                  ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel={mobileMessages.MobileCore.photo} />
+                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? mobileMessages.MobileCore.uploading : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.retryUpload.replace('{name}', file.name)} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} style={styles.attachmentAction} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
+                <Pressable accessibilityRole="button" accessibilityLabel={file.kind === 'image' ? mobileMessages.MobileCore.removePhoto : mobileMessages.MobileCore.removeFile.replace('{name}', file.name)} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
                   <View style={styles.removeMark}><X size={12} color={colors.onInk} strokeWidth={3} /></View>
                 </Pressable>
               </View>
@@ -151,23 +161,23 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
           {quote ? (
             <View style={styles.quote}>
               <Text style={styles.quoteText} numberOfLines={1}>{quote.replace(/\s+/g, ' ')}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="取消引用" style={styles.attachmentAction} onPress={onClearQuote}>
+              <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.clearQuote} style={styles.attachmentAction} onPress={onClearQuote}>
                 <X size={16} color={colors.secondary} strokeWidth={2.2} />
               </Pressable>
             </View>
           ) : null}
-          <TextInput ref={input} accessibilityLabel={placeholder} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
+          <TextInput ref={input} accessibilityLabel={placeholder} value={text} onSelectionChange={onCaretChange ? event => onCaretChange(event.nativeEvent.selection.end) : undefined} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
             placeholderTextColor={colors.secondary} style={[styles.input, sending && { color: colors.secondary }]} />
           <View style={styles.fieldRow}>
             {attach ? <ChatAttachmentPlus ref={card.plus} progress={card.progress} disabled={blocked} onPress={openCard} /> : null}
             {accessory}
             <View style={{ flex: 1 }} />
             {onStop && empty && !sending ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="停止" hitSlop={4} onPress={() => { tap(); onStop() }} style={styles.send}>
+              <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.stop} hitSlop={4} onPress={() => { tap(); onStop() }} style={styles.send}>
                 <Square size={12} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="发送" hitSlop={4} accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
+              <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.Coordinator.send} hitSlop={4} accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
                 style={[styles.send, sendBlocked && { backgroundColor: colors.tertiary }]}>
                 <ArrowUp size={17} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
@@ -185,7 +195,9 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
 /** The composer's fade over the end of the list, in the page's colour for the scheme (a CSS gradient takes no system colour). */
 function fade(scheme: 'light' | 'dark') {
   const page = plainColor('page', scheme)
-  return { paddingTop: 28, backgroundImage: `linear-gradient(to bottom, ${page}00 0%, ${page}D9 45%, ${page}F7 100%)` }
+  // Finish the fade inside the empty top inset, including when the tray or input grows.
+  const paddingTop = 28
+  return { paddingTop, backgroundImage: `linear-gradient(to bottom, ${page}00 0px, ${page} ${paddingTop}px)` }
 }
 
 

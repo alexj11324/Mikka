@@ -7,7 +7,7 @@ import { setTimeout as pause } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { orderMigrations } from '../scripts/migration-order.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 
 const target = process.env.E2E_DATABASE_URL
 const allowed = !!target && disposableDatabase(process.env, target)
@@ -18,7 +18,7 @@ const code = (error: unknown): string | undefined => error && typeof error === '
 test('background Factory transactions use persisted tenants before the APP pool and preserve native device authority', { skip: !allowed, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: target, max: 1 })
   const database = 'factory_background_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const isolated = new URL(target!); isolated.pathname = '/' + database
   const url = isolated.toString()
   // Independent control transactions orchestrate two real blocking writers and
@@ -199,6 +199,39 @@ test('background Factory transactions use persisted tenants before the APP pool 
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
+  await t.test('an existing Factory APP transaction rechecks current Enterprise policy without another checkout', async () => {
+    const organizationId = randomUUID(), sessionId = randomUUID()
+    const { enterprisePrincipal } = await import('../lib/enterprise/principal')
+    const reader = { id: owner, [tokenWorkspace]: alpha, [enterprisePrincipal]: { kind: 'session' as const, sessionId } }
+    await controls.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Background borrow fixture\',$2)', [organizationId, owner])
+    await controls.query('INSERT INTO mikka_organization_workspaces("organizationId","workspaceId") VALUES($1,$2)', [organizationId, alpha])
+    await controls.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,false,false)', [organizationId])
+    await controls.query('INSERT INTO session(id,token,"userId","expiresAt","createdAt","updatedAt") VALUES($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, randomUUID(), owner])
+    const before = await state()
+    try {
+      await actAs(reader, () => withProjectResourceLease(reader, alpha, async () => {
+        const tx = await pool.connect()
+        try {
+          await beginFactoryTransaction(tx)
+          assert.equal((await runtime.store.route(owner, a.input, tx)).task.id, a.task.id)
+          await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+          await assert.rejects(runtime.store.route(owner, a.input, tx), error => code(error) === 'factoryNotFound')
+          registerFactoryProfile(tx, { ownerId: owner, workspaceId: alpha })
+          await assert.rejects(commitFactoryTransaction(tx), error => code(error) === 'agentProfileScopeNotFound'
+            && !!error && typeof error === 'object' && 'cause' in error && code(error.cause) === 'workspaceAccessDenied')
+        } finally { await rollbackFactoryTransaction(tx); forgetFactoryTransaction(tx); tx.release() }
+      }))
+      assert.deepEqual(await state(), before, 'denied continuation and COMMIT leave no Factory effects')
+      assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+      assert.equal(app.waitingCount, 0)
+    } finally {
+      await controls.query('DELETE FROM session WHERE id=$1', [sessionId])
+      await controls.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organization_workspaces WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
+    }
+  })
+
   await t.test('membership suspension waits for a background write commit and later operations have no side effects', async () => {
     const f = await fixture(alpha, alphaBot)
     const blocker = await controls.connect()
@@ -265,7 +298,7 @@ test('background Factory transactions use persisted tenants before the APP pool 
   })
 
   const deviceId = randomUUID()
-  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt") VALUES($1,$2,\'Background local fixture\',\'local\',true,3,now())', [deviceId, owner])
+  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Background local fixture\',\'local\',true,3,now(),now())', [deviceId, owner])
   const run = async (workspaceId: string | null) => {
     const id = randomUUID()
     await controls.query('INSERT INTO agent_runs(id,"userId","workspaceId","agentId","deviceId",status,prompt) VALUES($1,$2,$3,$4,$5,\'queued\',\'Synthetic claim; no executor\')', [id, owner, workspaceId, agentId, deviceId])

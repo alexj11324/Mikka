@@ -4,10 +4,11 @@ const sources = new Map([
   ['server-only', 'export {}'],
   ['next/headers', 'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}'],
   ['next/server', 'export function after(){throw new Error("unexpected background dispatch")}'],
-  ['next-intl/server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
+  ['@/lib/intl/i18n-server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
 ])
 const files = new Map([
-  ['/lib/acting-user.ts', 'export async function currentUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export function actAs(_id,fn){return fn()}'],
+  ['/lib/server-runtime/headers.ts', 'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}'],
+  ['/lib/acting-user.ts', 'export async function currentUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export async function requireUser(){return currentUser()};export function actAs(_id,fn){return fn()}'],
   ['/lib/issue-access.ts', 'export async function requireUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export async function requireIssueAccess(id){return {issue:{id,userId:globalThis.scopeActionProbe.issueOwner},user:{id:"owner"}}};export {requireIssueAccess as requireIssueAccessWithoutBody};export async function issueForUser(){return null}'],
   ['/lib/issue-scope-store.ts', 'export async function changeIssueScopeLocally(){globalThis.scopeActionProbe.writes++;return {error:"unexpected"}};export async function previewPersonalScope(){throw new Error("unexpected preview")}'],
   ['/lib/linear-sync/dispatch.ts', 'export function dispatchLinearIssueSync(){globalThis.scopeActionProbe.dispatch++};export function dispatchLinearWork(){}'],

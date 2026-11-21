@@ -1,18 +1,19 @@
 'use server'
 
 import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
-import { db } from '@/lib/db'
+import { db, withDatabaseTransaction } from '@/lib/db'
 import { issueListChanged } from '@/lib/live/lists'
+import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 import { issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
-import { readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
+import { issueRestoreDeadline, readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { createsIssueCycle } from '@/lib/issue-relations'
 import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
@@ -45,7 +46,7 @@ type ConnectionAccess = { issue: Pick<typeof issues.$inferSelect, 'id' | 'userId
   user: Awaited<ReturnType<typeof requireIssueAccess>>['user']; teamId: string | null }
 async function issueConnections(id: string, reach: 'linked' | 'all', known?: ConnectionAccess) {
   const { issue, user, teamId } = known ?? await requireIssueAccessWithoutBody(id, { projection: 'lock' })
-  return db.transaction(async tx => {
+  return db.transaction(tx => withDatabaseTransaction(tx, async () => {
   const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
@@ -75,7 +76,7 @@ async function issueConnections(id: string, reach: 'linked' | 'all', known?: Con
       number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })), tx, knownTeams)
     : new Map<string, string | null>()
   return live.map(({ content, issuedIdentifier: _issuedIdentifier, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
-  })
+  }))
 }
 
 export async function updateIssueRelation(input: z.input<typeof relationSchema>) {
@@ -140,6 +141,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         for (const [id, patch] of patches) {
           const row = rows.find(row => row.id === id)!
           const [saved] = await tx.update(issues).set({ content: withIssueMetadata(row.content, patch.metadata), status: patch.status ?? row.status, revision: row.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).returning()
+          reviewTaskChanged(tx, row, saved)
           await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: issue.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
           await issueListChanged(tx, saved.id)
           if (id === current.id) savedCurrent = saved
@@ -229,7 +231,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         // All copies become private before this transaction can commit. A new
         // child intersects the source Task; a duplicated root retains its
         // source ancestor, including a Private Project or Task parent.
-        await tx.execute(sql`update resource_access_policies p set visibility=${child ? 'shared' : 'private'},
+        await tx.execute(sql`update resource_access_policies p set visibility=${child && workspace.kind === 'team' ? 'shared' : 'private'},
           "parentKind"=case when v."parentId" is not null then 'task' else s."parentKind" end,
           "parentId"=coalesce(v."parentId",s."parentId")
           from jsonb_to_recordset(${JSON.stringify(policies)}::jsonb) v(id uuid,"parentId" uuid),resource_access_policies s
@@ -246,9 +248,9 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
   })
 }
 
-export async function toggleIssuePreference(input: { id: string; kind: 'favorite' | 'subscribe' }) {
+export async function toggleIssuePreference(input: { id: string; kind: 'favorite' | 'subscribe'; enabled?: boolean }) {
   return runAction(async () => {
-    const parsed = z.object({ id: z.uuid(), kind: z.enum(['favorite', 'subscribe']) }).safeParse(input)
+    const parsed = z.object({ id: z.uuid(), kind: z.enum(['favorite', 'subscribe']), enabled: z.boolean().optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueOperationInvalid' }
     const { issue, user } = await requireIssueAccess(input.id)
     try {
@@ -259,7 +261,10 @@ export async function toggleIssuePreference(input: { id: string; kind: 'favorite
         const metadata = readIssueMetadata(latest.content)
         const key = input.kind === 'favorite' ? 'favoriteUserIds' : 'subscriberUserIds'
         const ids = metadata[key]
-        metadata[key] = ids.includes(user.id) ? ids.filter(id => id !== user.id) : [...ids, user.id]
+        const current = ids.includes(user.id)
+        const enabled = parsed.data.enabled ?? !current
+        if (current === enabled) return { issue: await issueView(latest, tx) }
+        metadata[key] = enabled ? [...ids, user.id] : ids.filter(id => id !== user.id)
         if (metadata[key].length > 200) return { error: 'issuePreferenceLimit' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, metadata), revision: latest.revision + 1 }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).returning()
         await issueListChanged(tx, saved.id)
@@ -277,7 +282,8 @@ export async function getDeletedIssue(id: string) {
     const { issue, user } = await requireIssueAccess(id, true)
     await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     const deletedAt = readIssueMetadata(issue.content).deletedAt
-    return issue.userId === user.id && deletedAt ? { id: issue.id, title: issue.title, deletedAt } : null
+    if (issue.userId !== user.id || !deletedAt) return null
+    return { id: issue.id, title: issue.title, deletedAt, canRestore: Date.now() <= issueRestoreDeadline(deletedAt) }
   } catch { return null }
 }
 
@@ -293,12 +299,15 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
         if (!latest || (!input.restore && latest.revision !== input.revision)) return { error: 'issueOutdated' }
         const metadata = readIssueMetadata(latest.content)
-        if (input.restore && metadata.deletedAt && Date.now() - new Date(metadata.deletedAt).getTime() > 30 * 86400000) return { error: 'issueRestoreWindow' }
+        if (input.restore && metadata.deletedAt && Date.now() > issueRestoreDeadline(metadata.deletedAt)) return { error: 'issueRestoreWindow' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
+        reviewTaskChanged(tx, latest, saved)
         await issueListChanged(tx, saved.id, true)
         await issueRelationsChanged(tx, [saved.id])
         return { issue: await issueView(saved, tx) }
       }))
+      // A deleted task's running work stops now; nothing rechecks it later (decision 2026-11-17-2215).
+      if (!input.restore && 'issue' in result) await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ issueId: issue.id })
       if (input.restore && 'issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(issue.id)
       return result
     } catch (error) {

@@ -332,7 +332,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     const original = await fixture()
     const pending = await advance(original, await followup(original, 'Continue only while this workspace membership remains active'))
     const deviceId = randomUUID(), childId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES ($1,$2,'Watchdog commit fixture','local',true,now())`, [deviceId, owner])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES ($1,$2,'Watchdog commit fixture','local',true,now(),now())`, [deviceId, owner])
     await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
     await seedAllowedModel(pool, owner, { workspaceId: workspace.id, deviceIds: [deviceId] })
     await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [pending.id])
@@ -410,5 +410,60 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
       if (sweeping) await Promise.allSettled([sweeping])
       await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
     }
+  })
+
+  await t.test('2257 owner interrupt keeps its exact superseded run cancelled when a heartbeat revocation arrives first', async group => {
+    const { persistRunCompletion } = await import('../run-publications')
+    const device = randomUUID()
+    await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled) VALUES($1,$2,'epoch daemon','local',true)`, [device, owner])
+    const active = async () => {
+      const original = await fixture()
+      await pool.query(`UPDATE factory_tasks SET status='running' WHERE id=$1`, [original.id])
+      await pool.query(`UPDATE factory_attempts SET status='running',"finishedAt"=NULL WHERE id=$1`, [original.attemptId])
+      await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"finishedAt"=NULL,
+        "workspaceId"=$2,"deviceId"=$3,"leaseExpiresAt"=now()+interval '90 seconds' WHERE id=$1`, [original.runId, workspace.id, device])
+      return original
+    }
+    const terminal = async (id: string) => (await pool.query(`SELECT status,"stopReason","finishedAt" FROM agent_runs WHERE id=$1`, [id])).rows[0]
+    const superseded = await active()
+    const event = await followup(superseded, 'Stop this attempt and use a different input.')
+    const next = await advance(superseded, event)
+    assert.notEqual(next.attemptId, superseded.attemptId)
+    assert.equal(await persistRunCompletion(owner, superseded.runId, { stopReason: 'device_lost' }, randomUUID()), null)
+    assert.equal((await terminal(superseded.runId)).status, 'running')
+    await persistRunCompletion(owner, superseded.runId, { stopReason: 'device_lost' }, device)
+    const receipt = await terminal(superseded.runId)
+    assert.deepEqual([receipt.status, receipt.stopReason], ['cancelled', 'cancelled'])
+    await persistRunCompletion(owner, superseded.runId, { stopReason: 'device_lost' }, device)
+    assert.deepEqual(await terminal(superseded.runId), receipt)
+    const ordinary = await active()
+    // A stop flag alone also covers device and policy revocation.
+    await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1`, [ordinary.runId])
+    await persistRunCompletion(owner, ordinary.runId, { stopReason: 'device_lost' }, device)
+    const lost = await terminal(ordinary.runId)
+    assert.deepEqual([lost.status, lost.stopReason], ['failed', 'device_lost'])
+    const { revokeDeviceCredential } = await import('../device-revocation')
+    for (const path of ['audited', 'rotated'] as const) await group.test(`recorded ${path} claim credential still reports device loss`, async () => {
+      const revoked = await active()
+      const tokenId = randomUUID()
+      await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId") VALUES($1,$2,$3,$4,$5)`,
+        [tokenId, owner, randomUUID(), device, workspace.id])
+      await pool.query(`UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1`, [revoked.runId, tokenId])
+      try {
+        await advance(revoked, await followup(revoked, 'Replace this request before its claim credential is revoked.'))
+        if (path === 'audited') assert.ok(await revokeDeviceCredential(pool, owner, tokenId))
+        else {
+          // Cloud device rotation and release retire the token directly without creating an audit row.
+          await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1 AND "boundDeviceId"=$2', [tokenId, device])
+          assert.equal((await pool.query('SELECT 1 FROM device_credential_revocations WHERE "tokenId"=$1', [tokenId])).rowCount, 0)
+        }
+        await persistRunCompletion(owner, revoked.runId, { stopReason: 'device_lost' }, device)
+        const refused = await terminal(revoked.runId)
+        assert.deepEqual([refused.status, refused.stopReason], ['failed', 'device_lost'])
+      } finally {
+        await pool.query('DELETE FROM device_credential_revocations WHERE "tokenId"=$1', [tokenId])
+        await pool.query('DELETE FROM device_tokens WHERE id=$1', [tokenId])
+      }
+    })
   })
 })

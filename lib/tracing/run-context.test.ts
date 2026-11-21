@@ -26,7 +26,7 @@ test('request, deferred job, durable queue carrier and remote run share ancestry
     request.finish(200)
     await runJob('after:coordinator-wake', 'background', async () => {
       propagation.inject(context.active(), carrier)
-    }, { detach: true })
+    })
   })
   assert.ok(carrier.traceparent)
   assert.equal(carrier.baggage, undefined)

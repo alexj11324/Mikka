@@ -7,8 +7,6 @@ import { readComputerEvents } from '@/lib/computer/event-log'
 import { withRequestLog } from '@/lib/request-log'
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 const headers = { 'cache-control': 'private, no-store' }
 
 /** Browser notifications contain no data; each incremental read authorizes again. */

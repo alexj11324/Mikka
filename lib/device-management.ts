@@ -14,6 +14,15 @@ export async function enqueueDeviceCommand(userId: string, deviceId: string, kin
   return id
 }
 export async function pendingDeviceCommands(deviceId: string, completed: string[], failed: { id: string; error: string }[] = []) {
+  // With no receipts this is one read: removal state and the pending command
+  // share a snapshot. Acknowledgements and credential revocation stay below.
+  if (!completed.length && !failed.length) {
+    const { rows } = await pool.query<{ id: string; kind: DeviceCommandKind }>(`SELECT c.id,c.kind
+      FROM devices d JOIN device_management_commands c ON c."deviceId"=d.id
+      WHERE d.id=$1 AND c."completedAt" IS NULL AND (d."removedAt" IS NULL OR c.kind='uninstall')
+      ORDER BY c."createdAt" LIMIT 1`, [deviceId])
+    return rows
+  }
   const connection = await pool.connect()
   try {
     await connection.query('BEGIN')

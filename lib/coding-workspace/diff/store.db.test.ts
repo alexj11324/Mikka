@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { gunzipSync } from 'node:zlib'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../../db/commit-effects'
 import { runAssignmentSchema } from '@mikka/protocol'
 import { runCheckpointReceiptSchema, SOURCE_DAEMON_VERSION, type RunCheckpoint } from '@mikka/protocol/device'
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
@@ -20,7 +21,7 @@ import { takeCheckpoint } from '../../../packages/daemon/src/agents/checkpoint'
 import type { JournalEntry } from '../../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import type { ReviewActor } from './authority'
 
 const url = process.env.E2E_DATABASE_URL
@@ -40,9 +41,10 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
   const database = `coding_workspace_diff_${randomUUID().replaceAll('-', '')}_e2e`
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'Diff storage acceptance requires PostgreSQL 17')
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8, connectionTimeoutMillis: 5000 })
+  observePoolCommits(pool)
   const root = await mkdtemp(join(tmpdir(), 'mikka-diff-store-db-'))
   const environment = {
     MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(), E2E_DATABASE_URL: target.toString(),
@@ -55,10 +57,10 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
     const directory = new URL('../../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, directory), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { resolveReviewScope, withReviewTransaction } = await import('./authority')
     const { manifestRevision, retainDiffSnapshot, readDiffSnapshot, latestDiffSnapshot, readDiffFilePage, readStoredDiffFile, retainDiffFilePatch } = await import('./store')
@@ -228,7 +230,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       { selection: { source: 'checkpoint' } })
     const postCheckpoint = (f: CheckpointFixture, checkpoint: RunCheckpoint, token: string | null = f.token) => checkpointPOST(
       new Request(`http://127.0.0.1:3199/v1/runs/${f.runId}/checkpoint`, { method: 'POST',
-        headers: { 'content-type': 'application/json', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION,
+        headers: { 'content-type': 'application/json', 'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION,
           ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(checkpoint) }),
       { params: Promise.resolve({ runId: f.runId }) })
     async function acknowledgeCheckpoint(f: CheckpointFixture, checkpoint: RunCheckpoint, token = f.token) {

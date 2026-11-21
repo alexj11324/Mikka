@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
-import { frontendRuntimeSource } from '../apps/frontend/scripts/frontend-runtime.mjs'
+import { applicationPlugin } from '../apps/frontend/scripts/application-plugin.mjs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { FIRST_TOUCH_COOKIE, firstTouchFromPage, firstTouchCookieHeader, parseFirstTouch, rememberFirstTouch } from '../lib/first-touch.mjs'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
@@ -45,13 +45,76 @@ test('automatic top-level person mutations are stripped without losing ingestion
   })
 })
 
-test('unknown events and raw exception events never pass the allowlist', () => {
-  for (const event of ['$exception', '$autocapture', 'unknown']) {
+test('unknown events never pass the allowlist, and an exception without a usable entry is dropped', () => {
+  for (const event of ['$autocapture', '$exception_steps', 'unknown']) {
     assert.equal(sanitizeAnalyticsEvent({ event, properties: {} }), null)
+  }
+  for (const properties of [{}, { $exception_list: 'private' }, { $exception_list: ['private'] }, { $exception_list: [null] }]) {
+    assert.equal(sanitizeAnalyticsEvent({ event: '$exception', properties }), null)
   }
   assert.equal(sanitizeAnalyticsEvent(null), null)
   assert.deepEqual(sanitizeAnalyticsEvent({ event: '$pageview', properties: { $current_url: 'not a url' } }).properties, {})
   assert.deepEqual(sanitizeAnalyticsEvent({ event: 'mikka_team_created', properties: { name: 'private' } }).properties, {})
+})
+
+test('an exception keeps its type, a scrubbed message and only the in-app stack', () => {
+  const event = sanitizeAnalyticsEvent({
+    event: '$exception', uuid: 'event-id',
+    properties: {
+      token: 'public-project-token', distinct_id: 'opaque-user-id', $session_id: 'session', $browser_type: 'browser',
+      $current_url: 'https://example.com/documents/01234567-89ab-cdef-0123-456789abcdef?email=private@example.com#secret',
+      $exception_level: 'error',
+      $exception_list: [{
+        type: 'TypeError',
+        value: "Cannot read 'segment' of undefined for bob@example.com from 10.1.2.3 at /Users/alex/Desktop/vibe/Mikka — token=PRIVATE_MESSAGE_CANARY",
+        mechanism: { type: 'onunhandledrejection', handled: false, synthetic: false, syntheticException: new Error('PRIVATE_MECHANISM_CANARY') },
+        stacktrace: { type: 'raw', frames: [
+          { platform: 'web:javascript', filename: 'https://app.aspectlylabs.com/mikka/assets/index-abc.js?token=private#frag', function: 'renderReader', in_app: true, lineno: 12, colno: 340, chunk_id: 'private', module: 'private' },
+          { platform: 'web:javascript', filename: 'file:///Users/alex/Desktop/vibe/Mikka/apps/frontend/src/index.tsx', function: 'boot', in_app: true, lineno: 3, colno: 4, private: 'PRIVATE_FRAME_CANARY' },
+          { platform: 'web:javascript', filename: 'chrome-extension://abcdef/private.js', function: 'injected', in_app: false, lineno: 1, colno: 2 },
+          { platform: 'web:javascript', filename: 'https://cdn.example.com/vendor.js', function: 'vendor', in_app: false, lineno: 9, colno: 9 },
+        ] },
+      }],
+      $exception_steps: [{ message: 'PRIVATE_BREADCRUMB_CANARY' }],
+      $sentry_event_id: 'PRIVATE_SENTRY_CANARY',
+      $set: { email: 'private@example.com' },
+    },
+    $set_once: { $initial_current_url: 'https://example.com/?token=private' },
+  })
+  assert.equal(JSON.stringify(event).includes('PRIVATE_'), false)
+  assert.equal(JSON.stringify(event).includes('private@example.com'), false)
+  assert.deepEqual(event, {
+    event: '$exception', uuid: 'event-id',
+    properties: {
+      token: 'public-project-token', distinct_id: 'opaque-user-id', $session_id: 'session', $browser_type: 'browser',
+      $current_url: 'https://example.com/documents/:id', $pathname: '/documents/:id',
+      $exception_level: 'error',
+      $exception_list: [{
+        type: 'TypeError',
+        value: "Cannot read 'segment' of undefined for [email] from [ip] at [home] — token=[redacted]",
+        mechanism: { type: 'onunhandledrejection', handled: false, synthetic: false },
+        stacktrace: { type: 'raw', frames: [
+          { platform: 'web:javascript', in_app: true, filename: 'https://app.aspectlylabs.com/mikka/assets/index-abc.js', function: 'renderReader', lineno: 12, colno: 340 },
+          { platform: 'web:javascript', in_app: true, filename: 'file://[home]', function: 'boot', lineno: 3, colno: 4 },
+        ] },
+      }],
+    },
+  })
+  const unnamed = sanitizeAnalyticsEvent({ event: '$exception', properties: { $exception_list: [{ type: 42, value: 'boom' }], $browser_type: 'private' } })
+  assert.deepEqual(unnamed.properties, { $exception_list: [{ type: 'Error', value: 'boom', mechanism: { type: 'generic', handled: true, synthetic: false } }] })
+})
+
+test('an exception message never carries a token or a path back to the user', () => {
+  const message = value => sanitizeAnalyticsEvent({ event: '$exception', properties: { $exception_list: [{ type: 'Error', value }] } }).properties.$exception_list[0].value
+  assert.equal(message('Authorization: Bearer PRIVATE_CANARY_TOKEN'), 'Authorization: Bearer [redacted]')
+  assert.equal(message('POST /api/x failed: token=PRIVATE_CANARY_TOKEN'), 'POST /api/x failed: token=[redacted]')
+  assert.equal(message('api_key: PRIVATE_CANARY_TOKEN'), 'api_key: [redacted]')
+  assert.equal(message('upload of sk-PRIVATE-CANARY-TOKEN failed'), 'upload of [redacted] failed')
+  assert.equal(message(`invalid ${['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0', 'PRIVATE_CANARY_TOKEN'].join('.')}`), 'invalid [redacted]')
+  assert.equal(message('fetch https://api.example.com/v1/x?token=private#frag failed'), 'fetch https://api.example.com/v1/x failed')
+  assert.equal(message('cannot read /Users/alex/Desktop/vibe/Mikka/private.txt'), 'cannot read [home]')
+  assert.equal(message('from bob@example.com at 10.1.2.3'), 'from [email] at [ip]')
+  assert.equal(message(undefined), 'Error')
 })
 
 test('masked replay keeps only its transport payload and cannot mutate a person', () => {
@@ -64,6 +127,29 @@ test('masked replay keeps only its transport payload and cannot mutate a person'
   assert.match(source, /maskAllElementAttributes: true/)
   assert.match(source, /recordHeaders: false/)
   assert.match(source, /recordBody: false/)
+})
+
+test('SDK browser classification keeps only bot or browser on normal events and masked Replay', () => {
+  const payload = [{ type: 2, data: { node: { textContent: '***' } } }]
+  for (const event of ['$pageview', '$snapshot']) {
+    for (const browserType of ['bot', 'browser']) {
+      const properties = { $browser_type: browserType, $session_id: 'session', $raw_user_agent: 'PRIVATE_UA_CANARY',
+        userAgent: 'PRIVATE_UA_CANARY', private: 'PRIVATE_CLASSIFICATION_CANARY',
+        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) }
+      const sanitized = sanitizeAnalyticsEvent({ event, properties })
+      assert.deepEqual(sanitized.properties, { $browser_type: browserType, $session_id: 'session',
+        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) })
+      if (event === '$snapshot') assert.equal(sanitized.properties.$snapshot_data, payload)
+      assert.equal(JSON.stringify(sanitized).includes('PRIVATE_'), false)
+    }
+    for (const value of [undefined, null, true, 1, 'BOT', 'human', 'bot ', 'private@example.invalid', 'x'.repeat(4096), { type: 'bot' }]) {
+      const sanitized = sanitizeAnalyticsEvent({ event, properties: { $browser_type: value } })
+      assert.equal(Object.hasOwn(sanitized.properties, '$browser_type'), false)
+      assert.deepEqual(sanitized.properties, {})
+    }
+  }
+  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', properties: { $browser_type: 'bot' } }), null)
+  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', get properties() { throw new Error('PRIVATE_CLASSIFICATION_CANARY') } }), null)
 })
 
 test('all upcoming features fail closed, even if the remote switch is accidentally enabled', () => {
@@ -98,22 +184,24 @@ test('the 电脑 tab has its own kill switch, apart from the cloud computer roll
   assert.match(hook, /export function useComputerTab\(\)[\s\S]*?killSwitches\.computerTab[\s\S]*?!== true/)
 })
 
-test('the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker', () => {
+test('the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker', async () => {
   const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
   assert.match(source('apps/frontend/src/index.tsx'), /import 'mikka:frontend-runtime'[\s\S]*await import\('\.\.\/\.\.\/desktop\/src\/renderer\/index'\)/)
-  const plugin = source('apps/frontend/scripts/application-plugin.mjs')
-  assert.match(plugin, /import \{ frontendRuntimeSource \} from '\.\/frontend-runtime\.mjs'/)
-  assert.match(plugin, /if \(id === '\\0mikka:frontend-runtime'\) \{\s*return frontendRuntimeSource\(target, \{ development, frontend, renderer \}\)/)
-  const frontend = fileURLToPath(new URL('../apps/frontend', import.meta.url))
-  const renderer = fileURLToPath(new URL('../apps/desktop/src/renderer', import.meta.url))
+  const plugin = await applicationPlugin('web')
+  const runtimeId = await plugin.resolveId('mikka:frontend-runtime')
+  const entry = fileURLToPath(new URL('../apps/frontend/src/web/runtime.ts', import.meta.url))
   for (const development of [false, true]) {
-    const code = frontendRuntimeSource('web', { development, frontend, renderer })
-    const prefix = development ? 'globalThis[Symbol.for("openui.devtools.autoMount")] = true;\n' : ''
-    assert.equal(code, `${prefix}import ${JSON.stringify(join(frontend, 'src/web/runtime.ts'))};\n`)
+    plugin.configResolved({ command: development ? 'serve' : 'build' })
+    const code = await plugin.load(runtimeId)
+    assert.ok(code.split('\n').includes(`import ${JSON.stringify(entry)};`))
+    assert.equal(code.includes('globalThis[Symbol.for("openui.devtools.autoMount")] = true;'), development)
   }
   assert.match(source('apps/frontend/src/web/runtime.ts'), /import '@\/instrumentation-client'/)
   assert.match(source('instrumentation-client.ts'), /posthog\.init\(posthogConfig\.token/)
   assert.match(source('instrumentation-client.ts'), /capture_pageview: false/)
+  assert.match(source('instrumentation-client.ts'), /capture_unhandled_errors: true/)
+  assert.match(source('instrumentation-client.ts'), /capture_unhandled_rejections: true/)
+  assert.match(source('instrumentation-client.ts'), /capture_console_errors: false/)
   assert.match(source('apps/desktop/src/renderer/app.tsx'), /<PlatformExtras \/>/)
   assert.match(source('apps/frontend/src/web/platform.tsx'), /posthogConfig\.token && <PostHogAnalytics \/>/)
 })

@@ -1,20 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
 import { build } from 'esbuild'
 import { Window } from 'happy-dom'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { actionReferences, actionSignatures, applicationBoundary, usedActionImports } from './build-renderer.mjs'
+import { actionReferences, actionSignatures } from './renderer-transforms.mjs'
+import { compileApplication } from '../../frontend/scripts/application-test-build.mjs'
 
 const repository = fileURLToPath(new URL('../../..', import.meta.url))
 const renderer = join(repository, 'apps/desktop/src/renderer')
 let imports = 0
-async function moduleFrom({ entry, source, plugins = [] }) {
+async function moduleFrom({ entry, source }) {
   const result = await build({
     absWorkingDir: repository, ...(entry ? { entryPoints: [join(renderer, entry)] } : { stdin: { contents: source, sourcefile: 'renderer-contract-test.ts', resolveDir: repository, loader: 'ts' } }),
     write: false, bundle: true, format: 'esm', platform: 'browser', target: 'es2023',
     tsconfig: join(repository, 'apps/desktop/tsconfig.renderer.json'),
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' }, plugins,
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' },
   })
   return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}#${++imports}`)
 }
@@ -60,27 +62,16 @@ test('local routing preserves workspace history state, locale, query and fragmen
   assert.deepEqual(external, ['https://example.test/help'])
 }))
 
-test('generated action stubs preserve declaration arity, including SWR zero-argument fetchers', () => browser(async window => {
+test('action signatures preserve declaration arity and reject synchronous exports', () => {
   assert.deepEqual(actionSignatures('export async function zero() {}\nexport async function one(value?: string) {}\nexport async function rest(...values: string[]) {}', 'actions.ts'), [
     { name: 'zero', arity: 0, rest: false }, { name: 'one', arity: 1, rest: false }, { name: 'rest', arity: 1, rest: true },
   ])
   assert.throws(() => actionSignatures('export function sync() {}', 'actions.ts'), /must be async/)
-  const requests = []
-  globalThis.fetch = async (_path, init) => {
-    requests.push(JSON.parse(init.body))
-    return Response.json({ version: 1, ok: true, result: [] })
-  }
-  window.mikka = {}
-  const actions = await moduleFrom({ source: 'export { listProjects, listWorkspaceProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts";', plugins: [applicationBoundary(new Map())] })
-  await actions.listProjects('SWR cache key')
-  const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
-  await actions.listWorkspaceProjects(workspace, 'extra ignored argument')
-  await actions.getArtifact('artifact-id', 'extra ignored argument')
-  assert.deepEqual(requests.map(request => [request.action, request.args]), [['projects.listProjects', []], ['projects.listWorkspaceProjects', [workspace]], ['artifacts.getArtifact', ['artifact-id']]])
-}))
+})
 
-test('action inventory includes the actual billing re-export chain and excludes type-only aliases', async () => {
-  assert.deepEqual(await usedActionImports(['lib/billing/verification-client.ts']), [
+test('action references include the actual billing re-exports and exclude type-only aliases', async () => {
+  const filename = join(repository, 'lib/billing/verification-client.ts')
+  assert.deepEqual(actionReferences(await readFile(filename, 'utf8'), filename), [
     'billing.cardVerificationStatus', 'billing.getHostedUsage', 'billing.startCardVerification', 'billing.startPointsPurchase',
   ])
   assert.deepEqual(actionReferences(`
@@ -90,24 +81,6 @@ test('action inventory includes the actual billing re-export chain and excludes 
     export { startPointsPurchase } from '@/app/actions/billing'
   `, 'consumer.ts'), ['billing.getBilling', 'billing.startCardVerification', 'billing.startPointsPurchase'])
 })
-
-test('real billing client re-exports reach the native RPC with only their declared parameters', () => browser(async () => {
-  const requests = []
-  globalThis.fetch = async (_path, init) => {
-    requests.push(JSON.parse(init.body))
-    return Response.json({ version: 1, ok: true, result: { url: 'https://checkout.stripe.com/c/fixture' } })
-  }
-  const client = await moduleFrom({
-    source: 'export { startCardVerification, startPointsPurchase } from "@/lib/billing/verification-client";',
-    plugins: [applicationBoundary(new Map())],
-  })
-  const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
-  await client.startCardVerification(workspace)
-  await client.startPointsPurchase(workspace, 25)
-  assert.deepEqual(requests.map(request => [request.action, request.args]), [
-    ['billing.startCardVerification', [workspace]], ['billing.startPointsPurchase', [workspace, 25]],
-  ])
-}))
 
 test('public configuration keeps only existing flags and discards the previous owner snapshot on reset', async () => {
   const store = await moduleFrom({ entry: 'client-configuration.ts' })
@@ -165,6 +138,49 @@ test('bootstrap only transports a workspace selector and uses server-proved cach
   assert.deepEqual(requests[1].args, [])
   await readBootstrap()
   assert.deepEqual(requests[2].args, [])
+}))
+
+test('an explicit workspace restores the server selection before returning its freshly authorized cache', () => browser(async () => {
+  const { readBootstrap } = await moduleFrom({ entry: 'bootstrap.ts' })
+  const id = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  const requests = []
+  let selected = false, allowed = true
+  globalThis.fetch = async (_path, init) => {
+    const request = JSON.parse(init.body)
+    requests.push([request.action, request.args])
+    if (request.action === 'workspace.switchWorkspace') {
+      selected = allowed
+      return Response.json({ version: 1, ok: true, result: allowed ? { ok: true } : { ok: false, error: 'Membership suspended' } })
+    }
+    return Response.json({ version: 1, ok: true, result: {
+      requestedWorkspaceSelected: selected, cacheWorkspace: allowed ? { workspaceId: id, role: selected ? 'member' : 'admin' } : null,
+    } })
+  }
+  assert.deepEqual((await readBootstrap(id)).cacheWorkspace, { workspaceId: id, role: 'member' })
+  assert.deepEqual(requests, [['desktop.bootstrap', [id]], ['workspace.switchWorkspace', [id]], ['desktop.bootstrap', [id]]])
+  requests.length = 0
+  await readBootstrap(id)
+  assert.deepEqual(requests, [['desktop.bootstrap', [id]]], 'ordinary same-scope navigation needs just one read')
+  allowed = false
+  assert.equal((await readBootstrap(id)).workspaceError, true, 'a revoked current scope cannot mount')
+  selected = false
+  const denied = await readBootstrap(id)
+  assert.equal(denied.cacheWorkspace, null)
+  assert.equal(denied.workspaceError, 'Membership suspended')
+}))
+
+test('a pinned expired Web installation can reopen its own sign-in control while an actual outage stays unavailable', () => browser(async () => {
+  const { readBootstrap, readAuthentication } = await moduleFrom({ entry: 'bootstrap.ts' })
+  let configuration = () => Response.json({ error: 'web_auth_session_expired' }, { status: 401 })
+  globalThis.fetch = async path => String(path).endsWith('/api/desktop/config')
+    ? configuration() : Response.json({ error: 'unauthorized' }, { status: 401 })
+  const signedOut = { user: null, session: null, googleEnabled: false, githubEnabled: false, emailEnabled: false }
+  assert.deepEqual(await readBootstrap(), { ...signedOut, cacheWorkspace: null, liveHomeWorkspaceId: null })
+  assert.deepEqual(await readAuthentication(), signedOut)
+  configuration = () => Response.json({ error: 'temporarily_unavailable' }, { status: 503 })
+  await assert.rejects(readBootstrap(), { code: 'desktop_backend_unreachable', status: 503 })
+  configuration = () => Response.json({ error: 'unexpected' }, { status: 401 })
+  await assert.rejects(readBootstrap(), { code: 'desktop_backend_unreachable', status: 401 })
 }))
 
 test('an old safe-session IPC completion cannot restore the previous account after an owner change', () => browser(async window => {
@@ -287,9 +303,21 @@ test('viewer HTTP seam retains shared response errors and routes ordinary reques
   const calls = []
   window.mikka = { bundled: { viewer: { prepare: async input => { calls.push(input); return { status: 403, body: { error: 'computer_not_available' } } } } } }
   globalThis.fetch = async (path, init) => { calls.push({ path, method: init.method }); return Response.json({ machine: 'sleeping' }) }
-  const { computerRequest } = await moduleFrom({ entry: 'computer-request.ts', plugins: [applicationBoundary(new Map())] })
+  const { code } = await compileApplication("export { computerRequest } from '@/lib/computer/request'", 'desktop')
+  const { computerRequest } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
   await assert.rejects(computerRequest('/api/bots/bot-id/computer/viewer', { method: 'POST', json: { mode: 'view' } }), error => error.status === 403 && error.body.error === 'computer_not_available')
   assert.deepEqual(calls[0], { botId: 'bot-id', mode: 'view' })
+  // Invalid percent escapes are untrusted route values: preserve the shared
+  // typed 400 response without calling the privileged local viewer bridge.
+  for (const malformed of ['%', '%FF', '%E0%A4%A']) {
+    for (const endpoint of ['viewer', 'takeover']) {
+      await assert.rejects(
+        computerRequest(`/api/bots/${malformed}/computer/${endpoint}`, { method: 'POST', json: { mode: 'view' } }),
+        error => error.status === 400 && error.body?.error === 'invalid_request' && error.cause instanceof URIError,
+      )
+    }
+  }
+  assert.equal(calls.length, 1, 'malformed bot IDs cannot reach the viewer IPC')
   assert.deepEqual(await computerRequest('/api/bots/bot-id/computer'), { machine: 'sleeping' })
   assert.equal(calls[1].path, '/mikka/api/bots/bot-id/computer')
 }))

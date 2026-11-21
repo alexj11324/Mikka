@@ -16,7 +16,7 @@ export { VIRTUALIZED_CHAT_LIST, type ChatListHandle, type ChatListProps }
  * are there, and an older page loading in front leaves the message they are reading where it is. The keyboard lifts
  * the list while the reader is at the end.
  */
-function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, onScrollUnderBar, anchorIndex, scrollEnabled, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
+function ChatMessageListInner<T>({ data, extraData, keyOf, renderItem, header, footer, bottomInset, onStartReached, onAtLatestChange, onScrollUnderBar, anchorIndex, scrollEnabled, testID }: ChatListProps<T>, ref: React.Ref<ChatListHandle>) {
   const insets = useSafeAreaInsets()
   // The bar floats over the list on iOS: the anchored message sits under it, not behind it.
   const topOffset = insets.top + 44
@@ -59,6 +59,7 @@ function ChatMessageListInner<T>({ data, keyOf, renderItem, header, footer, bott
       ref={list}
       testID={testID}
       data={data}
+      extraData={extraData}
       keyExtractor={keyOf}
       renderItem={({ item, index }) => <View style={styles.row}>{renderItem(item, index)}</View>}
       // A row holds its own state (arrival, reveal, photos): one reused for another message would show the wrong one.

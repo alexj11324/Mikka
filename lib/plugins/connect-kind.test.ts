@@ -9,8 +9,16 @@ test('how an app connects follows its Composio auth schemes', () => {
   assert.equal(connectKind({ auth_schemes: ['BASIC'] }), 'credentials')
   assert.equal(connectKind({ no_auth: true, composio_managed_auth_schemes: ['OAUTH2'] }), 'none')
   assert.equal(connectKind({ auth_schemes: ['NO_AUTH'] }), 'none')
-  // OAuth without Composio's managed app would need a developer app of the person's own.
-  assert.equal(connectKind({ auth_schemes: ['OAUTH2', 'DCR_OAUTH'] }), 'unsupported')
+  // OAuth-only is a real provider whose app configuration is missing, not an unknown unsupported scheme.
+  assert.equal(connectKind({ auth_schemes: ['OAUTH2'] }), 'oauthSetupRequired')
+  assert.equal(connectKind({ auth_schemes: ['OAUTH1'] }), 'oauthSetupRequired')
+  // DCR registers its client through the provider at connection time, so it needs no app credentials from Mikka's owner.
+  assert.equal(connectKind({ auth_schemes: ['DCR_OAUTH'] }), 'managed')
+  assert.equal(connectKind({ auth_schemes: ['OAUTH2', 'DCR_OAUTH'] }), 'managed')
+  // Credential route remains usable for a mixed provider that also advertises OAuth.
+  assert.equal(connectKind({ auth_schemes: ['OAUTH2', 'API_KEY'] }), 'credentials')
+  // Unknown or mixed unknown auth methods remain distinct from OAuth setup.
+  assert.equal(connectKind({ auth_schemes: ['OAUTH2', 'MAGIC_LINK'] }), 'unsupported')
   assert.equal(connectKind({}), 'unsupported')
 })
 

@@ -4,15 +4,20 @@ import { fillCredential } from '../../../lib/credentials/broker'
 import { verifyAppOidc } from '../../../lib/credentials/oidc'
 import { credentialBody, credentialFailure, privateHeaders } from '../../../lib/credentials/http'
 import { CredentialError } from '../../../lib/credentials/contracts'
+import { credentialRuntimeEnvironment } from '../../../lib/credentials/runtime-identity'
 
 const pool = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 3, connectionTimeoutMillis: 10_000 })
-export default async function handler(request: IncomingMessage, response: ServerResponse) {
+async function fill(request: IncomingMessage, response: ServerResponse, privateTransport: boolean) {
   let result: Response
   try {
     if (request.method !== 'POST') throw new CredentialError('credential_denied', 404)
-    const token = request.headers.authorization?.match(/^Bearer (\S+)$/)?.[1]
-    if (!token) throw new CredentialError('credential_denied', 403)
-    await verifyAppOidc(token)
+    if (privateTransport) {
+      if (!credentialRuntimeEnvironment()) throw new CredentialError('credential_denied', 403)
+    } else {
+      const token = request.headers.authorization?.match(/^Bearer (\S+)$/)?.[1]
+      if (!token) throw new CredentialError('credential_denied', 403)
+      await verifyAppOidc(token)
+    }
     const chunks: Buffer[] = []; let size = 0
     for await (const chunk of request) {
       size += chunk.length
@@ -27,4 +32,13 @@ export default async function handler(request: IncomingMessage, response: Server
     result = Response.json(await fillCredential(pool, (input as { lease: string }).lease), { headers: privateHeaders })
   } catch (error) { result = credentialFailure(error) }
   response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(await result.text())
+}
+
+export default function handler(request: IncomingMessage, response: ServerResponse) {
+  return fill(request, response, false)
+}
+
+/** Only the private Cloudflare Node server routes to this handler. */
+export function handlePrivateFill(request: IncomingMessage, response: ServerResponse) {
+  return fill(request, response, true)
 }

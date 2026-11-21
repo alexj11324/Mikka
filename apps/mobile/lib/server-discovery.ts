@@ -75,7 +75,8 @@ export async function probeMobileServer(input: unknown, options: {
   const get = (url: string) => options.fetch(url, { headers: { accept: 'application/json', 'x-mikka-client': 'mobile',
     'x-mikka-client-version': options.appVersion, 'x-mikka-desktop-protocol': String(MOBILE_SERVER_PROTOCOL) },
   redirect: 'error', credentials: 'omit', cache: 'no-store', signal: controller.signal })
-  let reachable = false, olderMikka = false
+  let reachable = false
+  const legacyBases: string[] = []
   const paths = address.pathname === '/' ? ['', '/mikka'] : [address.pathname.replace(/\/+$/, '')]
   try {
     for (const path of paths) {
@@ -90,6 +91,7 @@ export async function probeMobileServer(input: unknown, options: {
       if (response.status === 426 || code === 'desktop_client_update_required') return { status: 'app_update_required', minimum: text(body?.minDesktopVersion, 100) }
       const found = response.ok ? discovery(body) : null
       if (found) {
+        if (address.pathname !== '/' && found.basePath !== path) return { status: 'not_mikka' }
         if (found.max < MOBILE_SERVER_PROTOCOL) return { status: 'server_update_required', version: found.version }
         let belowMinimum = false
         try { belowMinimum = !!found.minimum && !meetsMinimumVersion(options.appVersion, found.minimum) }
@@ -99,12 +101,18 @@ export async function probeMobileServer(input: unknown, options: {
         return { status: 'ok', server: { url: `${address.origin}${found.basePath}`, name: found.name, version: found.version,
           edition: found.edition, signIn: found.signIn, mobileReady: true } }
       }
+      legacyBases.push(base)
+    }
+    for (const base of legacyBases) {
+      if (controller.signal.aborted) break
       try {
         const legacy = await readJson(await get(`${base}/api/version`))
-        if (legacy && typeof legacy.build === 'string' && 'minDesktopVersion' in legacy) olderMikka = true
+        if (legacy && typeof legacy.build === 'string' && 'minDesktopVersion' in legacy) {
+          return { status: 'server_update_required', version: null }
+        }
       } catch { /* This candidate did not identify a legacy server. */ }
     }
-    return olderMikka ? { status: 'server_update_required', version: null } : { status: reachable ? 'not_mikka' : 'unreachable' }
+    return { status: reachable ? 'not_mikka' : 'unreachable' }
   } finally {
     clearTimeout(timer)
     options.signal?.removeEventListener('abort', abort)

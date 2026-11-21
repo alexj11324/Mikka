@@ -26,9 +26,9 @@ test('actual emitted static imports, lazy chunks, preload entries and CSS fonts 
   const bundle = { 'assets/font.woff2': { type: 'asset', fileName: 'assets/font.woff2', source: '' }, 'assets/main.css': { type: 'asset', fileName: 'assets/main.css', source: '@font-face{src:url(./font.woff2)}' } }
   deploymentPlugin({ deploymentId: 'release-1' }).generateBundle({}, bundle)
   assert.match(bundle['assets/main.css'].source, /font\.woff2\?dpl=release-1/)
-  const html = deploymentPlugin({ deploymentId: 'release-1' }).transformIndexHtml.handler('<script type="module" src="/mikka/assets/main.js"></script><link href="/mikka/icon.svg">')
+  const html = deploymentPlugin({ deploymentId: 'release-1' }).transformIndexHtml.handler('<script type="module" src="/mikka/assets/main.js"></script><link href="/mikka/brand/mikka-app-icon-48.png">')
   assert.match(html, /main\.js\?dpl=release-1/)
-  assert.match(html, /icon\.svg\?dpl=release-1/)
+  assert.match(html, /mikka-app-icon-48\.png\?dpl=release-1/)
 })
 
 test('the real Vite HTML, lazy module and font outputs keep one deployment identity', async () => {
@@ -37,7 +37,7 @@ test('the real Vite HTML, lazy module and font outputs keep one deployment ident
   try {
     process.env.MIKKA_DEPLOYMENT_ID = 'release-contract'
     await Promise.all([
-      writeFile(join(directory, 'index.html'), '<html><head><link rel="icon" href="/mikka/icon.svg"></head><body><script type="module" src="./entry.ts"></script></body></html>'),
+      writeFile(join(directory, 'index.html'), '<html><head><link rel="icon" href="/mikka/brand/mikka-app-icon-48.png"></head><body><script type="module" src="./entry.ts"></script></body></html>'),
       writeFile(join(directory, 'entry.ts'), 'import "./style.css"; import { marker } from "./shared.ts"; window.marker = marker(); window.loadFixture = () => import("./lazy.ts");'),
       writeFile(join(directory, 'lazy.ts'), 'import { marker } from "./shared.ts"; export const loaded = marker()'),
       writeFile(join(directory, 'shared.ts'), 'export const marker = () => Math.random()'),

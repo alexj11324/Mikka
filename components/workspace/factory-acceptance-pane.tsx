@@ -4,9 +4,10 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { useFormatter, useTranslations } from 'next-intl'
-import { CircleAlert, CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
+import { CircleAlert, CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from '@/components/icons'
 import { Alert, AlertTitle } from '@/components/ui/alert'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useViewState } from '@/lib/hooks/view-state'
@@ -23,6 +24,7 @@ import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 import { RunErrorDetails } from './run-error-text'
+import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
 import { RequestError, request } from '@/lib/factory/browser-request'
 import { isFlowV2, useFactoryFlow } from './factory-flow'
 import { artifactReviewKind, pullNumberOf } from '@/lib/factory/artifact-review'
@@ -46,9 +48,6 @@ const ERROR_KEYS: Record<string, ErrorKey> = {
   factoryPublicationUnavailable: 'publicationUnavailable',
   factoryPolicyAttestationRequired: 'attestationRequired',
 }
-
-/** The approve call still takes an expiry until #517 lands; approving publishes at once, so the bar shows none. */
-const APPROVAL_HOURS = 1
 
 /** GitHub's refusals of a merge (#528): the task keeps waiting, and the person can open the PR on GitHub. */
 const MERGE_REFUSALS = new Set(['githubMergeAuthorizationRequired', 'githubMergeForbidden', 'githubMergeBlocked', 'githubMergeConflict', 'githubMergeHeadMoved', 'githubMergeClosed', 'githubUnavailable'])
@@ -211,6 +210,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   const deciding = useRef(false)
   const retrying = useRef(false)
   const completionRequest = useRef<{ revision: number; eventId: string } | null>(null)
+  const [activation, setActivation] = useViewState<{ revision: number; candidateId: string | null; eventId: string } | null>(`factory:${task.id}:activation`, null)
   const [checkRequest, setCheckRequest] = useViewState<{ key: string; eventId: string; reason: string } | null>(`factory:${task.id}:check-retry`, null)
   const [checkError, setCheckError] = useState<{ key: string; unknown: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -250,16 +250,19 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   }
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
-    setBusy(true); setError(null)
+    if (deciding.current) return
+    deciding.current = true
+    setBusy(true)
+    setError(null)
     try {
-      const result = await request(`/api/factory/tasks/${task.id}/approval`, { operation, input })
-      await Promise.all([reload(), ...(v2 ? [reloadFlow()] : [])])
-      return result
+      await request(`/api/factory/tasks/${task.id}/approval`, { operation, input })
     } catch (caught) {
       setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable')
-      await reload().catch(() => {})
-      return null
-    } finally { setBusy(false) }
+    } finally {
+      await reloadDecision()
+      deciding.current = false
+      setBusy(false)
+    }
   }
 
   async function retryCompletion() {
@@ -322,17 +325,16 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   /** A skill candidate has no PR: it is still enabled through the approval. */
   async function approve() {
     const approvedCandidate = evidence?.manifest?.candidate
-    if (!task.isSkillCandidate || !evidence || !approvedCandidate || !environment) return
-    const action = 'activate_skill'
-    const target = 'mikka-builtin:run-report'
+    if (!task.isSkillCandidate || !evidence || !approvedCandidate || !environment || deciding.current) return
     const binding = evidence.binding
-    const approved = await run('approve', {
-      binding, eventId: crypto.randomUUID(), candidate: approvedCandidate, action, target,
-      targetEnvironment: environment, expiresAt: new Date(Date.now() + APPROVAL_HOURS * 60 * 60 * 1000).toISOString(),
+    const submission = activation?.revision === binding.revision && activation.candidateId === binding.candidateId ? activation
+      : { revision: binding.revision, candidateId: binding.candidateId, eventId: crypto.randomUUID() }
+    setActivation(submission)
+    // Approval reserves and activates the skill atomically. Read the durable ledger after the response.
+    await run('approve', {
+      binding, eventId: submission.eventId, candidate: approvedCandidate,
+      action: 'activate_skill', target: 'mikka-builtin:run-report', targetEnvironment: environment,
     })
-    if (!approved?.approvalId) return
-    // The approval advances the task; publish must carry the returned binding.
-    await run('publish', { binding: approved.binding ?? binding, eventId: crypto.randomUUID(), approvalId: approved.approvalId, action, target, targetEnvironment: environment })
   }
 
   async function reconcile() {
@@ -350,30 +352,13 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     deciding.current = true
     dispatchReject({ type: 'submit' })
     try {
-      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), candidateId: ledger.binding.candidateId, note: reject.note.trim() } })
+      await sendReviewChange(ledger.binding, crypto.randomUUID(), reject.note.trim())
       dispatchReject({ type: 'succeed' })
     } catch { dispatchReject({ type: 'fail' }) }
     finally { await reloadDecision(); deciding.current = false }
   }
 
-  /** P2: the note typed in the thread's composer, sent as the existing send-back; the fix run follows on the same PR. */
-  async function requestChanges(note: string) {
-    if (!ledger?.binding.candidateId || !reportCurrent || deciding.current || !note.trim()) return false
-    deciding.current = true
-    try {
-      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), candidateId: ledger.binding.candidateId, note: note.trim() } })
-      return true
-    } catch { return false }
-    finally { await reloadDecision(); deciding.current = false }
-  }
-  const requestChangesRef = useRef(requestChanges)
-  requestChangesRef.current = requestChanges
-  const register = artifact?.registerReject
-  useEffect(() => {
-    if (!register) return
-    register(note => requestChangesRef.current(note))
-    return () => register(null)
-  }, [register])
+
 
   const readText = useCallback(async (name: string) => {
     const value = await request(`/api/factory/tasks/${task.id}/approval?artifact=${encodeURIComponent(name)}`)
@@ -396,7 +381,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     const unverified = flow?.acceptance?.counts.unverified ?? 0
     const unverifiedNames = criteria.filter(group => group.passed === null).map(group => group.title).filter(Boolean).join('、')
     const merged = ledger.merges?.filter(merge => merge.status === 'merged').at(-1)
-    const ask = () => artifact.onRequestChanges(number ? tReview('changeRequestChip', { number }) : tReview('changeRequestLabel'))
+    const ask = () => { if (ledger?.binding.candidateId) artifact.onRequestChanges({ label: number ? tReview('changeRequestChip', { number }) : tReview('changeRequestLabel'), binding: ledger.binding }) }
     const failedChecks = results.filter(row => row.status === 'failed')
     const actions = <>
       {(kind === 'review' || kind === 'refused' || kind === 'merging') && canRequest && <Button size="sm" variant="secondary" disabled={busy || kind === 'merging'} onClick={ask}>{tReview('changeRequestLabel')}</Button>}
@@ -406,12 +391,24 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
         <span className="flex items-center gap-1.5 text-sm"><span className="flex size-4 [&_svg]:size-4"><PullRequestIcon state="merged" /></span>{merged?.finishedAt ? tReview('mergedAt', { time: time(merged.finishedAt) }) : tReview('state.merged')}</span>
         {pullRequestUrl && <Button size="sm" variant="ghost" nativeButton={false} render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}>{t('openOnGitHub')}</Button>}
       </>}
-      {confirming && kind === 'review' && <div className="absolute top-full right-4 z-20 mt-1 w-[min(30rem,calc(100%-2rem))]">
-        <ApprovalBar state={state} isSkill={false} busy={busy} canApprove={Boolean(evidence && pullRequestUrl)} onAccept={() => { void accept().finally(() => setConfirming(false)) }}
-          confirm={{ warn: unverified > 0, title: unverified > 0 ? (unverifiedNames ? tReview('confirmUnverified', { count: unverified, names: unverifiedNames }) : tReview('confirmUnverifiedCount', { count: unverified })) : tReview('confirmTitle'),
-            detail: detail?.delivery?.mergeAs ? tReview('mergeAs', { login: detail.delivery.mergeAs, base: detail.delivery.branch?.base ?? 'main' }) : tReview('mergeTo', { base: detail?.delivery?.branch?.base ?? 'main' }),
-            onCancel: () => setConfirming(false) }} />
-      </div>}
+      {/*
+        P4 (decision 2026-11-06-1615): 批准并合并 asks once more, naming what is still unverified and the account
+        and branch it merges as. A dialog, not a popover pinned under the button: it is a decision about to be
+        irreversible, so it takes focus, says its name and detail as title and description, and closes on Escape
+        (R-33's dialog radius; group-leave-action.tsx is the same shape).
+      */}
+      <AlertDialog open={confirming && kind === 'review'} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{unverified > 0 ? (unverifiedNames ? tReview('confirmUnverified', { count: unverified, names: unverifiedNames }) : tReview('confirmUnverifiedCount', { count: unverified })) : tReview('confirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{detail?.delivery?.mergeAs ? tReview('mergeAs', { login: detail.delivery.mergeAs, base: detail.delivery.branch?.base ?? 'main' }) : tReview('mergeTo', { base: detail?.delivery?.branch?.base ?? 'main' })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{tReview('cancel')}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy || !(evidence && pullRequestUrl)} aria-busy={busy} onClick={() => { void accept().finally(() => setConfirming(false)) }}>{busy ? <Spinner data-icon="inline-start" /> : null}{tReview('mergeConfirm')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
     // The report lead (drawn whether or not this decision is bound) states the problem; these are its actions.
     const bannerActions = kind === 'refused' && refusal ? <>
@@ -432,7 +429,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
       {evidence && <section aria-label={criteria.length ? t('criteria') : t('evidence')} className="flex flex-col gap-1">
         <h4 className="flex gap-1.5 pl-3 text-xs">
           <span className="font-medium text-muted-foreground">{criteria.length ? t('criteria') : t('evidence')}</span>
-          {criteria.length > 0 && <span className="text-muted-foreground/70">{criteria.filter(group => group.passed).length}/{criteria.length}</span>}
+          {criteria.length > 0 && <span className="text-tertiary">{criteria.filter(group => group.passed).length}/{criteria.length}</span>}
         </h4>
         {groups.length
           ? <ul className="flex flex-col gap-1">{groups.map((group, position) => <CriterionRow key={group.key} taskId={task.id} group={group} onOpen={index => setViewing({ group: position, index })} />)}</ul>
@@ -443,7 +440,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
       {check?.status === 'blocked' && currentTask.reason && <RunErrorDetails code={currentTask.reason} />}
-      {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
+      {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-(--motion-fast) motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
       {checkError && [retryCheck?.key, recheck?.key].includes(checkError.key) && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}
     </div>}
@@ -482,7 +479,6 @@ export type ArtifactReviewSlots = {
   artifactId: string
   slots: ArtifactDecisionSlots
   /** Puts 要求修改 in the thread's composer, as a chip with this label (P2). */
-  onRequestChanges: (label: string) => void
+  onRequestChanges: (target: ReviewChangeTarget) => void
   /** The pane hands the window its send-back, so the composer can send the note with it. */
-  registerReject: (send: ((note: string) => Promise<boolean>) | null) => void
 }

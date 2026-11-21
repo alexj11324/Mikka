@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { Button } from '@/components/ui/button'
