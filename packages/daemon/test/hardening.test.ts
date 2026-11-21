@@ -1,13 +1,15 @@
 // Regression tests for the daemon review: path escapes through server ids,
 // self-reported verify, stop() with a session that never yields, claimed
 // runs without an adapter, and the data dir lock.
-import { spawnSync } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
+import { once } from "node:events"
 import {
   existsSync,
   mkdirSync,
   readFileSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs"
 import { join } from "node:path"
@@ -18,7 +20,11 @@ import type { HarnessInfo } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 
 import { InvalidIdError } from "../src/errors"
-import { acquireLock, DaemonAlreadyRunningError } from "../src/lock"
+import {
+  acquireLock,
+  DaemonAlreadyRunningError,
+  LOCK_STALE_MS,
+} from "../src/lock"
 import { Daemon } from "../src/main"
 import { daemonPaths } from "../src/paths"
 import { MemoryServer } from "../src/server-link"
@@ -256,6 +262,61 @@ describe("claimed runs without an adapter", () => {
 })
 
 describe("data dir lock", () => {
+  it("acquires without a lock dir when a leftover PID belongs to a live process", async () => {
+    const dataDir = tempDir()
+    const paths = daemonPaths(dataDir)
+    const unrelated = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"])
+    await once(unrelated, "spawn")
+    let release: (() => Promise<void>) | undefined
+    try {
+      writeFileSync(join(dataDir, "daemon.pid"), `${unrelated.pid}\n`)
+      expect(existsSync(paths.lock)).toBe(false)
+      release = await acquireLock(dataDir, paths.lock, undefined, {
+        socketPath: paths.socket,
+        takeoverMs: 0,
+      })
+      expect(readFileSync(join(dataDir, "daemon.pid"), "utf8")).toBe(`${process.pid}\n`)
+      expect(existsSync(paths.lock)).toBe(true)
+    } finally {
+      await release?.()
+      unrelated.kill()
+      await once(unrelated, "exit")
+    }
+  })
+
+  it("refuses a stale lock with a live holder without overwriting its PID", async () => {
+    const dataDir = tempDir()
+    const paths = daemonPaths(dataDir)
+    const holder = spawn(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ])
+    await once(holder, "spawn")
+    const pid = `${holder.pid}\n`
+    mkdirSync(paths.lock)
+    writeFileSync(join(dataDir, "daemon.pid"), pid)
+    const stale = new Date(Date.now() - LOCK_STALE_MS - 10_000)
+    utimesSync(paths.lock, stale, stale)
+    let release: (() => Promise<void>) | undefined
+    try {
+      const result = acquireLock(dataDir, paths.lock, undefined, {
+        socketPath: paths.socket,
+        takeoverMs: 0,
+      }).then((unlock) => {
+        release = unlock
+        return unlock
+      })
+      await expect
+        .soft(result)
+        .rejects.toBeInstanceOf(DaemonAlreadyRunningError)
+      expect(readFileSync(join(dataDir, "daemon.pid"), "utf8")).toBe(pid)
+    } finally {
+      await release?.()
+      holder.kill()
+      await once(holder, "exit")
+    }
+  })
+
   it("stops the daemon and reports it when the lock is compromised", async () => {
     const { server, dataDir } = await setup()
     let lost: Error | null = null
@@ -271,27 +332,34 @@ describe("data dir lock", () => {
     daemons.splice(daemons.indexOf(daemon), 1)
   })
 
-  it("takes over at once from a crashed holder, refuses a live one", async () => {
-    const dataDir = tempDir()
-    const paths = daemonPaths(dataDir)
-    // A lock left by a holder whose process is gone.
-    const dead = spawnSync(process.execPath, ["-e", "0"])
-    mkdirSync(paths.lock)
-    writeFileSync(join(dataDir, "daemon.pid"), `${dead.pid}\n`)
-    const started = Date.now()
-    const release = await acquireLock(dataDir, paths.lock, undefined, {
-      socketPath: paths.socket,
-    })
-    expect(Date.now() - started).toBeLessThan(2_000)
-    expect(readFileSync(join(dataDir, "daemon.pid"), "utf8").trim()).toBe(
-      String(process.pid)
-    )
-    await expect(
-      acquireLock(dataDir, paths.lock, undefined, { takeoverMs: 300 })
-    ).rejects.toBeInstanceOf(DaemonAlreadyRunningError)
-    await release()
-    expect(existsSync(paths.lock)).toBe(false)
-  })
+  it.each([false, true])(
+    "takes over at once from a crashed holder (stale: %s), refuses a live one",
+    async (stale) => {
+      const dataDir = tempDir()
+      const paths = daemonPaths(dataDir)
+      // A lock left by a holder whose process is gone.
+      const dead = spawnSync(process.execPath, ["-e", "0"])
+      mkdirSync(paths.lock)
+      writeFileSync(join(dataDir, "daemon.pid"), `${dead.pid}\n`)
+      if (stale) {
+        const mtime = new Date(Date.now() - LOCK_STALE_MS - 10_000)
+        utimesSync(paths.lock, mtime, mtime)
+      }
+      const started = Date.now()
+      const release = await acquireLock(dataDir, paths.lock, undefined, {
+        socketPath: paths.socket,
+      })
+      expect(Date.now() - started).toBeLessThan(2_000)
+      expect(readFileSync(join(dataDir, "daemon.pid"), "utf8").trim()).toBe(
+        String(process.pid)
+      )
+      await expect(
+        acquireLock(dataDir, paths.lock, undefined, { takeoverMs: 300 })
+      ).rejects.toBeInstanceOf(DaemonAlreadyRunningError)
+      await release()
+      expect(existsSync(paths.lock)).toBe(false)
+    }
+  )
 
   it("measures worktree disk usage asynchronously and caches it", async () => {
     const root = tempDir()

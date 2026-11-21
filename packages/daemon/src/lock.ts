@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { createConnection } from "node:net"
 import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
@@ -104,16 +104,18 @@ export async function acquireLock(
   }
   const deadline = Date.now() + (options.takeoverMs ?? LOCK_TAKEOVER_MS)
   for (;;) {
-    try {
-      return await lock()
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ELOCKED") throw error
-    }
     if (options.socketPath && (await socketAnswers(options.socketPath))) {
       throw new DaemonAlreadyRunningError(dataDir)
     }
     const pid = holderPid(dataDir)
     const crashed = pid !== null && pid !== process.pid && !processAlive(pid)
+    if (pid === null || crashed || !existsSync(lockfilePath)) {
+      try {
+        return await lock()
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ELOCKED") throw error
+      }
+    }
     if (crashed || (pid === null && Date.now() >= deadline)) {
       // The holder is gone: its lock is left over from a crash.
       rmSync(lockfilePath, { recursive: true, force: true })
