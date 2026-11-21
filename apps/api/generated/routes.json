@@ -1550,7 +1550,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "720dca1bfcc13d8b87c90e66ee283493834a29eaa294e1d0fd3eb324ab952977"
+      "sourceHash": "0acdb32f444a1e8d9d65520163dd020ad166eb96aebf01c4ac83a9990253cdf7"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/check",
@@ -1559,7 +1559,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "81ecda7aefe3e56fb87e4602d166f1c263fd79950a30c1b8da20d9d2d445f1a6"
+      "sourceHash": "ad523fdf93a3c527e926ae82ff14fb4dddddde8c12d20c1cfe8d6daf3277ef4f"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/environments",
@@ -1568,7 +1568,7 @@
       "methods": [
         "PATCH"
       ],
-      "sourceHash": "b6da012730f267dbd005fd7f9debb117d3e16a35a273c23e677d99da674aa6fe"
+      "sourceHash": "3129929de349c90bb876ff9d6eeaafce4ded8817f11ed382a19451de9686112b"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/oauth/callback",
@@ -1577,7 +1577,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "20998d20319dff9d3ff508e029f28a2e377889d230c8226949122bc71eb4c78f"
+      "sourceHash": "f32831d2df1e891bdc955cc47a8f496567c0a30c2b2f47b6c7ced03bcd6753b4"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/oauth/start",
@@ -1586,7 +1586,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "4cfbbf485fcdd1fb8f53ea73d23d420f57e311f7109ba419388a613ec7f6d552"
+      "sourceHash": "3dcdf9ec5d179e1fc4bd45da2e13db420c79c44aad0e542c15940eb2833b523a"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/tools/[name]",
@@ -1595,7 +1595,7 @@
       "methods": [
         "PATCH"
       ],
-      "sourceHash": "20a972c1bde8d31f7f53ce41b54532991013d1be56dc7e6b6ec7573d43dbe151"
+      "sourceHash": "dcc160221c970052c657a728374ebdd87fcecf5b231acef470bc8ddcfd52b59e"
     },
     {
       "path": "/mikka/api/integrations/slack",
