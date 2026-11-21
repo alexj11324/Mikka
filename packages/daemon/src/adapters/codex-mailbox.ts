@@ -12,8 +12,13 @@ const UNAVAILABLE = 'Run mailbox requires a verified original Codex thread'
 // Each gate names its own reason in the message — field names only, never
 // receipt or history bytes — so the next failure is diagnosed from the
 // worker log instead of one opaque check (#1468).
-const unavailable = (reason: string) => new Error(`${UNAVAILABLE} (${reason})`)
-const isUnavailable = (error: unknown) => error instanceof Error && error.message.startsWith(UNAVAILABLE)
+// The detail/name pair is what logCodedError's cause chain surfaces — field
+// names only, so the hosted log names the rejecting gate without bytes.
+const unavailable = (reason: string, cause?: unknown) => Object.assign(
+  new Error(`${UNAVAILABLE} (${reason})`, { cause }),
+  { name: 'codex_mailbox_unavailable', detail: reason },
+)
+const isUnavailable = (error: unknown) => error instanceof Error && error.name === 'codex_mailbox_unavailable'
 
 /** Verified official releases whose persisted-tool resume semantics were exercised. */
 export function codexMailboxResumeVersion(userAgent: unknown): NativeVersion | null {
@@ -31,10 +36,10 @@ export function codexMailboxCatalogue(mailbox: RunMailbox): Catalogue {
 }
 
 function historyParts(value: unknown): string[] {
-  if (typeof value !== 'string' || value.length > 1024 || /[\\\0]/.test(value)) throw unavailable('history-path')
+  if (typeof value !== 'string' || value.length > 1024 || /[\\\0]/.test(value)) throw unavailable('history_path')
   const parts = value.split('/')
   if (!['sessions', 'archived_sessions'].includes(parts[0]) || parts.length < 2 ||
-      parts.some(part => !part || part === '.' || part === '..') || !value.endsWith('.jsonl')) throw unavailable('history-path')
+      parts.some(part => !part || part === '.' || part === '..') || !value.endsWith('.jsonl')) throw unavailable('history_path')
   return parts
 }
 
@@ -43,8 +48,10 @@ function receiptFile(stateDir: string, runId: string): string {
 }
 
 /** Only fixed, bounded JSON is read; never follow links or log history bytes. */
-function readJson(file: string, limit: number, firstLine = false, reason = 'history-file'): unknown {
-  const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+function readJson(file: string, limit: number, firstLine = false, reason = 'history_file'): unknown {
+  let fd: number
+  try { fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) }
+  catch (error) { throw unavailable(reason, error) }
   try {
     const stat = fstatSync(fd)
     if (!stat.isFile() || stat.nlink !== 1 || (!firstLine && stat.size > limit)) throw unavailable(reason)
@@ -52,7 +59,8 @@ function readJson(file: string, limit: number, firstLine = false, reason = 'hist
     const length = readSync(fd, buffer, 0, buffer.length, 0)
     const end = firstLine ? buffer.subarray(0, length).indexOf(10) : length
     if (end < 0 || end > limit) throw unavailable(reason)
-    return JSON.parse(buffer.subarray(0, end).toString('utf8'))
+    try { return JSON.parse(buffer.subarray(0, end).toString('utf8')) }
+    catch (error) { throw unavailable(reason, error) }
   } finally { closeSync(fd) }
 }
 
@@ -62,13 +70,13 @@ function verifyHistory(home: string, path: string, threadId: string, catalogue: 
   for (const part of ['', ...parts.slice(0, -1)]) {
     if (part) parent = join(parent, part)
     const stat = lstatSync(parent)
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw unavailable('history-dir')
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw unavailable('history_dir')
   }
-  const header = readJson(join(home, ...parts), 1024 * 1024, true, 'history-meta') as {
+  const header = readJson(join(home, ...parts), 1024 * 1024, true, 'history_meta') as {
     type?: unknown; payload?: { id?: unknown; dynamic_tools?: unknown }
   } | null
   if (header?.type !== 'session_meta' || header.payload?.id !== threadId ||
-      !isDeepStrictEqual(header.payload.dynamic_tools, catalogue)) throw unavailable('history-meta')
+      !isDeepStrictEqual(header.payload.dynamic_tools, catalogue)) throw unavailable('history_meta')
 }
 
 /**
@@ -79,19 +87,19 @@ function verifyHistory(home: string, path: string, threadId: string, catalogue: 
 export function verifyCodexMailboxResume(stateDir: string, sourceRunId: string, home: string, threadId: string, catalogue: Catalogue): NativeVersion {
   try {
     const dir = lstatSync(join(stateDir, 'codex-mailbox'))
-    if (!dir.isDirectory() || dir.isSymbolicLink()) throw unavailable('mailbox-dir')
+    if (!dir.isDirectory() || dir.isSymbolicLink()) throw unavailable('mailbox_dir')
     const receipt = readJson(receiptFile(stateDir, sourceRunId), 256 * 1024, false, 'receipt') as Partial<Receipt> | null
     if (receipt?.version !== 1 || (receipt.nativeVersion !== '0.163.0' && receipt.nativeVersion !== '0.166.0' && receipt.nativeVersion !== '0.167.0') || receipt.runId !== sourceRunId || receipt.threadId !== threadId ||
-        !isDeepStrictEqual(receipt.catalogue, catalogue) || typeof receipt.historyPath !== 'string') throw unavailable('receipt-mismatch')
+        !isDeepStrictEqual(receipt.catalogue, catalogue) || typeof receipt.historyPath !== 'string') throw unavailable('receipt_mismatch')
     verifyHistory(home, receipt.historyPath, threadId, catalogue)
     return receipt.nativeVersion
-  } catch (error) { throw isUnavailable(error) ? error : unavailable('verify') }
+  } catch (error) { throw isUnavailable(error) ? error : unavailable('verify', error) }
 }
 
 /** Record only the actual native response, before this run can send a turn. */
 export function recordCodexMailboxSession(stateDir: string, runId: string, home: string, thread: { id: string; path?: string | null }, catalogue: Catalogue, resumed: boolean, nativeVersion: NativeVersion) {
   try {
-    if (!thread.id || typeof thread.path !== 'string' || !isAbsolute(thread.path)) throw unavailable('thread-path')
+    if (!thread.id || typeof thread.path !== 'string' || !isAbsolute(thread.path)) throw unavailable('thread_path')
     const historyPath = relative(home, thread.path).split(sep).join('/')
     historyParts(historyPath)
     // On resume, also check what the CLI actually opened before submitting
@@ -100,12 +108,12 @@ export function recordCodexMailboxSession(stateDir: string, runId: string, home:
     const dir = join(stateDir, 'codex-mailbox')
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     const stat = lstatSync(dir)
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw unavailable('mailbox-dir')
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw unavailable('mailbox_dir')
     writeJsonAtomic(receiptFile(stateDir, runId), { version: 1, nativeVersion, runId, threadId: thread.id, historyPath, catalogue } satisfies Receipt)
   } catch (error) {
     // A previously supported fresh thread does not become unavailable just
     // because this CLI cannot provide resume evidence. Its later resume still
     // requires the receipt and matching persisted metadata above.
-    if (resumed) throw isUnavailable(error) ? error : unavailable('record')
+    if (resumed) throw isUnavailable(error) ? error : unavailable('record', error)
   }
 }
