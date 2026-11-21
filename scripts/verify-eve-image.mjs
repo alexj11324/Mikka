@@ -17,7 +17,7 @@ export async function verifyEveImagePayload(directory, manifest, { sourceSha, re
   })
   assert.deepEqual(await read('eve/mikka-eve-build.json'), {
     version: 1, eve: '1.3.0', revision: sourceSha, preset: 'node-server',
-    world: '@workflow/world-postgres', worldVersion: '5.2.0',
+    world: '@workflow/world-postgres', worldVersion: '5.4.1',
   })
   await verifyResources(join(directory, 'eve'), manifest.resources)
 }

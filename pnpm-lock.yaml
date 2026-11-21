@@ -16,9 +16,9 @@ patchedDependencies:
   '@novnc/novnc@1.6.0':
     hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
-  '@workflow/world-postgres@5.2.0':
-    hash: 49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6
-    path: patches/@workflow__world-postgres@5.2.0.patch
+  '@workflow/world-postgres@5.4.1':
+    hash: 42f48feebe96d9c0980afda1697139e3510c0748ae059a9e70c25ab28c057151
+    path: patches/@workflow__world-postgres@5.4.1.patch
   eve@1.3.0:
     hash: 566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed
     path: patches/eve@1.3.0.patch
@@ -542,8 +542,8 @@ importers:
   apps/eve:
     dependencies:
       '@workflow/world-postgres':
-        specifier: 5.2.0
-        version: 5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
+        specifier: 5.4.1
+        version: 5.4.1(patch_hash=42f48feebe96d9c0980afda1697139e3510c0748ae059a9e70c25ab28c057151)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
       eve:
         specifier: 1.3.0
         version: 1.3.0(patch_hash=566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed)(b99b53494634a2b2300a4f3b0e6df2e7)
@@ -5623,8 +5623,8 @@ packages:
   '@workflow/errors@5.1.0':
     resolution: {integrity: sha512-++fn9P1AofCWjh166YP36Yr/hk3ynGQQio73jrYn4Fs2Ix2ECA6B9HK8zcjFpnAfZ0xqf7wpXUZQTmK3toAgxA==}
 
-  '@workflow/errors@5.1.1':
-    resolution: {integrity: sha512-ewDPH27oD7IAvADRcUEZ+vPeVopRKQ6V8t6Zi2dtFuCcmS5+LeM23vnJH3NewESFtbe8HyxNg9tjER1PgSqdRw==}
+  '@workflow/errors@5.1.5':
+    resolution: {integrity: sha512-3fD7I6ybv+MYM/bZJVdksbNNYTZejQ7WhhUO4W9u54uT798rIh825yMXwes2gmlhyKtOmRqZY84GlIfZKcTxwQ==}
 
   '@workflow/nest@5.1.4':
     resolution: {integrity: sha512-lB+Av4Pl6oF6dNevmhsVseJeRYr0QE4TOivjcgv1jN1PPFnzacH/mfUXq/M3zZwH//iEdN5/ElybguqRcxH8Xg==}
@@ -5683,8 +5683,8 @@ packages:
   '@workflow/utils@5.0.2':
     resolution: {integrity: sha512-TP5yOOJ82wuSB0io7d476ZBQuPEhR+VQ1k3zqOpaY0UXYHo+zUCeOIdQtIAeNsJwKkg+8f1bQPZrA8ZoMDA8Cw==}
 
-  '@workflow/utils@5.1.0':
-    resolution: {integrity: sha512-i92ygn9QdT2tCi+O+11nKuwlZBgSk4sEAh/U5w6dJ7UZupfXVgRgcXn1KdMDMNUWyY1Ml5ZhKMaul5S0ME3Q3g==}
+  '@workflow/utils@5.1.1':
+    resolution: {integrity: sha512-Ew38LKcOoO3Lg1uxB6bCykJICNgRoUbscks8YqNbDRa8IX+wJe+ZqA9a2RGaXgDCXYId+v0wMVAj8iKGtv3XNA==}
 
   '@workflow/vite@5.0.6':
     resolution: {integrity: sha512-vKidXneLqPDBMj5vx4u4vxP2HeLD7Zw9wMN+SDqYXQFj0pEgJT3AE4kY1ufN+zgjKKBywgRpHKsPbZ3KCCIg+A==}
@@ -5708,16 +5708,17 @@ packages:
       '@opentelemetry/api':
         optional: true
 
-  '@workflow/world-local@5.3.0':
-    resolution: {integrity: sha512-bFLLghrHQbRH5M2faX+CxPmTIDP2y3/M5VAFeRcqJzQdhzIfkn9SkqK5kFJDOHUJayUXQVowNyB0PSpkkd3snw==}
+  '@workflow/world-local@5.5.1':
+    resolution: {integrity: sha512-NOFydu2BPuwoBF/D6UgYpnc9B3vTRw+/2BM8fTamHS6Iq26tQIojvr7bFhIsPF447V8ItM4Fu1bL6sN1MuKqAA==}
+    engines: {node: '>=22.13.0'}
     peerDependencies:
       '@opentelemetry/api': '1'
     peerDependenciesMeta:
       '@opentelemetry/api':
         optional: true
 
-  '@workflow/world-postgres@5.2.0':
-    resolution: {integrity: sha512-vGr7T5a0zzXwYxptMnrhVqZdgwt2RPbSxjFUNFXlcGUACjoPch7lEcahgsDfFAAM94Fv1b0rh3GvwYIveZAFjg==}
+  '@workflow/world-postgres@5.4.1':
+    resolution: {integrity: sha512-Y8Dt6s6Wfyb9nAGZttMYJ1hPCQDxDwJjYxNbpAHvYC/ovGs6GXuK7Gac5sy0d/35G1gHdbZICBfpUj95Jcm2ow==}
     hasBin: true
 
   '@workflow/world-vercel@5.2.3':
@@ -5737,8 +5738,8 @@ packages:
   '@workflow/world@5.1.0':
     resolution: {integrity: sha512-+4hDxk76WPGef6Albro6mES9QprGCO6pWva/p9Zfb89mU01srzde5RHAN8f0oir85PJ/YLhE3XFiPxw+jMO1Pw==}
 
-  '@workflow/world@5.2.0':
-    resolution: {integrity: sha512-XBcgK01Zt7p1AA3g3A3vQE+R3X8YJcUiNKP+dlv2J7B2k26L96tvtiayrvKYcBgkFqhJMPu1vks9s0AVM0E6gQ==}
+  '@workflow/world@5.3.0':
+    resolution: {integrity: sha512-bSgxxSMYwYzON+NTqgVx374qBuHRYltANjNI6TeqPO9ysX3Ne8i9+7tAtQZiOCm7UtS/vCg886syC0oP/G8IHg==}
 
   '@xhmikosr/archive-type@8.1.0':
     resolution: {integrity: sha512-EXOjEbnZFE5c/nFMf4FOrEURVanzHpnkPYmnmr78u02/8hAhE0FMq8p9TK1IM0/bFr5VcyBUY0gfLm8f7dKy+Q==}
@@ -18051,10 +18052,10 @@ snapshots:
       '@workflow/world': 5.1.0
       ms: 2.1.3
 
-  '@workflow/errors@5.1.1':
+  '@workflow/errors@5.1.5':
     dependencies:
-      '@workflow/utils': 5.1.0
-      '@workflow/world': 5.2.0
+      '@workflow/utils': 5.1.1
+      '@workflow/world': 5.3.0
       ms: 2.1.3
 
   '@workflow/nest@5.1.4(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.10.0)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.22.0)':
@@ -18245,7 +18246,7 @@ snapshots:
     dependencies:
       ms: 2.1.3
 
-  '@workflow/utils@5.1.0':
+  '@workflow/utils@5.1.1':
     dependencies:
       ms: 2.1.3
 
@@ -18307,27 +18308,24 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
 
-  '@workflow/world-local@5.3.0(@opentelemetry/api@1.10.0)':
+  '@workflow/world-local@5.5.1(@opentelemetry/api@1.10.0)':
     dependencies:
-      '@vercel/queue': 0.10.0(@opentelemetry/api@1.10.0)
-      '@workflow/errors': 5.1.1
-      '@workflow/utils': 5.1.0
-      '@workflow/world': 5.2.0
+      '@workflow/errors': 5.1.5
+      '@workflow/utils': 5.1.1
+      '@workflow/world': 5.3.0
       async-sema: 3.1.1
-      proper-lockfile: 4.1.2
       ulid: 3.0.2
       undici: 7.30.2
       zod: 4.6.7
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
 
-  '@workflow/world-postgres@5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)':
+  '@workflow/world-postgres@5.4.1(patch_hash=42f48feebe96d9c0980afda1697139e3510c0748ae059a9e70c25ab28c057151)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)':
     dependencies:
-      '@vercel/queue': 0.10.0(@opentelemetry/api@1.10.0)
-      '@workflow/errors': 5.1.1
-      '@workflow/utils': 5.1.0
-      '@workflow/world': 5.2.0
-      '@workflow/world-local': 5.3.0(@opentelemetry/api@1.10.0)
+      '@workflow/errors': 5.1.5
+      '@workflow/utils': 5.1.1
+      '@workflow/world': 5.3.0
+      '@workflow/world-local': 5.5.1(@opentelemetry/api@1.10.0)
       cbor-x: 1.6.9
       dotenv: 17.4.2
       drizzle-orm: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)(sql.js@1.16.0)
@@ -18404,7 +18402,7 @@ snapshots:
       ulid: 3.0.2
       zod: 4.5.4
 
-  '@workflow/world@5.2.0':
+  '@workflow/world@5.3.0':
     dependencies:
       ulid: 3.0.2
       zod: 4.6.7

@@ -52,7 +52,8 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
     child.exitCode = null; child.signalCode = null
     child.stdout = new PassThrough(); child.stderr = new PassThrough()
     child.kill = signal => { assert.equal(signal, 'SIGTERM'); stopped++; child.exitCode = 0; child.emit('exit', 0) }
-    queueMicrotask(() => child.stdout.write('➜ Listening on: http://127.0.0.1:43127/\n'))
+    // `eve dev --no-ui` prints "ready at"; the packaged Nitro server prints "Listening on".
+    queueMicrotask(() => child.stdout.write(development ? '[DEV] ready at http://127.0.0.1:43127/\n' : '➜ Listening on: http://127.0.0.1:43127/\n'))
     return child
   } })
   assert.equal(env.MIKKA_EVE_ORIGIN, 'http://127.0.0.1:43127')

@@ -21,7 +21,7 @@ export async function buildEve({ root = process.cwd(), env = process.env, execut
     cwd: join(root, 'apps/eve'), stdio: 'inherit', env: childEnv,
   })
   const output = join(root, 'apps/eve', preset === 'vercel' ? '.vercel/output' : '.output')
-  await writeFile(join(output, 'mikka-eve-build.json'), `${JSON.stringify({ version: 1, eve, revision, preset, ...(postgres ? { world: '@workflow/world-postgres', worldVersion: '5.2.0' } : {}) })}\n`)
+  await writeFile(join(output, 'mikka-eve-build.json'), `${JSON.stringify({ version: 1, eve, revision, preset, ...(postgres ? { world: '@workflow/world-postgres', worldVersion: '5.4.1' } : {}) })}\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await buildEve()

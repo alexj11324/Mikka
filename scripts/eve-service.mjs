@@ -17,7 +17,7 @@ export async function availableEvePort() {
 
 /** eve names its own local server exactly once, on stdout. That line, and only
  * that line, means the peer is serving. */
-const READY_ADDRESS = /(?:Listening on:?|Local:|server[^\n]*?)\s*(http:\/\/127\.0\.0\.1:\d+)/i
+const READY_ADDRESS = /(?:Listening on:?|Local:|ready at|server[^\n]*?)\s*(http:\/\/127\.0\.0\.1:\d+)/i
 
 /** The peer's real reason for refusing to start is printed on stderr and
  * nowhere else ("A dev server is already running for this eve agent"). Keep a
