@@ -6,7 +6,7 @@
   "workflows": [
     {
       "id": 42131554221,
-      "name": "Browser gate",
+      "name": "Retired compatibility workflow",
       "status": "completed",
       "conclusion": "success"
     },

@@ -174,7 +174,7 @@ owner gets only thread metadata, read/send fail specifically runNotFound, zero
 messages are written, and the thread owner reads the real saved prompt/chunks.
 These are real action/SQL calls, not HTTP server-action or real OAuth acceptance.
 The HTTP and action claims remain distinguished. Fixtures were retained without
-DELETE. The browser-gate statement in the original handoff predates the
+DELETE. The compatibility-check statement in the original handoff predates the
 no-browser-test decision; a new run uses the current API/CLI checks.
 
 A task search hit is still metadata authority, never thread content or private-DM

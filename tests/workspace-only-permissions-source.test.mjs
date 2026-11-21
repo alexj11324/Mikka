@@ -50,7 +50,7 @@ test('the settings contract and page carry one workspace choice, not a Bot effec
   assert.doesNotMatch(page, /onBot/)
 })
 
-test('the browser gate takes the workspace layer only', () => {
+test('browser authorization takes the workspace layer only', () => {
   const visual = source['lib/cloud-computer/visual-contract.ts']
   assert.match(visual, /export function browserPermission\(effect: BrowserEffect, computer: 'allow'\|'deny', workspace: unknown\)/)
   const authority = source['lib/cloud-computer/browser-authority.ts']

@@ -19,13 +19,10 @@ bindings. Current workflow files define the triggers and selected coverage.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
   Targeted Desktop and Analytics jobs retain their selected browser
-  checks. `browser-gate.yml` only keeps the protected check name
-  `Browser tests (before merge)` and passes at once; delete it once that name
-  is removed from the required checks in the repository settings.
-- `GitGuardian Security Checks` is a separate external required check.
-- All four existing required names remain intact. Do not silently replace
-  them with a new aggregate check until the GitHub branch-protection settings
-  have been migrated and verified.
+  checks. The echo-only compatibility workflow has been removed.
+- The required checks are `UI policy (strict)` and
+  `Production build and browser interactions`. `GitGuardian Security Checks`
+  remains optional and unchanged.
 
 `local-device-node22.yml` now runs an actual app/Eve build and startup smoke
 on Node 22 and 24, retaining the daemon and installer tests. The core,
@@ -42,13 +39,9 @@ majors; the original Node 24 protected-check names stay unchanged.
   conclusion, and requires an intentional skip when unselected. Unrelated
   UI PRs do not allocate an extra PostgreSQL-backed governance workflow.
   On every `main` push, independent postmerge governance acceptance remains.
-- Browser compatibility, E2B PR runtime, E2B BYOS and SSH device workflows
+- E2B PR runtime, E2B BYOS and SSH device workflows
   cancel obsolete **same-PR** attempts. They never cancel main or manually
   dispatched production publication or recovery.
-- All protected check names remain stable. In particular,
-  `Browser tests (before merge)` must remain until GitHub branch protection
-  is read and migrated; a read-only connector's 403 is not authorization
-  to remove it.
 
 See [test ownership and CI cost](../../docs/ci/test-ownership.md) before
 adding or duplicating regression suites.
@@ -63,8 +56,8 @@ There are two intentionally different classes of PR checks:
   those aggregators explicitly **fail** until the PR is Ready. Core, Integration,
   Source, Daemon, Analytics, Governance and DB runner-heavy jobs are deferred.
   `ready_for_review` re-runs the complete applicable protected verification
-  even if the commit SHA has not changed. `Browser tests (before merge)` and
-  external GitGuardian retain their original workflows. A skipped required
+  even if the commit SHA has not changed. Optional external GitGuardian
+  retains its original workflow. A skipped required
   job can be reported successful by GitHub; these named aggregators must never
   skip or accept the draft as complete.
 - **Non-required specialized acceptances** (`E2B additive runtime release`

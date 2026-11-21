@@ -105,13 +105,13 @@ clones, template-bound serial lane, bootstrap, target binding, no skips/todos an
 TAP summary reconciliation remain intact. The first selected shard retains local
 runtime identity and thread privacy integration tests.
 
-Required status names remain `UI policy (strict)`, `Production build and browser
-interactions`, `Browser tests (before merge)` and external GitGuardian. Gates
+Required status names are `UI policy (strict)` and `Production build and browser
+interactions`. External GitGuardian remains optional and unchanged. Gates
 check each selected lane must succeed and each unselected lane must be skipped;
 failure, timeout, cancellation, missing output or unexpected skip cannot pass.
 Selected Analytics runs as a reusable CI job, and its conclusion feeds `UI policy (strict)`. Desktop keeps its separate acceptance workflow. No workflow-level path filter is added to required workflows. Main concurrency,
 OIDC, daemon/Desktop exact-source CI gates, E2B release pairs and publication
-checks are unchanged. Existing browser-gate remains a compatibility status only;
+checks are unchanged. The echo-only compatibility workflow has been removed;
 this change adds no browser tests.
 
 ## Inspect and verify

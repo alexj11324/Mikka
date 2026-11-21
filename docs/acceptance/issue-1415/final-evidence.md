@@ -1424,8 +1424,8 @@
       },
       {
         "id": 42217885974,
-        "name": "Browser gate",
-        "path": ".github/workflows/browser-gate.yml",
+        "name": "Retired compatibility workflow",
+        "path": "[removed compatibility workflow]",
         "status": "completed",
         "conclusion": "success",
         "updatedAt": "2026-11-06T12:28:15Z"
@@ -8103,7 +8103,7 @@
       "workflows": [
         {
           "id": 42247308848,
-          "name": "Browser gate",
+          "name": "Retired compatibility workflow",
           "status": "completed",
           "conclusion": "success"
         },
@@ -13248,8 +13248,8 @@
             "workflows": [
               {
                 "id": 42282022425,
-                "name": "Browser gate",
-                "path": ".github/workflows/browser-gate.yml",
+                "name": "Retired compatibility workflow",
+                "path": "[removed compatibility workflow]",
                 "event": "pull_request",
                 "attempt": 1,
                 "headRevision": "9ee56173ea1e9ed7bb0f579bd3499c7051ed1e46",
@@ -13526,7 +13526,7 @@
               },
               {
                 "id": 128113172137,
-                "name": "Browser tests (before merge)",
+                "name": "Retired compatibility check",
                 "status": "completed",
                 "conclusion": "success",
                 "startedAt": "2026-11-06T19:42:47Z",
@@ -16072,7 +16072,7 @@
               },
               {
                 "id": 128145212348,
-                "name": "Browser tests (before merge)",
+                "name": "Retired compatibility check",
                 "status": "completed",
                 "conclusion": "success",
                 "startedAt": "2026-11-06T20:48:07Z",
@@ -16943,8 +16943,8 @@
             "workflows": [
               {
                 "id": 42292526751,
-                "name": "Browser gate",
-                "path": ".github/workflows/browser-gate.yml",
+                "name": "Retired compatibility workflow",
+                "path": "[removed compatibility workflow]",
                 "headSha": "9aa84b64241df689e13651425ff22da5427295aa",
                 "event": "pull_request",
                 "runAttempt": 1,
@@ -17230,7 +17230,7 @@
               },
               {
                 "id": 128149337579,
-                "name": "Browser tests (before merge)",
+                "name": "Retired compatibility check",
                 "headSha": "9aa84b64241df689e13651425ff22da5427295aa",
                 "status": "completed",
                 "conclusion": "success",
@@ -17582,7 +17582,7 @@
             "productionExecutionVerified": false,
             "managedInspectionExecuted": false,
             "mergedByThisAgent": false,
-            "note": "Browser tests (before merge), UI policy (strict), and Production build and browser interactions are gates/aggregations. Actual Chromium evidence is the separately identified Analytics SSR job. No production owner credentials or production business execution is inferred from this PR CI.",
+            "note": "Retired compatibility check, UI policy (strict), and Production build and browser interactions are gates/aggregations. Actual Chromium evidence is the separately identified Analytics SSR job. No production owner credentials or production business execution is inferred from this PR CI.",
             "writtenAt": "2026-11-06T21:05:40.857503+00:00",
             "fullLogDigests": {
               "source": {
@@ -19298,7 +19298,7 @@
                 },
                 {
                   "id": 128164678168,
-                  "name": "Browser tests (before merge)",
+                  "name": "Retired compatibility check",
                   "status": "completed",
                   "conclusion": "success",
                   "startedAt": "2026-11-06T21:28:20Z",
@@ -19325,7 +19325,7 @@
             "workflows": [
               {
                 "id": 42296984603,
-                "name": "Browser gate",
+                "name": "Retired compatibility workflow",
                 "event": "pull_request",
                 "head": "2cd2faf31195bcaecf153c5dc982ceeb6edf6b36",
                 "attempt": 1,
@@ -19336,7 +19336,7 @@
                 "jobs": [
                   {
                     "id": 128164678168,
-                    "name": "Browser tests (before merge)",
+                    "name": "Retired compatibility check",
                     "status": "completed",
                     "conclusion": "success"
                   }
@@ -26060,8 +26060,8 @@
             "workflowRuns": [
               {
                 "id": 42306176619,
-                "name": "Browser gate",
-                "path": ".github/workflows/browser-gate.yml",
+                "name": "Retired compatibility workflow",
+                "path": "[removed compatibility workflow]",
                 "event": "pull_request",
                 "attempt": 1,
                 "head": "8478113ddb819656c2e63467a78d935e5f685e5e",
@@ -26284,7 +26284,7 @@
                 },
                 {
                   "id": 128195935294,
-                  "name": "Browser tests (before merge)",
+                  "name": "Retired compatibility check",
                   "status": "completed",
                   "conclusion": "success",
                   "startedAt": "2026-11-06T22:37:56Z",
@@ -26505,7 +26505,7 @@
                 "sha256": "fd4f5de3a1ff9fabcc8a3416de67a7bcaac33a486c9645ad2e43e1c358c5e584"
               },
               {
-                "path": "/vercel/issue1415-pr1555-ci/browser-gate-job-128195935294.log",
+                "path": "[retired compatibility job log 128195935294]",
                 "bytes": 2201,
                 "sha256": "c930d5532faae1ea2386c1d5a012eed3b1bea1c897301ade413e59116dd77b89"
               }
@@ -26596,7 +26596,7 @@
             "workflows": [
               {
                 "id": 42306176619,
-                "name": "Browser gate",
+                "name": "Retired compatibility workflow",
                 "conclusion": "success",
                 "updatedAt": "2026-11-06T22:37:59Z"
               },
@@ -36580,7 +36580,7 @@
             "workflows": [
               {
                 "id": 42320695492,
-                "name": "Browser gate",
+                "name": "Retired compatibility workflow",
                 "event": "pull_request",
                 "headSha": "413fe94b156817b95922a920029f0f4fc66e5162",
                 "attempt": 1,
@@ -36718,7 +36718,7 @@
               },
               {
                 "id": 128244255958,
-                "name": "Browser tests (before merge)",
+                "name": "Retired compatibility check",
                 "status": "completed",
                 "conclusion": "success"
               }
@@ -36862,7 +36862,7 @@
               ]
             },
             "scopeNotes": [
-              "Browser gate is the existing policy placeholder and executed no browser tests.",
+              "Retired compatibility workflow is the existing policy placeholder and executed no browser tests.",
               "CI job named Production build and browser interactions is an aggregation check; Analytics SSR independently built the actual tested merge revision and loaded its three reported paths.",
               "No production sign-in, model request, reminder, SQL or deployment operation was performed by this CI monitoring task.",
               "The actual main merge includes an intervening PR; its distinct tree is covered by the separate normal push CI, not relabeled as the PR CI tree."

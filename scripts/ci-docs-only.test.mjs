@@ -235,7 +235,6 @@ test('blocking CI checks synthetic PR merge candidates once and preserves every 
     assert.match(text, /github\.ref == 'refs\/heads\/main' && format\('-\{0\}', github\.run_id\)/)
     assert.match(text, /cancel-in-progress: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}/)
   }
-  assert.match(readFileSync('.github/workflows/browser-gate.yml', 'utf8'), /name: Browser tests \(before merge\)\n/)
 })
 
 
