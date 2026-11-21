@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
+import { before, beforeEach, mock, test } from 'node:test'
 import type { SQL } from 'drizzle-orm'
+import type { PoolClient } from 'pg'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { coordinatorEvents, coordinatorMessages, coordinatorSessions } from '../db/schema'
 import { peerCoordinatorMessageEvent, userMessageEvent } from '../coordinator-events'
 import { promptMessages, type StoredMessage } from './context'
 import { actingContext } from '../activity-actor'
+import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
+import { observeCommitEffects } from '../db/commit-effects'
+
+const scheduledLive = captureFixtureLiveEffects()
+beforeEach(() => { scheduledLive.length = 0 })
 
 // Exercises actual event persistence/take/MCP consumers against a SQL-shaped
 // in-memory transport. It neither imports a real Pool nor starts services.
@@ -16,7 +22,13 @@ let selectionConditions = 0
 const resolveChat = mock.fn(async (user: string, chosen: string | null | undefined, workspaceId: string) => {
   assert.equal(user, owner); assert.equal(workspaceId, workspace); return chosen ?? bot
 })
+const client = { async query(command: string) {
+  assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command))
+  return { command, rows: [] }
+} } as unknown as PoolClient
+observeCommitEffects(client)
 const transport = {
+  session: { client },
   async execute(query: SQL) {
     const statement = dialect.sqlToQuery(query)
     // The event's credential check reads through the executor it was given.
@@ -95,7 +107,19 @@ const transport = {
     } } } }
   },
 }
-const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>): Promise<T> { return fn(transport) } }
+const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>): Promise<T> {
+  const priorEvents = structuredClone(events), priorMessages = structuredClone(messages)
+  await client.query('BEGIN')
+  try {
+    const result = await fn(transport)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    events = priorEvents; messages = priorMessages
+    throw error
+  }
+} }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 stub('../db/index.ts', { db: database, pool: { query: async (sql: string) => {
   assert.match(sql, /to_regclass\('credential_secrets'\)/)
@@ -139,6 +163,8 @@ test('actual takeInbox keeps direct user authority separate from earlier forged 
   assert.equal(packet.authority, 'coordination_data_only')
   assert.ok(packet.untrustedData.body.includes(hostile))
   assert.ok(selectionConditions >= 2)
+  await import('../live/notify')
+  assert.ok(scheduledLive.length > 0, 'committed inbox changes register live work')
 })
 
 test('a request and its queued STOP share a direct turn while all runtime notifications wait', async () => {
@@ -186,6 +212,8 @@ test('a request and its queued STOP share a direct turn while all runtime notifi
   assert.equal(JSON.parse(history[3].content as string).source.messageId, 'stored-result-id')
   assert.equal(await store.hasWakingEvents(owner, bot), false)
   assert.equal((await store.takeInbox(owner, 'holder', bot)).added, 0, 'delivered events never repeat')
+  await import('../live/notify')
+  assert.ok(scheduledLive.length > 0, 'committed direct and runtime turns register live work')
 })
 
 test('actual existing MCP send records an Agent report without fabricating a user event', async () => {
@@ -201,4 +229,6 @@ test('actual existing MCP send records an Agent report without fabricating a use
   assert.equal(events[0].tier, undefined)
   assert.equal(events[0].runId, null)
   assert.equal(events[0].botId, bot)
+  await import('../live/notify')
+  assert.ok(scheduledLive.length > 0, 'the autocommitted peer event registers live work')
 })

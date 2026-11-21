@@ -3,9 +3,14 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import type { SQL } from 'drizzle-orm'
+import type { PoolClient } from 'pg'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { teams } from '../lib/db/team-schema'
 import { tokenWorkspace } from '../lib/tokens/principal'
+import { captureFixtureLiveEffects } from './support/live-runtime'
+import { observeCommitEffects } from '../lib/db/commit-effects'
+
+const scheduledLive = captureFixtureLiveEffects()
 
 class WorkspaceError extends Error { constructor(readonly code: string) { super(code) } }
 const calls: Array<[string, ...unknown[]]> = []
@@ -31,6 +36,28 @@ let teamActions: typeof import('../app/actions/teams')
 let botActions: typeof import('../app/actions/bots')
 const inserted: Record<string, unknown>[] = []
 let defaults = { defaultModel: 'codex' as string | null, defaultRepository: 'acme/app' as string | null }
+const client = { async query(command: string) {
+  assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command))
+  return { command, rows: [] }
+} } as unknown as PoolClient
+observeCommitEffects(client)
+const database = {
+  session: { client },
+  insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }),
+  async transaction<T>(work: (tx: { session: { client: PoolClient } }) => Promise<T>): Promise<T> {
+    const before = inserted.length
+    await client.query('BEGIN')
+    try {
+      const result = await work(database)
+      await client.query('COMMIT')
+      return result
+    } catch (error) {
+      await client.query('ROLLBACK')
+      inserted.length = before
+      throw error
+    }
+  },
+}
 
 before(async () => {
   mock.module('@/lib/server-runtime/headers', { namedExports: {
@@ -82,9 +109,9 @@ before(async () => {
     teamLifecycleImpact: () => assert.fail('unexpected lifecycle impact read'),
   } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name }, session: { id: 'workspace-fixture-session' } }) } } } })
-  // createBot writes the Bot, its access and followers in one transaction; this fixture's writes need no real one.
+  // Keep the Bot's fake writes on the same observed transaction as its live registration.
   mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } },
-    db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }), transaction: async (work: (tx: object) => Promise<unknown>) => work({}) },
+    db: database,
     withDatabaseTransaction: (_tx: object, work: () => unknown) => work() } })
   mock.module('@/lib/run-policy-stop', { namedExports: { stopRunsForPolicyChange: respond('stopRunsForPolicyChange', 0) } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
@@ -101,7 +128,7 @@ before(async () => {
   teamActions = await import('../app/actions/teams')
 })
 
-function reset() { calls.length = 0; workspaceContextCalls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined }
+function reset() { calls.length = 0; workspaceContextCalls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined; scheduledLive.length = 0 }
 const relevant = () => calls.filter(([name]) => name !== 'currentWorkspaceActor')
 
 test('updateWorkspace delegates the real slug change and audit context to one backend transaction', async () => {
@@ -209,6 +236,8 @@ test('createBot uses the workspace defaults only for omitted fields', async () =
   defaults = { defaultModel: null, defaultRepository: null }
   await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle' })
   assert.equal(inserted[2].model, null)
+  await import('../lib/live/notify')
+  assert.ok(scheduledLive.length > 0, 'committed Bot creations register live work')
   await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', model: 'gpt-x' }), /validationGeneric/)
 })
 
@@ -219,6 +248,8 @@ test('createBot refuses a repository the workspace has not installed', async () 
   await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
   assert.equal(inserted.length, 1)
   assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])
+  await import('../lib/live/notify')
+  assert.equal(scheduledLive.length, 1, 'only the accepted Bot creation registers live work')
 })
 
 test('the Bot list for a shown workspace is read from that workspace, not the session active one', async () => {

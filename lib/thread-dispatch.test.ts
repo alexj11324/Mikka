@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { EventEmitter } from 'node:events'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
+import type { PoolClient } from 'pg'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+import { observeCommitEffects } from './db/commit-effects'
+
+const scheduledAfter = captureFixtureLiveEffects()
 
 let transaction = false
 let locked = false
@@ -11,6 +18,18 @@ const messages: { runId: string; text: string }[] = []
 const stops: string[] = []
 const executed: string[] = []
 const releases: boolean[] = []
+const writer = { async query(sql: string) {
+  assert.match(sql, /^\s*UPDATE agent_runs\s/)
+  return { command: 'UPDATE', rows: [], rowCount: 1 }
+} } as unknown as PoolClient
+observeCommitEffects(writer)
+const dialect = new PgDialect()
+// The application write autocommits independently of the task-lock checkout.
+const database = { session: { client: writer }, async execute(statement: SQL) {
+  executed.push(JSON.stringify(statement.queryChunks ?? statement).includes('threadReplacedBy') ? 'replaced' : 'continues')
+  const query = dialect.sqlToQuery(statement)
+  return writer.query(query.sql, query.params)
+} }
 const client = {
   async query(sql: string) {
     if (sql === 'BEGIN') transaction = true
@@ -35,13 +54,13 @@ before(async () => {
     end() { return Promise.resolve() }
   } } })
   mock.module(new URL('./agent-run-statuses.ts', import.meta.url).href, { namedExports: { UNFINISHED_RUN_STATUSES: ['queued', 'running'] } })
-  mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: { execute: async (statement: { queryChunks?: unknown[] }) => { executed.push(JSON.stringify(statement.queryChunks ?? statement).includes('threadReplacedBy') ? 'replaced' : 'continues'); return { rows: [], rowCount: 1 } } }, pool: { connect: async () => client, query: async () => ({ rows: latest ? [latest] : [] }) } } })
+  mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: database, pool: { connect: async () => client, query: async () => ({ rows: latest ? [latest] : [] }) } } })
   mock.module(new URL('./run-chain.ts', import.meta.url).href, { namedExports: { readRunChain: async () => null } })
   mock.module(new URL('./run-control.ts', import.meta.url).href, { namedExports: { sendOwnedRunMessage: async (_db: unknown, _user: string, message: { runId: string; text: string }) => { messages.push(message) } } })
   mock.module(new URL('./agent-runs.ts', import.meta.url).href, { namedExports: { requestRunStop: async (_user: string, runId: string) => { stops.push(runId) } } })
   ;({ dispatchToTask } = await import('./thread-dispatch'))
 })
-beforeEach(() => { transaction = false; locked = false; rollbackFails = false; releases.length = 0; latest = null; messages.length = 0; stops.length = 0; executed.length = 0 })
+beforeEach(() => { transaction = false; locked = false; rollbackFails = false; releases.length = 0; latest = null; messages.length = 0; stops.length = 0; executed.length = 0; scheduledAfter.length = 0 })
 
 test('an unavailable machine releases the task lock so the same task can be retried', async () => {
   assert.deepEqual(await dispatchToTask('owner', 'task', { start: async () => {
@@ -92,6 +111,7 @@ test('a follow-up on an ended thread runs the same thread again', async () => {
   assert.deepEqual([(result as { continuesRunId: string }).continuesRunId, (result as { threadId: string }).threadId], ['thread-1', 'thread-1'])
   assert.equal((starts[0] as { id: string }).id, 'thread-1', 'started as the next run of that thread')
   assert.deepEqual(executed, ['continues'])
+  assert.ok(scheduledAfter.length > 0, 'the autocommitted continuation registers live response work')
 })
 
 test('asking for a new thread is honoured only when the person said so; otherwise the thread is kept', async () => {
@@ -104,6 +124,7 @@ test('asking for a new thread is honoured only when the person said so; otherwis
   assert.deepEqual(fresh, { runId: 'run-2', thread: 'new', threadId: 'run-2', replacedThreadId: 'thread-1' })
   assert.deepEqual(stops, ['thread-1'], 'the old thread stops: one thread works on a task at a time')
   assert.deepEqual(executed, ['replaced'])
+  assert.ok(scheduledAfter.length > 0, 'the autocommitted replacement registers live response work')
 })
 
 test('an explicit replacement finishes the old stop even when an epoch already set the stop flag', async () => {
@@ -111,4 +132,5 @@ test('an explicit replacement finishes the old stop even when an epoch already s
   const result = await dispatchToTask('owner', 'task', { newThread: true, explicit: async () => true, start })
   assert.deepEqual(result, { runId: 'run-2', thread: 'new', threadId: 'run-2', replacedThreadId: 'thread-1' })
   assert.deepEqual(stops, ['thread-1'])
+  assert.ok(scheduledAfter.length > 0, 'the autocommitted replacement registers live response work')
 })

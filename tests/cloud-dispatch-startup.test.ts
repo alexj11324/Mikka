@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { EventEmitter } from 'node:events'
 import * as databaseScope from '../lib/db/request-scope'
-import { ComputerError } from '../lib/computer/store'
 import { ActionFailureError } from '../lib/action-error'
 import * as profileDefinitions from '../lib/factory/agent-profile-definition'
 import { createRequire } from 'node:module'
@@ -13,6 +12,15 @@ import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
 import { createTracerProvider, SafeExporter } from '../lib/tracing/node'
 import { createLogProvider } from '../lib/tracing/logs'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
+import type { PoolClient } from 'pg'
+import { captureFixtureLiveEffects } from './support/live-runtime'
+import { observeCommitEffects } from '../lib/db/commit-effects'
+
+const scheduledAfter = captureFixtureLiveEffects()
+// This module loads live writers; install the response scheduler before them.
+const { ComputerError } = await import('../lib/computer/store')
 
 const owner = 'synthetic-owner', botId = '10000000-0000-4000-8000-000000000001'
 const issueId = '10000000-0000-4000-8000-000000000002', runId = '10000000-0000-4000-8000-000000000003'
@@ -77,6 +85,18 @@ async function query(sql: string, values: unknown[] = []) {
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
 const pool = { query, connect: async () => ({ query, release() {} }) }
+const writer = { async query(sql: string) {
+  assert.match(sql, /^\s*UPDATE agent_runs\s/)
+  return { command: 'UPDATE', rows: [], rowCount: 1 }
+} } as unknown as PoolClient
+observeCommitEffects(writer)
+const dialect = new PgDialect()
+// Linking the continuation uses APP, not the separate task-lock transaction.
+const database = { session: { client: writer }, async execute(statement: SQL) {
+  calls.push('link-continuation')
+  const query = dialect.sqlToQuery(statement)
+  return writer.query(query.sql, query.params)
+} }
 const applicationPool = { options: {}, end: async () => undefined }
 stub('../lib/db/request-scope.ts', { ...databaseScope, currentDatabasePool: () => applicationPool })
 class TaskLockPool extends EventEmitter {
@@ -86,7 +106,7 @@ class TaskLockPool extends EventEmitter {
 mock.module('pg', { defaultExport: { Pool: TaskLockPool }, namedExports: { Pool: TaskLockPool, Client: unused, escapeLiteral: unused } })
 stub('../lib/auth.ts', { auth: { api: {} } })
 stub('../lib/cloud-computer-flag.ts', { cloudComputerRunsEnabled: () => true, cloudComputerTasksEnabled: () => true, byosEnabled: () => true, byosEnrollmentEnabled: () => true })
-stub('../lib/db/index.ts', { db: { execute: async () => { calls.push('link-continuation'); return { rows: [], rowCount: 1 } } }, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
+stub('../lib/db/index.ts', { db: database, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
 stub('../lib/agent-runs.ts', { queueRun: unused, queueFactoryRun: unused, addRunMessage: unused, readRun: unused, requestRunStop: unused, visibleRuns: unused })
 stub('../lib/factory/queue-local.ts', { queueTaskRun: async () => {
   calls.push('local-queue-refused')
@@ -189,6 +209,7 @@ let dispatchThread: typeof import('../workflows/coordinator/steps')['dispatchCom
 let dispatchRun: typeof import('../workflows/coordinator/steps')['dispatchRun']
 before(async () => { ({ dispatchComputerTask: dispatch, dispatchComputerThread: dispatchThread, dispatchRun } = await import('../workflows/coordinator/steps')) })
 beforeEach(() => {
+  scheduledAfter.length = 0
   calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
@@ -491,6 +512,7 @@ test('a completed thread retains its model, binding, ancestry and read-only poli
   assert.equal(input.apiKeyId, undefined)
   assert.equal(input.readOnly, true)
   assert.equal(input.idempotencyKey, `coordinator:thread:${priorRunId}:continued-call`)
+  assert.ok(scheduledAfter.length > 0, 'the autocommitted continuation registers live response work')
 })
 
 test('a working thread receives its message without waking or reselecting anything', async () => {
