@@ -3,7 +3,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 're
 import { useRouter } from 'expo-router'
 import { Check, X } from 'lucide-react-native'
 import { BOT_COLORS, BOT_PICKER_SHAPES, BotAvatar } from '@/components/icons'
-import { NavBar } from '@/components/NavBar'
+import { NavBar, underBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
 import { Field } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
@@ -51,7 +51,7 @@ export default function NewBot() {
       <NavBar fade={false} title="新建 Bot"
         left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
         right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !name.trim() || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
-      <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
+      <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" {...underBar} contentContainerStyle={styles.body}>
         <View style={styles.hero}><BotAvatar color={color} shape={shape} size={96} /></View>
         <Field style={styles.field}>
           <TextInput editable={!busy} value={name} onChangeText={setName} placeholder="名字" placeholderTextColor={colors.secondary} maxLength={60} autoFocus

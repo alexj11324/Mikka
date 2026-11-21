@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, TextInput } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
 import { Check, X } from 'lucide-react-native'
-import { NavBar } from '@/components/NavBar'
+import { NavBar, underBar } from '@/components/NavBar'
 import { Segmented } from '@/components/Segmented'
 import { Text } from '@/components/Text'
 import { Field } from '@/components/ui'
@@ -54,7 +54,7 @@ export default function NewTask() {
     <NavBar fade={false} title={copy.title}
       left={{ icon: 'xmark', label: mobileMessages.Common.cancel, disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
       right={{ icon: 'checkmark', label: busy ? copy.sending : label, disabled: busy || !text || !home, busy, prominent: true, web: <Check size={20} color={colors.accent} />, onPress: () => void submit() }} />
-    <ScrollView keyboardShouldPersistTaps="handled" style={styles.page} contentContainerStyle={styles.body}>
+    <ScrollView keyboardShouldPersistTaps="handled" style={styles.page} {...underBar} contentContainerStyle={styles.body}>
       <Segmented value={intent} onChange={next => { if (!pending.current) setIntent(next) }} options={[{ value: 'create_only', label: copy.createOnly }, { value: 'create_and_dispatch', label: copy.createAndDispatch }]} />
       <Field style={styles.field}><TextInput value={title} editable={!busy} onChangeText={setTitle} maxLength={TASK_TITLE_MAX} accessibilityLabel={copy.titleLabel}
         autoFocus placeholder={copy.backlogTitlePlaceholder} placeholderTextColor={colors.secondary} style={styles.input} /></Field>

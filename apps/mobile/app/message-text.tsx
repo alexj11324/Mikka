@@ -15,7 +15,7 @@ export default function MessageText() {
     <View style={styles.screen}>
       <NavBar title="选择文本" />
       <TextInput value={text} onChangeText={() => {}} multiline showSoftInputOnFocus={false} autoFocus
-        scrollEnabled contextMenuHidden={false} style={styles.text} />
+        scrollEnabled contextMenuHidden={false} contentInsetAdjustmentBehavior="automatic" style={styles.text} />
     </View>
   )
 }
