@@ -17,7 +17,7 @@ export class ComputerError extends Error {
 }
 type Actor = { userId: string; workspaceId: string }
 type Bot = { id: string; name: string; ownerId: string; workspaceId: string }
-type Machine = { workspaceId: string; ownerId: string; sandboxId: string | null; operationId: string; state: string; runtimeReady: boolean }
+type Machine = { workspaceId: string; ownerId: string; sandboxId: string | null; operationId: string; state: string; errorCode: string | null; runtimeReady: boolean }
 type Desktop = { botId: string; ownerId: string; display: number; epoch: number; control: string; controlledBy: string | null; controlUntil: Date | null; lastAction: unknown }
 
 /** Serialize machine allocation and control transitions across server instances. */
@@ -122,13 +122,18 @@ export class ComputerStore {
       LEFT JOIN bot_desktops d ON d."botId" = b.id AND d."workspaceId" = m."workspaceId" AND d."ownerId" = m."ownerId"
       WHERE b.id = $1 AND b."workspaceId" = $2 AND b."ownerId" = $3`, [botId, actor.workspaceId, actor.userId])
     if (!row) throw new ComputerError(404, 'Computer not found')
+    const provisionDeadline = row.machine === 'waking' ? row.provisionLeaseUntil : null
+    const provisionExpired = (now: number) => provisionDeadline != null && new Date(provisionDeadline).getTime() <= now
+    let machine = row.machine
     if (row.control === null) {
-      return { machine: row.machine === 'waking' ? 'waking' : 'sleeping', control: 'idle',
-        live: computerLiveState(actor.workspaceId, row.machine === 'waking' ? [row.provisionLeaseUntil] : []) }
+      const now = Date.now()
+      const abandonedProvision = provisionExpired(now)
+      return { machine: abandonedProvision ? 'error' : machine === 'waking' ? 'waking' : 'sleeping', control: 'idle',
+        live: computerLiveState(actor.workspaceId, abandonedProvision ? [] : [provisionDeadline], now) }
     }
-    const deadlines: (Date | null | undefined)[] = row.machine === 'waking' ? [row.provisionLeaseUntil] : []
-    if (row.sandboxId && row.machine !== 'error' && row.machine !== 'waking') {
-      row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
+    const deadlines: (Date | null | undefined)[] = []
+    if (row.sandboxId && machine !== 'error' && machine !== 'waking') {
+      machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
     }
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
     const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt",
@@ -151,8 +156,11 @@ export class ComputerStore {
           expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     if (held) deadlines.push(row.controlUntil)
     if (pendingApproval) deadlines.push(review.visibleUntil)
-    return { machine: row.machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
-      live: computerLiveState(actor.workspaceId, deadlines),
+    const now = Date.now()
+    if (provisionExpired(now)) machine = 'error'
+    else if (provisionDeadline != null) deadlines.push(provisionDeadline)
+    return { machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
+      live: computerLiveState(actor.workspaceId, deadlines, now),
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
   }
   private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {

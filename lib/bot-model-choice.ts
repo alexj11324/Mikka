@@ -3,6 +3,7 @@ import { hostedModelEnabled } from './enabled-models'
 import { ActionFailureError } from './action-error'
 import type { Pool } from 'pg'
 import type { ExecutionSettings, ExecutionSettingsScope } from './execution-settings'
+import type { ModelCandidateSnapshot } from './model-order'
 import { creditsOptionId, parseCreditsOption, type BotModelQuota } from './bot-model-menu-view'
 import { apiKeyChatBaseUrl } from './model-api-key-providers'
 import { usableApiKeys, type UsableApiKey } from './model-api-keys'
@@ -58,7 +59,7 @@ export async function resolveBotModelChoice(
   scope: ExecutionSettingsScope,
   botId: string | null,
   preference: { selected?: string; key?: { keyId: string; model: string } },
-  cached: { rows?: BotSubscriptionChoice[]; keys?: UsableApiKey[]; now?: number } = {},
+  cached: { rows?: BotSubscriptionChoice[]; keys?: UsableApiKey[]; now?: number; fallback?: ModelCandidateSnapshot } = {},
 ): Promise<BotModelChoice> {
   const now = cached.now ?? Date.now()
   const keys = cached.keys ?? await usableApiKeys(pool, scope.ownerId, scope.workspaceId)
@@ -71,7 +72,7 @@ export async function resolveBotModelChoice(
   const hostedAllowed = () => hostedPolicy ??= hostedModelEnabled(pool, scope.ownerId)
   const hosted = async (state: ChoiceState, model: string): Promise<BotModelChoice> => {
     if (!await hostedAllowed()) {
-      const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
+      const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope, cached.fallback)
       if (next?.kind === 'api_key') {
         const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
         if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'preference' }
@@ -86,7 +87,7 @@ export async function resolveBotModelChoice(
     // or their own provider. Local hosted balances never redirect that choice.
     if (!isCloudEdition()) return { kind: 'hosted', model, ...state }
     const { hostedPointsRefusal, pointsFallback } = await import('./points-fallback')
-    const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope) : null
+    const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope, cached.fallback) : null
     if (next?.kind === 'api_key') {
       const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
       if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'points' }
@@ -122,7 +123,7 @@ export async function resolveBotModelChoice(
     return { kind: 'subscription', binding, ...state, quota }
   }
   if (!selected && (preference.key || preference.selected)) {
-    const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
+    const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope, cached.fallback)
     if (next?.kind === 'api_key') {
       const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
       if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'preference' }
@@ -135,7 +136,7 @@ export async function resolveBotModelChoice(
   // A subscription serves its owner only (decision 2026-11-17): only their own is a default.
   if (binding) return withQuota(binding)
   // No silent default (decision 2026-11-15-1900): the person's own 优先使用的模型 may still name one; else they choose.
-  const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
+  const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope, cached.fallback)
   if (next?.kind === 'api_key') {
     const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
     if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'preference' }
