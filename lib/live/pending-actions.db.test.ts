@@ -63,6 +63,12 @@ test('legacy pending producers invalidate only their committed owner-personal li
     const { decidePendingAction } = await import('../pending-actions')
     const { proposeCredentialOperation } = await import('../cloud-computer/credential-reviews')
     const { sweepBrowserMutations } = await import('../cloud-computer/action-reviews')
+    mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { namedExports: { authorizeSubscriptionWorkspace: async () => undefined } })
+    mock.module(new URL('../cloud-computer/subagent-browser.ts', import.meta.url).href, { namedExports: { resolveSubagentBrowserTarget: async () => ({ targetId: 'fixture-target', origin: 'https://example.invalid', observedInputs: [{ backendNodeId: 12, credentialRole: 'password', loaderId: 'fixture-document', epoch: 1, permissionVersion: 0 }] }) } })
+    mock.module(new URL('../credentials/runtime.ts', import.meta.url).href, { namedExports: {
+      credentialStore: { authorize: async () => undefined, lease: async () => ({ status: 'needs_login' }) },
+      executeCredentialLease: async () => { throw new Error('unexpected fill') },
+    } })
     const owner = `pending-live-${randomUUID()}`, other = `pending-other-${randomUUID()}`
     const homes = new Map([[owner, randomUUID()], [other, randomUUID()]])
     for (const pool of pools) for (const userId of [owner, other]) {
@@ -196,22 +202,28 @@ test('legacy pending producers invalidate only their committed owner-personal li
         await database.query('INSERT INTO bot_subagents(id,"ownerId","workspaceId","botId",task,status,epoch,"targetId") VALUES($1,$2,$3,$4,$5,\'running\',1,$6)', [id, owner, workspaceId, botId, task, target.targetId])
         return id
       }
+      const credentialId = randomUUID()
+      await database.query('INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4)', [credentialId, owner, target.origin, 'saved-user'])
+      await database.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,'fixture-dek','secret-version-1','fixture-ct','fixture-hmac',4)`, [credentialId])
       const subagentId = await subagent('Pending approval fixture'), caller = { userId: owner, workspaceId, botId, subagentId }
       const before = sent.length
-      assert.equal((await proposeCredentialOperation(database, caller, target, 'fill')).status, 'needs_approval')
+      // The saved login is the consent: the proposal signs in at once and ends
+      // needs_you when the lease finds no usable account state.
+      assert.equal((await proposeCredentialOperation(database, caller, target)).status, 'needs_login')
       const subagentEvents = { path: expected(owner).path, events: [{ kind: 'subagent_events', id: workspaceId }] }
       const byKind = (items: typeof sent) => [...items].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
-      // One committed credential proposal changes both the pending list and its subagent event stream.
-      await drain(); assert.deepEqual(byKind(sent.slice(before)), byKind([expected(owner), subagentEvents]))
-      assert.equal((await proposeCredentialOperation(database, caller, target, 'fill')).status, 'needs_approval')
-      await drain(); assert.equal(sent.length, before + 2)
+      // One committed credential proposal notifies its subagent event stream:
+      // Signing in, then the needs_you outcome. The receipt is never a card.
+      await drain(); assert.deepEqual(byKind(sent.slice(before)), [subagentEvents, subagentEvents])
+      assert.equal((await proposeCredentialOperation(database, caller, target)).status, 'needs_login')
+      await drain(); assert.equal(sent.length, before + 4)
       await database.query(`CREATE FUNCTION reject_pending_live_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
         IF NEW.event->'data'->>'task'='pending-live-must-rollback' THEN RAISE EXCEPTION 'fixture event write rejected'; END IF; RETURN NEW; END $$;
         CREATE TRIGGER reject_pending_live_fixture BEFORE INSERT ON subagent_events FOR EACH ROW EXECUTE FUNCTION reject_pending_live_fixture()`)
       const rejected = await subagent('pending-live-must-rollback')
       const count = (await database.query('SELECT count(*) FROM pending_actions')).rows[0].count
-      await assert.rejects(proposeCredentialOperation(database, { ...caller, subagentId: rejected }, target, 'fill'), /fixture event write rejected/)
-      await drain(); assert.equal(sent.length, before + 2)
+      await assert.rejects(proposeCredentialOperation(database, { ...caller, subagentId: rejected }, target), /fixture event write rejected/)
+      await drain(); assert.equal(sent.length, before + 4)
       assert.equal((await database.query('SELECT count(*) FROM pending_actions')).rows[0].count, count)
       assert.equal((await database.query('SELECT status FROM bot_subagents WHERE id=$1', [rejected])).rows[0].status, 'running')
     })

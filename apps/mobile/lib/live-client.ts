@@ -109,7 +109,7 @@ export function createLiveClient(deps: LiveClientDeps) {
 export type LiveClient = ReturnType<typeof createLiveClient>
 
 const PENDING_ACTION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // lib/pending-action-view.ts
-const SHORT_LIVED = ['credential_operation', 'browser_operation']
+const SHORT_LIVED = ['browser_operation']
 
 /** When the soonest proposal expires (lib/live/pending-action-cache.ts): no write marks it, so the list reads once more then. */
 export function pendingActionsDeadline(items: readonly { action: string; createdAt: string }[] | null | undefined, now = Date.now()) {

@@ -14,9 +14,8 @@ test('a pending list has an owner and session key; unresolved identity subscribe
   assert.notDeepEqual(pendingActionsLiveKeys('owner', 'session'), pendingActionsLiveKeys('owner', 'new-session'))
 })
 
-test('browser and credential cards retain five minutes; account/app cards retain seven days', () => {
+test('browser cards retain five minutes; account/app cards retain seven days', () => {
   const createdAt = '2026-11-04T20:00:00.000Z'
-  assert.equal(pendingActionExpiresAt({ action: 'credential_operation', createdAt }), '2026-11-04T20:05:00.000Z')
   assert.equal(pendingActionExpiresAt({ action: 'browser_operation', createdAt }), '2026-11-04T20:05:00.000Z')
   assert.equal(pendingActionExpiresAt({ action: 'app_tool_call', createdAt }), '2026-11-11T20:00:00.000Z')
   assert.equal(pendingActionExpiresAt({ action: 'send_email', createdAt }), '2026-11-11T20:00:00.000Z')

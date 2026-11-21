@@ -58,6 +58,8 @@ before(async () => {
   await pool.query(`CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text DEFAULT 'allow',version bigint DEFAULT 0,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
     CREATE TABLE agent_kit_heads(owner_id text,bot_id uuid,workspace_id uuid,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
     CREATE TABLE pending_actions(id uuid PRIMARY KEY,"botId" uuid,"userId" text NOT NULL,action text NOT NULL,input jsonb NOT NULL,status text DEFAULT 'pending',"createdAt" timestamptz DEFAULT now(),"decidedAt" timestamptz,result jsonb,error text);
+    CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,revoked_at timestamptz);
+    CREATE TABLE credential_secrets(credential_id uuid PRIMARY KEY,nonce text);
     CREATE FUNCTION reject_fixture_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
       IF NEW.event->'data'->>'task'='event-write-must-rollback' THEN RAISE EXCEPTION 'fixture event write rejected'; END IF;
       RETURN NEW; END $$;
@@ -66,6 +68,9 @@ before(async () => {
   await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_id,workspace_id) VALUES($1,$2,$3)', [actor.userId, botId, actor.workspaceId])
   await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)', [actor.workspaceId])
   await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,true)', [actor.workspaceId, actor.userId, randomUUID(), 'fixture-machine', 'running'])
+  const credentialId = randomUUID()
+  await pool.query('INSERT INTO credentials VALUES($1,$2,$3,$4,NULL)', [credentialId, actor.userId, target.origin, 'saved-user'])
+  await pool.query('INSERT INTO credential_secrets VALUES($1,$2)', [credentialId, 'secret-version-1'])
   const live = await import('../live/notify')
   mock.module('@/lib/live/notify', { namedExports: { ...live,
     notifyLive(scope: LiveScope, events: LiveInvalidation[]) {
@@ -92,6 +97,11 @@ before(async () => {
     },
     grant: async () => { throw new Error('Unexpected credential continuation') },
     endpointPath: (endpoint: string, path: string) => endpoint + path,
+  } })
+  mock.module('@/lib/cloud-computer/subagent-browser', { namedExports: { resolveSubagentBrowserTarget: async () => target } })
+  mock.module('@/lib/credentials/runtime', { namedExports: {
+    credentialStore: { authorize: async () => undefined, lease: async () => ({ status: 'needs_login' }) },
+    executeCredentialLease: async () => { throw new Error('unexpected fill') },
   } })
   readComputerEvents = (await import('./event-log')).readComputerEvents
   store = new (await import('../cloud-computer/subagents')).SubagentStore(pool)
@@ -172,16 +182,17 @@ test('actual queued stop rolls back its state and sends no notification when eve
   assert.equal((await readComputerEvents(observer, { ownerId: actor.userId, workspaceId: actor.workspaceId }, '0')).events.length, 0)
 })
 
-test('actual credential proposal commits approval and event together; rollback leaves neither', { skip: !databaseURL }, async () => {
+test('actual credential proposal commits receipt and event together; rollback leaves neither', { skip: !databaseURL }, async () => {
   const id = await task('running')
-  assert.equal((await proposeCredentialOperation(pool, { ...actor, botId, subagentId: id }, target, 'fill')).status, 'needs_approval')
-  await notice(1, 'needs_you')
+  // The saved fixture login is the consent: the proposal runs at once and ends needs_you when no lease is usable.
+  assert.equal((await proposeCredentialOperation(pool, { ...actor, botId, subagentId: id }, target)).status, 'needs_login')
+  await notice(2, 'needs_you')
   assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 1)
   const rejected = await task('running', 'event-write-must-rollback')
-  await assert.rejects(proposeCredentialOperation(pool, { ...actor, botId, subagentId: rejected }, target, 'fill'), /fixture event write rejected/)
+  await assert.rejects(proposeCredentialOperation(pool, { ...actor, botId, subagentId: rejected }, target), /fixture event write rejected/)
   assert.equal((await store.get(actor, botId, rejected)).status, 'running')
   assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 1)
-  await Promise.all(probes); assert.equal(notices.length, 1)
+  await Promise.all(probes); assert.equal(notices.length, 2)
 })
 
 test('actual browser action commits its event before notification and external action; rollback prevents action', { skip: !databaseURL }, async () => {
