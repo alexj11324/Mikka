@@ -27,7 +27,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     await pendingActionsChanged(executor, row.id, userId)
     if (!approve && row.action !== 'credential_operation') {
       await recordCoordinatorEvent(executor, actionDecidedEvent(row, { status: 'declined', error: null, outcome: {} }, { botId: row.botId }))
-      return row.action === 'browser_operation' ? row : null
+      return row.action === 'browser_operation' ? { ...row, action: row.action } as const : null
     }
     return { ...row, action: row.action } as const
   }
