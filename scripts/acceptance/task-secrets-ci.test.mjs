@@ -22,9 +22,11 @@ const workflow = { id: 456, name: RELEASE_NAME, path: RELEASE_WORKFLOW, state: '
 const started = new Date(Date.now() - 60_000).toISOString()
 const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: RELEASE_NAME, path: RELEASE_WORKFLOW,
   head_sha: SHA, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success', run_started_at: started,
-  repository: { id: 789, full_name: REPOSITORY }, head_repository: { id: 789, full_name: REPOSITORY } }
+  repository: { id: 1427517699, full_name: REPOSITORY, owner: { id: 183887963 } },
+  head_repository: { id: 1427517699, full_name: REPOSITORY, owner: { id: 183887963 } } }
 const expected = { sourceCommit: SHA, runId: run.id, runAttempt: run.run_attempt, workflowId: workflow.id, event: run.event }
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
+  GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SHA, GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', GITHUB_TOKEN: TOKEN,
   TASK_SECRETS_JOB_ID: '991', TASK_SECRETS_JOB_STARTED_AT: started, TASK_SECRETS_JOB_START_SOURCE: 'github_actions_job.started_at',
   APPLICATION_SHA: SHA, EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: '123', EXPECTED_UPSTREAM_RUN_ATTEMPT: '2',
@@ -55,7 +57,7 @@ function artifact(archive = validArchive) {
   return { id: 321, name: 'e2b-release-evidence-123-2', expired: false, size_in_bytes: archive.length,
     created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 3600_000).toISOString(), digest: `sha256:${hash(archive)}`,
     url: `${API}/actions/artifacts/321`, archive_download_url: `${API}/actions/artifacts/321/zip`,
-    workflow_run: { id: 123, repository_id: 789, head_repository_id: 789, head_branch: 'main', head_sha: SHA } }
+    workflow_run: { id: 123, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: SHA } }
 }
 const relevant = ['docs/security/task-secret-delivery.md', 'lib/secrets/runtime.ts']
 function proof() {
@@ -208,7 +210,7 @@ function metadataFixture(t, mutate = () => {}) {
   writeFileSync(fixturePath, JSON.stringify(fixture)); writeFileSync(eventPath, JSON.stringify(fixture.event)); writeFileSync(output, '')
   const setup = `import {readFileSync as fixtureRead} from 'node:fs'; const f=JSON.parse(fixtureRead(process.env.FIXTURE_PATH));\n`
     + `globalThis.fetch=async(url,options)=>{if(options.redirect!=='error'||options.headers.authorization!=='Bearer ${TOKEN}')throw Error('private');\n`
-    + `const routes={'${API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${API}/actions/runs/123':f.run,'${API}/git/ref/heads/main':f.main}; if(!Object.hasOwn(routes,url))throw Error('private');return Response.json(routes[url])};\n`
+    + `const routes={'${MAIN_API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${MAIN_API}/actions/runs/123':f.run,'${MAIN_API}/git/ref/heads/main':f.main}; if(!Object.hasOwn(routes,url))throw Error('private');return Response.json(routes[url])};\n`
   const result = spawnSync(process.execPath, ['--input-type=module'], { input: setup + metadataScript(), encoding: 'utf8',
     env: { PATH: process.env.PATH, ...fixture.environment, FIXTURE_PATH: fixturePath, GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output } })
   return { ...result, output: readFileSync(output, 'utf8') }
@@ -225,6 +227,9 @@ test('the actual pre-checkout script permits current official release or exact m
 test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
   const automatic = mutate => metadataFixture(t, value => {
     value.event.workflow_run.event = 'workflow_run'; value.run.event = 'workflow_run'
+    value.environment.GITHUB_REPOSITORY = 'aspectly-labs/Mikka'; value.environment.GITHUB_REPOSITORY_OWNER_ID = '359279274'
+    for (const source of [value.event.workflow_run, value.run]) for (const key of ['repository', 'head_repository'])
+      source[key] = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
     mutate?.(value)
   })
   const result = automatic()
@@ -233,7 +238,13 @@ test('Cloudflare-triggered runtime metadata retains all pre-checkout identity ch
   for (const mutate of [value => { value.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
     value => { value.workflow.path = '.github/workflows/other.yml' }, value => { value.run.event = 'push' },
     value => { value.run.run_attempt++ }, value => { value.main.object.sha = OTHER },
-    value => { value.environment.GITHUB_RUN_ATTEMPT = '3' }]) {
+    value => { value.environment.GITHUB_RUN_ATTEMPT = '3' },
+    value => { value.environment.GITHUB_REPOSITORY_ID = '999' },
+    value => { value.environment.GITHUB_REPOSITORY_OWNER_ID = '183887963' },
+    value => { delete value.environment.GITHUB_REPOSITORY_OWNER_ID },
+    value => { value.event.workflow_run.repository.id++ },
+    value => { value.event.workflow_run.head_repository.owner.id = 183887963 },
+    value => { value.run.repository.owner.id = 183887963 }, value => { value.run.head_repository.id++ }]) {
     const refused = automatic(mutate)
     assert.equal(refused.status, 1); assert.equal(refused.output, '')
     assert.equal(refused.stderr.trim(), 'task_secret_source_refused')

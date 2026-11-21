@@ -213,7 +213,9 @@ export async function selectAcceptance(env, event, { fetchImpl = fetch, now = Da
   check(Array.isArray(releases.workflow_runs) && releases.total_count === releases.workflow_runs.length && releases.total_count <= 100, 'runtime')
   const upstream = releases.workflow_runs.filter(run => run.head_sha === sourceCommit).sort((a, b) => b.id - a.id)[0]
   if (!upstream || upstream.status !== 'completed') return empty('runtime_not_finished')
-  const expected = { sourceCommit, runId: upstream.id, runAttempt: upstream.run_attempt, workflowId: upstream.workflow_id, event: upstream.event }
+  const expected = { sourceCommit, runId: upstream.id, runAttempt: upstream.run_attempt, workflowId: upstream.workflow_id, event: upstream.event,
+    repositoryFullName: env.GITHUB_REPOSITORY, repositoryId: Number(env.GITHUB_REPOSITORY_ID),
+    repositoryOwnerId: env.GITHUB_REPOSITORY_OWNER_ID }
   const workflow = await read('/actions/workflows/e2b-official-runtime.yml')
   assertReleaseIdentity(expected, workflow, upstream)
   const release = selectRelease(expected, await read(`/actions/runs/${upstream.id}/attempts/${upstream.run_attempt}/jobs?per_page=100`), [])

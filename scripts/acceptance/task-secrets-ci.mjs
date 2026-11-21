@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { expectedRelease, assertReleaseIdentity, selectRelease, REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW } from './thread-lifecycle-ci.mjs'
 import { assertCurrentMain, PRODUCTION_VERSION_URL } from '../release/web-deploy.mjs'
 import { assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 
 export { REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW }
 export const MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
@@ -26,7 +27,7 @@ const check = (ok, code) => { if (!ok) throw new SecretCIError(code) }
 export const safeCIFailure = error => error instanceof SecretCIError && CODES.has(error.code) ? error.code : 'guard_failed'
 
 function context(env) {
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === REPOSITORY && env.GITHUB_REF === 'refs/heads/main'
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env) && env.GITHUB_REF === 'refs/heads/main'
     && ['workflow_run', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)
     && number(env.GITHUB_RUN_ID) && number(env.GITHUB_RUN_ATTEMPT), 'context')
   // There is no rerun API or self-trigger. A single automatic receiver permits

@@ -27,7 +27,7 @@ const config = { caseId, harness: 'codex', repository: 'alexj11324/Mikka-handoff
   workerSha: 'b'.repeat(40), workerSourceCommit: 'c'.repeat(40), fixtureOrigin: 'https://8081-fixture.e2b.app',
   upstreamOrigin: 'https://8080-fixture.e2b.app', bootstrapToken: 'd'.repeat(64), canarySha256: 'e'.repeat(64), responseSha256: 'f'.repeat(64) }
 const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: config.sourceCommit,
-  GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', TASK_SECRETS_JOB_STARTED_AT: new Date().toISOString(),
+  GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', TASK_SECRETS_JOB_STARTED_AT: new Date().toISOString(),
   TASK_SECRETS_JOB_ID: '991', TASK_SECRETS_JOB_START_SOURCE: 'github_actions_job.started_at',
   APPLICATION_SHA: config.sourceCommit, EXPECTED_WORKER_SHA: config.workerSha, EXPECTED_WORKER_SOURCE_SHA: config.workerSourceCommit,
   EXPECTED_CLAUDE_TEMPLATE: 'released-claude', EXPECTED_CODEX_TEMPLATE: 'released-codex' }
@@ -35,6 +35,11 @@ const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GI
 test('default is read-only preflight; execute requires exact main and worker/template pins', () => {
   assert.equal(readOptions([], env).execute, false)
   assert.equal(readOptions(['--execute'], env).execute, true)
+  const transferred = { ...env, GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }
+  assert.equal(readOptions(['--execute'], transferred).execute, true)
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '999' }, { GITHUB_REPOSITORY_OWNER_ID: '183887963' },
+    { GITHUB_REPOSITORY_OWNER_ID: undefined }, { GITHUB_REPOSITORY: 'foreign/Mikka' }])
+    assert.throws(() => readOptions(['--execute'], { ...transferred, ...patch }), /main_workflow_required/)
   for (const patch of [{ GITHUB_ACTIONS: 'false' }, { GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/other' },
     { APPLICATION_SHA: 'e'.repeat(40) }, { EXPECTED_WORKER_SHA: '' }, { EXPECTED_CODEX_TEMPLATE: '' }, { TASK_SECRETS_MODEL_CASE: 'paid' }]) {
     assert.throws(() => readOptions(['--execute'], { ...env, ...patch }))
@@ -1045,13 +1050,21 @@ test('job budget reads the actual unique running job in this attempt and refuses
   const job = { id: 991, name: 'acceptance', run_id: 990, run_attempt: 1, head_sha: env.GITHUB_SHA,
     status: 'in_progress', conclusion: null, started_at: startedAt }
   const request = (payload, headers = {}) => async (url, init) => {
-    assert.equal(url, 'https://api.github.com/repos/alexj11324/Mikka/actions/runs/990/attempts/1/jobs?per_page=100')
+    assert.equal(url, 'https://api.github.com/repositories/1427517699/actions/runs/990/attempts/1/jobs?per_page=100')
     assert.equal(init.redirect, 'error'); assert.ok(init.signal instanceof AbortSignal)
     assert.equal(init.headers.authorization, 'Bearer synthetic-github-read-token')
     return Response.json(payload, { headers })
   }
   assert.deepEqual(await readSecretJobStart(options, { fetchImpl: request({ jobs: [job], total_count: 1 }) }),
     { id: 991, startedAt, source: 'github_actions_job.started_at' })
+  const transferred = { ...options, GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }
+  assert.deepEqual(await readSecretJobStart(transferred, { fetchImpl: request({ jobs: [job], total_count: 1 }) }),
+    { id: 991, startedAt, source: 'github_actions_job.started_at' })
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '999' }, { GITHUB_REPOSITORY_OWNER_ID: '183887963' },
+    { GITHUB_REPOSITORY_OWNER_ID: undefined }, { GITHUB_REPOSITORY: 'foreign/Mikka' }])
+    await assert.rejects(readSecretJobStart({ ...transferred, ...patch }, {
+      fetchImpl: () => assert.fail('untrusted context must fail before the API'),
+    }), /budget/)
   for (const patch of [{ run_id: 989 }, { run_attempt: 2 }, { head_sha: 'f'.repeat(40) }, { status: 'completed' },
     { started_at: null }, { started_at: new Date(Date.now() + 60_000).toISOString() }, { name: 'other' }])
     await assert.rejects(readSecretJobStart(options, { fetchImpl: request({ jobs: [{ ...job, ...patch }], total_count: 1 }) }), /budget/)
@@ -1071,7 +1084,7 @@ test('Factory obtains its own actual job provenance before the shared execute gu
   const earlierJobs = ['authorize', 'acceptance'].map((name, index) => ({ ...job, id: 989 + index, name,
     started_at: new Date(Date.parse(startedAt) - 600_000).toISOString() }))
   const request = (factory = job) => async (url, init) => {
-    assert.equal(url, 'https://api.github.com/repos/alexj11324/Mikka/actions/runs/990/attempts/1/jobs?per_page=100')
+    assert.equal(url, 'https://api.github.com/repositories/1427517699/actions/runs/990/attempts/1/jobs?per_page=100')
     assert.equal(init.headers.authorization, 'Bearer synthetic-github-read-token')
     return Response.json({ jobs: [...earlierJobs, factory], total_count: 3 })
   }

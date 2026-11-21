@@ -11,7 +11,8 @@ const REPOSITORY = 'alexj11324/Mikka'
 const workflow = { id: 405833668, name: 'E2B additive runtime release', path: '.github/workflows/e2b-official-runtime.yml', state: 'active' }
 const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: workflow.name, path: workflow.path,
   head_sha: SHA, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success',
-  repository: { full_name: REPOSITORY }, head_repository: { full_name: REPOSITORY } }
+  repository: { id: 1427517699, full_name: REPOSITORY, owner: { id: 183887963 } },
+  head_repository: { id: 1427517699, full_name: REPOSITORY, owner: { id: 183887963 } } }
 
 function preCheckoutScript() {
   const lines = readFileSync(new URL('../../.github/workflows/coding-workspace-acceptance.yml', import.meta.url), 'utf8').split('\n')
@@ -26,7 +27,8 @@ function authenticate(t, mutate = () => {}) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const fixture = { event: { workflow_run: structuredClone(run) }, workflow: structuredClone(workflow), run: structuredClone(run),
     main: { object: { type: 'commit', sha: SHA } }, status: 200,
-    env: { GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY, GITHUB_REF: 'refs/heads/main', GITHUB_TOKEN: 'private-token-sentinel' } }
+    env: { GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
+  GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_REF: 'refs/heads/main', GITHUB_TOKEN: 'private-token-sentinel' } }
   mutate(fixture)
   const fixturePath = join(root, 'fixture.json'), eventPath = join(root, 'event.json'), output = join(root, 'output')
   writeFileSync(fixturePath, JSON.stringify(fixture)); writeFileSync(eventPath, JSON.stringify(fixture.event)); writeFileSync(output, '')
@@ -34,11 +36,11 @@ function authenticate(t, mutate = () => {}) {
     import { readFileSync as readFixture } from 'node:fs'
     const fixture = JSON.parse(readFixture(process.env.FIXTURE_PATH, 'utf8'))
     globalThis.fetch = async (url, options) => {
-      if (!url.startsWith('https://api.github.com/repos/alexj11324/Mikka/') || options.redirect !== 'error'
+      if (!url.startsWith('https://api.github.com/repositories/1427517699/') || options.redirect !== 'error'
         || options.headers.authorization !== 'Bearer private-token-sentinel') throw Error('unexpected_request')
       const routes = { '/actions/workflows/e2b-official-runtime.yml': fixture.workflow,
         ['/actions/runs/' + fixture.event.workflow_run.id]: fixture.run, '/git/ref/heads/main': fixture.main }
-      const route = url.slice('https://api.github.com/repos/alexj11324/Mikka'.length)
+      const route = url.slice('https://api.github.com/repositories/1427517699'.length)
       if (!Object.hasOwn(routes, route)) throw Error('unexpected_request')
       return Response.json(routes[route], { status: fixture.status })
     }
@@ -56,6 +58,9 @@ test('actual pre-checkout workflow script accepts only the confirmed main releas
 test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
   const automatic = mutate => authenticate(t, value => {
     value.event.workflow_run.event = 'workflow_run'; value.run.event = 'workflow_run'
+    value.env.GITHUB_REPOSITORY = 'aspectly-labs/Mikka'; value.env.GITHUB_REPOSITORY_OWNER_ID = '359279274'
+    for (const source of [value.event.workflow_run, value.run]) for (const key of ['repository', 'head_repository'])
+      source[key] = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
     mutate?.(value)
   })
   const result = automatic()
@@ -63,7 +68,11 @@ test('Cloudflare-triggered runtime metadata retains all pre-checkout identity ch
   assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
   for (const mutate of [value => { value.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
     value => { value.workflow.path = '.github/workflows/other.yml' }, value => { value.run.event = 'push' },
-    value => { value.run.run_attempt++ }, value => { value.main.object.sha = OTHER }]) {
+    value => { value.run.run_attempt++ }, value => { value.main.object.sha = OTHER },
+    value => { value.env.GITHUB_REPOSITORY_ID = '999' }, value => { value.env.GITHUB_REPOSITORY_OWNER_ID = '183887963' },
+    value => { delete value.env.GITHUB_REPOSITORY_OWNER_ID }, value => { value.event.workflow_run.repository.id++ },
+    value => { value.event.workflow_run.head_repository.owner.id = 183887963 },
+    value => { value.run.repository.owner.id = 183887963 }, value => { value.run.head_repository.id++ }]) {
     const refused = automatic(mutate)
     assert.equal(refused.status, 1); assert.equal(refused.output, '')
     assert.equal(refused.stderr.trim(), 'coding_workspace_source_refused')
