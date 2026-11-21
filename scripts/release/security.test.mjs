@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assessAudit } from './audit-policy.mjs'
@@ -9,6 +10,20 @@ import { artifactInventory, pinRuntime, sealArtifact, stageDesktop, verifyArtifa
 import { workspaceSbom } from './workspace-sbom.mjs'
 
 const sourceSha = 'a'.repeat(40), repository = 'alexj11324/Mikka'
+
+test('API image merge queue admission is confined to the paired bot identity on main push', async () => {
+  const yaml = createRequire(import.meta.url)('js-yaml')
+  const workflow = yaml.load(await readFile(new URL('../../.github/workflows/cloudflare-api-image.yml', import.meta.url), 'utf8'))
+  const allowed = new Function('github', `return ${workflow.jobs['service-plan'].if}`)
+  const github = { repository_id: '1427517699', repository_owner_id: '359279274', ref: 'refs/heads/main', event_name: 'push',
+    actor_id: '118344674', actor: 'github-merge-queue[bot]', triggering_actor: 'github-merge-queue[bot]' }
+  assert.equal(allowed(github), true)
+  assert.equal(allowed({ ...github, triggering_actor: 'alexj11324' }), true)
+  assert.equal(allowed({ ...github, actor_id: '183887963', actor: 'alexj11324', triggering_actor: 'alexj11324' }), true)
+  for (const patch of [{ event_name: 'workflow_dispatch' }, { event_name: 'pull_request' }, { ref: 'refs/heads/feature' },
+    { repository_id: '7' }, { repository_owner_id: '7' }, { actor_id: '7' }, { actor: 'outsider' },
+    { actor_id: undefined }, { triggering_actor: 'outsider' }]) assert.equal(allowed({ ...github, ...patch }), false)
+})
 const identity = { repository, sha: sourceSha, runId: '42', kind: 'github-actions-main' }
 const run = (workflow, extra = {}) => ({ id: 1, head_sha: sourceSha, event: 'push', head_branch: 'main',
   repository: { id: 1427517699, full_name: repository, owner: { id: 183887963 } }, path: `.github/workflows/${workflow}`, status: 'completed', conclusion: 'success', ...extra })

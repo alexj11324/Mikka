@@ -998,20 +998,3 @@ export async function scheduleCommand(userId:string,botId:string|null,sourceEven
   const {executeScheduleCommand}=await import('@/lib/schedules/runtime')
   return executeScheduleCommand(userId,botId,sourceEventId,input)
 }
-export async function assertScheduleRead(userId:string,botId:string,scope:import('@/lib/schedules/contract').ScheduledRead){
-  'use step'
-  const {assertScheduledRead}=await import('@/lib/schedules/runtime')
-  await assertScheduledRead(userId,botId,scope)
-}
-export async function completeScheduleRead(userId:string,botId:string,scope:import('@/lib/schedules/contract').ScheduledRead,text:string,streamId?:string){
-  'use step'
-  const {schedules}=await import('@/lib/schedules/runtime')
-  await schedules().completeRead(userId,botId,scope,text,streamId)
-  return (await store.conversationForDisplay(userId,1,botId))[0]?.position ?? 0
-}
-export async function failScheduleRead(scope:import('@/lib/schedules/contract').ScheduledRead,denied=false){
-  'use step'
-  const {failScheduledRead}=await import('@/lib/schedules/runtime')
-  const {ScheduleError}=await import('@/lib/schedules/contract')
-  await failScheduledRead({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
-}
