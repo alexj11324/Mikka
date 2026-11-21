@@ -246,7 +246,7 @@ export async function runCli(
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,
       onDrained: () => { lifecycle?.stopping("drained"); process.exit(0) },
-      onLockLost: () => { lifecycle?.stopping("lock_lost"); process.exit(1) },
+      onLockLost: () => { lifecycle?.disown(); process.exit(1) },
     })
     lifecycle = trackDaemonLifecycle(daemonPaths(dataDir).logs)
     const shutdown = (signal: NodeJS.Signals, code: number) => {

@@ -12,9 +12,10 @@ const MODULE = join(import.meta.dirname, "lifecycle-record.ts")
 function exitWith(body: string) {
   const dir = mkdtempSync(join(tmpdir(), "mikka-lifecycle-"))
   const script = join(dir, "daemon.ts")
-  writeFileSync(script, `import { trackDaemonLifecycle } from ${JSON.stringify(MODULE)}\nconst lifecycle = trackDaemonLifecycle(${JSON.stringify(join(dir, "logs"))})\n${body}\n`)
+  const file = join(dir, "logs", LIFECYCLE_FILE)
+  writeFileSync(script, `import { writeFileSync } from "node:fs"\nimport { trackDaemonLifecycle } from ${JSON.stringify(MODULE)}\nconst lifecycle = trackDaemonLifecycle(${JSON.stringify(join(dir, "logs"))})\n${body.replaceAll("__FILE__", file)}\n`)
   const child = spawnSync(process.execPath, ["--import", "tsx", script], { encoding: "utf8", timeout: 30_000 })
-  const record = JSON.parse(readFileSync(join(dir, "logs", LIFECYCLE_FILE), "utf8")) as DaemonLifecycleRecord
+  const record = JSON.parse(readFileSync(file, "utf8")) as DaemonLifecycleRecord
   return { child, record }
 }
 
@@ -37,6 +38,12 @@ describe("daemon lifecycle record", () => {
     const { child, record } = exitWith(`lifecycle.stopping("signal:SIGTERM")\nlifecycle.stopping("drained")\nprocess.exit(0)`)
     expect(child.status).toBe(0)
     expect(record).toMatchObject({ phase: "exited", reason: "signal:SIGTERM", code: 0 })
+  })
+
+  it("leaves the record to the daemon that took over the data dir", () => {
+    const { child, record } = exitWith(`writeFileSync(${JSON.stringify("__FILE__")}, JSON.stringify({ phase: "running", pid: 1 }))\nlifecycle.disown()\nprocess.exit(1)`)
+    expect(child.status).toBe(1)
+    expect(record).toMatchObject({ phase: "running", pid: 1 })
   })
 
   it("stays running when the process is killed before it can write", () => {

@@ -26,8 +26,9 @@ type LifecycleProcess = Pick<NodeJS.Process, "pid" | "once" | "on">
 export function trackDaemonLifecycle(logsDir: string, proc: LifecycleProcess = process, now = () => new Date()) {
   const file = join(logsDir, LIFECYCLE_FILE)
   const startedAt = now().toISOString()
-  let reason: string | undefined, error: DaemonLifecycleRecord["error"]
+  let reason: string | undefined, error: DaemonLifecycleRecord["error"], owned = true
   const write = (phase: DaemonLifecycleRecord["phase"], code?: number) => {
+    if (!owned) return
     const record: DaemonLifecycleRecord = { phase, pid: proc.pid, startedAt, ...(reason ? { reason } : {}), ...(error ? { error } : {}), ...(code === undefined ? {} : { code }), at: now().toISOString() }
     try { writeJsonAtomic(file, record) } catch { /* diagnostics never change how the daemon exits */ }
   }
@@ -45,5 +46,7 @@ export function trackDaemonLifecycle(logsDir: string, proc: LifecycleProcess = p
       reason ??= why
       write("stopping")
     },
+    /** Another daemon took the data dir; the record is its to write from now on. */
+    disown() { owned = false },
   }
 }
