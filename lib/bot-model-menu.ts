@@ -43,13 +43,40 @@ export async function botModelScope(ownerId: string, botId: string | null, onlyW
  */
 export async function botModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding">,
+  settings: Pick<ExecutionSettings, "botModels" | "chatModels" | "chatBinding">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   now = Date.now(),
   inspectPreference = false,
 ): Promise<BotModelMenu & { preferenceState?: "absent" | "present" }> {
-  const rows = await settings.chatModels(scope);
+  const [{ usableApiKeys }, { hostedPointsHere }, { creditsModels }] = await Promise.all([
+    import("./model-api-keys"), import("./points-fallback"), import("./credits-models"),
+  ]);
+  const local = !isCloudEdition();
+  const subscriptionsRead = settings.botModels(scope).then(async allRows => {
+    const rows = await settings.chatModels(scope, pool, allRows);
+    return { allRows, rows };
+  });
+  const keysRead = usableApiKeys(pool, scope.ownerId, scope.workspaceId).then(allKeys => {
+    const keys = allKeys.filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
+    return { allKeys, keys };
+  });
+  const pointsRead = local ? Promise.resolve({ points: 0 }) : hostedPointsHere(scope.workspaceId);
+  const enabledRead = (async () => {
+    const target = local ? await defaultModelTarget(scope.ownerId) : null;
+    return await hostedModelEnabled(pool, scope.ownerId) && (!local || target !== null);
+  })();
+  const preferenceRead = botModelPreference(pool, scope, botId);
+  const catalogueRead = enabledRead.then(enabled => enabled ? creditsModels(scope.ownerId) : []);
+  const ownerNamesRead = keysRead.then(({ keys }) => {
+    const sharedOwners = [...new Set(keys.filter((key) => !key.mine).map((key) => key.ownerId))];
+    return sharedOwners.length ? memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
+  });
+  const choiceRead = Promise.all([subscriptionsRead, keysRead, preferenceRead]).then(([{ allRows, rows }, { allKeys, keys }, preference]) =>
+    resolveBotModelChoice(pool, settings, scope, botId, preference, { rows, keys, now, fallback: { rows: allRows, keys: allKeys } }));
+  const [{ rows }, { keys }, { points }, enabled, preference, catalogue, ownerNames, choice] = await Promise.all([
+    subscriptionsRead, keysRead, pointsRead, enabledRead, preferenceRead, catalogueRead, ownerNamesRead, choiceRead,
+  ]);
   // Claude first, then ChatGPT/Codex, as the resolver orders them (orchestration §2).
   const ordered = [
     ...rows.filter((row) => row.provider === "claude"),
@@ -69,25 +96,14 @@ export async function botModelMenu(
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
   }
   // API keys and custom providers that reach bot chats (C22): the person's own, then teammates' shared ones.
-  const { usableApiKeys } = await import("./model-api-keys");
-  const keys = (await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
   const keyOptions = (key: (typeof keys)[number]) =>
     key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
   const keyLabel = (key: (typeof keys)[number]) => [key.name, key.last4 ? `····${key.last4}` : null].filter(Boolean).join(" ") || key.provider;
   const ownKeys = keys.filter((key) => key.mine);
-  const sharedOwners = [...new Set(keys.filter((key) => !key.mine).map((key) => key.ownerId))];
-  const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
   // Mikka 额度: every catalogue model, listed whenever the source is on; the balance is checked when a message is sent
   // (decision 2026-11-15-1900). A self-hosted server lists its LiteLLM default alias.
-  const { hostedPointsHere } = await import("./points-fallback");
-  const { creditsModels } = await import("./credits-models");
-  const local = !isCloudEdition();
-  const target = local ? await defaultModelTarget(scope.ownerId) : null;
-  const { points } = local ? { points: 0 } : await hostedPointsHere(scope.workspaceId);
-  const enabled = await hostedModelEnabled(pool, scope.ownerId) && (!local || target !== null);
   const usable = enabled && (local || points > 0);
   const hostedSource = local ? "self-hosted" as const : undefined;
-  const catalogue = enabled ? await creditsModels(scope.ownerId) : [];
   const creditsOption = (model: { id: string; name?: string; pricing?: { input: number; output: number } | null }, featured?: boolean): BotModelMenuOption => ({
     id: creditsOptionId(model.id), modelId: model.id, provider: "mikka", ...(model.name ? { name: model.name } : {}),
     ...(model.pricing ? { price: { input: model.pricing.input, output: model.pricing.output } } : {}),
@@ -104,9 +120,6 @@ export async function botModelMenu(
       kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
     })),
   ];
-  const preference = await botModelPreference(pool, scope, botId);
-  const choice = await resolveBotModelChoice(pool, settings, scope, botId,
-    preference, { rows, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "none") {
@@ -153,7 +166,7 @@ async function memberNames(workspaceId: string, userIds: string[]) {
  */
 export async function refreshBotModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions">,
+  settings: Pick<ExecutionSettings, "botModels" | "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   timeoutMs = 8000,

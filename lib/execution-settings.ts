@@ -53,8 +53,8 @@ export class ExecutionSettings {
     return (await this.connectedBindings(scope, bindingId))[0];
   }
   /** A bot chat's subscription options: `botModels` on a route that answers chats for its owner (`subscriptionRouteReady`). */
-  async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool) {
-    return chatReady(await this.botModels(scope, query));
+  async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool, rows?: Awaited<ReturnType<ExecutionSettings["botModels"]>>) {
+    return chatReady(rows ?? await this.botModels(scope, query));
   }
   /** A saved chat choice, while its route answers chats. */
   async chatBinding(scope: ExecutionSettingsScope, bindingId: string) {
