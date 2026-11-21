@@ -72,7 +72,8 @@ function history(rows, downloaded) {
       if (path.startsWith('actions/artifacts?')) return { total_count: rows.length, artifacts: rows.map(row => row.artifact) }
       for (const row of rows) {
         const run = `actions/runs/${row.run.id}`
-        if (path === run || path === run + '/attempts/1') return row.run
+        if (path === run) return row.currentRun ?? row.run
+        if (path === run + '/attempts/1') return row.run
         if (path === run + '/attempts/1/jobs?per_page=100&page=1') return { total_count: row.jobs.length, jobs: row.jobs }
       }
       assert.fail('unexpected read-only GitHub path: ' + path)
@@ -83,6 +84,14 @@ function history(rows, downloaded) {
     },
   }
 }
+
+test('a later rerun cannot change the original publication attempt identity', async () => {
+  const f = fixture()
+  f.currentRun = { ...f.run, run_attempt: 2, triggering_actor: { id: 1 } }
+  assert.equal((await latestMobilePublication(history([f], []))).status, 'published')
+  f.run.triggering_actor = { id: 1 }
+  await assert.rejects(latestMobilePublication(history([f], [])))
+})
 
 test('a source receipt uploaded before a failed or cancelled publish blocks automatic OTA without falling back', async () => {
   const older = fixture(), newer = fixture(20, '2026-11-20T10:01:00Z'), downloaded = []

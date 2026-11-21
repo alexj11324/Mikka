@@ -38,7 +38,7 @@ export function sourceReceipt(value) {
   return value
 }
 
-function trustedRun(run) {
+function trustedRun(run, { originalAttempt = true } = {}) {
   for (const field of ['repository', 'head_repository']) {
     assert.ok(officialMikkaRepository(run[field]?.full_name, String(run[field]?.id)))
     assert.equal(run[field].fork, false)
@@ -48,7 +48,7 @@ function trustedRun(run) {
   assert.equal(run.head_branch, 'main')
   assert.ok(['push', 'workflow_dispatch', 'workflow_run'].includes(run.event))
   assert.equal(run.actor?.id, 183887963)
-  assert.equal(run.triggering_actor?.id, 183887963)
+  if (originalAttempt) assert.equal(run.triggering_actor?.id, 183887963)
   assert.match(run.head_sha, sha)
 }
 
@@ -112,7 +112,7 @@ export async function latestMobilePublication({ json, download, now = Date.now()
     assert.ok(Number.isSafeInteger(artifact.workflow_run.id) && artifact.workflow_run.id > 0)
     const run = await json('actions/runs/' + artifact.workflow_run.id)
     if (run.path !== workflow) continue
-    trustedRun(run)
+    trustedRun(run, { originalAttempt: false })
     assert.equal(artifact.workflow_run.head_sha, run.head_sha)
     assert.ok(Number.isFinite(Date.parse(artifact.created_at)))
     trusted.push(artifact)
