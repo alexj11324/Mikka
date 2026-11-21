@@ -282,6 +282,24 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   3. 新写的回归测试要做变异验证：把旧代码放回去确认变红，否则不知道它在测什么。
   4. 跨组件共享的 context 要从**叶子模块**导出，不要从已经 import 了消费方的模块里导出（会形成 cycle）——`conversation-panels-context.ts` 就是这么拆出来的。
 
+## 2026-11-19 跨层追踪：组件名 grep 会漏掉同文件导出的 hook
+
+- 现象：审计 public 层时判定 `LinearSettings` / `TelegramSettings` 是「孤儿组件」（全仓库无 import）。实际 hosted 层 `.hosted-ui/components/mikka/app-page.tsx:16,20` 用的是同文件导出的 `useLinearPlugin` / `useTelegramPlugin`，功能完全正常。
+- 根因：`grep -rn "LinearSettings"` 只搜组件名，且我习惯性排除了源文件自身（`grep -v "linear-settings.tsx"`），于是 hook 导出和同文件引用全被滤掉。
+- 规则：
+  1. 判定「组件是否被挂载」必须同时搜**组件名和同文件的 hook 导出**，且**不要排除源文件自身**——源文件里的 `export function useX` 是跨层契约的一部分。
+  2. slot 架构下，「public 层是 stub」不等于缺陷。`components/slots/settings-connections.tsx` 抛 `UI_SLOT_REQUIRES_OFFICIAL_CLIENT` 是设计，不是缺失；判缺陷前先确认 hosted 层是否实现了它。
+  3. 每个 `missing-affordance` 结论至少用两条独立检索路径验证（按名字、按导入、按调用点），单次 grep 的空结果不足以定性。
+
+## 2026-11-19 后端返回了字段 ≠ UI 使用了字段
+
+- 现象：记忆页「待确认」功能完全不可用。后端 `lib/profile/store.ts:94` 每条新事实都写 `reviewStatus: 'pending'`，`lib/profile/memory.ts:155` 也把它放在 `pending` 数组返回，但 `hooks/settings/use-memory-settings.ts` 只解构 `facts`，`pending` 从未进入渲染，`reviewFact` 零调用者。结果：用户永远看不到 Mikka 记住了什么，记忆永不生效，且无任何报错。
+- 根因：审查时看到「后端返回了 pending」就以为功能存在。实际上消费端漏了一个字段，而周围代码（`undoable` 已被 hosted 使用）看起来都很完整，掩盖了这个缺口。
+- 规则：
+  1. 判定「功能是否可用」必须走完 `后端返回 → hook 解构 → 组件渲染 → 用户可操作` 四步，任何一步断开都是缺陷。
+  2. 看到 `data.xxx` 被返回时，`grep` 一次 `xxx` 在 hook 和组件里的出现位置；只出现在服务端和类型定义里，就是死字段。
+  3. 静默失效最危险：没有报错、没有空状态提示、测试全绿。给这类修复补的测试必须做**变异验证**（删掉实现看测试是否变红），否则不知道测试在测什么。
+
 ## 2026-11-19 "grep 不到 importer" 不能用来删依赖
 
 - 现象：审计把 `unstorage` 判成死依赖删掉（源码里 grep `unstorage` 零命中），CI 上 Nitro 构建全线失败：`unstorage is not installed. It is required for KV storage (nitro/kv)`。`lib/agent-images-server.ts:3` 用的是虚拟模块 `nitro/kv`，真正的包由 Nitro 在构建期注入。
@@ -336,3 +354,241 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
   3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
   4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
+
+## 2026-11-19 收紧读口的过滤条件，必须同步改 fixture 的造数路径
+
+- 现象：给 `lib/profile/store.ts` 的 `profilePromptSection` 加了 `reviewStatus = 'approved'`（修复真实的安全缺口：设置页承诺"确认后才用于回答"，而 prompt 一直在读 pending 事实）。CI 红了 `test:user-facts-db` 里唯一一条仓库作用域用例 —— 它的 fixture 用 `recordFacts` 造数据，而 `recordFacts` 按设计写 `pending`，于是整个 prompt 段读成空串，`assert.match` 报 `actual: ''`。
+- 根因：过滤条件是**读口**改的，测试的**写口**（`recordFacts` → `pending`）没变。测试的名字讲的是"仓库作用域"，容易被误判成"这条断言过期了、改断言就行"，实际上应该补全 fixture 的**前置状态**。
+- 规则：
+  1. 给读函数加状态过滤后，第一件事是 `grep -rn "<读函数名>" --include='*.test.*'`，逐个看每个测试的造数走的是哪条写路径、写到什么状态。
+  2. 补前置状态用该状态的生产入口（这里是"审批"）；测试层拿不到业务入口时，在 fixture 里直接 `UPDATE` 该列，并在注释里写明这是 fixture 前置状态而非被测行为。
+  3. 顺手把新加的过滤条件本身变成断言（"还没审批时读出来必须是空"），否则这次修复没有任何回归保护。
+  4. 一个 DB suite 红会连带把 `Database checks (4/4)` 两个矩阵变体和聚合门 `Production build and browser interactions` 一起拖红。判断"到底红了几件事"，看日志里的 `test:<name> lifecycle] exit code=1` 有几条，不要按 job 数。
+
+## 2026-11-19 在 JSDoc 和它描述的函数之间插入新符号，等于把文档送给了新符号
+
+- 现象：修 `lib/run-recovery.ts` 的静默失败时，我把新的 `swept` 辅助函数直接插在 `recoverRuns` 的 JSDoc 结束处和 `recoverRuns` 之间。结果那段"Everything run recovery does …"的文档挂到了 `swept` 上，`recoverRuns` 变成无文档；`tsc`、lint、CI 全绿，只有 review 能看出来。
+- 根因：JSDoc 的归属由**相邻性**决定，不是由内容决定。插入点选在 `*/` 之后、函数之前，就破坏了归属。
+- 规则：
+  1. 在任何 `/** … */` 和它下面的 `export function` 之间不要插入任何东西 —— 包括注释块、常量、辅助函数。新辅助函数放到该 `*/` 之前（如果它服务于同一个导出）或放到该函数之后。
+  2. 改完用 `sed -n '<起点>,<终点>p' <file>` 肉眼看一遍：每个 `/**` 的正下方应该紧跟它描述的那个声明。
+  3. 这类问题 CI 抓不到，只有代码审查或人眼能抓 —— 属于"必须 review"的那一类，别指望门禁兜底。
+
+## 2026-11-19 `test:web-auth-db` 是 flake，不要当回归查
+
+- 现象：`tests/web-auth-handoff.db.test.ts` 的 `remote Web Workspace selection survives bearer-only HTTP and never broadens a tenant or PAT`（单条约 7 秒的重 HTTP+PG 用例）会间歇失败。本会话里出现三次：CI 报 `fetch failed` + 120s 超时；本地同样环境跑出 20/21；紧接着同参数重跑 29/29 全过。
+- 判断依据：**同输入重跑即绿** + 失败信息是网络层（`fetch failed`）而非断言不一致。本机复跑要带 `BETTER_AUTH_URL`，否则 `context.baseURL` 为空，`new URL('')` 会让 4 条用例报 `TypeError: Invalid URL` —— 那是环境缺失，不是代码问题。
+- 规则：
+  1. 看到这个 suite 红，先原地重跑一次再决定是否调查；不要顺着 workspace/PAT 的代码路径去改。
+  2. 本机跑 DB suite 必须按脚本原样调用（`bash -c "$(node -e "console.log(require('./package.json').scripts['<name>'])" )"`），漏掉 `--experimental-test-module-mocks` 或 `--import ./scripts/server-test.mjs` 会自己造出假失败。
+  3. 本地补齐的环境变量：`E2E_DATABASE_URL` / `MIKKA_DATABASE_URL` / `DATABASE_URL` / `WORKSPACE_DATABASE_URL` / `ORVILO_DATABASE_URL` 指向 `mikka_e2e`，外加 `BETTER_AUTH_URL` 和 `REQUIRE_DB=1`。
+
+## 2026-11-19 新接进 CI 的测试，"接上"不等于"跑过"
+
+- 现象：计划 006 把六个没被任何 CI 任务执行的 suite 接进了 `scripts/ci/tasks.json`。其中 `test:factory-query-http` 和 `test:factory-monitor-http` 少了全仓库其它 factory suite 都带的 `--import ./tests/support/server-only.mjs`，CI 一真正选中就报 `ERR_MODULE_NOT_FOUND: Cannot find package 'server-only' imported from lib/task-status-run-start.ts`。在 main 上它一直是绿的，因为 main 的 `Core unit checks` 日志里**这两个测试一次都没出现过** —— 任务按改动文件被选中，很久没匹配到相关改动。
+- 根因：这两个探测用例用 `FACTORY_QUERY_LOCAL_HTTP=1` 做 skip 守卫，本地默认跳过，跳过发生在运行测试体之前，所以本地永远走不到那条动态 import 链；`server-only` 本地甚至没装（Next 自己解析）。
+- 规则：
+  1. 把测试接进 CI 时，除了确认"文件在任务列表里"，还要确认**它在 CI 里真的被执行过**：翻一次该 job 的日志，grep 测试文件名，出现 0 次就是还没验证。
+  2. 新接的 suite 要照抄同目录其它 suite 的 `--import` 前缀，不要只写 `node --import tsx --test`。
+  3. 带 skip 守卫的集成测试，本地绿灯不构成证据 —— 只能靠 CI 或手动打开守卫跑。
+
+## 2026-11-19 解决冲突时整取一方，会静默吃掉另一方的同文件新增
+
+- 现象：`messages/en.json` / `zh-CN.json` 在合 main 时冲突，我用 `git checkout --theirs` 整取 main 版，然后只补回了自己记得的 `githubClearSearch`。结果本分支加的 `Automations.editor.devicesError` 和 `Settings.tokens.copyFailed` 被静默删掉，CI 的 `pnpm typecheck` 报两条 `TS2345`（消息键不在类型里）。`Source checks` 和 `site-search` 两个 job 报的是同一个错。
+- 根因：冲突解决只按"我记住的那几个键"做人工并集，没有把两侧的键集**算出来**比对。`check-i18n.mjs` 抓不到：它校验 en/zh 之间是否成对、占位符是否一致，不校验"代码里引用的键是否存在"——那是 typecheck 的职责。
+- 规则：
+  1. `messages/*.json` 冲突不要 `checkout --theirs` 了事。解决后用脚本算并集：
+     `flat(branch) | flat(main)` 与当前文件比对，必须 **missing 为空且 extra 为空**。
+  2. 任何"整取一方"的冲突解决，都要再 diff 一次该文件的**另一侧独有内容**（`git diff <theirs> <branch> -- <file>`），而不是回忆自己改过什么。
+  3. 大文件 JSON 插入键时，插在最后一个成员之前要给原最后一行补逗号；写完立刻 `json.loads` 校验再落盘。
+
+## 2026-11-19 iOS/Web UI 的 className 不能透传，颜色查找表要放在 `lib/`
+
+- 现象：写 `Mark({shape, tone, className})` 并把 `className` 透传给 `<svg>`，`node scripts/lint-ui.mjs` 报 `style/static-layout-only`（`className` 必须可静态检查）。同时 `className={cn(...)}` 里如果用的是**本文件内**的查找表 `MARK_TONE_CLASS[tone]` 也会报同一条。
+- 根因：`scripts/ui-policy.mjs` 的 `resolve()` 只认字面量、`cn()` 实参、三元表达式、`&&` 右侧，以及**从别的模块 import 进来的对象**的下标访问（`imports.has(...)`）。函数参数里的解构 `className` 不是 `ts.VariableDeclaration`，`binding()` 找不到 → `known: false`。
+- 规则：
+  1. 业务组件不要收 `className` 再往下传（本体 `git grep 'className={className}' components/workspace` 里没有先例，这是原因）。要换尺寸就开 `size` prop，用字面量三元；要换颜色就开语义枚举 prop。
+  2. 需要"名字 → token class"的查找表，放到 `lib/`（如 `lib/status-appearance.ts`）再 import，本文件里写表会被判不可静态检查。
+  3. 加新 UI 前先跑一遍 `node scripts/lint-ui.mjs`，比写完再回来拆便宜。
+
+## 2026-11-19 UI 变更必须先做视觉对比，没问题才准提交
+
+- 用户原话：「凡是涉及到 UI 变更的，你必须都要进行 UI 对齐，需要从视觉上进行对比，没问题才准提交」。
+- 现象：我把「lint 通过 + 单测通过 + 入口能点」当成了对齐完成。被问「你有从视觉角度去检查过吗」时，答案是**没有**。并排一比，详情页属性行 Capy 9 行我们 5 行、新建任务 chips Capy 6 个我们 3 个、issue 详情我们是整页 Capy 是右侧面板——这些 lint 和单测全都发现不了。
+- 规则：
+  1. UI 改动的完成标准是**并排截图对比**：我们的界面 vs Capy 对应界面，两张图一起看。
+  2. 提交前必须有视觉证据：`agent-browser --session <s> screenshot` 存图并**实际 Read 这张图**，不能只跑 `eval` 查 DOM。DOM 里有 `data-mark` 不代表看起来对。
+  3. 差异要分类说清：真缺口 / 故意不画（没数据）/ 结构差异（详情页是面板还是整页）。不要笼统说「对齐了」。
+  4. dev server 和 Capy 登录态都在时，直接用它做对照，不要靠回忆和推测。
+  5. 造数据用于对照时，用本地 dev 账号在 UI 里真建一条，比读代码想象行样式可靠。
+
+## 2026-11-19 改 UI 前先用 DOM 确认是哪个组件在渲染
+
+- 现象：给 `components/workspace/issue-list.tsx` 加了 ⌘+点击开右侧面板。改完 typecheck 通过、代码确实在文件里、dev server 也重启了，但实测点击仍然整页跳转（URL 还是 `?issue=`）。查 DOM 祖先链才发现列表行是 `DIV.ui-kb-row → SECTION.ui-kb-group → DIV.ui-kb`，渲染它的是 overlay 的 `.hosted-ui/components/kanban.tsx`，`issue-list.tsx` 在那条路径上**根本没被渲染**。
+- 根因：同一个界面有两套实现（公开仓库的开源 UI + 私有 overlay）。凭文件名猜会改错地方，而 typecheck / lint / 单测**全都发现不了**——它们只证明代码能编译。
+- 规则：
+  1. 改 UI 前先 `agent-browser eval` 看目标元素的 tag + class + 祖先链，确认是哪个文件渲染的。已知标记：`ui-kb-*` = overlay `kanban.tsx`；`data-mark` = `lib/state-mark.ts` 的注册表；`data-focus-id` 在**两个**文件里都有（`kanban-board.tsx` 和 `issue-list.tsx`），不能只凭它判断。
+  2. 改完必须真的点一次，看 URL / DOM 有没有按预期变化。typecheck 通过 ≠ 渲染路径对。
+  3. 另一个坑：Base UI 的 `Button` 不会把原生事件交给你的 `onClick`，在它上面读 `event.metaKey` 永远读到 false。要么用捕获阶段（`onClickCapture`），要么改在普通元素上。
+
+## 2026-11-19 别用 git checkout 撤自己的一处改动
+
+- 现象：想撤销一次把 `messages/*.json` 整文件重排的 python 操作，用了
+  `git checkout messages/en.json messages/zh-CN.json`。这两个文件里有 **6 个 agent 未提交的
+  i18n 改动**，一起被回退掉了，包括自动化页 26 个 key —— 页面整片显示成 key 本身。
+- 恢复：`~/.claude/projects/<proj>/<session>/subagents/agent-*.jsonl` 存着每个 agent 的
+  Edit 调用，逐条提取 `old_string`/`new_string` 就能重放。22 条唯一编辑，重放 18 条。
+- 规则：
+  1. 只想撤自己那处，就用精确 Edit 反向替换；`git checkout <file>` 是**文件级**回退，
+     会把别人未提交的东西一起带走。
+  2. 用 Python 改 JSON 时不要 `json.dump` 整个文件 —— 键序、缩进、数组换行都会变，
+     diff 从 6 行膨胀到 131 行。用精确字符串替换。
+  3. 判断「该不该补回某个 key」看**代码还引用吗**，不是看「跟 HEAD 比少了什么」。
+     `PullDirectory.states.failed` 被删是重构（`PullState` 只剩 7 个值），补回去等于塞回死 key。
+  4. 验证 i18n 完整性最可靠的办法是让应用自己报：把所有页面打开，抓
+     `MISSING_MESSAGE` / `Could not resolve`，比静态扫 key 准。
+
+## 2026-11-19 dev server 只能有一个，第二个会把第一个挤死
+
+- 现象：后台又起了一个 dev server 做验证，之后服务出现
+  `ENOENT: rename '.../steps.mjs.api-aliases' -> '.../steps.mjs'` 然后退出。
+  但端口还返回 200 —— 主进程变僵尸：页面能出，`api` 全 404，eve 端口无响应，
+  界面显示「无法连接 Mikka」。
+- 根因：两个 dev server 共用 `.cache/dev-runtime/3100/`，互相 rename 对方刚写的临时文件。
+- 规则：
+  1. 起之前先 `lsof -nP -iTCP:3100 -sTCP:LISTEN`。已经有一个就别再起。
+  2. 崩过一次之后先 `rm -rf .cache/dev-runtime/3100` 再起，残留会让下一次继续失败。
+  3. 健康检查用 `curl http://localhost:3100/mikka/api/version`——**带 base path**。
+     不带的话 404 是正常路由，会被误判成服务挂了。
+  4. 端口 200 不等于服务健康。要同时看 `api` 和 eve 端口。
+
+## 2026-11-19 agent-browser 的 `media` 是 `set media` 的子命令
+
+- 现象：`tasks/alignment-shot.sh` 里写的是 `agent-browser ... media light`，实际返回
+  `Unknown command: media`，退出码又被 `>/dev/null 2>&1` 吞掉。结果**之前所有「亮色」截图
+  全是暗色**，等于从来没验过亮色。
+- 规则：
+  1. 正确形式是 `agent-browser --session <s> set media light|dark`（在 `set` 分组下）。
+  2. 必须**先设 scheme 再 open**：页面加载时才按 `prefers-color-scheme` 求值；
+     先 open 之后 `html.dark` 已经加上，再设也不会重算。
+  3. 截图脚本里不要静默吞掉退出码。`&& echo ✓ || echo ✗` 至少留个痕迹。
+
+## 2026-11-19 Capy 登录态靠固定 profile，不靠导 cookie
+
+- 三层原因，逐个排除过：
+  1. agent-browser 默认用 `/var/folders/.../T/agent-browser-chrome-<uuid>` 做 Chrome profile，
+     浏览器一关就被系统清理，登录态必丢。
+  2. `agent-browser auth save` 只存「用户名+密码+表单选择器」，Capy 走邮箱 OTP，没有密码字段。
+  3. 导 cookie 也不行：Clerk 的 `__session` 是 **60 秒寿命 JWT**（实测 `iat`/`exp` 差 60），
+     导出那一刻就开始作废；它能长期保持登录靠的是 `__client`（长效），而临时 profile 从没写下来。
+- 复制 Brave profile 也走不通：macOS 上 Chromium 的 cookie 密钥在 Keychain、不在 profile 文件里。
+  实测把 Brave 的 `Cookies` + `Local State` 复制给 Chrome，13 条 capy cookie 被当成无效清成 0 条；
+  用 `--executable-path` 指到 Brave 内核结果一样。
+- 正确做法：`--profile "$HOME/.cache/mikka-capy-profile"` 固定目录，让 Chrome 自己维护
+  `Default/Network/Cookies`（落盘 12 条，含 `__client`）。**关闭重开验证过**仍在 `/new`。
+- 判断是否登录不能看 `document.cookie`（`__session` 是 httpOnly，JS 读不到），要看
+  `location.pathname` 有没有被重定向到 `/sign-in`。
+
+## 2026-11-19 CSS 模板字符串里的反引号会白屏整个应用
+
+- 现象：给 `kanban.tsx` 的 Match 行加样式注释时，写成
+  ``/* ... a quiet chip per condition, `property is value`, with its own ✕ */``，
+  结果**整个应用白屏**——不是 Match 行不显示，是所有页面都不渲染。Vite 报
+  `[plugin:vite:oxc] Transform failed` / `[PARSE_ERROR] ... kanban.tsx:1446:76`。
+- 根因：这整段 CSS 是 `const css = /* css */ \`...\``，一个 JS 模板字符串。
+  注释里的反引号**提前结束**了模板字符串，后面全被当非法 JS 解析。
+  我以为「反引号在注释里」是安全的——在 CSS 注释里安全，在**模板字符串**里不安全。
+- 规则：
+  1. 往这种 CSS-in-template-string 里写任何东西，**注释也算**：不能有反引号、不能有 `${`。
+     要引用代码单词就用普通单引号：`'property is value'`。
+  2. 改完这类文件立刻验白屏，别等截图：
+     `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3100/mikka/api/version`
+     （必须带 base path），再
+     `agent-browser --session mikka eval "document.body.innerText.includes('PARSE_ERROR')"` → `false`。
+     白屏时页面上是红底报错面板，不是纯空白，很容易看出来。
+  3. 看到报错面板先修语法，**绝不能把那帧截图当视觉证据**。
+  4. 这类改动静态检查抓不到（`.hosted-ui` 不在公开仓 tsconfig 的 include 里），
+     语法错误只有 dev server / 浏览器会告诉你。
+
+## 2026-11-20 提交 merge 时漏了 `git add`，把带语法错误的 commit 推了上去
+
+- 现象：解决完 13 个 merge 冲突、跑完 typecheck 和 lint、又修好 5 个让合并结果能编译的文件，
+  然后 `git commit`——但**这 5 个文件没有 `git add`**。推上去的 merge commit 里
+  `apps/api/scripts/dev.mjs` 还留着 `words.split('` 加一个真实换行，文件根本无法解析。
+- 根因：`git commit` 只提交**暂存区**。lint 和 typecheck 看的是**工作区**，两者不一致时
+  检查全绿、提交却是坏的。我脑子里想的是「冲突都标完了」，忘了新修的文件也要进暂存区。
+- 规则：
+  1. 修完就 `git add`，不要攒到最后。
+  2. commit 之后、push 之前，抽查一个刚修过的地方确认它在 HEAD 里：
+     `git show HEAD:<path>` 再看那一行。这次是 push 之后才发现，只能补一个 fix commit。
+  3. 已经 push 的错误 commit 不要 amend 加 force push，补一个 fix commit。
+
+## 2026-11-20 改 `allowBuilds` 会改变构建行为，不只是消掉 pnpm 的报错
+
+- 现象：`pnpm-workspace.yaml` 里 11 个包的 `allowBuilds` 值是 pnpm 自己的提示文本
+  `set this to true or false`，每次 `pnpm install` 都以 `ERR_PNPM_IGNORED_BUILDS` 失败。
+  我把其中 4 个改成 `true`（理由是「它们需要 native 绑定」），install 过了，
+  但 CI 上 7 个 check 全挂：`UNLOADABLE_DEPENDENCY: Could not load .../zstd.node`。
+- 根因：那个字符串在 pnpm 眼里**不是 true，等于不跑构建脚本**。设成 `true` 之后
+  `@mongodb-js/zstd` 真的编译出 `zstd.node`，Eve 的 rolldown bundler 去读它、
+  发现是二进制就报 `stream did not contain valid UTF-8`。
+- 规则：
+  1. 修「值非法导致失败」的配置，先弄清旧值实际生效为什么。一个从未被解析成 true 的值，
+     实际语义就是 false；改成 true 是功能变更，不是修复。
+  2. 只想消掉 `ERR_PNPM_IGNORED_BUILDS` 而不改变构建行为，就全部显式写 `false`。
+  3. 验证要复现 CI 条件：删掉已编译的 `.node` 再跑 `node scripts/build-eve.mjs`，
+     而不是只看 `pnpm install` 绿了。
+
+## 2026-11-20 审计出清单后不要问「先做哪个」，用户要的是全部做完
+
+- 现象：SEO 审计给出 6 条 Critical、10 条 High，我按批次排好优先级，然后问用户
+  「三个可选下一步你挑一个」。用户回：「你直接把题做完就行了，你不用问我哪个先做，
+  哪个后做，都要做」。
+- 根因：把「优先级排序」当成了交付物，实际上排序只是内部执行顺序。用户要的是结果，
+  不是选择题。而且我把本该自己判断的事（哪些能自动做、哪些只能人手做）抛回给了用户。
+- 规则：
+  1. 列出清单后直接按依赖顺序执行，不要用「你挑一个」收尾。
+  2. 只有两种情况值得停下来问：需要用户做业务决策（定价、是否开源、是否接受不可逆操作），
+     或者需要用户提供我拿不到的东西（仓库位置、后台权限）。
+  3. 停下来时要把「我已经做到哪、剩下这一步为什么只能你做」写清楚，而不是给选项。
+
+## 2026-11-20 用响应头推断「页面没被缓存、每请求重渲染」是错的
+
+- 现象：SEO 性能审计看到 `x-nextjs-cache: MISS`、`cache-control: max-age=0, must-revalidate`，
+  判定「HTML 不走 CDN 缓存」，据此建议加 Cache Rule / 加 `revalidate`。
+  实际跑 `pnpm build` 后路由表显示 `/mikka` 等页面全是 ○ Static（构建时预渲染），
+  docs 是 ● SSG。那些头是 OpenNext 外层的响应策略，不是重新渲染的证据。
+- 根因：把外网可见的响应头当成渲染方式的证据。响应头能证明「浏览器/边缘怎么缓存」，
+  不能证明「服务端有没有重新渲染」。而如果真按这个判断加了 Cache Rule 覆盖
+  `must-revalidate`，发布瞬间会拿旧 HTML 拼新 chunk，直接白屏。
+- 规则：
+  1. 判断「是不是静态化」要看构建路由表（`○`/`●`/`ƒ`），不要从响应头反推。
+  2. 建议改缓存策略之前，先确认页面本来是不是预渲染的；已经静态的页面「加 revalidate」
+     是无效动作。
+  3. 覆盖 `must-revalidate` 属于危险改动，会破坏部署原子性，默认不做。
+
+## 2026-11-20 robots.txt 里的「放行」和边缘的「放行」是两件事
+
+- 现象：技术审计读 robots.txt 得出「PerplexityBot 放行」（文件里确实没有它），
+  而实测同一 UA 拿到 403 `Your request was blocked.`。反过来，`Google-Extended`
+  在 robots 里是 `Disallow: /`，但边缘返回 200 —— 两者都不矛盾，因为是两层。
+- 根因：Cloudflare 的 AI 爬虫控制同时改 robots.txt 托管块**和**边缘执行，
+  但 PerplexityBot 只被边缘拦（它不在托管列表里），Google-Extended 只被 robots 拦
+  （它本来就不自抓页）。
+- 规则：
+  1. 判断 AI 爬虫能否访问，必须**实跑 UA**：`curl -A "<完整官方 UA>" -o /dev/null -w "%{http_code}"`。
+     读 robots.txt 只能得出「声明层」结论。
+  2. 报结论时分开写「robots 层」和「边缘层」，不要合并成一句「已拦/已放行」。
+  3. 拦 AI 爬虫要区分训练 UA 和检索 UA：OpenAI（GPTBot / OAI-SearchBot）、
+     Anthropic（ClaudeBot / Claude-SearchBot / Claude-User）都有两套，拦前者无损；
+     **Perplexity 只有一个索引爬虫 PerplexityBot**，拦掉等于退出它的检索面。
+
+## 2026-11-19 · Figma 对照稿
+- 画 Mikka 设计稿前，先去「Mikka 三栏布局草图 v0」（zPe5LKycb2XuT1ivCLRw07）找现有约定和已接入的 shadcn 库，不要新建文件、自建组件。`get_libraries` 显示为空不代表没有库：直接 `search_design_system` 搜 "Button - Nova"，就能命中 Obra shadcn/ui kit 与 ReUI shadcn。
+- 抓竞品页面只用内置浏览器，不要切到 chrome-devtools 或别的浏览器。内置浏览器截图的分辨率受面板宽度限制，要高清图就请用户把面板拉宽，不要往页面里注入外部脚本。
+
+## 2026-11-19 · Figma 对照稿要画交互，并以 main 的实际界面为准
+- 用户纠正：只画了一张静态页面，没画右键菜单、筛选、显示设置、状态选择器、新建弹窗等交互状态；sidebar 入口也还是旧稿。
+- 规则：对照 Capy 画任何页面时，先在内置浏览器里把这一页的每个弹出层点一遍、截图（右键、⋯、筛选、显示、新建、二级菜单），再一页一页画 Mikka 版。
+- 规则：画之前先读 main 上的实际实现。侧栏的真实实现在私有层 `.hosted-ui`（capy-sidebar / app-frame），公开仓库的 `components/app-sidebar.tsx` 和 `nav-main.tsx` 已是死代码。文案取 `messages/en.json`。
+- 规则：Figma 里用 `resize()` 改过尺寸的 auto-layout 容器，主轴会被锁成 FIXED，要再设 `primaryAxisSizingMode="AUTO"`，否则内容会被裁掉。

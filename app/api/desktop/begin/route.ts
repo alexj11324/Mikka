@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 
 import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
@@ -6,7 +6,6 @@ import { DESKTOP_AUTH_PENDING_TTL_MS, desktopAuthChallenge, desktopAuthState, de
 import { sha256Hex } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * Registers a desktop sign-in before the system browser opens. The desktop is

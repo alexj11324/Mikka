@@ -4,7 +4,6 @@ import { createCloudGitHubReceiver } from '@/lib/github/cloud-webhook'
 import { dispatchVerifiedGitHubWebhook, readGitHubWebhookBody } from '@/lib/github/webhook-dispatch'
 import { withRequestLog } from '@/lib/request-log'
 
-export const runtime = 'nodejs'
 const receive = createCloudGitHubReceiver({ database: pool, registration: () => cloudClient.registration(), readBody: readGitHubWebhookBody, dispatch: dispatchVerifiedGitHubWebhook })
 export const POST = withRequestLog('/api/cloud/webhooks/github', async (request: Request) => {
   try { return await receive(request) }

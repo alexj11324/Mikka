@@ -1,7 +1,7 @@
 'use server'
 
 import { withFreshSession } from '@/lib/fresh-session'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import type { SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { auditRequestContext } from '@/lib/audit/events'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'

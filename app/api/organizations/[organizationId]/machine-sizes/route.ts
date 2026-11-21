@@ -5,7 +5,6 @@ import { GovernanceError } from '@/lib/governance/errors'
 import { governanceResponse } from '@/lib/governance/http'
 import { listOrganizations } from '@/lib/governance/organizations'
 
-export const runtime = 'nodejs'
 
 export const GET = freshSessionRoute(async (request: Request, context: { params: Promise<{ organizationId: string }> }) => governanceResponse(async () => {
   const { organizationId } = await context.params

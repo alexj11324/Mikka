@@ -156,12 +156,13 @@ test(
   "PG17 monitor: real transactions, concurrent dedupe, original issue, restart/rollback, fences, repair and recovery",
   { skip: !target, timeout: 120_000 },
   async (t) => {
-    // Only resolve Next's compile-time marker; use actual document/Yjs/SQL behavior.
+    // Resolve the compile-time marker to an empty module; use actual
+    // document/Yjs/SQL behavior.
     const marker = registerHooks({
       resolve(specifier, context, next) {
         return next(
           specifier === "server-only"
-            ? "next/dist/compiled/server-only/empty.js"
+            ? "data:text/javascript,export {}"
             : specifier,
           context,
         );

@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { BotPermissionsPage } from '@ui-slot/settings-bot-permissions'
 import { listBots, listBotsForWorkspace } from '@/app/actions/bots'
 import { listAgents } from '@/app/actions/agents'
 import { AppTile, OWN_APPS, useAppInfo, useConnectedApps, appState } from '@/components/plugins/connected-apps'
 import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plugins-view'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { SettingsLoading } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { CONFIGURABLE_ACTIONS, CONFIGURABLE_PERMISSIONS, type PermissionDecision } from '@mikka/protocol/agent-policy'
 import { LEGACY_APP_ACTIONS, LEGACY_WRITE_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
@@ -229,7 +230,7 @@ export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools
   // A run action with nothing stored runs under its scoped run policy, not the Decision API.
   const runLevel = (value: PermissionValue) => value === 'default' ? t('level.runDefault') : level(value)
   if (!apps) return <div className="flex flex-col gap-4">
-    <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
+    <SettingsLoading label={t('loading')} rows={2} bare />
     {error && <p role="alert" className="text-sm text-destructive-foreground">{error}</p>}
   </div>
   return <div className="flex flex-col gap-4">

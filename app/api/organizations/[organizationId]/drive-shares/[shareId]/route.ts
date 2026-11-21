@@ -2,7 +2,6 @@ import { driveResponse } from '@/lib/drive/server'
 import { freshSessionRoute } from '@/lib/fresh-session'
 import { governanceResponse } from '@/lib/governance/http'
 
-export const runtime = 'nodejs'
 
 type Context = { params: Promise<{ organizationId: string; shareId: string }> }
 

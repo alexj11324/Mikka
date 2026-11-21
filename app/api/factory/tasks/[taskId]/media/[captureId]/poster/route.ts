@@ -1,7 +1,5 @@
 import { serveFactoryTaskMedia } from '@/lib/factory/task-media-route'
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 export const maxDuration = 30
 
 /** A private real-frame JPEG, generated once for new and historical videos. */

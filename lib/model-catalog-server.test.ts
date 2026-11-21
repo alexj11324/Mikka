@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { beforeEach, test } from 'node:test'
-import { GATEWAY_MODELS_URL, modelCatalog, resetModelCatalogForTests } from './model-catalog-server'
+import { afterEach, beforeEach, test } from 'node:test'
+import { modelCatalog, resetModelCatalogForTests } from './model-catalog-server'
 import { CATALOG_SNAPSHOT } from './model-catalog'
 
 const live = { data: [
@@ -9,13 +9,26 @@ const live = { data: [
   { id: 'openai/gpt-image-2', owned_by: 'openai', type: 'image', tags: [] },
 ] }
 let reads = 0
-const answer = (body: unknown, status = 200) => (async (url: string | URL | Request) => {
+const answer = (body: unknown, status = 200) => (async (url: string | URL | Request, init?: RequestInit) => {
   reads++
-  assert.equal(String(url), GATEWAY_MODELS_URL)
+  assert.equal(String(url), 'https://litellm.example/v1/mikka/catalog')
+  assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer fixture-master-key')
   return Response.json(body, { status })
 }) as typeof fetch
 
-beforeEach(() => { resetModelCatalogForTests(); reads = 0 })
+const originals = { MIKKA_LITELLM_URL: process.env.MIKKA_LITELLM_URL, MIKKA_LITELLM_MASTER_KEY: process.env.MIKKA_LITELLM_MASTER_KEY }
+beforeEach(() => {
+  resetModelCatalogForTests()
+  reads = 0
+  process.env.MIKKA_LITELLM_URL = 'https://litellm.example'
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'fixture-master-key'
+})
+afterEach(() => {
+  for (const [key, value] of Object.entries(originals)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+})
 
 test('the live list is read once a day, chat models only, featured ones first', async () => {
   const first = await modelCatalog(answer(live), 0)

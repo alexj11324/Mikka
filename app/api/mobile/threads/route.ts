@@ -4,7 +4,6 @@ import { mobileThreads } from '@/lib/mobile-threads'
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/mobile/threads`: the 线程 screen: the person's threads and machines. */
 async function handleGET(request: Request) {

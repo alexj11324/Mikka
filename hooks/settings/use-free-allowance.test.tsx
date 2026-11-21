@@ -9,7 +9,7 @@ import type { CardVerificationStatus } from '@/lib/billing/hosted-usage'
 let status: CardVerificationStatus | { error: string } | Error
 let reads = 0
 const forbidden = async () => { throw new Error('Unexpected payment mutation') }
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { rich: (key: string) => `${namespace}.${key}` }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { rich: (key: string) => `${namespace}.${key}` }) } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => () => 'Read failed' } })
 mock.module('@/app/actions/billing', { namedExports: { openBillingPortal: forbidden, startPlanCheckout: forbidden } })
 mock.module('@/lib/billing/verification-client', { namedExports: {

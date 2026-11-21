@@ -88,7 +88,7 @@ export async function personalSubmissionEventId(executor:Pick<typeof db,'select'
 }
 
 /** Byte bound applies even when Content-Length is absent or dishonest. */
-export async function readPersonalSubmissionBody(request: Request): Promise<unknown> {
+export async function readPersonalSubmissionBody(request: Request, allowEmpty = false): Promise<unknown> {
   const declared=request.headers.get('content-length')
   if(declared && Number(declared)>MAX_PERSONAL_SUBMISSION_BYTES) throw new PersonalSubmissionBodyError(413)
   const reader=request.body?.getReader()
@@ -97,6 +97,7 @@ export async function readPersonalSubmissionBody(request: Request): Promise<unkn
   try{
     while(true){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;if(size>MAX_PERSONAL_SUBMISSION_BYTES){await reader.cancel();throw new PersonalSubmissionBodyError(413)}chunks.push(chunk.value)}
   }finally{reader.releaseLock()}
+  if (allowEmpty && size === 0) return {}
   const bytes=new Uint8Array(size);let offset=0
   for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
   try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw new PersonalSubmissionBodyError(400)}

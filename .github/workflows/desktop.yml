@@ -89,7 +89,6 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3000
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      NEXT_TELEMETRY_DISABLED: '1'
       MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
     steps:

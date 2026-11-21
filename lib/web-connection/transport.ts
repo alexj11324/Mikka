@@ -1,5 +1,5 @@
 import { OFFICIAL_WEB_URL, officialWebOriginAllowed, webConnectionURL, type WebConnectionEnvironment } from './policy'
-import { NextRequest } from '../../apps/api/compat/server'
+import { NextRequest } from '../../lib/server-runtime/server'
 import { parseRequestCookies } from '../../apps/api/src/request-cookies.mjs'
 import { selectedWorkspaceId, WORKSPACE_SELECTION_HEADER, workspaceSelection } from '../workspace-selection'
 

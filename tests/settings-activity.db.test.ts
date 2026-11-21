@@ -30,9 +30,9 @@ before(async () => {
   if (!databaseUrl) return
   // Credential mutations are audited in the selected workspace; this suite selects its team explicitly.
   const workspaceCookie = { name: 'mikka-workspace', value: workspaceId }
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === workspaceCookie.name ? workspaceCookie : undefined, getAll: () => [workspaceCookie], has: (key: string) => key === workspaceCookie.name }) } })
-  const intl = await import('next-intl/server')
-  mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === workspaceCookie.name ? workspaceCookie : undefined, getAll: () => [workspaceCookie], has: (key: string) => key === workspaceCookie.name }) } })
+  const intl = await import('@/lib/intl/i18n-server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en' } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` }, session: { id: 'activity-fixture-session' } } : null } } } })
   ;({ pool } = await import('../lib/db'))
   ;({ workspacePool } = await import('../lib/workspace-db'))

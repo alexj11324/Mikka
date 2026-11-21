@@ -7,6 +7,8 @@ import { SubscriptionRepository } from '@/lib/subscription-repository'
 import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { cleanupAccountSubscriptions, type SubscriptionCleanupFactory } from './subscription-cleanup'
 import { cleanupAccountRuntimes } from './runtime-cleanup'
+import { cleanupAccountBilling } from './billing-cleanup'
+import { cleanupAccountConnections } from './external-cleanup'
 import { requestAccountDeletion, resumeAccountDeletion } from './deletion-jobs'
 
 test('account cleanup calls only owner-scoped adapters and retains unresolved external mappings', { skip: !dbUrl }, async t => {
@@ -68,5 +70,79 @@ test('account cleanup calls only owner-scoped adapters and retains unresolved ex
     assert.deepEqual(blocked.sort(), ['cloud_thread_cleanup_pending', 'cloud_runtime_cleanup_required', 'cloud_snapshot_cleanup_required'].sort())
     assert.equal((await database.query('SELECT state FROM thread_machines WHERE "runId"=$1', [peerRun])).rows[0].state, 'running')
     assert.equal((await database.query('SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [workspace.id, subject])).rows[0].sandboxId, botSandbox)
+  })
+  await t.test('a live plan is cancelled while its workspace row still exists, and a cancel that cannot be confirmed aborts the deletion', async () => {
+    // Stripe is the only party that can stop the charge, and the Customer Portal that could
+    // cancel it goes with the workspace. Shared tenants keep the plan they pay for themselves.
+    const subject = await seedUser(database, 'cleanup-billing'), workspace = await seedWorkspace(database, subject, [{ userId: subject, role: 'admin' }])
+    const teamOwner = await seedUser(database, 'cleanup-billing-team'), shared = await seedWorkspace(database, teamOwner, [{ userId: teamOwner, role: 'admin' }, { userId: subject, role: 'member' }])
+    // Provider ids are unique per run: workspace_billing rows outlive the workspace row they bill.
+    const providerId = (prefix: 'cus' | 'sub') => `${prefix}_${randomUUID().replaceAll('-', '')}`
+    const soloCustomer = providerId('cus'), soloSubscription = providerId('sub'), teamCustomer = providerId('cus'), teamSubscription = providerId('sub')
+    await database.query(`INSERT INTO workspace_billing("workspaceId","stripeCustomerId","stripeSubscriptionId",plan,status) VALUES
+      ($1,$2,$3,'pro','active'),($4,$5,$6,'pro','active')`, [workspace.id, soloCustomer, soloSubscription, shared.id, teamCustomer, teamSubscription])
+    const provider = (outcome: 'canceled' | 'refused') => {
+      const seen: Array<{ method: string; url: string; ownWorkspacePresent: boolean }> = []
+      const fetchImpl = (async (url: string, init: RequestInit) => {
+        const method = init.method ?? 'GET'
+        // Ordering evidence: the workspace row must still be readable when Stripe is asked.
+        const ownWorkspacePresent = (await database.query('SELECT count(*)::int n FROM mikka_workspaces WHERE id=$1', [workspace.id])).rows[0].n === 1
+        seen.push({ method, url, ownWorkspacePresent })
+        if (method === 'GET') {
+          const customer = new URL(url).searchParams.get('customer')
+          const id = customer === soloCustomer ? soloSubscription : customer === teamCustomer ? teamSubscription : null
+          return new Response(JSON.stringify({ has_more: false, data: id ? [{ id, customer, status: 'active' }] : [] }))
+        }
+        if (outcome === 'refused') return new Response('{"error":{"message":"card detail"}}', { status: 402 })
+        return new Response(JSON.stringify({ id: new URL(url).pathname.split('/').at(-1), customer: soloCustomer, status: 'canceled' }))
+      }) as unknown as typeof fetch
+      return { seen, fetchImpl }
+    }
+    const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'fixture' }
+    const requested = await requestAccountDeletion(subject, `${subject}@example.invalid`, randomUUID(), { mainPool: database, workspacePool: database })
+    assert.ok(requested.ok)
+    if (!requested.ok) return
+    const plan = (await database.query<{ plan: { solo: string[]; shared: string[] } }>('SELECT plan FROM account_deletion_jobs WHERE id=$1', [requested.id])).rows[0].plan
+    assert.deepEqual(plan.solo, [workspace.id]); assert.deepEqual(plan.shared, [shared.id])
+    const attempt = (outcome: 'canceled' | 'refused') => {
+      const { seen, fetchImpl } = provider(outcome)
+      return { seen, options: { mainPool: database, workspacePool: database,
+        externalCleanup: async () => cleanupAccountBilling(database, { soloWorkspaceIds: plan.solo, fetchImpl, env }) } }
+    }
+    const refused = attempt('refused'), held = await resumeAccountDeletion(requested.id, refused.options)
+    assert.equal(held.stage, 'external_pending'); assert.deepEqual(held.blockedReasons, ['billing_subscription_cancel_failed'])
+    assert.deepEqual(refused.seen.map(call => call.method), ['GET', 'DELETE'])
+    // The failed cancel disclosed no provider detail and removed nothing local.
+    assert.equal((await database.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [subject])).rows[0].n, 1)
+    assert.equal((await database.query('SELECT count(*)::int n FROM mikka_workspaces WHERE id=$1', [workspace.id])).rows[0].n, 1)
+    const allowed = attempt('canceled'), completed = await resumeAccountDeletion(requested.id, allowed.options)
+    assert.equal(completed.stage, 'completed'); assert.deepEqual(completed.warnings, [])
+    assert.equal((await database.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [subject])).rows[0].n, 0)
+    assert.equal((await database.query('SELECT count(*)::int n FROM mikka_workspaces WHERE id=$1', [workspace.id])).rows[0].n, 0)
+    const cancelled = allowed.seen.filter(call => call.method === 'DELETE')
+    assert.deepEqual(cancelled.map(call => call.url), [`https://api.stripe.com/v1/subscriptions/${soloSubscription}`])
+    assert.equal(cancelled[0].ownWorkspacePresent, true, 'the plan is cancelled before its workspace row is deleted')
+    assert.equal(allowed.seen.some(call => call.url.includes(teamCustomer)), false, 'a shared tenant keeps its own plan')
+  })
+  await t.test('an account without billing never reaches the provider; one with a customer but no reachable provider holds the account', async () => {
+    const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'fixture' }
+    const free = await seedUser(database, 'cleanup-billing-free'), freeWorkspace = await seedWorkspace(database, free, [{ userId: free, role: 'admin' }])
+    const untouched: string[] = []
+    const spy = (async (url: string) => { untouched.push(url); return new Response('{}') }) as unknown as typeof fetch
+    assert.deepEqual(await cleanupAccountBilling(database, { soloWorkspaceIds: [freeWorkspace.id], fetchImpl: spy, env }), { blockedReasons: [], warnings: [] })
+    assert.deepEqual(untouched, [], 'no customer means no network call')
+    // The default adapter must include billing; with no provider configured it holds the
+    // account exactly like composio_not_configured, instead of deleting a plan it cannot stop.
+    const paid = await seedUser(database, 'cleanup-billing-unconfigured'), paidWorkspace = await seedWorkspace(database, paid, [{ userId: paid, role: 'admin' }])
+    await database.query('INSERT INTO workspace_billing("workspaceId","stripeCustomerId","stripeSubscriptionId",plan,status) VALUES($1,$2,$3,\'pro\',\'active\')',
+      [paidWorkspace.id, `cus_${randomUUID().replaceAll('-', '')}`, `sub_${randomUUID().replaceAll('-', '')}`])
+    const edition = process.env.MIKKA_EDITION, key = process.env.STRIPE_SECRET_KEY
+    delete process.env.MIKKA_EDITION; delete process.env.STRIPE_SECRET_KEY
+    try {
+      assert.deepEqual(await cleanupAccountConnections(paid, database, undefined, [paidWorkspace.id]), { blockedReasons: ['billing_provider_not_configured'], warnings: [] })
+    } finally {
+      if (edition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = edition
+      if (key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = key
+    }
   })
 })

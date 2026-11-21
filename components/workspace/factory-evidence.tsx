@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronLeft, ChevronRight, CircleCheck, CircleX, Download, FileText, Play, Server, SquareTerminal, X } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -58,7 +58,7 @@ function EvidenceThumb({ taskId, item, selected, label, onOpen, mediaSource }: {
   const [broken, setBroken] = useState(false)
   return <Button variant="ghost" aria-label={label} aria-current={selected ? 'true' : undefined} onClick={onOpen}
     data-kind={media ?? 'text'}
-    className={cn('relative h-[65px] w-[104px] shrink-0 overflow-hidden rounded-lg bg-muted p-0',
+    className={cn('relative h-16 w-[104px] shrink-0 overflow-hidden rounded-lg bg-muted p-0',
       media === null && 'flex-col items-start justify-center gap-0.5 bg-foreground px-2.5 text-background hover:bg-foreground/90 hover:text-background', selected && 'ring-2 ring-primary')}>
     {media === 'image' && !broken && <img src={(mediaSource ? mediaSource(entry) : mediaUrl(taskId, entry)) ?? undefined} alt="" loading="lazy" draggable={false} onError={() => setBroken(true)} className="size-full object-cover object-top" />}
     {media === 'video' && <>
@@ -227,7 +227,7 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
         <Button variant="outline" size="icon" aria-label={t('next')} disabled={index >= items.length - 1} onClick={() => go(1)}
           className="absolute right-2 z-10 rounded-full sm:static sm:shrink-0"><ChevronRight data-icon="inline-start" /></Button>
       </div>
-      <div ref={strip} role="group" aria-label={t('allEvidence')} className="flex h-[89px] shrink-0 items-center gap-2 overflow-x-auto px-4 sm:justify-center">
+      <div ref={strip} role="group" aria-label={t('allEvidence')} className="flex h-22 shrink-0 items-center gap-2 overflow-x-auto px-4 sm:justify-center">
         {items.map((other, position) => <EvidenceThumb key={other.entry.artifact + position} taskId={taskId} item={other} selected={position === index}
           label={itemLabel(t, other)} onOpen={() => onIndex(position)} mediaSource={mediaSource} />)}
       </div>

@@ -21,12 +21,13 @@ mock.module(new URL('./runtime.ts', import.meta.url).href, { namedExports: {
     settle: (...args: Parameters<HostedUsageStore['settle']>) => store.settle(...args),
   },
 } })
-// Existing callers may still read pricing during rollout. The price is much
-// higher than the initial balance; it must not authorize or freeze money.
-const gateway = Object.assign(() => { throw Error('Only the loopback provider is allowed') }, {
-  getAvailableModels: async () => ({ models: [{ id: 'postpay-fixture', pricing: { input: '0.000001', output: '0.000001' } }] }),
-})
-mock.module('ai', { namedExports: { gateway, createGateway: () => gateway } })
+let provider: unknown
+mock.module(new URL('../model-gateway/litellm-client.ts', import.meta.url).href, { namedExports: {
+  createLiteLLMModel: () => provider,
+  liteLLMBaseUrl: () => 'http://127.0.0.1/litellm-fixture',
+  liteLLMCost: (value: { litellm: { cost: string } }) => Math.ceil(Number(value.litellm.cost) * 1e6),
+  liteLLMGenerationId: () => undefined,
+} })
 mock.module(new URL('./alerts.ts', import.meta.url).href, { namedExports: { checkAbuseAlerts: async () => {} } })
 
 test('hosted calls check positive balance, debit only after receipts, and resume after credit', { skip: !target }, async t => {
@@ -41,7 +42,7 @@ test('hosted calls check positive balance, debit only after receipts, and resume
     response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
       content: [{ type: 'text', text: 'Synthetic provider receipt' }],
       usage: { inputTokens: { total: 0 }, outputTokens: { total: 1 } },
-      finishReason: { unified: 'stop', raw: 'stop' }, warnings: [], providerMetadata: { gateway: { cost } },
+      finishReason: { unified: 'stop', raw: 'stop' }, warnings: [], providerMetadata: { litellm: { cost } },
     }))
   })
   t.after(async () => {
@@ -54,7 +55,7 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
   const receive = async () => (await fetch(`http://127.0.0.1:${address.port}`, { method: 'POST' })).json()
-  const provider = {
+  provider = {
     specificationVersion: 'v4' as const, provider: 'loopback-fixture', modelId: 'postpay-fixture', supportedUrls: {},
     doGenerate: receive,
     async doStream() {
@@ -73,7 +74,7 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   // An allowance granted before 2026-11-15; new verifications grant none.
   await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1) ON CONFLICT ("workspaceId") DO UPDATE SET remaining=1', [workspace])
   const { hostedModel } = await import('./model')
-  const model = await hostedModel(workspace, 'postpay-fixture', provider)
+  const model = await hostedModel(workspace, 'postpay-fixture')
   const firstCall = model.doGenerate({ prompt: [] })
   await Promise.race([arrived, firstCall.then(() => { throw Error('Provider responded before the held receipt') })])
   try {

@@ -1,4 +1,4 @@
-import type { createFormatter, DateTimeFormatOptions } from 'next-intl'
+import type { createFormatter, DateTimeFormatOptions } from '@/lib/intl/i18n-client'
 
 type Formatter = Pick<ReturnType<typeof createFormatter>, 'dateTime'>
 

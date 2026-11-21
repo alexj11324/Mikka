@@ -283,11 +283,13 @@ export async function startFrameworkServer(sandbox, kind, directory, root, port)
     check(milliseconds > 0, 'ready')
     return milliseconds
   }
+  // The fixture installs its own framework, so this observes a real third-party
+  // Next project inside the sandbox; the product no longer ships the package.
   const binary = kind === 'next' ? `${root}/node_modules/next/dist/bin/next` : `${root}/node_modules/vite/bin/vite.js`
   const args = kind === 'next' ? `dev --webpack --hostname 127.0.0.1 --port ${port}` : `--host 127.0.0.1 --port ${port} --strictPort`
   const startup = (async () => {
     handle = await sandbox.commands.run(`exec '${NODE}' '${binary}' ${args}`, {
-      user: 'user', cwd: directory, envs: { NEXT_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
+      user: 'user', cwd: directory, envs: { NO_COLOR: '1' },
       background: true, timeoutMs: 0, onStderr: () => {}, onStdout: chunk => {
         if (settled || abandoned) return
         buffer += chunk
@@ -475,7 +477,7 @@ export async function probeTerminalAfterPreview(sandbox, report, identity, termi
 }
 
 export async function probeWorkspaceIngress(initialSandbox, identity, {
-  fetchImpl = fetch, Socket = require('next/dist/compiled/ws'),
+  fetchImpl = fetch, Socket = require('ws'),
   terminalProbe = async (...args) => (await import('./workspace-terminal-acceptance.mjs')).probeWorkspaceTerminal(...args),
 } = {}) {
   let sandbox = initialSandbox
@@ -529,7 +531,7 @@ export async function probeWorkspaceIngress(initialSandbox, identity, {
     for (const file of ['package.json', 'package-lock.json']) await sandbox.files.write(`${appRoot}/${file}`,
       await readFile(new URL(`./fixtures/preview-frameworks/${file}`, import.meta.url), 'utf8'), { user: 'user' })
     const installation = await sandbox.commands.run(`'${NODE}' /opt/mikka/runtime/node/lib/node_modules/npm/bin/npm-cli.js ci --ignore-scripts --no-audit --no-fund`,
-      { user: 'user', cwd: appRoot, timeoutMs: 180_000, envs: { NEXT_TELEMETRY_DISABLED: '1', NPM_CONFIG_UPDATE_NOTIFIER: 'false' } })
+      { user: 'user', cwd: appRoot, timeoutMs: 180_000, envs: { NPM_CONFIG_UPDATE_NOTIFIER: 'false' } })
     check(installation.exitCode === 0, 'dependencies')
     const versions = await jsonCommand(sandbox,
       `'${NODE}' -e 'console.log(JSON.stringify(Object.fromEntries(["next","vite","react","react-dom"].map(p=>[p,require("${appRoot}/node_modules/"+p+"/package.json").version]))))'`, 5000, 'user')

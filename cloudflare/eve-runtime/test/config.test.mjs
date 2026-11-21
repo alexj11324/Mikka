@@ -21,7 +21,6 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.equal(selected.runtimeEnv.ANOTHER_SECRET, undefined)
   assert.equal(selected.runtimeEnv.SOME_OTHER_BINDING, undefined)
   assert.equal(selected.runtimeEnv.WORKFLOW_TARGET_WORLD, '@workflow/world-postgres')
-  assert.equal(selected.runtimeEnv.MIKKA_HOSTED_MODEL_FALLBACK, 'cloudflare-workers-ai')
   assert.equal(selected.runtimeEnv.MIKKA_EVE_PUBLIC_ORIGIN, 'https://eve.example.test')
   assert.equal(selected.runtimeEnv.BETTER_AUTH_URL, 'https://app.example.test')
 })

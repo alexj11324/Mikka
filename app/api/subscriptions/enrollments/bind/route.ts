@@ -8,7 +8,6 @@ import { enrollmentBindHTTP } from '@/lib/subscription-enrollment-bind'
 import { byosEnrollmentEnabled } from '@/lib/cloud-computer-flag'
 import { enrollmentBindingDatabaseIdentity, enrollmentBindingPage, verifyEnrollmentBindingProof } from '@/lib/subscription-enrollment-binding-proof'
 
-export const runtime = 'nodejs'
 export const maxDuration = 120
 export const GET = () => byosEnrollmentEnabled() ? enrollmentBindingPage() : new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } })
 

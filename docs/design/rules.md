@@ -222,6 +222,13 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   under the title come the code and how long ago, then the properties in one
   column (an icon and label, then the value, ▾ where it opens choices) in
   Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
+  The full page's bar carries one action — 开始工作, which opens the dispatch
+  window where the task's work begins (decision 2026-11-19-2110, recorded in
+  `components/slots/task-detail-contract.ts`); where the bar has no room it
+  stays the ⋯ menu's first item (R-91). What the task is already doing is on
+  its own property line (R-62). Everything else in the bar is a tool or goes
+  into ⋯ (R-91).
+  [2026-11-18-2030](decisions/2026-11-18-2030-task-page-surface.md)
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
@@ -362,9 +369,18 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     the person set since the work was asked for: Agent starts → 进行中;
     submitted for review or PR delivered → 评审中; last delivered PR merged,
     or accepted by the Factory → 已完成 (`lib/task-status-advance.ts`).
-  - Status icons take R-34's colours: 进行中 warning, 评审中 info, 已完成
-    success, the rest grey. The Agent mark is warning while working, info
-    when waiting, destructive on error. No status dots, corner marks or
+  - Status icons take R-34's colours as Capy 0.9.2 and Linear order them:
+    进行中 warning, 评审中 success (green), 已完成 info (the violet), the rest
+    grey ([2026-11-19-1630](decisions/2026-11-19-1630-one-mark-registry.md)).
+    Every state mark is one row of one registry, `lib/state-mark.ts`
+    (`MARK_SHAPE_NAMES`, `MARK_TONE_NAMES`, the six domains' tables): a
+    surface calls that domain's resolver and draws the mark it returns, and no
+    component chooses a shape or a colour of its own. A mark's colour is
+    `stateMarkTone(mark)`, which the chip, the dot beside it and the badge all
+    read. A thread draws its group from the same table; it is no longer a
+    bubble with a corner dot (2026-11-19-1630 replaces the 2026-11-04 clause
+    in `../chat-tool-calls.md` §2.5). The Agent mark is warning while working,
+    info when waiting, destructive on error. No status dots, corner marks or
     badges.
   - `agent_runs.outcome` supplies the ended run's judgement, based on its
     reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
@@ -504,13 +520,15 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-71a** Mikka's own UI draws one icon family: affectUI's Hugeicons, through
   `components/icons/index.tsx` (`@/components/icons`), whose glyphs are stroke
   2 in a 24 box in `currentColor` ([2026-11-18-1900](decisions/2026-11-18-1900-icons-hugeicons.md)).
-  A task's status icon is the one exception: `ISSUE_STATUSES` keeps its lucide
-  glyphs and `status-icons.tsx` its three rings
-  ([2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), and no
+  A task's status icon is the one exception: `ISSUE_STATUSES` keeps its own glyphs, drawn in the status
+  registry `lib/state-mark.ts` / `components/workspace/state-mark.tsx`
+  ([2026-11-19-1630](decisions/2026-11-19-1630-one-mark-registry.md)), and no
   other family stands in for a status. Paid blocks keep their own icons
   ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
   A new glyph is a line in that file, not a new package (ui-policy
-  `icons/glyph-set`).
+  `icons/glyph-set`). Priority is the one mark Mikka draws itself: low, normal
+  and high are three bars on one baseline, rising one step each, in the set's
+  box and stroke (ui-policy `icons/priority-bars`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a

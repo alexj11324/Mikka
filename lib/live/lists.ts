@@ -148,6 +148,10 @@ export const groupListReadChanged = (executor: object, conversationId: string, o
 export const threadReadChanged = (executor: object, ownerId: string, workspaceId: string, kind: 'thread_list' | 'group_list' = 'thread_list') =>
   changed(executor, `thread-read:${workspaceId}:${ownerId}:${kind}`, async (_db, workspace) =>
     (await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, [kind])))
+/** Wake only this person's device list in the Project's Workspace. Paths never enter the event. */
+export const deviceCheckoutsChanged = (executor: object, ownerId: string, workspaceId: string) =>
+  changed(executor, `device-checkouts:${workspaceId}:${ownerId}`, async (_db, workspace) =>
+    (await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, ['device_list'])))
 /** A personal archive interval affects this reader's directories in each active workspace. */
 export const archivePreferenceChanged = (executor: object, ownerId: string) => changed(executor, `archive-preference:${ownerId}`, async (_db, workspace) => {
   const { rows } = await workspace.query<LiveScope>(`SELECT m."userId" AS "ownerId", w.id AS "workspaceId"

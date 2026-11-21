@@ -1,10 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { EveAuthResult } from 'eve/channels/eve'
 import { eveScopeSchema, scopeAuth, assertEveScope, type EveScope } from './scope'
-
-const MAX_REMAINING_MS = 60_000
-// Leave room for clock skew between self-hosted processes at issuance.
-const ISSUED_LIFETIME_MS = MAX_REMAINING_MS - 1_000
+import { maxRemainingMs, signInternalEveAuthorization } from './host-authorization.mjs'
 
 function hostKey() {
   const key = process.env.BETTER_AUTH_SECRET
@@ -13,9 +10,7 @@ function hostKey() {
 }
 /** Existing host key, domain-separated; never a user credential or model input. */
 export function internalEveAuthorization(scope: EveScope, now = Date.now()) {
-  const payload = Buffer.from(JSON.stringify({ ...scope, expires: now + ISSUED_LIFETIME_MS })).toString('base64url')
-  const signature = createHmac('sha256', hostKey()).update('mikka:eve:v1:' + payload).digest('base64url')
-  return `Bearer mev_${payload}.${signature}`
+  return signInternalEveAuthorization(scope, process.env.BETTER_AUTH_SECRET, now)
 }
 export function internalEveScope(header: string | null, now = Date.now()): EveScope | null {
   if (!header?.startsWith('Bearer mev_')) return null
@@ -27,7 +22,7 @@ export function internalEveScope(header: string | null, now = Date.now()): EveSc
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null
   try {
     const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString())
-    if (!Number.isFinite(parsed.expires) || parsed.expires <= now || parsed.expires > now + MAX_REMAINING_MS) return null
+    if (!Number.isFinite(parsed.expires) || parsed.expires <= now || parsed.expires > now + maxRemainingMs) return null
     return eveScopeSchema.parse(parsed)
   } catch { return null }
 }
@@ -51,9 +46,17 @@ export function internalEveRequestScope(request: Request): EveScope | null {
   return internalEveScope(request.headers.get('authorization'))
 }
 
-export async function authenticateEveRequest(request: Request): Promise<EveAuthResult | null> {
+type EveScopeExpectation = { expectedOwnerId?: string; expectedWorkspaceId?: string }
+
+export async function authenticateEveRequest(request: Request, readExpectation?: () => Promise<EveScopeExpectation | null>): Promise<EveAuthResult | null> {
   const internal = internalEveRequestScope(request)
-  if (internal) return {...scopeAuth(await assertEveScope(internal)),allowAgentInfo:true}
+  if (internal) {
+    const scope = await assertEveScope(internal)
+    const expected = await readExpectation?.()
+    if (expected === null || (expected?.expectedOwnerId && expected.expectedOwnerId !== scope.ownerId) ||
+        (expected?.expectedWorkspaceId && expected.expectedWorkspaceId !== scope.workspaceId)) return null
+    return { ...scopeAuth(scope), allowAgentInfo: true }
+  }
   if (request.method !== 'GET' && request.method !== 'HEAD' && !request.headers.has('authorization')) {
     if (request.headers.get('sec-fetch-site') === 'cross-site') return null
     let origin:string, expected:string
@@ -70,7 +73,9 @@ export async function authenticateEveRequest(request: Request): Promise<EveAuthR
   if (credentials.has('authorization')) credentials.delete('cookie')
   const session = await auth.api.getSession({ headers: credentials, query: { disableCookieCache: true } })
   if (!session) return null
-  const bot=await (await import('./auth-bot')).resolveEveRequestBot(request,session)
+  const expected = await readExpectation?.()
+  if (expected === null || (expected?.expectedOwnerId && expected.expectedOwnerId !== session.user.id)) return null
+  const bot=await (await import('./auth-bot')).resolveEveRequestBot(request,session,expected?.expectedWorkspaceId)
   if (!bot) return null
   return scopeAuth({ ownerId: session.user.id, ...bot, surface: 'web' })
 }

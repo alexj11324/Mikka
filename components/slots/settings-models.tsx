@@ -1,7 +1,7 @@
 'use client'
 
 import { CloudModelSettings } from '@/components/settings/cloud-settings'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { ApiKeyFallbackSetting, useApiKeyList } from '@/components/settings/api-key-settings'
 import { ModelOrderSettings } from '@/components/settings/model-order-settings'

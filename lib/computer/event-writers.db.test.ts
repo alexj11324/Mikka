@@ -1,3 +1,4 @@
+import { DECISION_MODEL } from '../coordinator/decision'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -187,7 +188,7 @@ test('actual browser action commits its event before notification and external a
   const bytes = Buffer.from([0xff, 0xd8, 0xff, ...Array.from({ length: 40 }, () => 0), 0xff, 0xd9])
   const imageDigest = createHash('sha256').update(bytes).digest('hex')
   const observation: VisualObservation = { observationId: 'a'.repeat(32), loaderId: target.observedInputs[0].loaderId, origin: target.origin, observedAt: Date.now(), screenshot: 'data:image/jpeg;base64,' + bytes.toString('base64'), width: 1280, height: 800, observation: { url: target.origin, title: 'Fixture', text: 'Fixture', elements: [], needsLogin: false } }
-  const judgment: Awaited<ReturnType<typeof judgeVisualBrowserAction>> = { scope: 'within_task', effect: 'browse', execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'synthetic-provider', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'b'.repeat(64), imageDigests: [imageDigest], vision: 'image-input-submitted' } }
+  const judgment: Awaited<ReturnType<typeof judgeVisualBrowserAction>> = { scope: 'within_task', effect: 'browse', execution: { executionId: randomUUID(), modelId: DECISION_MODEL, providerGenerationId: 'synthetic-provider', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'b'.repeat(64), imageDigests: [imageDigest], vision: 'image-input-submitted' } }
   const perform = (id: string) => browserAction(pool, actor, botId, id, { action: 'click', x: 20, y: 40 }, 'Open documentation', observation, judgment)
   assert.equal((await perform(await task('running'))).state, 'running')
   await notice(1, 'running'); assert.equal(runtimeCalls, 1)

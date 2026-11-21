@@ -4,7 +4,8 @@ import { createMcpHandler } from 'mcp-handler'
 import { z } from 'zod'
 import { waitForReply, type ReplyWaitCompletion } from '../../../lib/mcp/reply-wait'
 import { requestOwnedMcpTools } from '../../../lib/mcp/tool-lifetime'
-import { after } from '../compat/server'
+// oxlint-disable-next-line no-restricted-imports -- this spec exercises the request lifetime itself
+import { after } from '@/lib/server-runtime/server'
 import { createApiHandler } from './application'
 
 function fixture() {

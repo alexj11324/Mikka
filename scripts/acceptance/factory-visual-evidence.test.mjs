@@ -81,7 +81,9 @@ test('Web finishing before its exact E2B release defers without signing in or re
     GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: source, GITHUB_RUN_ID: '420', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_TOKEN: 'fixture-token', APPLICATION_SHA: source, RUNNER_TEMP: '/tmp', FACTORY_VISUAL_MODEL_CASE: 'all' }
   const fetchImpl = async url => {
-    const path = new URL(url).pathname.replace('/repos/alexj11324/Mikka', '') + new URL(url).search
+    const parsed = new URL(url)
+    const path = parsed.pathname === '/repositories/1427517699/git/ref/heads/main'
+      ? '/git/ref/heads/main' : parsed.pathname.replace('/repos/alexj11324/Mikka', '') + parsed.search
     paths.push(path)
     let value
     if (path === '/pulls/1789') value = { number: 1789, merged: true, merge_commit_sha: source,

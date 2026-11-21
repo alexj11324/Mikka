@@ -1,5 +1,5 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { and, asc, eq } from 'drizzle-orm'
 import { auth, type DeviceSessionSummary } from '@/lib/auth'
 import { workspaceDb } from '@/lib/workspace-db'

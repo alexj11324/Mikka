@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import type { listAuditLog } from '@/app/actions/audit-log'
 import type { AuditFilter, AuditScope } from '@/lib/audit/cursor'
 import type { AuditCategory } from '@/lib/audit/categories'

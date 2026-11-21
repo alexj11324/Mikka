@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from 'react'
 import useSWR, { type SWRResponse } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Plus, Trash2, UserRound } from '@/components/icons'
 import { withBasePath } from '@/lib/base-path'
 import { settingsKeys } from '@/lib/swr/keys'
@@ -171,7 +171,7 @@ function McpToolList({ server, disabled }: { server: McpWorkspaceServerView; dis
     <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) latestRead.current++ }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{t('serverTools', { name: server.name })}</DialogTitle></DialogHeader>
-        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} />}
+        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} bare />}
         {state === 'error' && <SettingsSaveError message={t('toolsFailed')} retryLabel={t('checkAgain')} onRetry={() => void read(cursor)} />}
         {state === 'ready' && page && <>
           {page.tools.length ? <ul className="max-h-64 overflow-y-auto text-sm">

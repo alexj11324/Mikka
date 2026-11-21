@@ -21,8 +21,8 @@ test('Telegram /link resolves stable and historical task identity inside the cur
 
   // Only the transport's already-selected Coordinator binding and translated
   // copy are fixtures. The handler, alias resolver, tenant lease and SQL ACL run.
-  const intl = await import('next-intl/server')
-  mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+  const intl = await import('@/lib/intl/i18n-server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string, values?: Record<string, unknown>) => JSON.stringify({ key, ...values }), { has: () => true }) } })
   const coordinator = await import('../lib/coordinator/coordinator-bot')
   mock.module('../lib/coordinator/coordinator-bot', { namedExports: { ...coordinator,

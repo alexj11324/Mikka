@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { SuggestionSource } from '@/lib/db/schema'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { GitHubIcon, GmailIcon, LinearIcon, NotionIcon, SlackIcon } from '@/components/icons/brand-icons'
@@ -48,7 +48,7 @@ export function SentSuggestion({ card, compact }: { card: SuggestionCard; compac
   return <>
     <div data-slot="suggestion-card" className={cn(CARD_FRAME, 'self-end', width)}><SuggestionCardBody card={card} /></div>
     {(original || url) && <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', width)}>
-      <BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 break-words">
+      <BubbleContent size="roomy" className="flex flex-col gap-1.5 break-words">
         {original && <span>{t('original', { title: original })}</span>}
         {url && <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">{url}</a>}
       </BubbleContent>

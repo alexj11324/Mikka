@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo, useState, type ComponentProps, type
 import useSWR from 'swr'
 import { Globe } from '@/components/icons'
 import { GitHubIcon } from '@/components/icons/brand-icons'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { getLinkPreviews } from '@/app/actions/link-preview'
 import { LINK_PREVIEWS_PER_REQUEST } from '@/lib/link-preview-batch'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'
@@ -132,7 +132,17 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
-/** The place of a task or thread chip whose task or thread is still being looked up; never its id or marker. */
+/**
+ * The place of a task or thread chip whose task or thread is still being looked
+ * up; never its id or marker.
+ *
+ * A `span`, not the shared `Skeleton`: this renders where a markdown link would,
+ * which react-markdown wraps in a `<p>` (components/workspace/agent-markdown.tsx
+ * registers `CitationAnchor` as the `a` renderer). `Skeleton` renders a `div`, and
+ * a `div` inside a `<p>` is invalid: the browser closes the paragraph when it
+ * re-parses the server HTML, so React 19 hydrates a different tree than it
+ * rendered. It keeps the skeleton's pulse and the chip's own colour token.
+ */
 export function PendingCitation() {
   return <span aria-hidden="true" data-citation-pending="" className="mx-0.5 inline-block h-5 w-16 translate-y-[-1px] animate-pulse rounded-[5px] bg-object-chip align-middle motion-reduce:animate-none" />
 }
@@ -170,7 +180,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationMeta>
           {status && <span data-task-status-label={status}><TaskStatusIcon status={status} />{statusLabel(status)}</span>}
           {indicator && <span data-run-indicator-label={indicator}>{runLabel(indicator)}</span>}
-          {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
+          {priority && <span><priority.icon />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>
     </InlineCitationContent>

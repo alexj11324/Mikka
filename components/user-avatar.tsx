@@ -4,7 +4,7 @@ import { UserRound } from "@/components/icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { avatarImageSrc } from "@/lib/default-avatar";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 
 export function UserAvatar({
   user,

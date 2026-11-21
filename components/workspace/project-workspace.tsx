@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useViewState } from '@/lib/hooks/view-state'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { Skeleton } from '@/components/ui/skeleton'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 
 import { PROJECT_STATUSES, PROJECT_ICON_TINTS, projectTaskCounts, type ProjectTaskPaging, type Project } from './project-properties'
+import { ProjectDetailLoading, ProjectsPageLoading } from './workspace-loading'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { projectDirectory, ProjectPropertyControl } from './project-property-controls'
 import { useProjectUpdate } from './use-project-update'
@@ -25,9 +25,7 @@ import { SearchInput } from '@/components/ui/search-input'
 const ProjectForm = dynamic(() => import('./project-form').then(module => module.ProjectForm), {
   loading: () => { const agentCopy = useAgentCopy(); return (<p role="status" className="p-6 text-sm text-muted-foreground">{agentCopy.loadingProjectForm}</p>) },
 })
-const ProjectDetail = dynamic(() => import('./project-detail').then(module => module.ProjectDetail), {
-  loading: () => { const agentCopy = useAgentCopy(); return (<div role="status" aria-label={agentCopy.loadingProjectDetails} className="flex flex-col gap-6 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>) },
-})
+const ProjectDetail = dynamic(() => import('./project-detail').then(module => module.ProjectDetail), { loading: ProjectDetailLoading })
 
 export function ProjectWorkspace({ readerId, paging, projects, loading, error, projectId, team, initialTeamId, issues, workspace, onSelect, onOpenTeam, onOpenIssue, onCreateIssue, onUpdated }: {
   readerId: string; paging: ProjectTaskPaging; projects: Project[]; loading: boolean; error: boolean; projectId: string | null; team?: string; initialTeamId?: string; issues: Awaited<ReturnType<typeof listIssues>>; workspace?: WorkspaceSettings; onSelect: (id: string | null) => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void
@@ -44,7 +42,7 @@ export function ProjectWorkspace({ readerId, paging, projects, loading, error, p
   const project = projects.find(item => item.id === projectId)
   const filtered = projects.filter(item => Boolean(item.archivedAt) === archived && (status === 'all' || item.status === status) && item.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') * (ascending ? 1 : -1))
   if (error) return <Empty><EmptyHeader><EmptyTitle>{i18nText("Projects.loadErrorTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={onUpdated}>{i18nText("Projects.reload")}</Button></Empty>
-  if (loading) return <div role="status" aria-label={i18nText("Projects.loading")} className="flex flex-col gap-4 p-6"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+  if (loading) return <ProjectsPageLoading />
   if (projectId && !project) return <Empty>
     <EmptyHeader><EmptyTitle role="status">{i18nText('Errors.projectNotFound')}</EmptyTitle></EmptyHeader>
     <EmptyContent><div className="flex flex-wrap justify-center gap-2">

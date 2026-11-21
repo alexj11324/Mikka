@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { observeEveSession } from './eve-session.mjs'
+import { observeEveSession, submitEveMessage } from './eve-session.mjs'
 /** #1712: normal smoke-owner native Git/gh and both official subscriptions.
  * The additional HTTP leg runs the exact data-plane/bridge source against an
  * isolated random key in a disposable E2B fixture. It is not production-store
@@ -186,10 +186,9 @@ async function dispatch(client, record, profileId, botId, now, checkpoint, budge
     note: `Execute this test's exact native verification command once, then reply STARTUP_OK_${record.sampleId} if it completes. ${scope} Do not submit to Factory, merge, change main, spawn agents, or retry.` }
   const trace = sampledRequestTrace(); record.requestTraceId = trace.traceId
   record.messageSubmittedAt = new Date(now()).toISOString()
-  await secretMutation(record, 'dispatch', () => client.rpc('coordinator.sendCoordinatorMessage', [
+  await secretMutation(record, 'dispatch', () => submitEveMessage(client, botId,
     `执行已有测试任务 ${record.issueId}，只调用一次 dispatch_run，参数：${JSON.stringify(tool)}。使用指定 Profile，不变更模型、订阅或电脑，不创建另一任务。派发后只汇报 runId。`,
-    null, botId, randomUUID(), { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId,
-  ], { headers: { traceparent: trace.traceparent } }), () => {}, checkpoint, now)
+    randomUUID(), { profileId }, { traceparent: trace.traceparent }), () => {}, checkpoint, now)
   let call, completed = false
   await observeEveSession(client, botId, { timeoutMs: budget.remaining('execution', 120_000), fail: () => { check(false, 'dispatch') },
     onEvent: async event => {

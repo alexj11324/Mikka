@@ -4,6 +4,8 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "cn"
 
+import { BADGE_SIZE } from "@/components/ui/badge-size"
+
 const badgeVariants = cva(
   [
     "relative inline-flex shrink-0 items-center justify-center w-fit border border-transparent font-medium whitespace-nowrap outline-none transition-shadow",
@@ -51,13 +53,9 @@ const badgeVariants = cva(
         "focus-outline":
           "bg-background border-border text-focus-foreground dark:bg-input/30",
       },
-      size: {
-        xs: "px-1 py-0.25 text-[0.6rem] leading-none h-4 min-w-4 gap-1",
-        sm: "px-1 py-0.25 text-[0.6875rem] leading-none h-4.5 min-w-4.5 gap-1",
-        default: "px-1.25 py-0.5 text-xs h-5 min-w-5 gap-1",
-        lg: "px-1.5 py-0.5 text-xs h-5.5 min-w-5.5 gap-1",
-        xl: "px-2 py-0.75 text-sm h-6 min-w-6 gap-1.5",
-      },
+      // One ladder with components/ui/badge (`badge-size.ts`): a row mixing
+      // the two must share a baseline, so neither module spells a size.
+      size: { default: BADGE_SIZE.md, ...BADGE_SIZE },
       /** `default`: active style radius. `full`: pill radius. */
       radius: {
         default:

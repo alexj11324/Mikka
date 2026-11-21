@@ -4,7 +4,6 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { leaseDevice } from '@/lib/subscription-native-device'
 import { subscriptionNativeLease } from '@/lib/subscription-native-lease'
 
-export const runtime = 'nodejs'
 const handlePOST = subscriptionNativeLease({
   authorize: async (request, deviceId) => {
     const caller = await authenticateDevice(request)

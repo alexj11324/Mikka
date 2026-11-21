@@ -12,7 +12,7 @@ test('MCP permission grants require the existing human session boundary', { skip
   const home = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
   const nativeToken = randomBytes(32).toString('base64url')
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
   mock.module('@/lib/auth', { namedExports: {
     MOBILE_APP_ORIGIN: 'mikka://',
     auth: { api: { getSession: async ({ headers }: { headers: Headers }) => headers.get('cookie') === 'human-fixture' || headers.get('authorization') === `Bearer ${nativeToken}` ? {

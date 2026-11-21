@@ -8,8 +8,9 @@ import useSWRInfinite from 'swr/infinite'
 import { useSWRConfig } from 'swr'
 import { usePreferences } from '@/components/settings/use-preferences'
 import { unstable_serialize } from 'swr/infinite'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { listConversations } from '@/app/actions/task-runs'
+import { AutomationFilterChip } from './automation-filter-chip'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
@@ -44,7 +45,12 @@ function DirectorySkeleton({ label }: { label: string }) {
   </div>
 }
 
-export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 0, pullsOnly = false }: { ownerId: string; workspaceId: string | null; botId: string | null; revision?: number; pullsOnly?: boolean }) {
+export function ConversationDirectory({ ownerId, workspaceId, botId, automationId = null, onClearAutomation, revision = 0, pullsOnly = false }: {
+  ownerId: string; workspaceId: string | null; botId: string | null
+  /** 查看运行: only the threads one automation's runs started; the chip's ✕ calls `onClearAutomation`. */
+  automationId?: string | null; onClearAutomation?: () => void
+  revision?: number; pullsOnly?: boolean
+}) {
   const t = useTranslations('ConversationDirectory')
   const prLabel = useTranslations('Metadata.prState')
   const categories = useTranslations('ArtifactsPage.category')
@@ -60,9 +66,9 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
   const [archived, setArchived] = useState(false)
   const query = search.trim()
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
-    ? null : ['conversation-directory', ownerId, workspaceId, botId, query, state, pullsOnly ? 'any' : archived, previous?.cursor ?? null, revision, pullsOnly && pullState === 'all' ? 'linked' : pullState] as const
+    ? null : ['conversation-directory', ownerId, workspaceId, botId, query, state, pullsOnly ? 'any' : archived, previous?.cursor ?? null, revision, pullsOnly && pullState === 'all' ? 'linked' : pullState, automationId] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
-    ([, , , selectedBot, text, selected, showArchive, cursor, , selectedPr]) => listConversations({ pullState: selectedPr, botId:selectedBot ?? undefined, search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
+    ([, , , selectedBot, text, selected, showArchive, cursor, , selectedPr, automation]) => listConversations({ pullState: selectedPr, botId:selectedBot ?? undefined, automationId: automation ?? undefined, search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey), settingsKeys.preferences()] : [], workspaceId)
@@ -89,6 +95,8 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
   }
   const failedDays = prefs.failed?.patch.archiveIdleAfterDays
   return <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4" aria-label={pullsOnly ? categories('pullRequests') : t('title')}>
+    {/* R-100: the directory is a page, not a conversation, so it names itself at the size 设置 and the other rail pages use. */}
+    <h1 className="text-xl font-semibold text-foreground">{pullsOnly ? categories('pullRequests') : t('title')}</h1>
     <Label className="flex items-center gap-2 text-sm">{t('archiveIdle')}
       <NativeSelect value={prefs.data?.archiveIdleAfterDays ?? 30} disabled={!prefs.data || saving}
         onChange={event=>void changeDays(Number(event.target.value))}>
@@ -109,6 +117,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
         {pullStates.map(value => <NativeSelectOption value={value} key={value}>{value === 'all' ? categories('pullRequests') : prLabel(value)}</NativeSelectOption>)}
       </NativeSelect>
       {!pullsOnly && <Button size="sm" variant="outline" aria-pressed={archived} onClick={() => setArchived(!archived)}>{t('archived')}</Button>}
+      {!pullsOnly && automationId && <AutomationFilterChip automationId={automationId} workspaceId={workspaceId} onClear={onClearAutomation} />}
       <Button size="sm" variant="ghost" disabled={writing || !workspaceId} onClick={() => void mark({ action: 'readAll' })}>{t('readAll')}</Button>
     </div>
     {writeError && <p role="alert">{t('writeError')}</p>}
@@ -118,14 +127,14 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
       // R-96: "nothing here" and "nothing matches the filters" are two states,
       // each with the one action that resolves it. This directory has no create
       // path (the rail owns that), so only the filtered state gets a button.
-      const filtered = Boolean(query) || state !== 'all' || archived || pullState !== 'all'
+      const filtered = Boolean(query) || state !== 'all' || archived || pullState !== 'all' || Boolean(automationId)
       return <Empty className="min-h-64 border-0">
         <EmptyHeader>
           <EmptyMedia variant="icon">{pullsOnly ? <GitPullRequest aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}</EmptyMedia>
           <EmptyTitle>{filtered ? t('empty') : t('emptyTitle')}</EmptyTitle>
         </EmptyHeader>
         {filtered && <EmptyContent>
-          <Button size="sm" variant="outline" onClick={() => { setSearch(''); setState('all'); setArchived(false); setPullState('all') }}>{t('clearFilters')}</Button>
+          <Button size="sm" variant="outline" onClick={() => { setSearch(''); setState('all'); setArchived(false); setPullState('all'); onClearAutomation?.() }}>{t('clearFilters')}</Button>
         </EmptyContent>}
       </Empty>
     })()}

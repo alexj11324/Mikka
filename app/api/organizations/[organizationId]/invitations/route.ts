@@ -6,7 +6,6 @@ import { organizationInvitationMailEnabled, sendOrganizationInvitationEmails } f
 import { appOrigin } from '@/lib/mcp/resource'
 import { afterJob } from '@/lib/background'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

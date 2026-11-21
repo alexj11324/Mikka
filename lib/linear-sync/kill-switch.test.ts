@@ -36,8 +36,8 @@ before(async () => {
     linearSyncState: async () => unavailable ? 'unavailable' : enabled ? 'enabled' : 'disabled',
     linearSyncDisabledResponse: () => Response.json({ disabled: true }, { status: 503, headers: { 'retry-after': '60' } }),
   } })
-  mock.module('next/server', { namedExports: { after: (fn: () => Promise<void>) => { scheduled.push(fn) }, NextResponse: { redirect: unexpected } } })
-  mock.module('next/headers', { namedExports: { cookies: unexpected } })
+  mock.module('@/lib/server-runtime/server', { namedExports: { after: (fn: () => Promise<void>) => { scheduled.push(fn) }, NextResponse: { redirect: unexpected } } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { cookies: unexpected } })
   mock.module('@/lib/schedules/runtime', { namedExports: { fireLinearAutomations: async (deliveryId: string) => { automationDeliveries.push(deliveryId); return 0 } } })
   mock.module('@/lib/db', { namedExports: {
     db: { select: unexpected, insert: unexpected, update: dbMockUpdate, transaction: async (run: (tx: { update: typeof dbMockUpdate }) => Promise<unknown>) => {

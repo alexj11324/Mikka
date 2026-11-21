@@ -6,13 +6,28 @@
 // different products. The row's own actions hold a reserved slot that stays
 // empty until the pointer is on the row or focus is inside it
 // (decision 2026-11-18-1400, R-92…R-94).
-import { ChevronDown, ChevronRight, ExternalLink, Pin } from "lucide-react";
-import { useTranslations } from "next-intl";
+//
+// A press opens the pull request's review in the app, whichever PR it is: the
+// list holds every PR the person can read, not only the ones Mikka produced
+// (hooks/code-review/use-review-page.ts). GitHub stays one explicit icon away.
+// A right click offers what Capy's row menu does: open the PR's own page in a
+// new tab, pin, open on GitHub, copy its branch, copy its link.
+import { AppWindow, ChevronDown, ChevronRight, ExternalLink, GitBranch, Link2, Pin } from "lucide-react";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { openPullReview } from "@/hooks/code-review/use-review-page";
 import {
   PULL_REQUEST_COLORS,
   PULL_REQUEST_ICONS,
@@ -20,6 +35,8 @@ import {
 } from "@/lib/pull-request-appearance";
 import {
   pullDirectoryState,
+  pullPageHref,
+  pullReviewRef,
   type PullDirectoryRow,
   type PullState,
 } from "@/lib/pull-directory";
@@ -27,7 +44,7 @@ import {
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
   pending: "states.pending",
-  failed: "states.failed",
+  attention: "states.attention",
   draft: "states.draft",
   open: "states.open",
   merged: "states.merged",
@@ -47,6 +64,8 @@ export function PullRow({
   onSelect,
   onCheck,
   onPin,
+  onCopy,
+  workspaceId,
 }: {
   row: PullDirectoryRow;
   index: number;
@@ -56,6 +75,8 @@ export function PullRow({
   onSelect: (row: PullDirectoryRow) => void;
   onCheck: (url: string, next: boolean) => void;
   onPin: (url: string) => void;
+  onCopy: (text: string) => void;
+  workspaceId: string | null;
 }) {
   const t = useTranslations("PullDirectory");
   const age = useTranslations("Nav.age");
@@ -63,75 +84,110 @@ export function PullRow({
   const Icon = PULL_REQUEST_ICONS[row.state];
   const title = row.title || `${row.repo} #${row.number}`;
   const diff = row.additions !== undefined && row.deletions !== undefined;
+  const page = pullPageHref(row, workspaceId);
   return (
-    <li
-      data-pull-row
-      data-state={state}
-      className={cn(
-        "group/row relative flex h-10 items-center rounded-md pe-0.5 ps-1.5",
-        selected ? "bg-control-hover" : "hover:bg-control",
-      )}
-    >
-      <span className="flex w-5 shrink-0 justify-center">
-        <Checkbox
-          aria-label={t("selectPull", { number: row.number })}
-          checked={checked}
-          onCheckedChange={(value) => onCheck(row.url, Boolean(value))}
-          className={cn(DISCLOSED, checked && "opacity-100")}
-        />
-      </span>
-      <Button
-        variant="ghost"
-        data-pull-index={index}
-        aria-pressed={selected}
-        onClick={() => onSelect(row)}
-        className="h-full min-w-0 flex-1 flex-row items-center justify-start gap-2 rounded-none px-1 text-start font-normal hover:bg-transparent"
-      >
-        <Icon aria-hidden="true" className={cn("size-3.5 shrink-0", PULL_REQUEST_COLORS[row.state])} />
-        <bdi className="hidden max-w-40 shrink-0 truncate text-xs text-muted-foreground tabular-nums sm:block">
-          {row.repo}{" "}
-          <span className="text-muted-foreground">#{row.number}</span>
-        </bdi>
-        <span data-pull-title className="min-w-0 flex-1 truncate text-sm font-medium" title={title}>
-          {title}
-        </span>
-        {diff && (
-          <bdi className="shrink-0 text-xs tabular-nums">
-            <span className="text-github-pr-open">+{row.additions}</span>{" "}
-            <span className="text-github-pr-closed">−{row.deletions}</span>
-          </bdi>
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={<li />}
+        data-pull-row
+        data-state={state}
+        className={cn(
+          "group/row relative flex h-10 items-center rounded-md pe-0.5 ps-1.5 select-auto",
+          selected ? "bg-control-hover" : "hover:bg-control",
         )}
-        <span className="w-10 shrink-0 text-end text-xs text-muted-foreground tabular-nums">
-          {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
+      >
+        <span className="flex w-5 shrink-0 justify-center">
+          <Checkbox
+            aria-label={t("selectPull", { number: row.number })}
+            checked={checked}
+            onCheckedChange={(value) => onCheck(row.url, Boolean(value))}
+            className={cn(DISCLOSED, checked && "opacity-100")}
+          />
         </span>
-        <span className={cn("w-12 shrink-0 text-end text-xs font-medium", PULL_STATE_TONES[state])}>
-          {t(stateKeys[state])}
-        </span>
-      </Button>
-      <span className="flex w-14 shrink-0 justify-end">
         <Button
           variant="ghost"
-          size="icon-xs"
-          aria-label={t(pinned ? "unpin" : "pin")}
-          aria-pressed={pinned}
-          onClick={() => onPin(row.url)}
-          className={cn(DISCLOSED, "text-muted-foreground")}
+          data-pull-index={index}
+          aria-pressed={selected}
+          onClick={() => {
+            onSelect(row);
+            const pull = pullReviewRef(row);
+            if (pull) openPullReview(pull);
+          }}
+          className="h-full min-w-0 flex-1 flex-row items-center justify-start gap-2 rounded-none px-1 text-start font-normal hover:bg-transparent"
         >
-          <Pin data-icon className={cn(pinned && "fill-current")} />
+          <Icon aria-hidden="true" className={cn("size-3.5 shrink-0", PULL_REQUEST_COLORS[row.state])} />
+          <bdi className="hidden max-w-40 shrink-0 truncate text-xs text-muted-foreground tabular-nums sm:block">
+            {row.repo}{" "}
+            <span className="text-muted-foreground">#{row.number}</span>
+          </bdi>
+          <span data-pull-title className="min-w-0 flex-1 truncate text-sm font-medium" title={title}>
+            {title}
+          </span>
+          {diff && (
+            <bdi className="shrink-0 text-xs tabular-nums">
+              <span className="text-github-pr-open">+{row.additions}</span>{" "}
+              <span className="text-github-pr-closed">−{row.deletions}</span>
+            </bdi>
+          )}
+          <span className="w-10 shrink-0 text-end text-xs text-muted-foreground tabular-nums">
+            {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
+          </span>
+          <span className={cn("w-12 shrink-0 text-end text-xs font-medium", PULL_STATE_TONES[state])}>
+            {t(stateKeys[state])}
+          </span>
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={t("openGitHub")}
-          title={t("openGitHub")}
-          nativeButton={false}
-          render={<a href={row.url} target="_blank" rel="noopener noreferrer" />}
-          className={cn(DISCLOSED, "text-muted-foreground")}
-        >
-          <ExternalLink data-icon />
-        </Button>
-      </span>
-    </li>
+        <span className="flex w-14 shrink-0 justify-end">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t(pinned ? "unpin" : "pin")}
+            aria-pressed={pinned}
+            onClick={() => onPin(row.url)}
+            className={cn(DISCLOSED, "text-muted-foreground")}
+          >
+            <Pin data-icon className={cn(pinned && "fill-current")} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t("openGitHub")}
+            title={t("openGitHub")}
+            nativeButton={false}
+            render={<a href={row.url} target="_blank" rel="noopener noreferrer" />}
+            className={cn(DISCLOSED, "text-muted-foreground")}
+          >
+            <ExternalLink data-icon />
+          </Button>
+        </span>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-52">
+        <ContextMenuGroup>
+          <ContextMenuItem disabled={!page} onClick={() => page && window.open(page, "_blank", "noopener")}>
+            <AppWindow data-icon />
+            {t("openNewTab")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onPin(row.url)}>
+            <Pin data-icon />
+            {t(pinned ? "unpin" : "pin")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => window.open(row.url, "_blank", "noopener")}>
+            <ExternalLink data-icon />
+            {t("openGitHub")}
+          </ContextMenuItem>
+        </ContextMenuGroup>
+        <ContextMenuSeparator />
+        <ContextMenuGroup>
+          <ContextMenuItem disabled={!row.head} onClick={() => row.head && onCopy(row.head)}>
+            <GitBranch data-icon />
+            {t("copyBranch")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onCopy(row.url)}>
+            <Link2 data-icon />
+            {t("copyLink")}
+          </ContextMenuItem>
+        </ContextMenuGroup>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useEffect, useRef, useState } from 'react'
 import { saveProject } from '@/app/actions/projects'
@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { listTeams } from '@/app/actions/teams'
 import { setProjectTeams } from '@/app/actions/team-relations'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { Box, ChevronRight, ContactRound, X, LoaderCircle } from '@/components/icons'
+import { Box, ChevronRight, ContactRound, X } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { DEFAULT_PROJECT_PROPERTIES, projectPeople, type ProjectDraft } from '@/lib/project-input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -24,6 +24,7 @@ import { ProjectPicker, ProjectPropertyControl, type ProjectDirectory } from './
 import { ProjectMilestones } from './project-milestones'
 import { WORKSPACE_NAME } from './issue-properties'
 import { ShortcutKeys } from '@/components/shortcut-keys'
+import { Spinner } from '@/components/ui/spinner'
 import type { PresenceProps } from '@/lib/use-presence'
 import { useProjectVisibilityDefault } from './use-project-visibility-default'
 
@@ -87,7 +88,7 @@ export function ProjectForm({ readerId, project, initialTeamId = '', projects = 
         <ProjectMilestones value={draft.properties.milestones} disabled={pending} onChange={milestones => setDraft(current => ({ ...current, properties: { ...current.properties, milestones } }))} />
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       </div>
-      <footer className="flex shrink-0 items-center justify-end gap-3 px-5 py-4 sm:px-7"><span className="mr-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><ShortcutKeys keys={['mod', 'Enter']} />{project ? i18nText("Projects.form.saveAction") : i18nText("Projects.form.createAction")}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim() || (!project && (!visibility.data || visibility.saving))}>{pending && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{pending ? i18nText("Projects.textEditor.saving") : project ? i18nText("Projects.form.save") : i18nText("Projects.form.create")}</Button></footer>
+      <footer className="flex shrink-0 items-center justify-end gap-3 px-5 py-4 sm:px-7"><span className="mr-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><ShortcutKeys keys={['mod', 'Enter']} />{project ? i18nText("Projects.form.saveAction") : i18nText("Projects.form.createAction")}</span><Button type="submit" className="rounded-full bg-project-action px-4 text-project-action-foreground hover:bg-project-action/90" disabled={pending || !draft.name.trim() || (!project && (!visibility.data || visibility.saving))}>{pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{pending ? i18nText("Projects.textEditor.saving") : project ? i18nText("Projects.form.save") : i18nText("Projects.form.create")}</Button></footer>
     </form>
   </DialogContent></Dialog>
 }

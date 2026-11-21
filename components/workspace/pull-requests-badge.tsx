@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { IssuePullRequest } from '@/lib/issue-metadata'
 import { PULL_REQUEST_COLORS, PULL_REQUEST_ICONS, pullRequestsState } from '@/lib/pull-request-appearance'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'

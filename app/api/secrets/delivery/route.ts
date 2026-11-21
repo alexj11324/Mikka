@@ -6,7 +6,6 @@ import { createSecretDeliveryHandler } from '@/lib/secrets/delivery-http'
 import { listUserSecrets, replaceUserSecret } from '@/lib/secrets/user-store'
 import { listWorkspaceSecrets, replaceWorkspaceSecret } from '@/lib/secrets/store'
 
-export const dynamic = 'force-dynamic'
 
 const handle = createSecretDeliveryHandler({
   getSession: input => auth.api.getSession(input),

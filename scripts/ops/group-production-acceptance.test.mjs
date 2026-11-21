@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { DECISION_MODEL } from '../../lib/coordinator/decision.ts'
 import test from 'node:test'
 import { runGroupProductionAcceptance } from './group-production-acceptance.mjs'
 import { randomUUID } from 'node:crypto'
@@ -66,7 +67,7 @@ function pendingFixture({ recoverFirst = false, wrongCleanupOwner = false, unkno
   const bots = [], roles = new Map(), messages = [], polls = new Map(), stops = new Map(), calls = []
   let group = null, elapsed = 0, stopCalls = 0
   const receipt = { executionId: 'execution-synthetic', providerGenerationId: 'generation-synthetic',
-    modelId: 'openai/gpt-6-luna-decisions', requestDigest: 'a'.repeat(64), imageDigests: [],
+    modelId: DECISION_MODEL, requestDigest: 'a'.repeat(64), imageDigests: [],
     startedAt: new Date().toISOString(), completedAt: new Date().toISOString() }
   const step = { id: randomUUID(), phase: 'intent', index: 0, policyVersion: 'group-contribution-v4', status: 'complete', failure: null, receipt, decisionCostUsd: null }
   function turn(message, index) {

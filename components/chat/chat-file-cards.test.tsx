@@ -20,7 +20,7 @@ test('attachment links use the configured Next base path exactly once', async (t
     mediaType: 'text/markdown',
   }
   let metadataPath: string | undefined
-  mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+  mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
   mock.module('swr', {
     defaultExport: (path: string) => {
       metadataPath = path

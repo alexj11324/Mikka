@@ -23,11 +23,21 @@ services:
       MIKKA_EMAIL_FROM: ${MIKKA_EMAIL_FROM:-}
       SMTP_URL: ${SMTP_URL:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MIKKA_DEFAULT_MODEL_BASE_URL: ${MIKKA_DEFAULT_MODEL_BASE_URL:-}
-      MIKKA_DEFAULT_MODEL_API_KEY: ${MIKKA_DEFAULT_MODEL_API_KEY:-}
-      MIKKA_DEFAULT_MODEL_ID: ${MIKKA_DEFAULT_MODEL_ID:-}
+      MIKKA_LITELLM_URL: ${MIKKA_LITELLM_URL:-http://litellm:4000}
+      MIKKA_LITELLM_MASTER_KEY: ${MIKKA_LITELLM_MASTER_KEY:?Set MIKKA_LITELLM_MASTER_KEY in .env}
     volumes:
       - app-data:/data
+    depends_on:
+      litellm:
+        condition: service_started
     stop_grace_period: 60s
+  litellm:
+    build: ./deploy/litellm
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LITELLM_MASTER_KEY: ${MIKKA_LITELLM_MASTER_KEY:?Set MIKKA_LITELLM_MASTER_KEY in .env}
 volumes:
   app-data:

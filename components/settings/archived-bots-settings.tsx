@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'

@@ -3,7 +3,6 @@ import { organizationSession } from '@/lib/enterprise/http'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { addAllowedDomain, listAllowedDomains } from '@/lib/governance/organization-join-domains'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

@@ -1,12 +1,12 @@
-# Self-hosted image acceptance
+# Historical self-hosted image acceptance
 
-The `Self-hosted image` workflow builds the exact GitHub checkout once and uses
-that image for two independent Node application processes. Both connect to one
-disposable PostgreSQL 17 service. Each application has its own data volume;
-the test supplies the same temporary installation keys to both. The ordinary
-two-service user Compose file stays unchanged. CI adds
-`tests/self-hosted/compose.services.yml` and removes all its containers and
-volumes in the final step.
+Mikka retired this CI workflow on November 20, 2026. Use this page to interpret receipts from earlier runs.
+
+The former `Self-hosted image` workflow built the exact GitHub checkout and
+ran two Node processes against one disposable PostgreSQL 17 service. Each
+process had its own data volume. Both used the same temporary installation
+keys. CI added `tests/self-hosted/compose.services.yml` and removed its
+containers and volumes in the final step.
 
 No Infisical identity, Mikka account, cloud-provider key, browser, or paid cloud
 computer is used. The driver runs inside the application container and refuses
@@ -57,10 +57,8 @@ least one of #1560, #1561, #1562 or #1556 remains open. An all-closed result is 
 explicit skip, before owner credentials; a stale or unproven target cannot
 start the business checks. The target is checked again after cleanup.
 
-This job accepts compatibility of the already-deployed Mikka cloud application.
-The independent `Self-hosted image` workflow above accepts the community
-deployment. A passing cloud compatibility report does not complete that
-community deployment's registration, chat or daemon-task acceptance.
+This job verifies the deployed Mikka Cloud application. The scope of its
+report is Mikka Cloud.
 
 The existing GitHub OIDC identity delivers only `SMOKE_OWNER_EMAIL` and
 `SMOKE_OWNER_PASSWORD` from `prod:/`. GitHub's built-in read-only job token reads

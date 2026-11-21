@@ -3,17 +3,17 @@ import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // The icon's label reads as its key.
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 let threadGroupOfRun: typeof import('./thread-status-icon')['threadGroupOfRun']
-// What a rendered icon draws: its svg's own path data, so the check names the glyph, not a library's class.
-const drawingOf = (html: string) => [...html.matchAll(/<path d="([^"]+)"/g)].map(match => match[1]).join('|')
-let BUBBLE = ''
+let GROUP_BADGES: typeof import('./thread-status-icon')['GROUP_BADGES']
 let ThreadStatusIcon: typeof import('./thread-status-icon')['ThreadStatusIcon']
 let ThreadStatus: typeof import('./thread-status-icon')['ThreadStatus']
+let threadMarkOf: typeof import('@/lib/state-mark')['threadMarkOf']
+let THREAD_GROUPS: typeof import('@/lib/thread-groups')['THREAD_GROUPS']
 before(async () => {
-  ;({ threadGroupOfRun, ThreadStatusIcon, ThreadStatus } = await import('./thread-status-icon'))
-  const { MessageCircle } = await import('@/components/icons')
-  BUBBLE = drawingOf(renderToStaticMarkup(<MessageCircle aria-hidden="true" />))
+  ;({ threadGroupOfRun, GROUP_BADGES, ThreadStatusIcon, ThreadStatus } = await import('./thread-status-icon'))
+  ;({ threadMarkOf } = await import('@/lib/state-mark'))
+  ;({ THREAD_GROUPS } = await import('@/lib/thread-groups'))
 })
 
 test('a card or chip shows the run\'s group: done is 已解决, blocked and failed 受阻', () => {
@@ -33,39 +33,46 @@ test('not judged yet: failed is 受阻, any other ended run 等待你, never 已
   assert.equal(threadGroupOfRun('waiting_input'), 'waiting')
 })
 
-// Alex, 2026-11-04: a task and a thread must never look alike. A task is a circle; a thread is a bubble with a dot.
-test('a thread is a speech bubble with its group as a dot, never a circle like a task\'s status', () => {
-  for (const group of ['running', 'waiting', 'blocked', 'idle', 'resolved'] as const) {
+// Decision 2026-11-19-1630 replaces the thread's bubble and corner dot of 2026-11-04-2330: a thread is drawn with the
+// same marks a task's status uses, so one vocabulary covers both.
+test('a thread draws its group\'s mark from the shared registry, and its label names the group', () => {
+  for (const group of THREAD_GROUPS) {
+    const mark = threadMarkOf(group)
     for (const small of [true, false]) {
       const html = renderToStaticMarkup(<ThreadStatusIcon group={group} small={small} />)
-      // The glyph is the bubble's own drawing (R-52), whatever family it is drawn in; never a task's circle.
-      assert.equal(drawingOf(html), BUBBLE, 'a thread is a speech bubble')
-      assert.doesNotMatch(html, /<circle\b/, 'never a task\'s status circle')
-      assert.match(html, new RegExp(`data-thread-dot="${group}"`))
-      assert.match(html, new RegExp(`aria-label="Shell\\.threads\\.state\\.${group}"`), 'the dot is never the only sign')
+      assert.match(html, new RegExp(`data-mark="${mark.shape}"`), `${group} draws its mark`)
+      assert.match(html, new RegExp(`data-thread-mark="${group}"`))
+      assert.match(html, new RegExp(`aria-label="Shell\\.threads\\.state\\.${group}"`), 'the colour is never the only sign')
     }
   }
-  assert.match(renderToStaticMarkup(<ThreadStatusIcon status="stopped" waiting />), /data-thread-dot="waiting"/)
+  assert.match(renderToStaticMarkup(<ThreadStatusIcon status="stopped" waiting />), /data-thread-mark="waiting"/)
+  // A surface that shows no state beside the mark draws the shape alone, in the colour of where it sits.
+  assert.doesNotMatch(renderToStaticMarkup(<ThreadStatusIcon group="waiting" dot={false} />), /text-(?:muted|warning|success|info|label|destructive)/)
+  assert.doesNotMatch(renderToStaticMarkup(<ThreadStatusIcon group="waiting" accent />), /text-label-blue/)
 })
 
-// Decision (coordinator, 2026-11-02, option A): the badge says its group, as the list does, never the run's raw status.
-test('a thread\'s badge shows its group\'s icon and word: an unjudged finished run is 等待你, never 已完成', () => {
+test('a thread\'s badge says its group, and takes its colour from the same mark', () => {
   const badge = (props: Parameters<typeof ThreadStatus>[0]) => renderToStaticMarkup(<ThreadStatus {...props} />)
-  const table: [Parameters<typeof ThreadStatus>[0], string, RegExp][] = [
-    [{ status: 'running' }, 'running', /data-thread-dot="running"/],
-    [{ status: 'waiting_input' }, 'waiting', /data-thread-dot="waiting"/],
-    [{ status: 'succeeded' }, 'waiting', /data-thread-dot="waiting"/],
-    [{ status: 'stopped' }, 'waiting', /data-thread-dot="waiting"/],
-    [{ status: 'succeeded', outcome: 'done' }, 'resolved', /data-thread-dot="resolved"/],
-    [{ status: 'failed' }, 'blocked', /data-thread-dot="blocked"/],
-    [{ status: 'succeeded', outcome: 'blocked' }, 'blocked', /data-thread-dot="blocked"/],
-    [{ status: 'stopped', outcome: 'idle' }, 'idle', /data-thread-dot="idle"/],
+  const table: [Parameters<typeof ThreadStatus>[0], string, string][] = [
+    [{ status: 'running' }, 'running', 'half'],
+    [{ status: 'waiting_input' }, 'waiting', 'hand'],
+    [{ status: 'succeeded' }, 'waiting', 'hand'],
+    [{ status: 'stopped' }, 'waiting', 'hand'],
+    [{ status: 'succeeded', outcome: 'done' }, 'resolved', 'check'],
+    [{ status: 'failed' }, 'blocked', 'x'],
+    [{ status: 'succeeded', outcome: 'blocked' }, 'blocked', 'x'],
+    [{ status: 'stopped', outcome: 'idle' }, 'idle', 'empty'],
   ]
-  for (const [props, group, icon] of table) {
+  for (const [props, group, shape] of table) {
     const html = badge(props)
     assert.match(html, new RegExp(`Shell\\.threads\\.state\\.${group}<`), JSON.stringify(props))
-    assert.match(html, icon, JSON.stringify(props))
+    assert.match(html, new RegExp(`data-thread-mark="${group}"`), JSON.stringify(props))
+    assert.match(html, new RegExp(`data-mark="${shape}"`), JSON.stringify(props))
   }
   assert.doesNotMatch(badge({ status: 'running', icon: false }), /<svg/)
   assert.match(badge({ status: 'running', stopping: true }), /IssueThreads\.stopping/)
+  // 等待你 is the hand's info tint, so its badge is the info one, not a colour of its own.
+  assert.equal(GROUP_BADGES.waiting, 'info-light')
+  assert.equal(GROUP_BADGES.resolved, 'success-light')
+  assert.equal(GROUP_BADGES.blocked, 'destructive-light')
 })

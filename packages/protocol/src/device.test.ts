@@ -121,6 +121,28 @@ describe("device link schemas", () => {
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, modelCredential: { kind: "api_key", key: "fixture-key" } }).success).toBe(false)
   })
 
+  it("allows HTTP model credentials only for scoped Mikka gateway tokens on loopback", () => {
+    const base = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'claude_code', prompt: 'p' }
+    const key = 'mkg_' + 'a'.repeat(43)
+    for (const hostname of ['127.0.0.1', 'localhost', '[::1]']) {
+      for (const [protocol, path] of [['anthropic', '/api/model-gateway/anthropic'], ['openai', '/mikka/api/model-gateway/openai/v1']]) {
+        const modelCredential = { kind: 'provider', protocol, baseUrl: `http://${hostname}:3000${path}`, key }
+        expect(runAssignmentSchema.parse({ ...base, modelCredential }).modelCredential).toEqual(modelCredential)
+      }
+    }
+    const provider = { kind: 'provider', protocol: 'anthropic', baseUrl: 'http://127.0.0.1:3000/api/model-gateway/anthropic', key }
+    for (const changed of [
+      { key: 'raw-provider-key' }, { key: 'mkg_short' },
+      { baseUrl: 'http://remote.example/api/model-gateway/anthropic' },
+      { baseUrl: 'http://127.0.0.1:3000/v1/messages' },
+      { baseUrl: 'http://127.0.0.1:3000/api/model-gateway/anthropic/' },
+      { baseUrl: 'http://127.0.0.1:3000/api/model-gateway/openai/v1' },
+      { baseUrl: provider.baseUrl + '?redirect=elsewhere' },
+      { baseUrl: provider.baseUrl + '#fragment' },
+      { baseUrl: 'http://user:pass@127.0.0.1:3000/api/model-gateway/anthropic' },
+    ]) expect(runAssignmentSchema.safeParse({ ...base, modelCredential: { ...provider, ...changed } }).success).toBe(false)
+  })
+
   it("accepts prepared GitHub credentials with their natural expiry and keeps old assignments compatible", () => {
     const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "codex", prompt: "p" }
     const github = { endpoint: "https://example.com/api/runs/github-token", repository: "owner/repo" }

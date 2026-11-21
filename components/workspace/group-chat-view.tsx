@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
@@ -247,7 +247,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
                             ? <ChatMessage key={message.id} from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage>} after={<MessageReactions reactions={reactions[message.id]} align="end" />} />
                             : <Fragment key={message.id}>
                               <Bubble variant="muted" align="start" className="max-w-full">
-                                <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
+                                <BubbleContent size="roomy" className="whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
                               </Bubble>
                               <MessageReactions reactions={reactions[message.id]} align="start" />
                             </Fragment>)}

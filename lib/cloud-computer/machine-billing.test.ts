@@ -5,7 +5,7 @@ import { DEFAULT_MACHINE_SIZE, MACHINE_CHUNK_MS, machineChunkMicroUsd, machineHo
 import { fundMachineChunk, machineChunkId, type MachineBillingDependencies, type MachineChunk } from './machine-billing'
 
 test('machines are priced by memory at USD 0.025 per GiB-hour; standard-3 is the default', () => {
-  assert.deepEqual(['standard-1', 'standard-2', 'standard-3', 'standard-4'].map(size => machineHourlyUsd(size as never)), [0.1, 0.15, 0.2, 0.3])
+  assert.deepEqual(['standard-1', 'standard-2', 'standard-3', 'standard-4', 'standard-4-16'].map(size => machineHourlyUsd(size as never)), [0.1, 0.15, 0.2, 0.3, 0.4])
   assert.equal(DEFAULT_MACHINE_SIZE, 'standard-3')
   // A five-minute chunk of standard-3: USD 0.2 / 12.
   assert.equal(MACHINE_CHUNK_MS, 300_000)

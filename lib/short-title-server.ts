@@ -1,12 +1,19 @@
 import 'server-only'
-import { generateText } from 'ai'
-import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
-import { isCjk, parseShortTitle, shortTitlePrompt } from './short-title'
+import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from 'ai'
+import { z } from 'zod'
+import { HOSTED_CALL_TIMEOUT_MS } from '@/lib/abuse/policy'
+import { TITLE_MODEL } from '@/lib/coordinator/model'
+import { cleanShortTitle, isCjk, parseShortTitle, shortTitlePrompt, SHORT_TITLE_CHARS_MAX } from './short-title'
 import { withAiMetadata } from './tracing/ai'
 
-/** The small text model that names conversations, as Capy names its threads; the Coordinator's flash model. */
-const SHORT_TITLE_MODEL = COORDINATOR_MODEL
-const SHORT_TITLE_TIMEOUT_MS = 10_000
+/** Thread names use the independently managed title model. */
+const SHORT_TITLE_MODEL = TITLE_MODEL
+
+/**
+ * Codex asks for structured output with `maxLength` on the title, then still trims and truncates what comes back.
+ * An answer over the bound fails the schema; its text is then parsed and cut (below), so it is shortened, not lost.
+ */
+const SHORT_TITLE_SCHEMA = z.object({ title: z.string().max(SHORT_TITLE_CHARS_MAX) })
 
 /**
  * One bounded short title from the small model, for a conversation (thread-title-server.ts): the same
@@ -18,6 +25,15 @@ export async function generateShortTitle(ownerId: string, text: { title: string;
   await admitHostedModel({ workspaceId, ownerId }, SHORT_TITLE_MODEL, { auditAllowed: false })
   const model = await hostedModel(workspaceId, SHORT_TITLE_MODEL, undefined, ownerId)
   const { instructions, prompt } = shortTitlePrompt(text, naming)
-  const answer = await withAiMetadata({ operation: 'short_title' }, () => generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(SHORT_TITLE_TIMEOUT_MS) }))
-  return parseShortTitle(answer.text, isCjk(`${text.title} ${text.body}`))
+  const cjk = isCjk(`${text.title} ${text.body}`)
+  try {
+    const answer = await withAiMetadata({ operation: 'short_title' }, () => generateText({ model, instructions, prompt, output: Output.object({ schema: SHORT_TITLE_SCHEMA }), maxRetries: 1, abortSignal: AbortSignal.timeout(HOSTED_CALL_TIMEOUT_MS) }))
+    return cleanShortTitle(answer.output.title, cjk)
+  } catch (error) {
+    // The model answered but not in the schema's shape: read the title out of its text, as before structured output.
+    if (NoObjectGeneratedError.isInstance(error) && error.text) return parseShortTitle(error.text, cjk)
+    // The model stopped without any output (a content filter, a length stop): no title, as before structured output.
+    if (NoOutputGeneratedError.isInstance(error)) return null
+    throw error
+  }
 }

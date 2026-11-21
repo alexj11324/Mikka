@@ -10,7 +10,7 @@ import type { ThreadRecord } from '../components/blocks/rich-text-editor-4/compo
 const invalid = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'mystery', text: 'kept' }] }] }
 const translate = (key: string) => key
 const u = (path: string) => new URL(path, import.meta.url).href
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'zh-CN', useFormatter: () => ({ dateTime: () => '08:00' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useLocale: () => 'zh-CN', useFormatter: () => ({ dateTime: () => '08:00' }) } })
 mock.module(u('../app/actions/agents.ts'), { namedExports: { pollTaskDetail: async () => { throw Object.assign(new Error('older server'), { code: 'desktop_rpc_action_unknown', status: 404 }) } } })
 mock.module(u('../app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string) => ({ viewerId: 'u1', version: 'a'.repeat(32), issue: { id, title: 'Invalid body', content: invalid, status: 'todo', priority: 'normal', identifier: 'MIK-1', userId: 'u1', updatedAt: new Date(), createdAt: new Date() } }),

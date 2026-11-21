@@ -1,7 +1,6 @@
 import { withRequestLog } from '@/lib/request-log'
 import { parseLinearWebhookRequest } from '@/lib/linear-sync/webhook'
 
-export const runtime = 'nodejs'
 
 /**
  * Linear deliveries for 自动化 triggers (decision 2026-11-15-1930), forwarded by the Linear Worker that receives the

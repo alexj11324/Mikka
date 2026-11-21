@@ -7,7 +7,6 @@ import { authorizeRunApp } from '@/lib/run-app-mcp'
 import { runAppEntry, runAppToolkits } from '@/lib/app-tools-server'
 import { CUSTOM_MCP_TOOLKIT } from '@/lib/plugins/run-mcp'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 // One connected app (Composio toolkit) as its own MCP server for a device

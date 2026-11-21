@@ -114,9 +114,11 @@ export async function preparePreviewFramework(terminal, { fixtureId, framework, 
     await upload(terminal, `${directory}/${name}`, Buffer.from(value))
   await terminal.run(`cd ${quote(root)}; ${NODE} ${NPM} ci --ignore-scripts --no-audit --no-fund >/dev/null 2>&1`, { timeoutMs: 180000 })
   await terminal.run(`cd ${quote(root)}; ${NODE} -e ${quote("for(const [n,v] of Object.entries({next:'16.4.1',vite:'8.3.6',react:'19.3.1','react-dom':'19.3.1'}))if(require(n+'/package.json').version!==v)process.exit(1)")}`)
+  // The fixture installs its own framework (`npm ci` above) so this acceptance
+  // run observes a real third-party Next project, not the product's dependency.
   const binary = framework === 'next' ? '../node_modules/next/dist/bin/next' : '../node_modules/vite/bin/vite.js'
   const args = framework === 'next' ? `dev --webpack --hostname 127.0.0.1 --port ${port}` : `--host 127.0.0.1 --port ${port} --strictPort`
-  await terminal.run(`cd ${quote(directory)}; NEXT_TELEMETRY_DISABLED=1 NO_COLOR=1 ${NODE} ${binary} ${args} &`)
+  await terminal.run(`cd ${quote(directory)}; NO_COLOR=1 ${NODE} ${binary} ${args} &`)
   await terminal.expectText(framework === 'next' ? 'Ready in' : 'Local:', { timeoutMs: 90000 })
   return { directory, port, marker, frameworkLockSha256: hash(files['package-lock.json']),
     async update() {
@@ -154,7 +156,7 @@ export async function verifyPreviewTargetRefusals({ client, taskId }) {
 }
 
 export async function verifyExistingTaskPreview(options, { fetchImpl = fetch, bootstrap = previewBootstrap,
-  Socket = require('next/dist/compiled/ws'), observe = observeHmr, terminal = withPreviewTerminal, fixtureFiles } = {}) {
+  Socket = require('ws'), observe = observeHmr, terminal = withPreviewTerminal, fixtureFiles } = {}) {
   const { client, taskId, runId, fixtureId, harness, sandboxId, expectedBuild, beforeEnd, workerSha, workerSourceCommit } = options
   check(UUID.test(taskId ?? '') && UUID.test(runId ?? '') && UUID.test(fixtureId ?? '')
     && ['claude_code', 'codex'].includes(harness) && typeof beforeEnd === 'function'

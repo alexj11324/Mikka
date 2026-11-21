@@ -20,7 +20,7 @@ let choices: string[] = []
 let fixtureMenu: BotModelMenu | undefined = initial
 const fixtureScope = (userId: string, workspaceId: string) => new PersistentReadCache({ userId, workspaceId, role: 'admin', build: 'fixture' })
 let fixtureCache: Map<string, unknown> = new Map()
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: () => { failures++ } } } })
 mock.module('swr', { namedExports: { useSWRConfig: () => ({ cache: fixtureCache }) }, defaultExport: function useFixtureSWR() {
   const [data, setData] = useState(fixtureMenu)

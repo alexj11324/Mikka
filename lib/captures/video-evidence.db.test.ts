@@ -1,4 +1,3 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'

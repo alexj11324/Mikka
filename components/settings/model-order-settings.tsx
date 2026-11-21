@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useTranslations } from 'next-intl'
+import Link from '@/lib/client-runtime/link'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from '@/components/icons'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
-import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -48,7 +48,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const keyDialog = usePresence(keyOpen)
 
   if (loadError) return <SettingsSection id="model-order-heading" title={t('title')}><SettingsSaveError message={loadError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} /></SettingsSection>
-  if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
+  if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><SettingsLoading label={t('loading')} rows={2} bare /></SettingsSection>
 
   // The order each location tries (decision 2026-11-02-2330) is drawn as a chain, not a sentence (Alex, 2026-11-06).
   const noKey = data.location === 'cloud' && e2b.configured === false

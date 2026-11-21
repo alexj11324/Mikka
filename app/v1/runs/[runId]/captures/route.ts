@@ -4,7 +4,6 @@ import { beginUpload } from '@/lib/captures/store'
 import { maskFor } from '@/lib/secrets/runtime'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/runs/:runId/captures`: the daemon announces a screenshot or

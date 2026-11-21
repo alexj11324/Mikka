@@ -40,7 +40,7 @@ mock.module('../app/actions/team-relations.ts', { namedExports: {
     return relation === 'denied' ? { ok: false, error: 'denied' } : { ok: true, data: { ...saved, revision: 2 } }
   },
 } })
-mock.module('next-intl', { namedExports: { useTranslations: () => key => key, useMessages: () => ({}) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => key => key, useMessages: () => ({}) } })
 mock.module('../components/ui/dialog.tsx', { namedExports: {
   Dialog: children, DialogContent: children, DialogHeader: children, DialogTitle: children, DialogDescription: children,
 } })
@@ -124,6 +124,7 @@ test('a selected project missing from the current directory retains an explicit 
 test('project activity uses the displayed workspace and obtains a fresh read when the reader changes', async () => {
   const nested = [
     ['../components/workspace/project-dependency-repositories.tsx', { ProjectDependencyRepositories: empty }],
+    ['../components/workspace/project-device-checkouts.tsx', { ProjectDeviceCheckouts: empty }],
     ['../components/workspace/project-lifecycle-controls.tsx', { ProjectLifecycleControls: empty }],
     ['../components/teams/project-team-control.tsx', { ProjectTeamControl: empty }],
     ['../components/workspace/project-issue-picker.tsx', { ProjectIssuePicker: empty }],

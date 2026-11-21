@@ -1,11 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { attentionBudgets, setAttentionEnabled } from '@/lib/attention/store'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 
-export const dynamic = 'force-dynamic'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 

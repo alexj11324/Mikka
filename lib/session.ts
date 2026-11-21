@@ -1,6 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { auth } from '@/lib/auth'
 
 // React cache is scoped to one server render, never shared between users or requests.

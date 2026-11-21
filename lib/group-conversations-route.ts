@@ -1,5 +1,6 @@
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { groupDirectory } from '@/lib/group-conversations-directory'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { NextResponse } from 'next/server'
 import { groupsWithPendingTurns, processGroupTurn } from '@/lib/coordinator/group-turns'

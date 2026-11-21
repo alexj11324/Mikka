@@ -2,7 +2,6 @@ import { BASE_PATH } from '@/lib/base-path'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'
 
-export const dynamic = 'force-dynamic'
 
 const safeHeaders = {
   'Cache-Control': 'private, no-store',
