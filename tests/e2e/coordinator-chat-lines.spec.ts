@@ -84,7 +84,7 @@ test('runtime events read as lines in the person\'s language, with the thread as
   // Decision 2026-11-13-1405: every thread reference uses the bounded short title.
   await expect(waiting).toContainText('改用 msw 还是只改这')
   await expect(chat.locator('[data-event-line="runQuestion"]')).toHaveCount(0)
-  await expect(chat.locator('[data-event-line="issueStatus"]')).toHaveText('「登录页在 Safari 17 上白屏」 改为评审中')
+  await expect(chat.locator('[data-event-line="issueStatus"]')).toHaveText('「登录页在 Safari 17 上白屏」改为评审中')
   await expect(chat.locator('[data-event-line="runRetried"]')).toContainText('换了一台机器继续')
   for (const leak of ['[Event]', 'asks the person', 'send_to_run', runId, issueId]) await expect(chat.getByText(leak, { exact: false })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'chat-event-lines')
