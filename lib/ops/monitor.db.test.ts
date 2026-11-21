@@ -7,6 +7,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl } from '../../tests/support/workspace-admin-db'
 import { collectOperationalSignals } from './monitor'
+import { MAX_WAKE_ATTEMPTS } from '../coordinator/wake-recovery'
 import { repairDrillFaults } from '../../scripts/ops/drill-state.mjs'
 
 test('minute collector persists real SQL signals without a sink and keeps delivery retries separate from incident deduplication', { skip: !dbUrl }, async t => {
@@ -47,6 +48,26 @@ test('minute collector persists real SQL signals without a sink and keeps delive
   assert.deepEqual(result.transitions.map(event => [event.id, event.state]).sort(), [['database-unavailable', 'resolved'], ['staleWake', 'resolved']])
   assert.equal(result.notificationStatus, 'delivered')
   assert.equal((await pool.query('SELECT count(*)::int n FROM ops_monitor_observations')).rows[0].n, 7)
+})
+
+test('an exhausted wake is its own terminal signal and no longer holds staleWake firing', { skip: !dbUrl }, async t => {
+  const admin = new Pool({ connectionString: dbUrl }), schema = `ops_exhausted_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  const pool = new Pool({ connectionString: dbUrl, options: `-c search_path=${schema},public`, max: 5 })
+  t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
+  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences'])
+    await pool.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
+  await pool.query(await readFile(new URL('../../drizzle/20261031050736_ops_monitor_observations.sql', import.meta.url), 'utf8'))
+  await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,"createdAt","wakeAttempts","wakeLastError") VALUES
+    (gen_random_uuid(),'ops-fixture','run_finished',gen_random_uuid()::text,'{}',now()-interval '10 minutes',$1,'wake_exhausted')`, [MAX_WAKE_ATTEMPTS])
+  const exhausted = await collectOperationalSignals(pool)
+  assert.equal(exhausted.signals.staleWake, 0); assert.equal(exhausted.signals.exhaustedWake, 1)
+  assert.deepEqual(exhausted.alerts, [])
+  await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,"createdAt","wakeAttempts") VALUES
+    (gen_random_uuid(),'ops-fixture','run_finished',gen_random_uuid()::text,'{}',now()-interval '10 minutes',$1)`, [MAX_WAKE_ATTEMPTS - 1])
+  const stale = await collectOperationalSignals(pool)
+  assert.equal(stale.signals.staleWake, 1); assert.equal(stale.signals.exhaustedWake, 1)
+  assert.deepEqual(stale.alerts.map((alert: { id: string }) => alert.id), ['staleWake'])
 })
 
 test('fault matrix preserves failed SLO history while live wake, lease, uncertainty and cleanup signals recover', { skip: !dbUrl }, async t => {
@@ -90,7 +111,7 @@ test('fault matrix preserves failed SLO history while live wake, lease, uncertai
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const sink = `http://127.0.0.1:${address.port}/internal-alerts`
   const fired = await collectOperationalSignals(pool, { sink, now: at })
-  assert.deepEqual(fired.signals, { databaseAvailable: 1, staleWake: 1, expiredRunLease: 1, uncertainEffect: 1, staleEffect: 1, overdueSecretCleanup: 1, dueTotal: 3, dueSuccessful: 1, dispatchTotal: 3, dispatchStarted: 1 })
+  assert.deepEqual(fired.signals, { databaseAvailable: 1, staleWake: 1, exhaustedWake: 0, expiredRunLease: 1, uncertainEffect: 1, staleEffect: 1, overdueSecretCleanup: 1, dueTotal: 3, dueSuccessful: 1, dispatchTotal: 3, dispatchStarted: 1 })
   assert.equal(fired.notificationStatus, 'delivered'); assert.equal(received.length, 7)
   await collectOperationalSignals(pool, { sink, now: new Date(at.getTime() + 1) }); assert.equal(received.length, 7)
 
