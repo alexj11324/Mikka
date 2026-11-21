@@ -15,9 +15,10 @@ UI changes are verified locally with a production build (`next build`, then
 ([dev workflow](../../dev-workflow.md)). Browser specs under `tests/e2e/`
 stay and run locally.
 
-The former echo-only compatibility workflow has been removed. Required checks
-are "UI policy (strict)" and "Production build and browser interactions";
-GitGuardian remains optional and unchanged.
+`browser-gate.yml` remains only because `main`'s branch protection still
+requires the check name "Browser tests (before merge)". Its one job passes at
+once; delete the file once Alex removes that name from the required checks in
+the repository settings.
 
 The CI production build stays off (0230 rule 3); "Production build and
 browser interactions" remains the name of the database-suite gate.

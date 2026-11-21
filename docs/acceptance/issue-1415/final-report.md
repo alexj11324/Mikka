@@ -106,7 +106,7 @@ PR 的实际90项 bot-chat DB、16项 schedule、1项 task-binding，以及合�
 | tracing | 7ed，一次正常 owner workspace GET | 同trace的4个DB span、本地OTLP真实接收；默认0.1 sampler，预选其接受的traceID；只证该条链路，不测采样率或证明生产供应商入库 |
 | Factory 五文件 | exact69e9+父级预算修正，及后续 f01/095d CI | 各305/305；单项SQL/lock/model时限未放宽；独立库、role、进程清理通过 |
 
-“Production build and browser interactions”这个 CI job 只有结果汇总，不算额外实际 build/browser 执行。真实 Analytics3路径的 Chromium 记录与生产浏览器报告分别计数；Retired compatibility workflow 也不被包装成浏览器测试。源码220条 route mapping、35项HTTPS、14项实际编译入口 Request/Response 是不同证据，未声称220条路径都经过网络调用。历史 PG wire35窗口和 tracing近似404B属性不能混算，已取消性能验收后没有恢复性能门槛。
+“Production build and browser interactions”这个 CI job 只有结果汇总，不算额外实际 build/browser 执行。真实 Analytics3路径的 Chromium 记录与生产浏览器报告分别计数；Browser gate 也不被包装成浏览器测试。源码220条 route mapping、35项HTTPS、14项实际编译入口 Request/Response 是不同证据，未声称220条路径都经过网络调用。历史 PG wire35窗口和 tracing近似404B属性不能混算，已取消性能验收后没有恢复性能门槛。
 
 [原生 Desktop run42231017214](https://github.com/alexj11324/Mikka/actions/runs/42231017214) 的实际环境为 macOS26.7.2、image20261102.0473.1、Node24.22.2。最大像素差异约0.0027006%。[artifact13510164029](https://github.com/alexj11324/Mikka/actions/runs/42231017214/artifacts/13510164029) 的 `parity/` 含100组 hosted/bundled/diff，共300张PNG与 `parity/parity.json`，到期时间为 **2026-11-13 14:30:32 UTC**。下载依赖正常 GitHub 权限及保留期，未承诺永久可下载。
 

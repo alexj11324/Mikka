@@ -58,7 +58,7 @@
     },
     {
       "id": 42126742871,
-      "name": "Retired compatibility workflow",
+      "name": "Browser gate",
       "conclusion": "success"
     },
     {
