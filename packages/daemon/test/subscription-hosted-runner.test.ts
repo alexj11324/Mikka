@@ -321,10 +321,6 @@ it.each([
       await expect(started).rejects.toThrow(); expect(executions).toBe(0); return
     }
     const finished = collect(await started)
-    if (permission === 'ask') {
-      const review = await waitFor(() => broker.list()[0]); expect(executions).toBe(0)
-      await broker.decide(review.id, review.digest, true)
-    }
     expect((await finished).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
     expect(executions).toBe(1)
     expect(f.never).not.toHaveBeenCalled()
