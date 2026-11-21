@@ -13,6 +13,8 @@ import { ComputerRequestError, computerApi } from '@/lib/computer/client'
 import { MOCK_SCREEN_URL } from '@/lib/computer/mock'
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type ScreenRect, type ViewerMode } from '@/lib/computer/types'
 import { cn } from '@/lib/utils'
+import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
+import { usePresence } from '@/lib/use-presence'
 
 type RFBInstance = EventTarget & { viewOnly: boolean; scaleViewport: boolean; resizeSession: boolean; background: string; disconnect: () => void; focus: () => void }
 
@@ -118,6 +120,8 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   const { data: state, error, mutate } = useComputer(botId)
   const wakeInFlight = useRef(false)
   const [wakePending, setWakePending] = useState(false)
+  const [addingKey, setAddingKey] = useState(false)
+  const keyDialog = usePresence(addingKey)
   const waking = wakePending || state?.machine === 'waking'
   const running = state?.machine === 'running'
   const { data: grant, error: grantError, mutate: renewGrant } = useViewerGrant(botId, mode, running && live)
@@ -131,11 +135,15 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
     if (wakeInFlight.current) return
     wakeInFlight.current = true
     setWakePending(true)
-    try { await computerApi.wake(botId); await mutate() } catch { toast.error(t('wakeFailed')) }
+    try { await computerApi.wake(botId); await mutate() } catch (error) {
+      if (error instanceof ComputerRequestError && (error.body as { error?: string } | null)?.error === 'e2b_key_missing') setAddingKey(true)
+      else toast.error(t('wakeFailed'))
+    }
     finally { wakeInFlight.current = false; setWakePending(false) }
   }
   const label = t('screenOf', { name })
   return <div className={cn('@container/screen relative aspect-[16/10] w-full overflow-hidden bg-screen text-screen-foreground', frame === 'rounded' ? 'rounded-lg' : 'rounded-xl')}>
+    {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) void wake() }} />}
     {running && !unauthorized && (grant?.url === MOCK_SCREEN_URL
       ? <img src={withBasePath('/computer/mock-desktop.svg')} alt={label} draggable={false} className="absolute inset-0 size-full select-none" />
       : <NoVncView key={botId} url={grant?.url} mode={mode} label={label} disconnected={() => { void mutate() }} />)}
