@@ -1,5 +1,6 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
+import { validTraceparent } from '@mikka/protocol/trace-context'
 import { authClient } from '@/lib/auth'
 import { currentAccount } from '@/lib/config'
 import { endLostSession } from '@/lib/session'
@@ -9,10 +10,18 @@ import { accountStorageKey } from './server-store'
 import { presenceScope } from './presence-scope'
 
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string) {
+  constructor(readonly status: number, readonly code: string, readonly traceId?: string) {
     super(code)
   }
 }
+
+export class ApiTransportError extends Error {
+  constructor(readonly reason: 'credentials' | 'network' | 'timeout' | 'invalid_response', cause: unknown, readonly traceId?: string) {
+    super(reason, { cause })
+  }
+}
+
+type ApiRequest = { method?: string; body?: unknown; timeoutMs?: number; diagnostics?: { headers?: Record<string, string> } }
 export const apiConnection = () => ({ account: currentAccount(), client: authClient })
 export type ApiConnection = ReturnType<typeof apiConnection>
 
@@ -54,15 +63,22 @@ export async function authHeaders(connection: ApiConnection = apiConnection()): 
 /** A request that has not answered by then fails, so nothing waits on it forever (a send shows 重试). */
 export const REQUEST_TIMEOUT_MS = 30_000
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}, connection: ApiConnection = apiConnection()): Promise<T> {
+export async function api<T>(path: string, init: ApiRequest = {}, connection: ApiConnection = apiConnection()): Promise<T> {
   const context = apiCache.context()
-  const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders(connection) }
+  let authentication: Record<string, string>
+  try { authentication = await authHeaders(connection) }
+  catch (error) {
+    if (init.diagnostics) throw new ApiTransportError('credentials', error)
+    throw error
+  }
+  const headers: Record<string, string> = { ...init.diagnostics?.headers, accept: 'application/json', ...authentication }
+  const traceId = validTraceparent(authentication.traceparent) ? authentication.traceparent.slice(3, 35) : undefined
   if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET' && currentAccount().id === connection.account.id) {
     const proof = presenceScope.token(context)
     if (proof) headers['x-mikka-presence-scope'] = proof
   }
-  if (path === '/api/rpc') {
-    headers['x-mikka-rpc'] = '1'
+  if (path === '/api/rpc') headers['x-mikka-rpc'] = '1'
+  if (path === '/api/rpc' || (path === '/api/inbox' && init.method === 'POST')) {
     // Native fetch has no browser Origin. Bind the cookie and origin to the
     // same saved connection even if the person switches servers in flight.
     if (Platform.OS !== 'web') headers.origin = new URL(connection.account.server.url).origin
@@ -70,18 +86,27 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? REQUEST_TIMEOUT_MS)
-  const response = await fetch(`${connection.account.server.url}${path}`, {
-    method: init.method ?? 'GET',
-    headers,
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    credentials: Platform.OS === 'web' ? 'include' : 'omit',
-    redirect: 'error',
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timer))
-  // A response for a previous identity must not sign the current person out.
-  if (response.status === 401 && currentAccount().id === connection.account.id) apiCache.commit(context, () => { void endLostSession() })
-  if (response.status === 204) return undefined as T
-  const data = await response.json().catch(() => null) as (T & { error?: string }) | null
-  if (!response.ok) throw new ApiError(response.status, data?.error ?? `http${response.status}`)
-  return data as T
+  try {
+    const response = await fetch(`${connection.account.server.url}${path}`, {
+      method: init.method ?? 'GET',
+      headers,
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      credentials: Platform.OS === 'web' ? 'include' : 'omit',
+      redirect: 'error',
+      signal: controller.signal,
+    }).catch(error => {
+      if (init.diagnostics) throw new ApiTransportError(controller.signal.aborted ? 'timeout' : 'network', error, traceId)
+      throw error
+    })
+    if (!init.diagnostics) clearTimeout(timer)
+    // A response for a previous identity must not sign the current person out.
+    if (response.status === 401 && currentAccount().id === connection.account.id) apiCache.commit(context, () => { void endLostSession() })
+    if (response.status === 204) return undefined as T
+    const data = await response.json().catch(error => {
+      if (response.ok && init.diagnostics) throw new ApiTransportError(controller.signal.aborted ? 'timeout' : 'invalid_response', error, traceId)
+      return null
+    }) as (T & { error?: string }) | null
+    if (!response.ok) throw new ApiError(response.status, data?.error ?? `http${response.status}`, traceId)
+    return data as T
+  } finally { clearTimeout(timer) }
 }

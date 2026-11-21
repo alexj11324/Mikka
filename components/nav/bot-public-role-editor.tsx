@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
@@ -10,8 +10,9 @@ const MAX_ROLE_LENGTH = 2000
 type PublicRole = { publicRole: string }
 
 /** The owner endpoint projects public fields only; private instructions never reach this editor. */
-async function requestPublicRole(botId: string, publicRole?: string): Promise<PublicRole> {
-  const response = await fetch(withBasePath(`/api/bots/${botId}`), publicRole === undefined ? { cache: 'no-store' } : {
+async function requestPublicRole(botId: string, workspaceId?: string, publicRole?: string): Promise<PublicRole> {
+  const query = workspaceId ? '?' + new URLSearchParams({ workspaceId }) : ''
+  const response = await fetch(withBasePath(`/api/bots/${botId}${query}`), publicRole === undefined ? { cache: 'no-store' } : {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publicRole }),
   })
   const body = await response.json()
@@ -26,7 +27,7 @@ async function requestPublicRole(botId: string, publicRole?: string): Promise<Pu
 export function useBotPublicRole(botId: string, workspaceId: string | undefined, visible: boolean) {
   const t = useTranslations('Shell.panel.publicRole')
   const actionError = useActionError()
-  const { data, error: loadError, mutate } = useSWR(visible ? ['bot-public-role', workspaceId ?? null, botId] : null, () => requestPublicRole(botId))
+  const { data, error: loadError, mutate } = useSWR(visible ? ['bot-public-role', workspaceId ?? null, botId] : null, () => requestPublicRole(botId, workspaceId))
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -41,7 +42,7 @@ export function useBotPublicRole(botId: string, workspaceId: string | undefined,
     setError(null)
     setSaved(false)
     try {
-      const next = await requestPublicRole(botId, value.trim())
+      const next = await requestPublicRole(botId, workspaceId, value.trim())
       await mutate(next, { revalidate: false })
       setDraft(null)
       setSaved(true)

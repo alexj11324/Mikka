@@ -7,5 +7,5 @@ export type SettingsMembersProps = {
   /** Open the invite once the role is known to be admin (an invite link from elsewhere, `&invite=1`). */
   inviteInitially: boolean
   /** Moves to the other section (the page's tabs). */
-  onSection: (section: 'members' | 'teams') => void
+  onSection: (section: 'members' | 'teams' | 'organization') => void
 }

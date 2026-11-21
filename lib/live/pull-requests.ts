@@ -10,19 +10,12 @@ type Target = { scope: LiveScope; events: LiveInvalidation[] }
 const MAX_TASKS = 50
 
 /** A linked pull request's state shows on its task. Each task's key (`pull_request_status`, the task ID) goes to
- * that task's own audience, re-checked when sent (documentLiveTargets). The badge then asks GitHub with the
+ * that task's own audience, re-checked when sent. The badge then asks GitHub with the
  * viewer's own access; no PR state, title or URL crosses the channel. */
 export async function pullRequestStatusTargets(database: Database, workspaceDatabase: Database, issueIds: readonly string[]): Promise<Target[]> {
   const ids = [...new Set(issueIds.filter(id => LIVE_ID.test(id)))].slice(0, MAX_TASKS)
-  const { documentLiveTargets } = await import('./panels')
-  const merged = new Map<string, Target>()
-  for (const issueId of ids) for (const target of await documentLiveTargets(database, workspaceDatabase, issueId)) {
-    const key = JSON.stringify(target.scope)
-    const current = merged.get(key) ?? { scope: target.scope, events: [] }
-    current.events.push({ kind: 'pull_request_status', id: issueId })
-    merged.set(key, current)
-  }
-  return [...merged.values()]
+  const { issueAudienceTargets } = await import('./panels')
+  return issueAudienceTargets(database, workspaceDatabase, ids, 'pull_request_status')
 }
 
 /** A GitHub webhook committed a delivered PR's state. Sent after COMMIT; a failed write sends nothing. */

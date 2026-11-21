@@ -22,6 +22,8 @@ export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
     const requestDigest = snapshotDigest({outcome:input.outcome,messages:input.messages ?? null})
     let receipt = (await client.query<Receipt>('SELECT * FROM eve_turn_settlements WHERE session_id=$1 AND turn_id=$2',[input.sessionId,input.turnId])).rows[0]
     if (receipt && receipt.request_digest !== requestDigest) throw new Error('operationBindingConflict')
+    // The native hook omits executionId. A completed matching receipt has already finished its execution.
+    if (receipt?.completed_at && !input.executionId) return {status:'accepted'}
     const execution = (await pool.query<{id:string}>('SELECT id FROM agent_kit_executions WHERE owner_id=$1 AND bot_key=$2 AND execution_key=$3',[scope.ownerId,scope.botId,`${input.sessionId}:${input.turnId}:0`])).rows[0]
     if (input.executionId && input.executionId !== execution?.id) throw new Error('agentExecutionClosed')
     if (receipt?.completed_at) return {status:'accepted'}

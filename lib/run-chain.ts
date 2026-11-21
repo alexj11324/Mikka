@@ -1,3 +1,4 @@
+import { FACTORY_STAGES, type FactoryStage } from './factory/contract'
 import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
@@ -24,6 +25,7 @@ export interface RunChainQueryable {
 export const RUN_CHAIN_MAX_DEPTH = 64
 
 export interface RunAttempt {
+  pauseReason?: import('./task-state').TaskStateRun['pauseReason']
   failureDetails?: RunFailure | CompactRunFailure | null
   runId: string
   /** 1-based, in chain order: the root is attempt 1. */
@@ -31,6 +33,8 @@ export interface RunAttempt {
   status: string
   /** How it came out once it ended (R-52); null while running or not judged yet. */
   outcome?: string | null
+  /** The Factory stage this run works on (factory_attempts.stage), when the run is a Factory attempt. */
+  stage?: FactoryStage | null
   stopRequestedAt: Date | null
   createdAt: Date
   finishedAt: Date | null
@@ -56,7 +60,7 @@ const PARENT = (child: string, parent: string) => `${parent}.id IN (${child}.ori
  * Every run in scope with its chain root. `scope` filters agent_runs aliased `r`;
  * parameters $1..$n belong to the caller, `depth` is the depth-cap placeholder.
  */
-function chainSql(scope: string, depth: string) {
+export function runChainSql(scope: string, depth: string) {
   return `
     runs AS (
       SELECT r.id, r."userId", r."issueId", r."workspaceId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId" FROM agent_runs r WHERE ${scope}
@@ -85,8 +89,9 @@ const COMPACT_FAILURE = `CASE WHEN jsonb_typeof(x."failureDetails")='object' AND
     'occurredAt',x."failureDetails"->'occurredAt','appVersion',x."failureDetails"->'appVersion') ||
   jsonb_strip_nulls(jsonb_build_object('detail',x."failureDetails"->'detail','provider',x."failureDetails"->'provider',
     'status',x."failureDetails"->'status','recovery',x."failureDetails"->'recovery')) END`
-const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome,
-  x."stopRequestedAt", x."createdAt", x."finishedAt", ${ownerDetail ? 'x."failureDetails"' : COMPACT_FAILURE} AS "failureDetails"`
+const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome, x."pauseReason",
+  x."stopRequestedAt", x."createdAt", x."finishedAt", ${ownerDetail ? 'x."failureDetails"' : COMPACT_FAILURE} AS "failureDetails",
+  (SELECT fa.stage FROM factory_attempts fa WHERE fa."runId" = x.id) AS "factoryStage"`
 
 /**
  * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
@@ -94,7 +99,7 @@ const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text
  */
 export async function listIssueRunChains(q: RunChainQueryable, issueId: string, userIds: readonly string[], limit: number): Promise<RunChain[]> {
   const { rows } = await q.query(`
-    WITH RECURSIVE ${chainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])
+    WITH RECURSIVE ${runChainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])
       AND EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=r."workspaceId")`, '$4')},
     roots AS (
       SELECT DISTINCT a.root, n."createdAt" FROM assigned a JOIN runs n ON n.id = a.root
@@ -140,7 +145,9 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
     const root = String(row.rootRunId)
     const entry = byRoot.get(root) ?? { rootCreatedAt: row.rootCreatedAt as Date, runs: [] }
     const failureDetails = readRunFailure(row.failureDetails) ?? readCompactRunFailure(row.failureDetails)
-    entry.runs.push({ ...(failureDetails ? { failureDetails } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
+    const pauseReason = row.pauseReason === 'human_control' || row.pauseReason === 'quota_exhausted' ? row.pauseReason : null
+    const stage = typeof row.factoryStage === 'string' && (FACTORY_STAGES as readonly string[]).includes(row.factoryStage) ? row.factoryStage as FactoryStage : null
+    entry.runs.push({ ...(pauseReason ? { pauseReason } : {}), ...(failureDetails ? { failureDetails } : {}), ...(stage ? { stage } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
     byRoot.set(root, entry)
   }
   const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0)
@@ -157,7 +164,7 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
 function selectedChainSql() {
   return `start AS (
       SELECT "issueId","workspaceId" FROM agent_runs WHERE id = $1::uuid AND "userId" = $2 AND "workspaceId" IS NOT NULL
-    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")`, '$3')},
+    ), ${runChainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")`, '$3')},
     selected AS (
       SELECT * FROM assigned WHERE root = (SELECT root FROM assigned WHERE id = $1::uuid)
     )`

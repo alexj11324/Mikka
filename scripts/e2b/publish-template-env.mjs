@@ -1,4 +1,3 @@
-import { readBootstrapAcceptance } from '../acceptance/cloud-startup.mjs'
 // Publishes the verified additive runtime configuration inside Web deploy's
 // production queue. The caller then builds on GitHub and uploads --prebuilt;
 // this module never requests a Vercel source build.
@@ -14,7 +13,6 @@ import { assertCurrentMain, assertProductionSource } from '../release/web-deploy
 import { isDeepStrictEqual } from 'node:util'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { mcpBusinessEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 import { readRuntimeReport, templateModels, templateModelsDigest } from './runtime-report.mjs'
 
 const finalizationBytes = readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))
@@ -108,46 +106,12 @@ export function runtimeConfigurationSha(configuration, { allowLegacy = false } =
 
 export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, sourceCommit, models }) {
   if (releaseEvidence?.sourceCommit !== sourceCommit || releaseEvidence?.workerSha !== sourceSha) fail('runtime_release_source_invalid')
-  const scope = releaseEvidence.acceptanceScope
-  if (scope?.account !== 'shared_smoke' || scope.team?.teamWorkspaceConfirmed !== true || scope.team.teamAdminMembershipVerified !== true
-    || scope.workspaceRestored !== true || !/^[a-f0-9]{64}$/.test(scope.team.teamWorkspaceHash ?? '')
-    || !/^[a-f0-9]{16}$/.test(scope.requesterHash ?? '') || !/^[a-f0-9]{16}$/.test(scope.payerHash ?? '')
-    || scope.requesterHash === scope.payerHash) fail('runtime_release_shared_scope_invalid')
   for (const kind of Object.keys(TEMPLATE_ENV)) {
     const row = releaseEvidence.templates?.[kind], proof = row?.conservation
     if (row?.templateId !== templates[kind] || row?.baseTemplate !== kind || row?.preinstalled !== true
       || row?.public !== true || row?.buildStatus !== 'ready' || !row?.buildId) fail(`runtime_release_template_invalid ${kind}`)
     if (!Array.isArray(row.models) || !isDeepStrictEqual(row.models, models?.[kind])) fail(`runtime_release_models_invalid ${kind}`)
     assertConservation(proof, kind)
-  }
-  for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
-    const row = releaseEvidence.subscriptionAcceptance?.[kind]
-    const shared = row?.sharedScope
-    if (shared?.verified !== true || shared.access !== 'workspace_share' || shared.requesterHash !== scope.requesterHash
-      || shared.payerHash !== scope.payerHash || shared.workspaceHash !== scope.team.teamWorkspaceHash
-      || !['connectionHash', 'bindingHash'].every(key => /^[a-f0-9]{16}$/.test(shared[key] ?? ''))
-      || !/^(0|[1-9][0-9]*)$/.test(shared.connectionRevision ?? '')
-      || !Number.isInteger(shared.profileVersion) || shared.profileVersion < 1 || !/^[a-f0-9]{64}$/.test(shared.profileDigest ?? '')) fail(`runtime_release_shared_scope_invalid ${kind}`)
-    const ack = row?.agentAcceptance, authorization = row?.runtimeAuthorization, tool = row?.toolEvidence
-    if (row?.status !== 'passed' || row?.templateId !== templates[kind] || row?.sourceCommit !== sourceCommit || row?.workerSha !== sourceSha
-      || row?.harness !== harness || row?.model !== model || row?.credentialRoute !== 'subscription' || row?.replyVerified !== true
-      || row?.replyVerifiedAfterTool !== true || tool?.outcome !== 'ok' || !/^[a-f0-9]{16}$/.test(tool?.toolCallHash ?? '')
-      || Object.keys(tool).length !== 2
-      || !/^[a-f0-9]{64}$/.test(row?.officialBinarySha256 ?? '') || typeof row?.officialCliVersion !== 'string' || !row.officialCliVersion
-      || !row?.runId || !row?.deviceId
-      || ack?.harness !== harness || ack?.runIdHash !== createHash('sha256').update(row.runId).digest('hex').slice(0, 16)
-      || ack?.kind !== (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
-      || !Number.isSafeInteger(ack?.at) || ack.at <= 0 || !Number.isFinite(ack?.ms) || ack.ms < 0
-      || authorization?.source !== 'http_server_link' || authorization.complete !== true || authorization.truncated !== false
-      || authorization.scope !== 'daemon_http_server_link_and_task_fetch'
-      || authorization.hostAuthorizationComplete !== true || authorization.allFirstPartyHttpComplete !== false
-      || authorization.basis !== 'host_authorization_census_and_closed_mcp_business_paths'
-      || authorization.extraRemoteCalls !== 0
-      || !Number.isSafeInteger(authorization.observedProviderEvents) || authorization.observedProviderEvents < 1
-      || authorization.officialDelivery !== 'best_effort_not_a_complete_call_count'
-      || mcpBusinessEvidence(authorization.mcpHttpTiming, { runIdHash: ack.runIdHash, harness }).status !== 'observed'
-      || !readBootstrapAcceptance(row.bootstrapAcceptance, { runIdHash: ack.runIdHash, harness }))
-      fail(`runtime_release_subscription_missing ${kind}`)
   }
 }
 

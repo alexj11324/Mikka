@@ -4,9 +4,10 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool, type PoolClient, type QueryResult } from 'pg'
 import { dbUrl, seedUser, seedWorkspace, seedBot, seedIssue } from './support/workspace-admin-db'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { templateModelsFixture } from './support/template-models'
 import { orderMigrations } from '../scripts/migration-order.mjs'
+import { observePoolCommits } from '../lib/db/commit-effects'
 
 type Run = typeof import('../lib/db/schema').agentRuns.$inferSelect
 type Phase = { calls: number; statements: number; rows: number; jsonBytes: number; repeatedRunReads: number }
@@ -17,11 +18,13 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
   assert.ok(dbUrl)
   const admin = new Pool({ connectionString: dbUrl, max: 1 })
   const database = 'claim_locked_run_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   console.info(JSON.stringify({ event: 'claim_locked_run_owned_database', database }))
   const target = new URL(dbUrl); target.pathname = '/' + database
   const saved = Object.fromEntries(['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL', 'MIKKA_BYOS_ENABLED', 'MIKKA_BYOS_VALIDATED_MODEL_ROUTES'].map(k => [k, process.env[k]]))
   const pool = new Pool({ connectionString: target.toString(), max: 6, options: '-c statement_timeout=15000 -c lock_timeout=5000' })
+  // As the application's pool is: a claim's after-commit effects (the task moving to 进行中) see its COMMIT.
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   t.after(async () => {
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
@@ -108,16 +111,17 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
     }
   }
   const fixture = async (harness: 'claude_code' | 'codex' = 'claude_code') => {
-    const ownerId = await seedUser(pool, 'locked-requester'), payer = await seedUser(pool, 'locked-subscriber')
-    const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }, { userId: payer, role: 'member' }])
-    const { id: payerWorkspace } = await seedWorkspace(pool, payer, [{ userId: payer, role: 'admin' }])
+    // A subscription serves its owner only (decision 2026-11-17): the requester pays with their own.
+    const ownerId = await seedUser(pool, 'locked-requester'), payer = ownerId
+    const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
+    const payerWorkspace = workspaceId
     const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId, workspaceId)
     const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), connection = randomUUID()
     const model = harness === 'claude_code' ? 'claude-haiku-5-5' : 'gpt-6-luna'
     const actor = { userId: ownerId, workspaceId }, scope = { ownerId, workspaceId, botId }
     await pool.query('INSERT INTO user_e2b_keys ("userId",ciphertext,iv,"keyVersion",last4) VALUES ($1,\'synthetic-unopened\',\'synthetic-unopened\',1,\'test\')', [ownerId])
     await pool.query('INSERT INTO model_order_settings ("ownerId","workspaceId",location,customized) VALUES ($1,$2,\'cloud\',true)', [ownerId, workspaceId])
-    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Fixture\',\'cloud\',true,now(),$3)', [deviceId, ownerId, JSON.stringify([{ harness, installed: true, models: [model], subscriptionBroker: true, computerBroker: true }])])
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,\'Fixture\',\'cloud\',true,now(),$3,now())', [deviceId, ownerId, JSON.stringify([{ harness, installed: true, models: [model], subscriptionBroker: true, computerBroker: true }])])
     await pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","deviceId","sandboxId","operationId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,\'running\',true)', [workspaceId, ownerId, deviceId, 'synthetic-' + deviceId, randomUUID()])
     await pool.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)', [botId, workspaceId, ownerId])
     await pool.query('INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,\'Fixture\',$3,$4)', [agentId, ownerId, harness, deviceId])
@@ -126,7 +130,6 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
     const quota = { vendor: harness, source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .1, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] }
     await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,$4,\'connected\',1,(\'synthetic-\'||$1::uuid::text),$5,\'synthetic-subject\',$6,$7)', [connection, payer, payerWorkspace, harness === 'codex' ? 'codex' : 'claude', 'a'.repeat(64), JSON.stringify({ revision: '1', models: [model] }), JSON.stringify(quota)])
     await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,\'catalogue\',$4,1,$5,$6)', [randomUUID(), payer, payerWorkspace, connection, harness === 'codex' ? 'codex_cpa' : 'claude_cpa', model])
-    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [payer, workspaceId])
     await pool.query('INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId") VALUES ($1,$2,$3,0,$4,$5,\'subscription\',$6)', [randomUUID(), ownerId, workspaceId, harness, model, connection])
     const profile = await profileStore.create(scope, { name: 'Fixture role', roles: ['execute'], harness, model: { mode: 'fixed', harness, model, source: { kind: 'subscription', connectionId: connection } }, instructions: 'Synthetic Profile instructions', skills: [] })
     const prepare = async (phase: (name: string) => void = () => undefined) => {
@@ -155,12 +158,16 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [id])).rows[0].status, 'queued')
     assert.equal((await pool.query('SELECT 1 FROM byos_native_runs WHERE "runId"=$1', [id])).rowCount, 0)
   }
-  for (const harness of ['claude_code', 'codex'] as const) await t.test('normal shared fixed Profile Task: ' + harness, async () => {
+  for (const harness of ['claude_code', 'codex'] as const) await t.test('normal own fixed Profile Task: ' + harness, async () => {
     const f = await fixture(harness), before = allowanceCalls
     const measured = await measure(harness, async phase => {
       const run = await f.prepare(phase), lease = new Date(Date.now() + 60_000)
       phase('claim')
       assert.equal((await claim(f, run, lease))?.ownerId, f.ownerId)
+      // Its Agent started: the task moves to 进行中 once the claim has committed (decision 2026-11-13-1405).
+      const taskStatus = async () => (await pool.query<{ status: string }>('SELECT i.status FROM issues i JOIN agent_runs r ON r."issueId"=i.id WHERE r.id=$1', [run.runId])).rows[0]?.status
+      for (let waited = 0; waited < 40 && await taskStatus() !== 'doing'; waited++) await new Promise(resolve => setTimeout(resolve, 50))
+      assert.equal(await taskStatus(), 'doing')
       phase('response_fence')
       const response = await authorizedClaimResponse(f.ownerId, run.hint, lease.toISOString(), current => Response.json({ runId: current.id, profile: current.agentDefinition?.agentProfile?.profileId }))
       assert.equal(response?.status, 200)

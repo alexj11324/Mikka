@@ -2,7 +2,7 @@
 // GitHub. Starts the local fake services (tests/mvp/services.mjs, with the
 // substitutes in scripts/dev-local/services.mjs), Vite + the API (hot reload) with a
 // preload that sends GitHub's API to the fake, and the daemon from source with
-// tsx. A workspace's own model key stays real; without a real AI_GATEWAY_API_KEY
+// tsx. A workspace's own model key stays real; without a configured LiteLLM service
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
@@ -15,12 +15,11 @@ import { assertDevLocal } from './dev-local/guard.mjs'
 import { startLocalCron } from './dev-local/cron.mjs'
 import { localSecretsKey } from './dev-local/secrets-key.mjs'
 import { refreshQueue } from './dev-local/refresh-queue.mjs'
-import { stopOwnedServices } from './dev-local/shutdown.mjs'
+import { stopOwnedServices, waitForApiReady } from './dev-local/shutdown.mjs'
 import { prepareLocalHarnesses } from './dev-local/prepare-harnesses.mjs'
-import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './dev-local/services.mjs'
+import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY, LOCAL_LITELLM_URL } from './dev-local/services.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
 import { MVP_SERVICES, REPOSITORY } from '../tests/mvp/isolated-env.mjs'
-import { MVP_DECISION_KEY } from '../tests/mvp/transport.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 if (process.env.MIKKA_DEV_SKIP_ENV_FILES !== '1') {
@@ -113,20 +112,21 @@ async function infisicalSecret(name) {
 }
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
-watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
-  cwd: root, stdio: 'inherit',
+const apiProcess = watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
+  cwd: root, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   env: { ...childEnv, NODE_ENV: 'development', NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${preload}`.trim(),
-    // A real key keeps the real service; without one the preload uses the local substitute.
-    AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || MVP_DECISION_KEY,
+    // A configured LiteLLM stays real; otherwise the guarded fixture handles model calls.
+    MIKKA_LITELLM_URL: process.env.MIKKA_LITELLM_URL || LOCAL_LITELLM_URL,
+    MIKKA_LITELLM_MASTER_KEY: process.env.MIKKA_LITELLM_URL ? process.env.MIKKA_LITELLM_MASTER_KEY : LOCAL_LITELLM_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY || LOCAL_RESEND_KEY,
-    // Mikka 默认 calls ZeroCat directly (lib/abuse/zerocat.ts); its fixed endpoint either way.
-    ZEROCAT_API_KEY: process.env.ZEROCAT_API_KEY || LOCAL_ZEROCAT_KEY,
-    ZEROCAT_BASE_URL: process.env.ZEROCAT_BASE_URL || 'https://zero.cat/v1',
     CRON_SECRET: cronSecret,
     // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
     WORKSPACE_SECRETS_KEY: secretsKey,
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() },
 }), 'Vite + API')
+// Only the owned API child can announce its compiled worker and successful
+// public /api/version response. A Vite HTML shell can be available much earlier.
+const apiReady = waitForApiReady(apiProcess, new URL(server).origin, AbortSignal.timeout(120_000))
 mkdirSync(dataDir, { recursive: true, mode: 0o700 })
 if (daemonUser) execFileSync('chown', [daemonUser, dataDir])
 // Download only through the existing official pins and integrity validator.
@@ -153,13 +153,7 @@ const grantCredits = async () => {
   const count = await grantLocalCredits(db, workspaceDb)
   if (count) log(`granted local credit to ${count} workspace(s)`)
 }
-let serverReady = false
-const readinessDeadline = Date.now() + 120_000
-while (Date.now() < readinessDeadline) {
-  if (await fetch(`${server}/sign-in`, { signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, readinessDeadline - Date.now()))) }).then(r => r.ok, () => false)) { serverReady = true; break }
-  await new Promise(r => setTimeout(r, 1000))
-}
-if (!serverReady) throw new Error('dev:local server did not become ready')
+await apiReady
 // Every local account gets the model key through lib/model-api-keys.ts (scripts/dev-local/seed-model-keys.ts).
 let seeder
 let seederReady
@@ -203,7 +197,7 @@ const warmId = '00000000-0000-4000-8000-000000000000'
 await Promise.all([
   [`/v1/runs/${warmId}/tool-approval`, 'POST'], [`/v1/runs/${warmId}/policy-snapshot`, 'GET'],
   [`/v1/devices/${warmId}/heartbeat`, 'POST'], [`/v1/devices/${warmId}/commands`, 'GET'],
-  [`/v1/devices/${warmId}/runs/${warmId}/claim`, 'POST'], ['/api/coordinator/messages', 'POST'], ['/api/mcp', 'POST'],
+  [`/v1/devices/${warmId}/runs/${warmId}/claim`, 'POST'], ['/api/agents/eve/v1/session', 'POST'], ['/api/mcp', 'POST'],
   [`/v1/runs/${warmId}/events`, 'POST'], [`/v1/runs/${warmId}/checkpoint`, 'POST'], [`/v1/runs/${warmId}/complete`, 'POST'],
   [`/v1/devices/${warmId}/repos`, 'GET'], [`/v1/devices/${warmId}/runs?state=queued`, 'GET'], [`/v1/devices/${warmId}/fs/requests`, 'GET'],
   ['/api/runs/github-token', 'POST'],
@@ -211,7 +205,7 @@ await Promise.all([
   await fetch(`${server}${path}`, { method, signal: AbortSignal.timeout(120_000) }).then(response => response.arrayBuffer())
 }))
 await harnessPreparation
-// The production minute Worker's schedule (cloudflare/suggestions-cron) against this server.
+// The production scheduled Worker's schedule (cloudflare/suggestions-cron) against this server.
 const stopCron = startLocalCron({ appUrl: server, secret: cronSecret, log: line => console.log(`dev:local ${line}`) })
 closers.push(stopCron)
 mkdirSync(join(root, '.cache/dev-local'), { recursive: true })

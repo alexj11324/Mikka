@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { switchWorkspace } from '@/app/actions/workspace'
 import { ArtifactShared } from '@/components/artifacts/artifact-shared'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'

@@ -1,8 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { withPendingWorkspaceChoices } from './workspace-choices'
+import { COMMIT_EXECUTOR } from '../db/commit-effects'
+import { currentRoute } from '../tracing/labels'
 import { isLiveRevisionKind, LIVE_ID } from '../live/events'
 import type { LiveScope } from '../live/scope'
 import { liveRevisionKey, readLiveRevisions, type LiveRef, type LiveRevisions } from '../live/revisions'
-import { readBatchOwnerRevisionKinds, type BatchReadAction } from './read-batch-contract'
+import { readBatchOwnerRevisionKinds, readBatchWorkspaceRevisionKinds, type BatchReadAction } from './read-batch-contract'
 
 type Database = Parameters<typeof readLiveRevisions>[0]
 type RevisionRead = { ref: LiveRef; resolve: (revision: number | undefined) => void; reject: (error: unknown) => void }
@@ -10,17 +13,46 @@ type RevisionQueue = { values: Map<string, Promise<number | undefined>>; pending
 type BatchContext = {
   active: boolean
   owners: Map<object, Map<string, Promise<LiveScope | null>>>
-  revisions: Map<Database, RevisionQueue>
+  revisions: Map<object, RevisionQueue>
+  subscriptionPolicies: Map<object, Map<string, Promise<boolean>>>
   ownerRevisionKinds: ReturnType<typeof readBatchOwnerRevisionKinds>
+  workspaceRevisionKinds: ReturnType<typeof readBatchWorkspaceRevisionKinds>
 }
 const batches = new AsyncLocalStorage<BatchContext>()
+type PolicyObservation = Pick<BatchContext, 'active' | 'subscriptionPolicies'>
+const policyObservations = new AsyncLocalStorage<PolicyObservation>()
+
+/** Only explicitly read-only callers open this lifetime. Execution and ordinary
+ * permission checks remain fresh; a Native batch keeps its existing observation. */
+export async function withReadOnlyPolicyObservation<T>(read: () => Promise<T>): Promise<T> {
+  if (/^(?:after|cron|workflow):/.test(currentRoute() ?? '') || batches.getStore()?.active || policyObservations.getStore()?.active) return read()
+  const scope: PolicyObservation = { active: true, subscriptionPolicies: new Map() }
+  try { return await policyObservations.run(scope, read) }
+  finally { scope.active = false; scope.subscriptionPolicies.clear() }
+}
 
 /** Installed only by the bounded read action. Detached after-work cannot keep
  * using the batch's authority/revision observations once its items settle. */
 export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
-  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
-  try { return await batches.run(scope, work) }
-  finally { scope.active = false; scope.owners.clear(); scope.revisions.clear() }
+  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), subscriptionPolicies: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions), workspaceRevisionKinds: readBatchWorkspaceRevisionKinds(actions) }
+  try { return await withPendingWorkspaceChoices(() => batches.run(scope, work)) }
+  finally { scope.active = false; scope.owners.clear(); scope.revisions.clear(); scope.subscriptionPolicies.clear() }
+}
+
+/** Chat model readers consult the same workspace policy for keys and subscriptions.
+ * Share only its bounded read observation; each consumer keeps its own data
+ * and authority checks. A request proxy must name its actual executor.
+ * Deferred jobs have their own observation even while the parent is active. */
+export function readBatchSubscriptionPolicy(database: object, workspaceId: string, read: () => Promise<boolean>): Promise<boolean> {
+  const batch = batches.getStore()
+  const scope = batch?.active ? batch : policyObservations.getStore()
+  if (!scope?.active || /^(?:after|cron|workflow):/.test(currentRoute() ?? '')) return read()
+  const executor = (database as { [COMMIT_EXECUTOR]?: object })[COMMIT_EXECUTOR] ?? database
+  let policies = scope.subscriptionPolicies.get(executor)
+  if (!policies) { policies = new Map(); scope.subscriptionPolicies.set(executor, policies) }
+  let pending = policies.get(workspaceId)
+  if (!pending) { pending = Promise.resolve().then(read); policies.set(workspaceId, pending) }
+  return pending
 }
 
 export function readBatchOwnerScope(database: object, ownerId: string, read: () => Promise<LiveScope | null>): Promise<LiveScope | null> {
@@ -49,14 +81,30 @@ export async function readBatchOwnerRevisions(database: Database, refs: readonly
   return Object.fromEntries(Object.entries(values).filter(([key]) => requested.has(key)))
 }
 
+/** The caller has already authorized this exact workspace. Only prepared
+ * workspace-list readers can start its bounded plan; entity and Personal-home
+ * readers keep their own paths. No authorization result is cached here. */
+export async function readBatchWorkspaceRevisions(database: Database, refs: readonly LiveRef[], workspace: LiveScope | null): Promise<LiveRevisions> {
+  const scope = batches.getStore()
+  if (!scope?.active || /^(?:after|cron|workflow):/.test(currentRoute() ?? '')) return readLiveRevisions(database, refs)
+  if (!workspace || !LIVE_ID.test(workspace.workspaceId) || !scope.workspaceRevisionKinds.length) return readBatchRevisions(database, refs)
+  const requested = new Set(refs.filter(ref => isLiveRevisionKind(ref.kind) && LIVE_ID.test(ref.id))
+    .map(ref => liveRevisionKey(ref.kind, ref.id.toLowerCase())))
+  if (!scope.workspaceRevisionKinds.some(kind => requested.has(liveRevisionKey(kind, workspace.workspaceId.toLowerCase()))))
+    return readBatchRevisions(database, refs)
+  const values = await readBatchRevisions(database, [...refs, ...scope.workspaceRevisionKinds.map(kind => ({ kind, id: workspace.workspaceId }))])
+  return Object.fromEntries(Object.entries(values).filter(([key]) => requested.has(key)))
+}
+
 /** Each caller still awaits the revision before its data. Keys arriving in the
  * same microtask share one SQL statement; already observed keys keep the older
  * value, never a newer revision that could acknowledge unseen data. */
 export async function readBatchRevisions(database: Database, refs: readonly LiveRef[]): Promise<LiveRevisions> {
   const scope = batches.getStore()
   if (!scope?.active) return readLiveRevisions(database, refs)
-  let queue = scope.revisions.get(database)
-  if (!queue) { queue = { values: new Map(), pending: new Map(), scheduled: false }; scope.revisions.set(database, queue) }
+  const executor = (database as { [COMMIT_EXECUTOR]?: object })[COMMIT_EXECUTOR] ?? database
+  let queue = scope.revisions.get(executor)
+  if (!queue) { queue = { values: new Map(), pending: new Map(), scheduled: false }; scope.revisions.set(executor, queue) }
   const selected = new Map<string, Promise<number | undefined>>()
   for (const ref of refs) {
     if (!isLiveRevisionKind(ref.kind) || !LIVE_ID.test(ref.id)) continue

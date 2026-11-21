@@ -176,7 +176,7 @@ async function measure(page: ReactNode, beforeFirstRead?: () => Promise<void>) {
   const { SWRConfig } = await import('swr')
   const { SWRDefaults } = await import('../components/swr-defaults')
   const { LiveProvider } = await import('../hooks/use-live-key')
-  const { NextIntlClientProvider } = await import('next-intl')
+  const { NextIntlClientProvider } = await import('@/lib/intl/i18n-client')
   const { SidebarProvider } = await import('../components/ui/sidebar')
   const messages = (await import('../messages/en.json')).default
   const container = browser.document.createElement('div') as unknown as HTMLElement; document.body.append(container)
@@ -227,6 +227,10 @@ const thread = { id: RUN, status: 'running', outcome: null, stopping: false, cre
 const person = { id: OWNER, name: 'Ada', email: 'ada@example.invalid', image: null }
 const user = { id: OWNER, name: 'Ada', email: 'ada@example.invalid' }
 Object.assign(fixtures, {
+  'agents.pollTaskDetail': (id: unknown, known: unknown) => ({ ...(known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION }), taskWork: {
+    viewerId: OWNER, threads: [thread], live: { workspaceId: WORKSPACE }, connections: [], work: null,
+    activity: { version: CHAT_VERSION, items: [], positions: [] },
+  } }),
   'issues.getIssue': (id: unknown) => ({ issue: issue(String(id), 'Fix sign-in redirect') }),
   'issues.pollIssue': (id: unknown, known: unknown) => known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION },
   'issues.pollIssueVersionSummaries': () => ({ viewerId: OWNER, snapshot: { version: CHAT_VERSION, items: [], positions: [] } }),
@@ -256,6 +260,11 @@ Object.assign(fixtures, {
   'agents.getThreadMachine': () => ({ kind: 'laptop', state: 'online', name: 'Ada’s MacBook', platform: 'darwin', arch: 'arm64', hostname: null, lastSeenAt: new Date(AT).toISOString(), cloud: null }),
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],
   'linear-sync.getLinearBoardSync': () => ({ synced: false }),
+  'task-runs.listConversationSidebar': () => ({ [BOT]: { more: false, items: [{
+    id: RUN, issueId: ISSUE, identifier: null, title: 'Fix sign-in redirect', at: AT,
+    pulls: [{ url: PULL_REQUEST, state: 'merged' }],
+    pinned: false, state: 'working', status: 'doing', harness: 'claude_code',
+  }] } }),
   'task-runs.pollTaskRuns': () => ({ items: [{ issueId: ISSUE, runId: RUN, issueTitle: 'Fix sign-in redirect', agentId: AGENT, agentName: 'Claude Code', status: 'running', outcome: null, error: null, finishedAt: null, bot: null, harnesses: ['claude_code'] }], live }),
   'execution-settings.getBotModelMenu': () => ({ groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'ada@example.invalid', options: [{ id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude' }] }],
     current: { id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude', kind: 'subscription', chosen: false, available: true } }),
@@ -264,6 +273,25 @@ Object.assign(fixtures, {
   'coordinator.getCoordinatorChat': () => chat,
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',
+})
+const AUTOMATION = 'b0000000-0000-4000-8000-000000000001'
+const automation = { id: AUTOMATION, owner_id: OWNER, owner_name: 'Ada', workspace_id: WORKSPACE, bot_id: null, visibility: 'workspace' as const, status: 'active' as const, version: 2, next_at: '2026-11-06T14:00:00.000Z',
+  definition: { title: 'Morning triage', timezone: 'America/New_York', timing: { kind: 'cron' as const, expression: '0 9 * * 1-5' }, task: { kind: 'dispatch_task' as const, botId: BOT, prompt: 'Triage new issues' }, misfire: 'skip' as const, maxLatenessMinutes: 30, maxConcurrent: 1 } }
+Object.assign(fixtures, {
+  'task-list.listUnreadTaskIds': () => [],
+  'task-list.countTaskListViews': () => ({ forYou: 0, assigned: 0, created: 0, mentioned: 0, all: 0 }),
+  'automations.listAutomations': () => ({ schedules: [automation], nextCursor: null }),
+  'automations.getAutomation': () => ({ automation }),
+  'automations.automationHistory': () => ({ occurrences: [{ id: 'c0000000-0000-4000-8000-000000000001', due_at: AT, started_at: AT, finished_at: AT, status: 'succeeded', attempts: 1, error: null, result: { id: ISSUE, title: 'Fix sign-in redirect', identifier: 'MIK-7' } }] }),
+  'bots.listWorkspaceBots': () => ({ bots: [{ id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }] }),
+  'bots.listBots': () => bots,
+  'bots.listBotsForWorkspace': (workspaceId: unknown) => workspaceId === WORKSPACE ? bots : [],
+  'automations.automationUsage': () => ({ timezone: 'America/New_York', maxRunsPerDay: 5, days: [{ day: '2026-11-05', runs: 2, skipped: 0, tasks: 2, costMicroUsd: 420000 }] }),
+  'bots.getWorkspaceBotDefaults': () => ({ defaultModel: null, defaultRepository: null, models: [], repositories: ['v2/github.com/acme/web'] }),
+  // The editor's Environment choice (one read when it opens).
+  // Runs as' choices (one read when the editor opens).
+  'automations.automationRunAsChoices': () => ({ members: [{ id: OWNER, name: 'Ada' }] }),
+  'project-resources.listProjectResources': () => ({ policy: { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: [], repositories: [], environmentBindings: [] }),
 })
 // A bodyless native create prewarms the mapped session without starting a turn.
 // The public v27 protocol reports tail -1 until its first delivery; resume catches up and closes while idle.
@@ -275,6 +303,7 @@ routes['/api/auth/get-session'] = () => ({ user: { ...person, emailVerified: tru
 routes['/api/workspace/switcher'] = () => ({ workspace: { id: WORKSPACE, name: 'Mikka' }, live, accounts: [{ id: OWNER, email: person.email, choices: [{ id: OWNER_HOME, name: 'Personal', kind: 'personal' }, { id: WORKSPACE, name: 'Mikka', kind: 'team' }] }] })
 routes['/api/pending-actions'] = () => new Response('[]', { headers: { 'content-type': 'application/json', 'x-mikka-viewer': OWNER, 'x-mikka-observed-at': AT } })
 routes['/api/approved-writes'] = () => ({ enabled: false })
+routes['/api/factory/agent-profiles'] = () => ({ profiles: [], catalog: { models: [], skills: [] }, availability: {} })
 // Sub-agent login prompts: one read on mount, then only on a subagent_events push.
 routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
@@ -282,6 +311,7 @@ routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+routes['/api/settings/issue-states'] = () => ({ states: [], canEdit: false })
 const GROUP = '90000000-0000-4000-8000-000000000001'
 const groupMessage = (position: number, authorType: 'user' | 'bot', body: string) => ({ id: `90000000-0000-4000-8000-00000000000${position + 1}`, conversationId: GROUP, position: String(position), authorType, authorId: authorType === 'user' ? OWNER : BOT, body, mentions: [], replyToId: null, createdAt: AT })
 // A bot is answering: the case that used to re-read the chat every 2.5 s.
@@ -299,7 +329,7 @@ const boardIssue = (id: string, title: string, status: string) => ({ id, ownerId
   createdAt: new Date(AT), updatedAt: new Date(AT), identifier: `MIK-${id.slice(-1)}`, teamId: null, metadata: { ...issue(id, title).metadata, assignee: { kind: 'member' as const, id: OWNER, name: 'Ada', image: null } }, checklist: { total: 0, checked: 0, percentage: 0 } })
 const boardIssues = [boardIssue(ISSUE, 'Fix sign-in redirect', 'doing'), boardIssue('30000000-0000-4000-8000-000000000002', 'Write release notes', 'todo'), boardIssue('30000000-0000-4000-8000-000000000003', 'Rotate the preview key', 'done')]
 const bots = [{ id: '50000000-0000-4000-8000-000000000000', name: 'Coordinator', color: 'encre', shape: 'cercle', coordinator: true }, { id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }]
-const listedThread = { id: RUN, botId: BOT, source: null, agentName: 'Scout', issueId: ISSUE, prompt: 'Fix the sign-in redirect', status: 'running' as const, error: null, createdAt: AT, updatedAt: AT, lastReply: 'Looking at the redirect handler.', lastReplyAt: AT, outcome: null, harness: 'claude_code' }
+const listedThread = { id: RUN, botId: BOT, pullState: 'merged' as const, source: null, agentName: 'Scout', issueId: ISSUE, prompt: 'Fix the sign-in redirect', status: 'running' as const, error: null, createdAt: AT, updatedAt: AT, lastReply: 'Looking at the redirect handler.', lastReplyAt: AT, outcome: null, harness: 'claude_code' }
 
 /** Each page's top-level client component, as the app mounts it, with fixture props. */
 /** Words each page shows once loaded, so a crash or a skeleton cannot pass as an idle page. */
@@ -309,10 +339,12 @@ const shows: Record<string, string[]> = {
   'bot-chat': ['Can you fix the sign-in redirect?', 'Done: the redirect is fixed.'],
   devices: ['Ada’s MacBook'],
   'artifact-viewer': ['Release notes', 'Sign-in redirect fixed.'],
-  'nav-bot-list': ['Scout', 'Fix sign-in redirect', 'blocked'],
+  'nav-bot-list': ['Scout', 'Fix sign-in redirect', 'blocked', 'merged'],
   'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
   'subscription-settings': ['ada@example.invalid'],
   'pull-request-badge': ['#81'],
+  automations: ['Morning triage', 'Scout'],
+  'automation-editor': ['Scout', 'MIK-7'],
 }
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
@@ -349,7 +381,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     const { useChatNav } = await import('../components/nav/bot-list')
     function ChatNavigation() {
       const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues.map(issue => ({ ...issue, workspaceId: WORKSPACE })) as never, presentations, active: { kind: 'coordinator' }, userId: user.id })
-      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}{entry.work?.map(row => <span key={row.id}>{row.fullName} {row.state}</span>)}</span>)}</>
+      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}{entry.work?.map(row => <span key={row.id}>{row.fullName} {row.state} {row.pullState}</span>)}</span>)}</>
     }
     return <ChatNavigation />
   },
@@ -366,6 +398,16 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   'pull-request-badge': async () => {
     const { IssuePullRequestLink } = await import('../components/workspace/issue-pull-request-link')
     return <IssuePullRequestLink issueId={ISSUE} pr={{ url: PULL_REQUEST, state: 'open' }} />
+  },
+  // 自动化: the list, and one automation with its history; both read again only on a schedule_list push.
+  automations: async () => {
+    const { AutomationsPage } = await import('../components/automations/automations-page')
+    // The page opens on 我的, so the reader is the fixture's creator (owner_id) for the row to be in the list.
+    return <AutomationsPage userId={OWNER} workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
+  },
+  'automation-editor': async () => {
+    const { AutomationEditor } = await import('../components/automations/automation-editor')
+    return <AutomationEditor workspaceId={WORKSPACE} userId={OWNER} id={AUTOMATION} onOpen={noop} onBack={noop} />
   },
 }
 

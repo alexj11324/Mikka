@@ -1,5 +1,5 @@
 import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
-import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
+import { oauthAccountNotLinkedProvider, ssoRefusalHasOwnNotice } from '@/lib/auth-error'
 import { withBasePath } from '@/lib/base-path'
 import { desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
 import { webAuthFlow } from '@/lib/web-connection/auth'
@@ -26,7 +26,7 @@ export function webAuthentication(location: URL) {
     mode, next, addAccount: query.addAccount === '1', desktopFlow, webFlow, oauthResume, composioResume,
     desktopRefused: Boolean((desktopFlow || webFlow) && query.oauth),
     // A company SSO refusal returns with sso=failed and its own error; the auth-sso slot shows that one.
-    oauthFailed: query.oauth === 'failed' || (Boolean(query.error) && query.sso !== 'failed'),
+    oauthFailed: query.oauth === 'failed' || (Boolean(query.error) && !ssoRefusalHasOwnNotice(query.sso, query.error)),
     oauthAccountNotLinked: oauthAccountNotLinkedProvider(query.error, query.provider),
     continueGoogle: mode === 'sign-in' && query.continue === 'google',
     continueGitHub: mode === 'sign-in' && query.continue === 'github',

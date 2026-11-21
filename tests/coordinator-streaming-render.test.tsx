@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
 import { act, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import messages from '../messages/en.json'
 import { TaskPresentationsContext } from '../hooks/use-task-collection'
 import { taskPresentation } from '../lib/task-presentation'
@@ -159,7 +159,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.equal(thinking?.getAttribute('data-activity-thinking'), 'active')
     assert.equal(thinking?.querySelector('[data-slot="trace-title"]')?.textContent, 'Thinking')
     assert.equal(thinking?.querySelector('[data-slot="trace-line"]')?.getAttribute('data-status'), 'running')
-    assert.ok(thinking?.querySelector('svg.lucide-loader-circle.animate-spin'), 'a spinner while it thinks')
+    assert.ok(thinking?.querySelector('svg.animate-spin'), 'a spinner while it thinks')
     await settle(() => /Check the login/.test(text()))
     assert.match(text(), /Check the login/, 'the running row is open, so its words show as they stream')
     assert.equal(group()?.getAttribute('data-activity-group'), 'running')
@@ -186,7 +186,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Dispatch Factory task', 'nothing succeeded: the line names the failed call')
     await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
     assert.equal(group()?.getAttribute('data-activity-group'), 'error')
-    assert.ok(group()?.querySelector('svg.lucide-circle-alert'), 'a failure is an icon, a colour and a word together (R-87)')
+    assert.ok(group()?.querySelector('[data-slot="trace-icon"] svg.text-destructive-foreground'), 'a failure is an icon, a colour and a word together (R-87)')
     // Only what succeeded is said as done: the dispatch that never returned and the Factory call that answered an error
     // are only in the failure count, never 「Dispatched」 (R-83).
     assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Looked up tasks')
@@ -201,7 +201,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 3 }} />)
     assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'done')
     assert.equal(text(), 'Thought for 3 seconds')
-    assert.ok(view.container.querySelector('[data-activity-thinking] svg.lucide-circle-check'), 'a check once it stops')
+    assert.ok(view.container.querySelector('[data-activity-thinking] [data-slot="trace-icon"] svg'), 'a check once it stops')
     await view.render(<ReplyActivity tools={[]} thought />)
     assert.equal(text(), 'Thought', 'a stored reply knows only that it thought')
     await view.render(<ReplyActivity tools={[]} />)
@@ -223,7 +223,7 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
     // Live, finished, with what the model thought: the Trace row's trigger with its chevron, closed until opened.
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 4, text: 'Check the login redirect first.' }} />)
     assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'readable')
-    assert.ok(trigger().querySelector('svg.lucide-chevron-right'), 'it shows the chevron')
+    assert.ok(trigger().querySelector('[data-slot="trace-icon"] svg'), 'it shows the chevron')
     assert.doesNotMatch(content(), /login redirect/, 'closed by default')
     await act(async () => { trigger().click() })
     await settle(() => /login redirect/.test(content()))
@@ -248,9 +248,9 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
       const plain = await mount()
       await plain.render(<ReplyActivity tools={[]} {...props} />)
       assert.equal(plain.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'none')
-      assert.equal(plain.container.querySelector('[data-activity-thinking] button'), null, 'no trigger')
-      assert.equal(plain.container.querySelector('svg.lucide-chevron-right'), null, 'no chevron')
-      assert.equal(plain.container.querySelector('[data-slot="trace-collapsible-content"]'), null)
+      assert.equal(plain.container.querySelector('[data-activity-thinking] button')?.outerHTML ?? null, null, 'no trigger')
+      assert.equal(plain.container.querySelector('[data-activity-thinking] button [data-slot="trace-icon"] svg')?.outerHTML ?? null, null, 'no chevron')
+      assert.equal(plain.container.querySelector('[data-activity-thinking] [data-slot="trace-collapsible-content"]')?.outerHTML ?? null, null, 'does not open')
       await plain.unmount()
     }
   } finally { try { await view.unmount() } catch { /* already unmounted */ } }
@@ -356,7 +356,7 @@ test('a quote cut at three lines is a button that opens the rest; one that fits 
   }
 })
 
-test('a task and its thread in one reply: the task is its state icon and code, the thread its title, said once (2026-11-10)', async () => {
+test('a task and its thread in one reply: the task is its status icon and code, the thread its own short title, said once', async () => {
   const view = await mount()
   const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
   const text = () => view.container.textContent ?? ''
@@ -371,15 +371,46 @@ test('a task and its thread in one reply: the task is its state icon and code, t
   try {
     await renderReply(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
     assert.equal(chips().length, 2, 'the task and the thread each stay their own object')
-    assert.equal(text(), 'MIK-1 的线程 Release checklist 在等你。', 'the code once, the title once: never 「MIK-1 MIK-1 …」')
+    assert.equal(text(), 'MIK-1 的线程 Fix sign-in redirect 在等你。', 'the code once, the conversation\'s own title once: never 「MIK-1 MIK-1 …」')
     assert.equal(view.container.querySelector('[data-citation-covered]'), null)
-    assert.equal(chips()[0].querySelector('[data-task-state]')?.getAttribute('data-task-state'), 'running', 'the task leads with its projected state icon')
-    assert.equal(chips()[1].querySelector('svg'), null, 'the thread has no icon')
+    assert.equal(chips()[0].querySelector('[data-task-status]')?.getAttribute('data-task-status'), 'doing', 'the task leads with its status icon')
+    assert.equal(chips()[0].querySelectorAll('svg').length, 1, 'a chip has one icon, its status')
+    assert.equal(chips()[0].querySelector('[data-run-indicator]'), null, 'what the Agent is doing is not on the task\'s chip')
+    assert.equal(chips()[1].querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator'), 'working', 'the running conversation carries its own mark, after its title')
+    assert.equal(chips()[1].querySelectorAll('svg').length, 1)
     // A task with no code is its title; the thread still names its task's title.
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
     await renderReply(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
     assert.equal(chips().length, 2)
-    assert.equal(text(), 'Release checklist的线程 Release checklist 在等你。')
+    assert.equal(text(), 'Release checklist的线程 Fix sign-in redirect 在等你。')
+    assert.doesNotMatch(text(), MARKUP)
+  } finally { await view.unmount() }
+})
+
+test('a task chip straight before its own thread is one reference; with that thread\'s card under the reply only the chip stays (2026-11-13-1405)', async () => {
+  const view = await mount()
+  const long = '修复登录后的工作区前缀和查询参数丢失问题并补充回归测试'
+  const ownThread: CitationSource = { ...thread, name: long, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: long } }
+  const sources = { [TASK]: issue(TASK, long), [THREAD]: ownThread }
+  const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
+  const text = () => view.container.textContent ?? ''
+  try {
+    await view.render(<CoordinatorReply text={`已派出 [[issue:${TASK}]]   [[run:${THREAD}]]，等它跑完。`} citations={{ ...base, sources }} />)
+    assert.equal(chips().length, 2, 'the chip and the title keep their own click targets')
+    assert.equal(text(), '已派出 MIK-1 修复登录后的工作区前缀和，等它跑完。', 'one normal gap, and the title is the bounded one')
+    assert.equal(chips()[1].getAttribute('data-thread-pair'), '', 'the thread is marked as its task\'s pair')
+    assert.doesNotMatch(chips()[1].className, /bg-object-chip( |$)/, 'never a second pill')
+    // The same pair with the thread's dispatch card right under the reply: the card names the thread.
+    await view.render(<CoordinatorReply text={`已派出 [[issue:${TASK}]]   [[run:${THREAD}]]，等它跑完。`} citations={{ ...base, sources }} carded={THREAD} />)
+    assert.equal(chips().length, 1)
+    assert.equal(view.container.querySelector('[data-thread-link]'), null, 'the inline thread title is dropped')
+    assert.equal(text(), '已派出 MIK-1，等它跑完。', 'no gap is left behind')
+    // Words between them, or another task's thread, are not a pair: the link stays even beside a card.
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在跑。`} citations={{ ...base, sources }} carded={THREAD} />)
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)
+    assert.equal(view.container.querySelector('[data-thread-pair]'), null)
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] [[run:${THREAD}]]`} citations={{ ...base, sources: { ...sources, [THREAD]: { ...thread, issue: null } } }} carded={THREAD} />)
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1, 'a thread of no task, or another task, is its own reference')
     assert.doesNotMatch(text(), MARKUP)
   } finally { await view.unmount() }
 })
@@ -392,9 +423,9 @@ test('a thread keeps its current text-link renderer when a dispatch card sits un
     assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)
     assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Fix sign-in redirect')
     assert.equal(view.container.querySelector('[data-citation-carded]'), null)
-    // A thread of a task is named by the task's title, without its code.
+    // A thread of a task keeps its own short title; its task's title is the task's.
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={{ ...citations, sources: { ...known, [THREAD]: { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } } } }} carded={THREAD} />)
-    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Release checklist')
+    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Fix sign-in redirect')
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} />)
     assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1, 'with or without a card it is the same thread link')
   } finally { await view.unmount() }
@@ -447,5 +478,29 @@ test('a reply draws its words in bubbles on its own, and plain in a frame that s
     assert.ok(rows.every(row => !row.disabled))
     await act(async () => { rows[1].click() })
     assert.deepEqual(sent, ['See running tasks'])
+  } finally { await view.unmount() }
+})
+
+test('a choice card that could not send says the chat\'s real reason; the general sentence is only the last fallback', async () => {
+  const card = 'root = BeQuestions("New bot", [{id:"next", title:"What first?", options:[{value:"task", label:"Create a task"}, {value:"list", label:"See running tasks"}]}])'
+  const view = await mount()
+  const pick = async () => {
+    const row = view.container.querySelector<HTMLButtonElement>('[data-choice-rows] button[data-choice="open"]')
+    assert.ok(row)
+    await act(async () => { row.click() })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  }
+  try {
+    for (const [interaction, shown, hidden] of [
+      [{ busy: false, continueFromAnswer: async () => false, answer: async () => ({ sent: false as const, reason: 'You are offline. Reconnect and send again.' }) }, /You are offline/, /Unable to continue/],
+      [{ busy: false, continueFromAnswer: async () => false, answer: async () => ({ sent: false as const, reason: 'This page is out of date. Refresh, then send again.' }) }, /Refresh, then send again/, /Unable to continue/],
+      [{ busy: false, continueFromAnswer: async () => false, answer: async () => ({ sent: false as const }) }, /Unable to continue/, /offline/],
+      [{ busy: false, continueFromAnswer: async () => false }, /Unable to continue/, /offline/],
+    ] as const) {
+      await view.render(<AgentInteractionContext key={String(shown)} value={interaction}><CoordinatorReply key={String(shown)} text={card} citations={base} /></AgentInteractionContext>)
+      await pick()
+      assert.match(view.container.textContent ?? '', shown)
+      assert.doesNotMatch(view.container.textContent ?? '', hidden)
+    }
   } finally { await view.unmount() }
 })

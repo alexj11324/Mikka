@@ -14,7 +14,7 @@ function subscribe(listener: () => void) {
   return () => { listeners.delete(listener) }
 }
 
-type Send = (text: string, submissionId: string, images?: readonly { dataUrl: string }[]) => Promise<unknown>
+type Send = (text: string, submissionId: string, images?: readonly { dataUrl: string }[], turnPolicy?: 'queue' | 'steer') => Promise<unknown>
 
 export function acknowledgedPersonalMessages(scope: string | null): string[] {
   if (!scope) return []
@@ -76,7 +76,7 @@ export function usePersonalDelivery(scope: string | null, canSend: boolean, rece
     const request = (async () => {
       try {
         const body = submissionBody(item)
-        await send(body.text, body.submissionId, body.images)
+        await send(body.text, body.submissionId, body.images, item.turnPolicy)
       } catch (failure) {
         const status = (failure as { status?: number } | null)?.status
         const message = sendFailureState(failure) === 'unconfirmed' ? uncertain

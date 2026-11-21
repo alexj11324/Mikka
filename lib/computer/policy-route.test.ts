@@ -11,7 +11,7 @@ test('only workspace admins may change policy, using an exact same-origin reques
   let writes = 0
   let role: 'admin' | 'member' | 'absent' = 'member'
   const handler = createComputerPolicyHandler({ enabled: () => true,
-    authorize: async () => role === 'absent' ? null : { canEdit: role === 'admin' },
+    withMember: async (_request, _workspace, _admin, operation) => role === 'absent' ? null : operation(role === 'admin'),
     store: { policy: async () => 'allow', setPolicy: async (_, permission) => { writes++; return { permission } } },
   })
   let response = await handler(new Request(endpoint), workspace)
@@ -38,11 +38,35 @@ test('only workspace admins may change policy, using an exact same-origin reques
 
 test('disabled and failed backends cannot expose details or change settings', async () => {
   const fail = async () => { throw new Error('private provider details') }
-  const disabled = createComputerPolicyHandler({ enabled: () => false, authorize: fail, store: { policy: fail, setPolicy: fail } })
+  const disabled = createComputerPolicyHandler({ enabled: () => false, withMember: fail, store: { policy: fail, setPolicy: fail } })
   assert.deepEqual(await (await disabled(new Request(endpoint), workspace)).json(), { enabled: false })
   assert.equal((await disabled(request('{"permission":"deny"}'), workspace)).status, 503)
-  const enabled = createComputerPolicyHandler({ enabled: () => true, authorize: async () => ({ canEdit: true }), store: { policy: fail, setPolicy: fail } })
+  const enabled = createComputerPolicyHandler({ enabled: () => true, withMember: async (_request, _workspace, _admin, operation) => operation(true), store: { policy: fail, setPolicy: fail } })
   const response = await enabled(request('{"permission":"deny"}'), workspace)
   assert.equal(response.status, 503)
   assert.deepEqual(await response.json(), { error: 'Computer policy unavailable' })
+})
+
+test('policy writes complete inside the authorized membership operation', async () => {
+  const events: string[] = []
+  const handler = createComputerPolicyHandler({
+    enabled: () => true,
+    withMember: async (_request, id, admin, operation) => {
+      assert.equal(id, workspace)
+      assert.equal(admin, true)
+      events.push('membership held')
+      try { return await operation(true) }
+      finally { events.push('membership released') }
+    },
+    store: {
+      policy: async () => 'allow',
+      setPolicy: async (_id, permission) => {
+        await Promise.resolve()
+        events.push('policy written')
+        return { permission }
+      },
+    },
+  })
+  assert.equal((await handler(request('{"permission":"deny"}'), workspace)).status, 200)
+  assert.deepEqual(events, ['membership held', 'policy written', 'membership released'])
 })

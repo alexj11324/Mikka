@@ -9,10 +9,12 @@ import { taskActivityChanged } from '../factory/activity-live'
 export const THREAD_MACHINE_IDLE_MS = 2 * 60_000
 export const THREAD_MACHINE_PROVIDER_MS = 15 * 60_000
 export const THREAD_MACHINE_REFRESH_MS = 5 * 60_000
-export const THREAD_MACHINE_BUDGET_MS = 12 * 60 * 60_000
 export const THREAD_MACHINE_RETENTION_MS = 7 * 24 * 60 * 60_000
 export const CLOSED_TASK_RETENTION_MS = 60 * 60_000
 export const THREAD_MACHINE_STOP_GRACE_MS = 30_000
+/** A restore with no live provisioning lease wakes at this cadence; the
+ * persisted operationId lets the same callback recover a lost create ACK. */
+export const THREAD_MACHINE_RESTORE_MS = 2 * 60_000
 const CLAIM_MS = 60_000
 const TERMINAL = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
 
@@ -40,8 +42,11 @@ export type ThreadLifecycleRow = {
   /** PostgreSQL text preserves the microseconds lost by pg's Date decoder. */
   lifecycleAtVersion: string | null
   lifecycle: ThreadLifecycleMetadata; status: string; stopRequestedAt: Instant
-  pauseReason?: string | null; safeExit?: boolean
+  pauseReason?: string | null; safeExit?: boolean; stopReason?: string | null
+  /** Human review is a separate absolute lease; it never renews execution. */
+  reviewExpiresAt?: Instant
   issueId: string | null; taskClosed: boolean; checkpointReady: boolean
+  filesystemSnapshotId?: string | null; snapshotState?: string | null; restoreStartedAt?: Instant
 }
 type Dependencies = {
   provider: Pick<typeof threadLifecycleProvider, 'info' | 'keepAlive'> & Partial<Pick<typeof threadLifecycleProvider, 'findCreated'>>
@@ -58,16 +63,11 @@ const live = (value: Instant, now: number) => at(value) > now
 const nextRetry = (now: number, failures: number) => now + Math.min(300_000, 5_000 * 2 ** Math.min(failures - 1, 6))
 const fenceOf = (row: ThreadLifecycleRow): ThreadMachineFence => ({ epoch: row.epoch, sandboxId: row.sandboxId })
 const pendingCreation = (row: ThreadLifecycleRow) => Boolean(row.workerLeaseId || row.workerLeaseUntil
-  || row.lifecycle.phase === 'create_requested' || row.lifecycle.creationMissingAt != null)
+  || row.lifecycle.phase === 'create_requested' || row.lifecycle.phase === 'restore_requested' || row.lifecycle.creationMissingAt != null)
 
-/** A paused interval is not execution time. Recalculate after resume from the
- * persisted billed time instead of expiring a week-old wall-clock deadline. */
-export function threadMachineExecutionDeadline(row: ThreadLifecycleRow, now: number): number {
-  const elapsed = row.state === 'running' && row.runningSince ? Math.max(0, now - at(row.runningSince)) : 0
-  return now + Math.max(0, THREAD_MACHINE_BUDGET_MS - Number(row.computeSeconds) * 1_000 - elapsed)
-}
-
-type StopCause = 'task_closed' | 'execution_budget' | 'execution_lease_lost' | 'provider_paused'
+// E2B runs on the user's own key: Mikka sets no execution budget on it. A machine
+// pauses when its run ends or it sits unclaimed, and the provider timeout pauses it as a safety net.
+type StopCause = 'task_closed' | 'execution_lease_lost' | 'provider_paused'
 type Decision = { action: 'stop' | 'recover'; at: number; reason: StopCause }
   | { action: 'keep' | 'pause' | 'retire' | 'wait' | 'missing'; at: number | null; reason: string }
 
@@ -77,6 +77,16 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
   const bootstrap = live(row.workerLeaseUntil, now)
   if (row.state === 'ended') return { action: row.sandboxId ? 'retire' : 'wait', at: bootstrap ? at(row.workerLeaseUntil) + 1 : null,
     reason: !row.sandboxId && pendingCreation(row) ? 'creation_cleanup_unconfirmed' : 'retirement' }
+  // A restore owns no sandbox while it rebuilds one from the task's own
+  // snapshot. A live provisioning lease is normal; without one the persisted
+  // operation is left to the lost-create reconciler. A closed task stops the
+  // restore instead of retaining the image.
+  if (row.state === 'restore') {
+    if (row.taskClosed && !row.stopRequestedAt) return { action: 'stop', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: 'task_closed' }
+    if (bootstrap) return { action: 'wait', at: Math.min(at(row.workerLeaseUntil) + 1, now + THREAD_MACHINE_REFRESH_MS), reason: 'provisioning' }
+    const restoreAt = at(row.restoreStartedAt ?? null)
+    return { action: 'wait', at: restoreAt ? restoreAt + THREAD_MACHINE_RESTORE_MS : now + THREAD_MACHINE_REFRESH_MS, reason: 'provisioning' }
+  }
   if (!row.sandboxId) return { action: 'wait', at: bootstrap ? at(row.workerLeaseUntil) + 1 : null,
     reason: bootstrap ? 'provisioning' : pendingCreation(row) ? 'creation_cleanup_unconfirmed' : 'provider_missing' }
   const terminal = TERMINAL.has(row.status)
@@ -94,11 +104,18 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
   // A quota completion deliberately leaves status=paused with no run lease.
   // It is waiting for account recovery, not a crashed/abandoned execution.
   const quotaWait = row.status === 'paused' && row.pauseReason === 'quota_exhausted'
+  const reviewing = live(row.reviewExpiresAt ?? null, now) && !row.stopRequestedAt && !row.taskClosed
+    && row.stopReason !== 'device_lost' && row.safeExit
+    && (['succeeded', 'failed'].includes(row.status) || quotaWait)
+  if (reviewing && row.lifecycle.phase === 'review_resume_requested')
+    return { action: 'wait', at: at(row.reviewExpiresAt!), reason: 'human_review_resume' }
+  if (reviewing && provider?.state === 'running') return { action: 'keep',
+    at: at(row.reviewExpiresAt!), reason: 'human_review' }
   if (quotaWait && !row.taskClosed && provider?.state === 'running') return row.safeExit
     ? { action: 'pause', at: now, reason: 'quota_wait' }
     : { action: 'wait', at: provider.endAt && provider.endAt > now ? provider.endAt : null, reason: 'quota_safe_point_unverified' }
-  if (!terminal && (row.taskClosed || threadMachineExecutionDeadline(row, now) <= now))
-    return { action: 'stop', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: row.taskClosed ? 'task_closed' : 'execution_budget' }
+  if (!terminal && row.taskClosed)
+    return { action: 'stop', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: 'task_closed' }
   if (!terminal && !quotaWait && row.status !== 'queued' && !live(row.leaseExpiresAt, now))
     return { action: 'recover', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: 'execution_lease_lost' }
   if (!terminal && !quotaWait && row.status !== 'queued' && provider?.state === 'paused')
@@ -119,8 +136,7 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
     const idleAt = at(row.lastActiveAt) + THREAD_MACHINE_IDLE_MS
     return { action: now >= idleAt ? 'pause' : 'keep', at: Math.min(idleAt, now + THREAD_MACHINE_REFRESH_MS), reason: 'unclaimed_idle' }
   }
-  return { action: 'keep', at: Math.min(now + THREAD_MACHINE_REFRESH_MS,
-    row.stopRequestedAt ? Infinity : threadMachineExecutionDeadline(row, now)), reason: row.stopRequestedAt ? 'stop_pending' : 'active_run' }
+  return { action: 'keep', at: now + THREAD_MACHINE_REFRESH_MS, reason: row.stopRequestedAt ? 'stop_pending' : 'active_run' }
 }
 
 async function requestLifecycleStop(pool: Pool, actor: Actor, row: ThreadLifecycleRow, cause: StopCause, claimId: string, now: number): Promise<boolean> {
@@ -148,18 +164,17 @@ async function requestLifecycleStop(pool: Pool, actor: Actor, row: ThreadLifecyc
             AND (r."leaseExpiresAt" IS NULL OR r."leaseExpiresAt"<=to_timestamp($8::double precision/1000))
           WHEN 'task_closed' THEN m."issueId" IS NOT NULL AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate')
             OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL)
-          WHEN 'execution_budget' THEN m."computeSeconds"*1000+CASE WHEN m.state='running' THEN
-            COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (to_timestamp($8::double precision/1000)-m."runningSince")))*1000,0) ELSE 0 END >= $9::double precision
           WHEN 'provider_paused' THEN m.state='paused' AND r.status<>'queued'
             AND NOT (r.status='paused' AND r."pauseReason" IS NOT DISTINCT FROM 'quota_exhausted')
           ELSE false END
-      RETURNING r."deviceId"`, [row.runId, actor.userId, actor.workspaceId, row.epoch, row.sandboxId, claimId, cause, now, THREAD_MACHINE_BUDGET_MS])
+      RETURNING r."deviceId"`, [row.runId, actor.userId, actor.workspaceId, row.epoch, row.sandboxId, claimId, cause, now])
     if (!stopped.rowCount) { await client.query('COMMIT'); return false }
-    const [{ runChanged }, { runListChanged }, { notifyDeviceWork }] = await Promise.all([
+    const [{ runChanged }, { runListChanged }, { notifyDeviceWork, runControlChanged }] = await Promise.all([
       import('@/lib/live/panels'), import('@/lib/live/lists'), import('@/lib/device-gateway-notify'),
     ])
     await runChanged(client, row.runId)
     await runListChanged(client, row.runId)
+    runControlChanged(client, { runIds: [row.runId] })
     await client.query('COMMIT')
     notifyDeviceWork(stopped.rows[0].deviceId)
     return true
@@ -179,7 +194,11 @@ const runtime: Dependencies = {
  * timer. Every I/O attempt has a committed claim/deadline before it starts. */
 export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: string, overrides: Partial<Dependencies> = {}): Promise<false | number> {
   const deps = { ...runtime, ...overrides }, now = deps.now()
-  const row = (await pool.query<ThreadLifecycleRow>(`SELECT m.*,m."lifecycleAt"::text AS "lifecycleAtVersion",r.status,r."stopRequestedAt",r."leaseExpiresAt",r."pauseReason",
+  const row = (await pool.query<ThreadLifecycleRow>(`SELECT m.*,m."lifecycleAt"::text AS "lifecycleAtVersion",r.status,r."stopRequestedAt",r."stopReason",r."leaseExpiresAt",r."pauseReason",
+      (SELECT max(s."expiresAt") FROM coding_review_sessions s WHERE s."runId"=m."runId" AND s."ownerId"=m."ownerId"
+        AND s."workspaceId"=m."workspaceId" AND s."sandboxId"=m."sandboxId" AND s."machineEpoch"=m.epoch
+        AND s."machineOperationId"=m."operationId" AND s."deviceId"=m."deviceId" AND s."taskId"=m."issueId"
+        AND s."revokedAt" IS NULL AND s."expiresAt">clock_timestamp()) AS "reviewExpiresAt",
       COALESCE(r.report->'safePoint'->>'session'='exited',false) AS "safeExit",
       (m."issueId" IS NOT NULL AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate')
         OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL)) AS "taskClosed",
@@ -241,17 +260,28 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
-      await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])
+      const run = (await client.query('SELECT status,"stopRequestedAt","stopReason" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
       const current = (await client.query(`SELECT state,epoch,"sandboxId",lifecycle FROM thread_machines
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
       if (!current || current.epoch !== row.epoch || current.sandboxId !== row.sandboxId || current.lifecycle.reconcileId !== token || ['paused', 'ended'].includes(current.state)) {
         await client.query('COMMIT')
         return now + 1
       }
+      if (reason === 'human_review') {
+        const valid = await client.query(`SELECT 1 FROM coding_review_sessions s
+          WHERE s."runId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."sandboxId"=$4
+            AND s."machineEpoch"=$5 AND s."revokedAt" IS NULL AND s."expiresAt">clock_timestamp() LIMIT 1`,
+        [runId, actor.userId, actor.workspaceId, row.sandboxId, row.epoch])
+        if (!valid.rowCount || run?.stopRequestedAt || run?.stopReason === 'device_lost'
+          || !['succeeded', 'failed', 'paused'].includes(run?.status)) {
+          const next = await finish({ phase: 'needs_reconciliation', reason: 'review_authority_changed' }, now, client)
+          await client.query('COMMIT')
+          return next
+        }
+      }
       await deps.provider.keepAlive(row.sandboxId!, actor.userId, THREAD_MACHINE_PROVIDER_MS)
       providerOutcome = 'timeout_renewed'
-      const next = await finish({ phase: reason === 'provisioning' ? 'provisioning' : 'active', reason, failures: 0, providerDeadline: deps.now() + THREAD_MACHINE_PROVIDER_MS,
-        executionDeadline: threadMachineExecutionDeadline(row, now) }, due, client)
+      const next = await finish({ phase: reason === 'human_review' ? 'review_resumed' : reason === 'provisioning' ? 'provisioning' : 'active', reason, failures: 0, providerDeadline: deps.now() + THREAD_MACHINE_PROVIDER_MS }, due, client)
       await client.query('COMMIT')
       committedTransition?.()
       committedTransition = undefined
@@ -260,6 +290,11 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
   }
 
   try {
+    // A concurrent SDK resume owns this short intent. Do not observe/pause the
+    // VM or replace its phase before its lease-fenced completion CAS returns.
+    // Stop/closure/revocation clears the lease and takes the normal path.
+    if (threadMachineLifecycleDecision(row, null, now).reason === 'human_review_resume')
+      return await finish({ phase: 'review_resume_requested', reason: 'human_review_resume', failures: 0 }, at(row.reviewExpiresAt!))
     if (row.status === 'queued' && row.stopRequestedAt && await deps.acknowledgeStop(pool, actor, runId)) {
       // True is returned only after provider kill acknowledgement and the
       // atomic retired write. Pending creation/failed kills retain their due row.
@@ -294,7 +329,8 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
         UPDATE thread_machines m SET "sandboxId"=$7,
           state=CASE WHEN state='ended' THEN state ELSE $8::text END,
           "runningSince"=CASE WHEN $8::text='running' THEN COALESCE("runningSince",to_timestamp($9::double precision/1000)) ELSE NULL END,
-          "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,
+          "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"restoreStartedAt"=NULL,
+          "snapshotState"=CASE WHEN state='restore' AND "snapshotState"='ready' THEN 'failed' ELSE "snapshotState" END,
           lifecycle=(lifecycle-'creationMissingAt')||$10::jsonb||CASE WHEN state='ended' THEN '{"phase":"retire_requested"}'::jsonb ELSE '{}'::jsonb END
         FROM parent WHERE m."runId"=parent.id AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND lifecycle->>'reconcileId'=$5
           AND "operationId"=$6 AND "sandboxId" IS NULL
@@ -352,7 +388,9 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     }
     if (decision.action === 'pause') {
       phase = 'pause_failed'
-      await deps.park(pool, actor, runId, { ...fenceOf(row), ...(decision.reason === 'stop_unacknowledged' ? { suspendAfterStop: true } : {}) })
+      const parked = await deps.park(pool, actor, runId, { ...fenceOf(row), ...(decision.reason === 'stop_unacknowledged' ? { suspendAfterStop: true } : {}) })
+      if (parked && typeof parked === 'object' && 'reviewHeldUntil' in parked)
+        return await finish({ phase: 'review_resumed', reason: 'human_review', failures: 0 }, Number(parked.reviewHeldUntil))
       providerOutcome = 'pause_ack'
       if (TERMINAL.has(row.status)) await pool.query(`UPDATE suggestion_executions SET status=$2,"endedAt"=COALESCE("endedAt",now()) WHERE "runId"=$1`,
         [runId, row.status === 'succeeded' ? 'done' : row.status === 'cancelled' ? 'stopped' : row.status])

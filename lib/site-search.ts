@@ -1,4 +1,4 @@
-import { withBasePath } from '@/lib/base-path'
+import { withBasePath } from './base-path'
 
 // Client side of GET /api/search (#310, docs/backend/131-site-search.md). The
 // route sits under the app base path, so requests go through withBasePath

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { createWorkspaceInvitation } from '@/app/actions/workspace'
 import {
   InvitationCsvError,

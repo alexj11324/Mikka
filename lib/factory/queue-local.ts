@@ -5,6 +5,7 @@ import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { ActionFailureError } from '@/lib/action-error'
 import { queueFactoryTask } from './task-dispatch'
 import { continuedRunPolicyCeiling } from '@/lib/computer/run-model'
+import { requestedRunSettings, withRequestedEffort } from '@/lib/task-run-settings'
 
 export async function queueTaskRun(userId: string, input: Parameters<typeof queueRun>[1] & { needsSpec?: boolean }, botId: string | null = null,
   execution?: Parameters<typeof queueRun>[3], sourceEventId?: string, dispatch: RunDispatchOrigin = {}) {
@@ -15,6 +16,9 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   const source = dispatch.source ?? null
   const origin = dispatch.origin ?? 'web'
   input = { ...input, policyCeiling: await continuedRunPolicyCeiling(pool, userId, input.issueId, input.threadRunId, input.policyCeiling) }
+  // A new thread takes the effort its request asked for (an automation's), when its model takes one.
+  if (input.modelDispatch && sourceEventId && !input.threadRunId && typeof input.model === 'string')
+    input = { ...input, modelDispatch: withRequestedEffort(input.modelDispatch, await requestedRunSettings(pool, userId, sourceEventId), input.model) }
   const { rows: [agent] } = await pool.query('SELECT "deviceId" FROM agents WHERE id=$1 AND "userId"=$2', [input.agentId, userId])
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
   const repo = await ensureDeviceRepository(userId, agent.deviceId, input.repo)
@@ -22,6 +26,7 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   if (previous && !['cancelled','revoked'].includes(previous.status)) botId = previous.botId
   return queueFactoryTask(pool, userId, {
     issueId: input.issueId, botId, agentId: input.agentId, deviceRepoId: repo.id, note: input.note,
+    ownerRequested: Boolean(sourceEventId) && source !== 'mcp',
     key: input.requestKey, sourceEventId, previousRunId: input.threadRunId, needsSpec: input.needsSpec,
     selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source, ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])],
     queue: async (tx, owner, request, scopeBot, context) => {

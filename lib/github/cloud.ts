@@ -128,7 +128,14 @@ export async function cloudGitHubRepositories(userId: string): Promise<{ githubA
     await client.query('BEGIN')
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mikka_cloud_github_user:'||$1,0))", [userId])
     await client.query('DELETE FROM cloud_github_repositories WHERE user_id=$1', [userId])
-    for (const repo of repositories) await client.query('INSERT INTO cloud_github_repositories(user_id,remote_key,installation_id,repository_id) SELECT $1,$2,$3,$4 WHERE EXISTS (SELECT 1 FROM cloud_github_installations WHERE user_id=$1 AND installation_id=$3)', [userId, `v2/github.com/${repo.fullName.toLowerCase()}`, repo.installationId, repo.id])
+    if (repositories.length) {
+      await client.query(`INSERT INTO cloud_github_repositories(user_id,remote_key,installation_id,repository_id)
+        SELECT i.user_id,r.remote_key,i.installation_id,r.repository_id
+        FROM unnest($2::text[],$3::text[],$4::text[]) AS r(remote_key,installation_id,repository_id)
+        JOIN cloud_github_installations i ON i.user_id=$1 AND i.installation_id=r.installation_id`,
+      [userId, repositories.map(repo => `v2/github.com/${repo.fullName.toLowerCase()}`),
+        repositories.map(repo => repo.installationId), repositories.map(repo => repo.id)])
+    }
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error }
   finally { client.release() }

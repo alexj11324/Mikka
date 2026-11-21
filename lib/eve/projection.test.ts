@@ -65,3 +65,54 @@ test('native failed outcomes preserve a closed provider code without publishing 
   assert.equal(messages[0].mikkaFailure,'rate_limit_exceeded')
   assert.equal(JSON.stringify(messages).includes('Private provider diagnostic'),false)
 })
+
+test('a cancelled turn keeps published interrupted text for display without importing it as model history', async () => {
+  const { stoppedTurnDisplay } = await import('./projection')
+  const sessionId = 'wrun_stop', turnId = 'turn_1'
+  const records = [
+    { type: 'content.completed', scope: { turnId: 'turn_0' }, data: { kind: 'text', value: 'Another turn', interrupted: true } },
+    { type: 'content.completed', scope: { turnId }, data: { kind: 'text', value: 'Earlier words.' } },
+    { type: 'content.delta', scope: { turnId }, data: { kind: 'text', delta: 'Partial words.' } },
+    { type: 'content.completed', scope: { turnId }, data: { kind: 'reasoning', value: 'Private thought', interrupted: true } },
+    { type: 'content.completed', scope: { turnId }, data: { kind: 'text', value: 'Partial words.', interrupted: true } },
+    { type: 'turn.settled', data: {turnId, outcome:'cancelled'} },
+    { type: 'turn.settled', data: {turnId:'before_first_token', outcome:'cancelled'} },
+  ]
+  const reader = { async *stream(options: { follow: boolean; startIndex: number }) {
+    assert.equal(options.follow, false)
+    assert.equal(options.startIndex, 7)
+    yield* records
+  } }
+  const display = await stoppedTurnDisplay(reader as never, turnId, 7)
+  const view = foldEvents(emptySessionView(), [
+    {type:'turn.started',scope:{turnId},data:{turnId,cause:{deliveryId:'user'},follows:null}},
+    {type:'call.requested',scope:{turnId},data:{callId:'call_1',owner:{turnId},capability:{kind:'tool',name:'list_issues'},input:{}}},
+    {type:'call.settled',scope:{turnId},data:{callId:'call_1',outcome:'completed',output:[]}},
+  ].map((event,line)=>({...event,meta:{position:{line,index:0},at:new Date(0).toISOString()}})))
+  const messages = projectEveTurn(view, sessionId, turnId, 'cancelled', display)
+  assert.ok(!JSON.stringify(messages[0].content).includes('Partial words.'))
+  const [row] = chatItems(messages.map((message, i) => ({ position: i + 1, message, createdAt: new Date(0) })) as never)
+  assert.deepEqual([row.text, row.stopped, row.streamId], ['Earlier words.\n\nPartial words.', true, 'eve:wrun_stop:turn_1'])
+  assert.deepEqual(row.tools, ['list_issues'])
+  assert.equal(row.activity?.tools[0].state, 'done')
+  assert.equal(await stoppedTurnDisplay(reader as never, 'before_first_token', 7), undefined)
+})
+
+test('reading a stopped transcript retries incomplete history once and preserves Stop when the journal is unavailable', async t => {
+  const { stoppedTurnDisplay } = await import('./projection')
+  const part = {type:'content.completed', scope:{turnId:'turn_1'}, data:{kind:'text', value:'Already shown.', interrupted:true}}
+  let attempts = 0
+  const recovering = {async *stream() {
+    yield part
+    if (++attempts === 2) yield {type:'turn.settled', data:{turnId:'turn_1', outcome:'cancelled'}}
+  }}
+  assert.equal(await stoppedTurnDisplay(recovering as never, 'turn_1', 0), 'Already shown.')
+  assert.equal(attempts,2)
+
+  const warning = t.mock.method(console,'warn',()=>{})
+  const unavailable = {async *stream() { yield part; throw new Error('private transport diagnostic') }}
+  const display = await stoppedTurnDisplay(unavailable as never, 'turn_1', 0)
+  const messages = projectEveTurn(emptySessionView(),'wrun_stop','turn_1','cancelled',display)
+  assert.deepEqual(messages[0],{role:'assistant', content:[], mikkaStreamId:'eve:wrun_stop:turn_1', mikkaStopped:true})
+  assert.deepEqual(warning.mock.calls.map(call=>call.arguments), [['eve_stopped_transcript_unavailable']])
+})

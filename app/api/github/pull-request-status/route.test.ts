@@ -11,7 +11,7 @@ const issueLookup = mock.fn(async (_user: { id: string }, _issueId: string) => c
 class GitHubAccessError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
-const githubResult = () => ({ userId: 'viewer', githubAccountId: '12', repoId: '34', installationId: '56', number: 81, url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z', token: 'never-return-this' })
+const githubResult = () => ({ userId: 'viewer', githubAccountId: '12', repoId: '34', installationId: '56', number: 81, url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z', title: 'Add issue activity', createdAt: '2026-10-26T09:30:00Z', mergedAt: '2026-10-27T11:00:00Z', token: 'never-return-this' })
 const readPr = mock.fn(async (_headers: Headers, _url: string) => githubResult())
 mock.module(new URL('../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'pull-request-status-fixture-session' } } : null } } } })
 mock.module(new URL('../../../../lib/issue-access.ts', import.meta.url).href, { namedExports: { issueForUser: issueLookup } })
@@ -65,7 +65,7 @@ test('only minimal viewer-authorized state is returned and shared metadata is un
   const response = await call({ issueId, url: `${url}/` })
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
-  assert.deepEqual(await response.json(), { viewerId: 'viewer', url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z', live: { workspaceId: liveWorkspaceId } })
+  assert.deepEqual(await response.json(), { viewerId: 'viewer', url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z', title: 'Add issue activity', createdAt: '2026-10-26T09:30:00Z', mergedAt: '2026-10-27T11:00:00Z', live: { workspaceId: liveWorkspaceId } })
   // The channel is the viewer's own for this task (#1212), looked up only after the task and GitHub checks.
   assert.deepEqual(liveLookup.mock.calls.at(-1)!.arguments.slice(2), [issueId, 'viewer'])
   assert.equal(readPr.mock.calls[0].arguments[1], url)

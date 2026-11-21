@@ -4,40 +4,31 @@
 - **GitHub:** [#1284](https://github.com/alexj11324/Mikka/issues/1284)
 - **Layout precedent:** existing Settings › Models and subscriptions, New task, and the thread's execution identity dialog. No new accepted Figma frame is claimed.
 - **Product authority:** [Factory flow decision](decisions/2026-11-04-2200-factory-flow-like-warp.md).
+- **Current behaviour:** [2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md) (content only, no automatic selection) and [2026-11-17-1800](decisions/2026-11-17-1800-one-agent-per-thread.md) (every dispatch names its Agent; a thread keeps it for life).
 
 ## What the person does
 
-Save reusable coding roles with responsibilities, capability tags, an Agent/model policy, reasoning effort, private instructions and controlled Skills. Choose one for a task, or let the existing host select an eligible Profile for that task's stage.
+Save reusable roles: a name, a description, private instructions and controlled Skills. That is all an Agent 配置 holds ([decision 2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md)). It never sets or limits the model or the machine.
 
-A Profile is a logical configuration owned by the current person in the current workspace. It is not a Bot, physical Agent installation, credential, machine or task. Profiles may share an Agent and model while differing in responsibilities and instructions.
+Three rules, which the UI and the Coordinator's instructions repeat:
+
+1. An Agent 配置 is content only: name, description, instructions, Skills.
+2. A task uses one only when someone names it: the person in New task, or the Coordinator by id from `list_factory_agent_profiles`. A task-form choice always wins. Nothing is chosen automatically, and stage dispatch (review, verify, the first implementation after a plan) runs without one.
+3. The Agent, model and machine come from the task. Every dispatch names its Agent (none named: `agentRequired`); the person's explicit model wins, else that Agent's 优先使用的模型 in order, and it is placed by 运行位置. A thread never switches Agent.
+
+A Profile is owned by the current person in the current workspace. It is not a Bot, physical Agent installation, credential, machine or task.
 
 ## Where it lives
 
-Settings › Models and subscriptions › the current workspace's model defaults › Agent 配置. Each row's state is a status badge (可运行 / 已停用 / its reason; R-34, R-87); only a toggle's result is announced. The section follows Preferred models. It uses the same section, rows, action menu and explicit edit dialog as nearby settings.
+Settings › Models and subscriptions › Agent 配置. Each row shows the name, description, version and whether it can be used (enabled, and its Skills still authorized). Row actions: edit, duplicate, archive, and the enable switch.
 
-New task has an Agent 配置 chip in its header row beside the machine and Bot chips, drawn the same way (`h-7 rounded-full`, icon first, R-90); its menu ends with 管理, which opens Settings in a new tab so the task draft stays. A load failure or an unavailable choice shows under the row. Automatic selection omits the explicit Profile ID. A selected Profile is sent as structured `profileId` beside `taskDestination`, through the existing Coordinator submission; the selector does not put a claimed choice into natural-language instructions.
+New task has an Agent 配置 chip in its header row beside the machine and Bot chips (R-90). Its menu offers 不用 Agent 配置 and each Profile, and ends with 管理, which opens Settings in a new tab so the draft stays. A selected Profile is sent as structured `profileId` beside `taskDestination`. A draft saved with the retired Default choice (`default`) reads as none.
 
-The same menu offers the existing built-in Default profile, including when custom Profiles are enabled. It uses the Default row's availability and inherits preferred models. Its structured task-form reference is the closed literal `default`; custom references remain UUIDs. The stored user event is authoritative: a model's text or tool argument cannot select Default on its own or replace the user's pin. Mutable Profile APIs remain UUID-only.
-
-An explicit Default choice enters the existing preferred-model dispatcher, preserving named Agent/model/source constraints, difficulty routing and current authorization. Its frozen receipt still has source and reason `default`, with the same immutable definition and no Profile Decision receipt. An explicit model remains a picked model; a named Agent alone still inherits that Agent's list. Automatic selection keeps its existing Decision and refusal behavior. This is an entry point for the person's existing Default choice, not a change to Automatic fallback policy.
-
-The host-only default continuation selector may retain the same structured Default pin, never a different custom Profile. Question answers keep the original frozen native role and session guards; independent review stages keep their own host-selected Profile.
-
-For an independent Review or Verify selection, the host describes the current read-only work against the locked task's candidate and request epoch. Its `currentWork` allowlist retains the actual candidate and producer, nullable SHA, and the existing stage's responsibility and validation-evidence requirement; it never serializes private instructions, Skill content, native sessions or a producer report. The original producer contract and the receipt-bound Owner context from `currentFactoryRequest` are separate acceptance references, not instructions to repeat implementation, a consumed question or producer self-review. This internal context is supplied only when an automatic Profile Decision is needed; it is not a public request or tool field. It describes the role to select and grants no permission. The existing check queue still validates the candidate, resolves its fixed SHA and freezes the independent assignment; Default, explicit choices and frozen check retries retain their existing paths. `none` and uncertain selections still block the unstarted check.
-
-Automatic Profile selection asks one constrained choice that binds an exact currently eligible Profile ID and the model's primary reason (`capability_fit` or `stage_fit`); `none` is a separate refusal choice. Profile and reason depend on each other, so they are not separate questions in the same request ([Decisions guidance](https://vercel.com/i/what-is-openai-decisions-api)). The host only maps an exact listed pair back to its ID and reason. It does not fill in a reason for a bare ID or accept the old two-answer format. Missing/refused answers and confidence below 0.55 remain unavailable; omitted confidence retains the existing behavior. Receipt validation, current authorization, independent check identity and candidate recovery are unchanged.
-
-The existing 100-Profile limit produces at most 201 choices, within the provider's [255-choice limit](https://developers.openai.com/api/reference/resources/decisions/methods/create), without truncating the eligible catalogue. Private Profile instructions remain outside the Decision input; unlike `currentWork`, the candidate list carries each eligible Profile's bounded Skill metadata — id, name, a description capped at 200 characters, and source — because the Decision matches declared capabilities against the assignment. It never carries a body, path, source revision or credential. A Profile whose Skills no longer resolve is not offered as a candidate: its closed availability code (`skill_missing`, `skill_disabled`, `skill_forbidden` or `skills_changed`) is recorded in the bounded Decision diagnostics. Existing frozen selections, including the historical `only_suitable` reason, retain their original role, reason and receipt; native continuation does not run this new selection protocol again.
-
-Task availability is requested for the explicitly selected cloud or device destination. A location change invalidates the previous availability result while the host evaluates the new destination; dispatch revalidates it again. The read-only `checking` allowance state remains selectable and shows a neutral pending status: it requests the existing authoritative check at dispatch, not permission to run. Confirmed refusals, missing reads, disabled or archived Profiles stay unselectable; enabled/archive state takes precedence even over an available or checking projection. The task form sends only the structured Profile reference, never a client availability grant.
-
-A selected built-in Default keeps its structured intent so the normal dispatcher can refresh the already authorized subscription and apply the current preferred-source order. The management preview stays read-only, with no background quota probe or source refresh. Its unresolved allowance is shown as checking, not as available; quota preparation does not erase provider-failure memory. Dispatch, queue and claim retain the strict quota and authorization checks for Default and custom Profiles.
-
-The existing thread execution identity dialog shows the frozen Profile name, version, selection source and reason (stored as a code — `capability_fit`, `stage_fit`, `only_suitable` — and worded in the reader's language; a run frozen before the codes reads as the neutral 按任务能力选择). The configuration digest stays in the snapshot but is not shown beside the run's actual Agent, model and credential kind. Opening a thread from a task uses the same dialog. It never reconstructs historical Profile data from the current settings.
+A selection made since 2026-11-15 is frozen with `contentOnly: true`, source `explicit` and the task's own target. Older frozen selections keep the source and reason they were admitted with (`decision` with `capability_fit` / `stage_fit` / `only_suitable`, or `default`), and an older selection that pinned a model keeps that model fence on retry, recovery and continuation. The thread execution identity dialog shows the frozen Profile name, version, source and reason, and never reconstructs them from current settings.
 
 ## Role templates
 
-Add opens a menu of a blank Profile and four starting points: Investigator, Planner, Implementer and Reviewer. A template is a copy, never a shared record: choosing one fills the normal editor (roles, private instructions, an initial Skill selection, automatic Agent and inherited model), and nothing exists until the person saves. Saving creates one ordinary custom Profile; it creates no Bot, machine or extra Profile. Template revisions are versioned in `lib/factory/agent-profile-templates.ts`; a revision never rewrites a Profile created from an earlier one, and the read-only Default stays empty and unchanged. Templates are editor data only: they enter the automatic Decision catalogue after a person instantiates and enables them.
+Add opens a menu of a blank Profile and four starting points: Investigator, Planner, Implementer and Reviewer. A template is a copy, never a shared record: choosing one fills the editor with its instructions and initial Skills, and nothing exists until the person saves. Template revisions are versioned in `lib/factory/agent-profile-templates.ts`; a revision never rewrites a Profile created from an earlier one.
 
 ## Skills, sources and progressive disclosure
 
@@ -60,36 +51,31 @@ The run identity dialog lists the configured Skills separately from the daemon-r
 
 | Field or action | Mikka behavior | Precedent |
 | --- | --- | --- |
-| Name, responsibilities, roles | Owner-edited public summary; instructions remain separate | [Warp custom agents](https://docs.warp.dev/factories/factory-agents/creating-custom-agents/) |
-| Icon and colour | A dotted glyph (`square`, `chevrons`, `lens`, `lines`, `check`, `stairs`, `diamond`, `arrow`) and a colour (`ink`, `graphite`, `teal`, `pink`), both closed sets stored as nullable `icon` and `color` columns beside the definition, outside its digest. A new Profile with none chosen stores one derived from its roles, then name and description; an existing row's null reads as that derived default. Default always draws `square` in `ink`. `ProfileMark` draws it first wherever a Profile is named (settings rows and editor, New task's Agent 配置, a task conversation's stretch label, the run identity dialog), with the Agent's brand mark smaller beside it. Shape tells Profiles apart; colour only assists. The run identity dialog and stretch label read the Profile's current mark, not a frozen copy | Alex, 2026-11-10; affectUI Live Session agent glyphs |
-| Agent and model | Auto / Claude Code / Codex; inherit preferred models or pin an authorized model/source | [Warp agent configuration](https://docs.warp.dev/factories/factory-agents/configuration/), existing Mikka Preferred models |
-| Reasoning effort | Default or the supported profile effort values | #1284 and existing per-run effort configuration |
-| Private instructions | Explicitly saved with the other Profile fields | Warp configuration's prompt editing |
+| Name, description | Owner-edited public summary; instructions remain separate | [Warp custom agents](https://docs.warp.dev/factories/factory-agents/creating-custom-agents/) |
+| Icon and colour | A dotted glyph and a colour from closed sets, stored beside the definition and outside its digest; derived from the name and description when none is chosen | Alex, 2026-11-10 |
+| Private instructions | Saved with the other fields | Warp configuration's prompt editing |
 | Skills | Checkboxes over the unified official/personal/workspace catalogue, declared repository names, and on-demand loading | [Warp factory agents](https://docs.warp.dev/factories/factory-agents/) and Mikka [Agent-as-Code](agent-as-code.md) |
-| Enable | One row switch; confirmed server value stays visible until saved | Existing Mikka subscription/device switches |
-| Edit, duplicate, archive | Row action menu; archive confirms by name and retains historical runs | Existing Mikka settings menus and archive flows |
+| Enable | One row switch | Existing Mikka switches |
+| Edit, duplicate, archive | Row action menu; archive confirms by name and retains historical runs | Existing Mikka settings menus |
 
-No field grants new tools, changes credentials, or expands authorization. Model source labels come only from authorized catalogue data. Source references are request identifiers, not displayed credential values.
+Saving drops any model, Agent, effort or tag an older row still holds. No field grants tools, changes credentials, or expands authorization.
 
 ## Layout and states
 
 | State | Presentation and recovery |
 | --- | --- |
-| First use / empty | Read-only Default profile row, inherited preferred-model policy and its real availability; Add creates the first custom Profile. No stored default is required. |
-| Normal | Name, responsibilities, capability tags, Agent/model policy, version, availability; enable switch and row menu. |
-| Loading | Existing SettingsLoading rows; dispatch retains Automatic selection. |
-| Read failure | Existing SettingsSaveError / InlineLoadError with reload; an explicit selection cannot dispatch while its availability is unknown. |
-| Disabled / unavailable | Localized reason on the row; confirmed unavailable choices are disabled in the task menu. Allowance `checking` stays selectable for Default and enabled, unarchived custom Profiles, with its unresolved state visible so normal dispatch can check it. Editing remains available. |
-| Fixed source removed | Editor retains the fixed policy, flags the missing selection and requires an authorized replacement. |
-| Skill removed | Existing reference is marked unavailable and can be unchecked before saving. |
-| Concurrent edit | Version conflict keeps the draft and offers reload. The stored newer version is not overwritten. |
-| Unconfirmed save | Draft and request identity are retained; retry sends the same definition. A new create uses an idempotency ID. |
-| Narrow screen | Settings row actions wrap below the content; editor fields collapse to one column; dialog scrolls inside the viewport; new-task selectors wrap. |
-| Dark mode | Shared control/background/status tokens only; no custom colors or border-input styling. |
+| First use / empty | 没有自定义 Agent 配置; Add creates the first one. Tasks run without one. |
+| Loading | Existing SettingsLoading rows. |
+| Read failure | SettingsSaveError / InlineLoadError with reload; a chosen Profile cannot dispatch while it is unknown. |
+| Disabled / unavailable | Localized reason on the row; the task menu disables it. 不用 Agent 配置 is always available. |
+| Skill removed | The reference is marked unavailable and can be unchecked before saving. |
+| Concurrent edit | Version conflict keeps the draft and offers reload. |
+| Unconfirmed save | Draft and request identity are retained; retry sends the same definition. |
+| Narrow screen / dark mode | Shared settings layout and tokens. |
 
 ## Components and copy
 
-Uses SettingsSection, SettingRow, SettingsLoading, SettingsSaveError, Dialog, AlertDialog, FieldGroup/Field/FieldSet, Input, Textarea, Select, Checkbox, Switch and the shared Agent/model labels.
+Uses SettingsSection, SettingRow, SettingsLoading, SettingsSaveError, Dialog, AlertDialog, FieldGroup/Field/FieldSet, Input, Textarea, Checkbox and Switch.
 
 New business components:
 - `components/settings/factory-profiles-settings.tsx`
@@ -102,19 +88,14 @@ Rules: R-01, R-22/23, R-30/31/32/33/34, R-40/41/42/43, R-70, R-74, R-90. Setting
 
 ## User-task review
 
-| Person's task | Before | After |
-| --- | --- | --- |
-| Run without configuration | Existing preferred-model flow | Same flow with a read-only default row; no setup gate |
-| Make distinct implementation and review roles | Missing | Create two Profiles without new Bots or computers |
-| Pin an authorized model/source | Global preferred-model defaults only | Per-Profile fixed selection; global defaults remain editable independently |
-| Pause a Profile | Missing | Disable; historical run snapshots stay intact |
-| Stop using a Profile | Missing | Archive with a named confirmation |
-| Choose a role for one task | Missing | New task selector sends the exact Profile ID |
-| Use preferred models for one task while custom Profiles exist | Default available only as a read-only settings row | New task can explicitly select Default with its current availability |
-| Explain a previous run's selection | Physical run identity only | Frozen Profile version/source/reason in the same run identity dialog |
-| Start a role from a known responsibility | Blank Profile only | Investigator, Planner, Implementer and Reviewer templates fill the editor; saving creates one ordinary Profile |
-| Use an installed or shared Skill | The three built-in texts only | Personal, explicitly shared workspace and declared repository Skills, pinned with a load receipt per run |
-| Recover from a removed source, Skill or concurrent edit | Missing | Explicit errors, replacement/removal controls and reload |
+| Person's task | Behaviour |
+| --- | --- |
+| Run without configuration | Tasks run without an Agent 配置; nothing to set up |
+| Make distinct implementation and review roles | Two Profiles with different instructions and Skills |
+| Choose a role for one task | New task's Agent 配置 chip sends the exact Profile ID |
+| Let the Coordinator pick a role | It lists the Profiles and passes one's id when it fits; the thread shows the choice |
+| Pause or stop using a Profile | Disable, or archive with a named confirmation; history stays intact |
+| Explain a previous run | Frozen Profile version, source and reason in the run identity dialog |
 
 ## Review and verification record
 

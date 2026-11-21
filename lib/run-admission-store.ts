@@ -1,7 +1,9 @@
 import { workerDefinitionDigest } from './agent-kit/worker-digest'
+import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import 'server-only'
 import { admitProfileSelection } from './factory/profile-admission'
 import { runListChanged } from './live/lists'
+import { requestedRunSettings } from './task-run-settings'
 import { runChanged } from './live/panels'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import type { PoolClient } from 'pg'
@@ -44,13 +46,17 @@ export async function acceptLocalRun(input: {
     const { rows: [target] } = await (existing ?? pool).query(`SELECT i."workspaceId",repo."repoPath",
         CASE WHEN source.id IS NULL THEN repo."baseBranch"
           WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
-          ELSE source."baseBranch" END AS "baseBranch"
+          ELSE source."baseBranch" END AS "baseBranch",
+        CASE WHEN source."agentDefinition"#>>'{projectExecution,environment,chosen}'='true' THEN source."agentDefinition"#>>'{projectExecution,environment,id}' END AS "chosenEnvironmentId"
       FROM issues i JOIN device_repos repo ON repo.id=$2 AND repo."userId"=$3
       LEFT JOIN agent_runs source ON source.id=$4 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"
       WHERE i.id=$1 AND i."ownershipState"='bound' AND i."workspaceId" IS NOT NULL`, [input.issueId, input.deviceRepoId, input.userId, sourceId ?? null])
     if (!target) throw new ActionFailureError('runInvalid', { reason: 'issueUnavailable' })
     const { withProjectExecution } = await import('./project-resources/store')
-    return withProjectExecution({ userId: input.userId, workspaceId: target.workspaceId, issueId: input.issueId, repositoryKey: target.repoPath, baseBranch: target.baseBranch, runtime: 'local', harness: input.definition.harness },
+    // An Environment the request chose for a new thread; a continuation keeps the one its thread was admitted with.
+    const environmentId = sourceId ? target.chosenEnvironmentId ?? undefined
+      : input.continuation ? undefined : (await requestedRunSettings(existing ?? pool, input.userId, input.requestEventId)).environmentId
+    return withProjectExecution({ userId: input.userId, workspaceId: target.workspaceId, issueId: input.issueId, repositoryKey: target.repoPath, baseBranch: target.baseBranch, runtime: 'local', harness: input.definition.harness, ...(environmentId ? { environmentId } : {}) },
       snapshot => acceptLocalRun(input, existing, snapshot), Boolean(existing))
   }
   requireProjectResourceLease(input.userId, projectExecution.workspaceId)
@@ -160,6 +166,8 @@ export async function acceptLocalRun(input: {
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
+      // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+      scheduleThreadTitle(tx, input.id, input.userId, 'created')
       await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
       await runListChanged(tx, input.id)
       await runChanged(tx, input.id)
@@ -177,8 +185,12 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid('branchInUse')
+    // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+    scheduleThreadTitle(tx, input.id, input.userId, 'created')
     await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: effectiveBaseBranch, pushApproved: true })
+    if (input.requestEventId && !input.continuation && !input.sourceRunId && (await requestedRunSettings(client, input.userId, input.requestEventId)).pin)
+      await client.query('UPDATE agent_runs SET "conversationPinnedAt"=clock_timestamp() WHERE id=$1', [input.id])
     await runListChanged(tx, input.id)
     await runChanged(tx, input.id)
     return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }

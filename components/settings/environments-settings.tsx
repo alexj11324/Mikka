@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
-import { Archive, Pencil, Plus } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Archive, Pencil, Plus } from '@/components/icons'
 import type { EnvironmentView, EnvironmentsView } from '@/app/actions/environments'
-import { saveEnvironment, setProjectDefaultEnvironment } from '@/app/actions/project-resources'
-import type { EnvironmentConfiguration } from '@/lib/project-resources/contracts'
+import { listProjectSetupVersions, rollbackProjectSetup, saveEnvironment, setProjectDefaultEnvironment } from '@/app/actions/project-resources'
+import type { EnvironmentConfiguration, ProjectSetupHistory } from '@/lib/project-resources/contracts'
 import type { ActionResult } from '@/lib/action-result'
+import { MACHINE_SIZES, isMachineSize, type MachineSize } from '@/lib/cloud-computer/machine-pricing'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
@@ -32,6 +33,7 @@ export function EnvironmentsSettings({ workspaceId }: { workspaceId: string }) {
   useLiveKey('workspace_settings', workspaceId, [unstable_serialize(key)], workspaceId)
   const data = !list.error && list.data && !list.data.error ? list.data : null
   const [editing, setEditing] = useState<{ environment?: EnvironmentView } | null>(null)
+  const [historyProject, setHistoryProject] = useState<string | null>(null)
   const [archiving, setArchiving] = useState<EnvironmentView | null>(null)
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -39,6 +41,8 @@ export function EnvironmentsSettings({ workspaceId }: { workspaceId: string }) {
   const active = data?.environments.filter(environment => !environment.archived) ?? []
   const archived = data?.environments.filter(environment => environment.archived) ?? []
   const canManage = data?.canManage === true
+  const selectedProject = data?.projects.find(project => project.id === historyProject)
+  const selectedEnvironment = active.find(env => env.id === selectedProject?.environmentId)
   useEffect(() => {
     if (!canManage) { setEditing(null); setArchiving(null) }
   }, [canManage])
@@ -97,13 +101,20 @@ export function EnvironmentsSettings({ workspaceId }: { workspaceId: string }) {
       {data.projects.map(project => {
         const items = [{ value: 'none', label: t('none') }, ...active.map(environment => ({ value: environment.id, label: environment.name }))]
         if (project.environmentId && !active.some(environment => environment.id === project.environmentId)) items.push({ value: project.environmentId, label: t('archived') })
-        return <SettingRow key={project.id} title={project.name}><Select value={project.environmentId ?? 'none'} items={items}
+        return <SettingRow key={project.id} title={project.name}><div className="flex flex-wrap items-center gap-2">
+          {active.some(environment => environment.id === project.environmentId) && <Button variant="ghost" size="sm"
+            aria-label={t('historyFor', { name: project.name })} onClick={() => setHistoryProject(project.id)}>{t('history')}</Button>}
+          <Select value={project.environmentId ?? 'none'} items={items}
           disabled={!data.canManage || pending} onValueChange={value => { if (value) void choose(project.id, project.revision, value) }}>
           <SelectTrigger className="w-48" aria-label={t('defaultFor', { name: project.name })}><SelectValue /></SelectTrigger>
           <SelectContent><SelectGroup>{items.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
-        </Select></SettingRow>
+        </Select></div></SettingRow>
       })}
     </SettingsSection>}
+    {selectedProject && selectedEnvironment && <SetupHistory key={workspaceId + ':' + selectedProject.id + ':' + selectedEnvironment.id}
+      workspaceId={workspaceId} projectId={selectedProject.id} environment={selectedEnvironment}
+      canRestore={canManage && selectedProject.canEditProperties}
+      onClose={() => setHistoryProject(null)} onSaved={() => { setHistoryProject(null); void list.mutate() }} />}
     {archived.length > 0 && <SettingsSection id="archived-environments" title={t('archived')}>
       {archived.map(environment => <SettingRow key={environment.id} title={environment.name} description={t('version', { revision: environment.revision })}>
         {canManage && <Button variant="outline" size="sm" disabled={pending} onClick={() => { void archive(environment, true) }}>{t('restore')}</Button>}
@@ -118,7 +129,8 @@ export function EnvironmentsSettings({ workspaceId }: { workspaceId: string }) {
         <AlertDialogHeader><AlertDialogTitle>{t('archiveNamed', { name: archiving?.name ?? '' })}</AlertDialogTitle></AlertDialogHeader>
         {failure && <FieldError>{failure}<Button variant="link" size="sm" onClick={() => { setArchiving(null); setFailure(null); void list.mutate() }}>{common('refresh')}</Button></FieldError>}
         <AlertDialogFooter><AlertDialogCancel disabled={pending}>{common('cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); if (archiving) void archive(archiving) }}>{t('archive')}</AlertDialogAction>
+          {/* Reversible: the archived list above restores it, so this is a write, not a delete (R-102). */}
+          <AlertDialogAction variant="default" disabled={pending} onClick={event => { event.preventDefault(); if (archiving) void archive(archiving) }}>{t('archive')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -135,6 +147,9 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
   const [command, setCommand] = useState(environment?.configuration.setup?.command ?? '')
   const [copyFiles, setCopyFiles] = useState(environment?.configuration.setup?.copyFiles.join('\n') ?? '')
   const [approved, setApproved] = useState(environment?.configuration.setup?.approved ?? false)
+  const [machineSize, setMachineSize] = useState<MachineSize | 'default'>(environment?.defaultMachineSize ?? 'default')
+  const sizes = [{ value: 'default', label: t('machineSizeDefault') }, ...(Object.keys(MACHINE_SIZES) as MachineSize[])
+    .map(value => ({ value, label: t('machineSizeOption', { vcpu: MACHINE_SIZES[value].vcpu, gib: MACHINE_SIZES[value].gib }) }))]
   const [pending, setPending] = useState(false), [failure, setFailure] = useState<string | null>(null)
   const options = (['any', 'local', 'cloud'] as const).map(value => ({ value, label: t(`runtimes.${value}`) }))
   async function save() {
@@ -145,7 +160,7 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
     if (!name.trim() || files.length > 200 || files.some(path => path.length > 1000)) { setFailure(t('invalid')); return }
     setPending(true); setFailure(null)
     try {
-      const result = await saveEnvironment({ workspaceId, name: name.trim(), configuration,
+      const result = await saveEnvironment({ workspaceId, name: name.trim(), configuration, defaultMachineSize: machineSize === 'default' ? null : machineSize,
         ...(environment ? { id: environment.id, revision: environment.revision } : {}) })
       if (result.error) {
         if (['authRequired', 'workspaceAccessDenied', 'workspaceMembershipSuspended'].includes(result.error)) onRefused(result.error)
@@ -169,6 +184,10 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
             onValueChange={value => { if (value === 'any' || value === 'local' || value === 'cloud') setRuntime(value) }}>
             <SelectTrigger id="environment-runtime"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
           </Select></Field>
+          <Field><FieldLabel htmlFor="environment-machine-size">{t('machineSize')}</FieldLabel><Select items={sizes} value={machineSize} disabled={pending}
+            onValueChange={value => { if (value === 'default' || isMachineSize(value)) setMachineSize(value) }}>
+            <SelectTrigger id="environment-machine-size"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{sizes.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select></Field>
           <Field><FieldLabel htmlFor="environment-setup">{t('setup')}</FieldLabel><Textarea id="environment-setup" value={command} maxLength={2000} rows={5} disabled={pending} onChange={event => { setCommand(event.target.value); setApproved(false) }} /></Field>
           <Field><FieldLabel htmlFor="environment-copy">{t('copyFiles')}</FieldLabel><Textarea id="environment-copy" value={copyFiles} rows={3} disabled={pending} onChange={event => { setCopyFiles(event.target.value); setApproved(false) }} /></Field>
           <Field orientation="horizontal"><Checkbox id="environment-approved" checked={approved} disabled={pending} onCheckedChange={value => setApproved(value === true)} /><FieldLabel htmlFor="environment-approved">{t('approveSetup')}</FieldLabel></Field>
@@ -178,4 +197,58 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
       </form>
     </DialogContent>
   </Dialog>
+}
+
+
+function SetupHistory({ workspaceId, projectId, environment, canRestore, onClose, onSaved }: {
+  workspaceId: string; projectId: string; environment: EnvironmentView; canRestore: boolean; onClose: () => void; onSaved: () => void
+}) {
+  const t = useTranslations('Settings.environments'), common = useTranslations('Common'), actionError = useActionError()
+  const [pages, setPages] = useState<number[]>([])
+  const [selected, setSelected] = useState<{ version: number; revision: number; bindingSnapshot: string; totalProjects: number } | null>(null)
+  const [pending, setPending] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const before = pages.at(-1)
+  const list = useSWR<ActionResult<ProjectSetupHistory>>(['project-setup-history', workspaceId, projectId, environment.id, environment.revision, before ?? null],
+    () => listProjectSetupVersions({ workspaceId, projectId, environmentId: environment.id, before }), { ...settingsReadOptions, revalidateOnMount: true })
+  const data = !list.error && !list.isValidating && list.data && !list.data.error ? list.data : null
+  const readError = list.error ? actionError() : list.data?.error ? actionError(list.data.error) : null
+  async function restore() {
+    if (!data || !canRestore || selected === null) return
+    setPending(true); setFailure(null)
+    try {
+      const result = await rollbackProjectSetup({ workspaceId, projectId, environmentId: environment.id,
+        revision: selected.revision, bindingSnapshot: selected.bindingSnapshot, version: selected.version })
+      if (!result.error) { onSaved(); return }
+      if (['authRequired', 'workspaceAccessDenied', 'workspaceMembershipSuspended', 'projectNotFound'].includes(result.error)) { onClose(); return }
+      setFailure(actionError(result.error)); setSelected(null); await list.mutate()
+    } catch { setFailure(actionError()); setSelected(null) }
+    finally { setPending(false) }
+  }
+  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}><DialogContent>
+    <DialogHeader><DialogTitle>{t('historyFor', { name: environment.name })}</DialogTitle></DialogHeader>
+    {readError ? <FieldError>{readError}<Button variant="link" onClick={() => void list.mutate()}>{common('refresh')}</Button></FieldError>
+      : !data ? <SettingsLoading label={common('loading')} />
+        : <div className="grid max-h-[55vh] gap-2 overflow-y-auto">
+            {data.versions.map(version => <div key={version.revision} className="grid gap-1">
+              <div className="flex items-center justify-between gap-2"><span>{t('version', { revision: version.revision })}</span>
+                {canRestore && version.revision < data.revision && <Button variant="outline" size="sm" disabled={pending}
+                  onClick={() => { setFailure(null); setSelected({ version: version.revision, revision: data.revision, bindingSnapshot: data.bindingSnapshot, totalProjects: data.totalProjects }) }}>{t('restoreSetup')}</Button>}</div>
+              {version.recipe?.command && <pre className="whitespace-pre-wrap break-words text-xs">{version.recipe.command}</pre>}
+              {version.recipe?.copyFiles.length ? <pre className="whitespace-pre-wrap break-words text-xs">{version.recipe.copyFiles.join('\n')}</pre> : null}
+              {!version.recipe && <span>{t('emptySetup')}</span>}
+            </div>)}
+            {(!!pages.length || data.before !== null) && <div className="flex gap-2">
+              <Button variant="ghost" disabled={!pages.length || pending} onClick={() => { setSelected(null); setPages(p => p.slice(0, -1)) }}>{t('newer')}</Button>
+              <Button variant="ghost" disabled={data.before === null || pending} onClick={() => { const next = data.before; if (next !== null) { setSelected(null); setPages(p => [...p, next]) } }}>{t('older')}</Button>
+            </div>}
+          </div>}
+    {failure && <FieldError>{failure}</FieldError>}
+    {selected !== null && data && canRestore && <AlertDialog open onOpenChange={open => { if (!open && !pending) setSelected(null) }}>
+      <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('confirmSetup', { revision: selected.version, name: environment.name })}</AlertDialogTitle></AlertDialogHeader>
+        <p>{t('setupImpact', { count: selected.totalProjects })}</p>
+        <AlertDialogFooter><AlertDialogCancel disabled={pending}>{common('cancel')}</AlertDialogCancel>
+          <AlertDialogAction variant="default" disabled={pending} onClick={event => { event.preventDefault(); void restore() }}>{t('restoreSetup')}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent></AlertDialog>}
+  </DialogContent></Dialog>
 }

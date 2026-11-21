@@ -1,5 +1,5 @@
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { actingContext } from '@/lib/activity-actor'
 import { activeTaskWorkspaces, withTaskWorkspace } from '@/lib/task-workspace'
 import { actAs } from '@/lib/acting-user'

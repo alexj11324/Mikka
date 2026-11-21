@@ -1,5 +1,6 @@
 import {Client,type ClientSession,type SessionStreamEvent} from 'eve/client'
 import type {Delivery} from 'eve/sessions'
+import {delivery as readDelivery, emptySessionView, foldEvents, parts, reply as turnReply, turn} from 'eve/events'
 import {z} from 'zod'
 import {internalEveHeaders} from './auth'
 import {eveInternalOrigin} from './server-client'
@@ -15,11 +16,17 @@ export const evaluationReplySchema=z.strictObject({text:z.string().max(16000),ou
 export async function evaluationDeliveryTrace(delivery:Delivery,plan:EvaluationPlan,signal:AbortSignal):Promise<EvalTrace> {
   const events:SessionStreamEvent[]=[]
   for await(const event of delivery.stream({signal}))events.push(event)
-  const result=await delivery.result({signal})
   signal.throwIfAborted()
-  const settled=events.find(event=>event.type==='turn.settled')
-  if(result.status!=='completed'||settled?.data.outcome!=='completed')throw new Error('agentEvaluationGenerationFailed')
-  const reply=evaluationReplySchema.parse(result.data??JSON.parse(result.reply??''))
+  const view = foldEvents(emptySessionView(), events)
+  const receipt = readDelivery(view, delivery.deliveryId)
+  if (receipt?.outcome !== 'handled' || !receipt.turnId || turn(view, receipt.turnId)?.outcome !== 'completed') {
+    throw new Error('agentEvaluationGenerationFailed')
+  }
+  const replyParts = turnReply(view, receipt.turnId)
+  const structured = replyParts.filter(part => part.kind === 'result').at(-1)
+    ?? parts(view, { turnId: receipt.turnId, kind: 'result' }).at(-1)
+  const text = replyParts.filter(part => part.kind === 'text' && typeof part.value === 'string').map(part => part.value).join('\n')
+  const reply = evaluationReplySchema.parse(structured?.value ?? JSON.parse(text))
   const tools:ToolObservation[]=[]
   for(const event of events) {
     if(event.type!=='call.requested')continue

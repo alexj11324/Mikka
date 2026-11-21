@@ -5,7 +5,7 @@ import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { registeredTask } from './helpers/registered-task'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -19,8 +19,8 @@ test('personal resources stay private through sharing and audited split-database
   const suffix = randomUUID().replaceAll('-', '')
   const appName = `privacy_app_${suffix}_e2e`, wsName = `privacy_ws_${suffix}_e2e`
   const admin = new Pool({ connectionString: url, max: 1 })
-  await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-  await admin.query(`CREATE DATABASE "${wsName}" TEMPLATE template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, wsName, 'template0')
   const appURL = new URL(url!), wsURL = new URL(url!)
   appURL.pathname = `/${appName}`; wsURL.pathname = `/${wsName}`
   const app = new Pool({ connectionString: appURL.toString(), max: 5 })

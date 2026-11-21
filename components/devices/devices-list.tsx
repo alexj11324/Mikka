@@ -3,8 +3,8 @@
 import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from '@/components/icons'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import type { DeviceView } from '@/app/actions/agents'
 import { HarnessLabel } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -240,13 +240,16 @@ function DeviceGroup({ title, devices, onChanged, onReconnect }: { title: string
 /** 设置 › 设备's page as the open-source UI draws it; the slot settings-devices' default. */
 export function DevicesPageView({ devices, listError, onAdd, onChanged, onReconnect, localSetup }: SettingsDevicesProps) {
   const t = useTranslations('Devices')
+  const common = useTranslations('Common')
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
       <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={onAdd}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
     {localSetup}
-    {listError && <FieldError className="text-xs">{t('listError')}</FieldError>}
+    {listError && <FieldError className="flex items-center gap-2 text-xs">{t('listError')}
+      <Button size="sm" variant="secondary" onClick={onChanged}>{common('retry')}</Button>
+    </FieldError>}
     {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
     {!devices ? !listError && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
       : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>

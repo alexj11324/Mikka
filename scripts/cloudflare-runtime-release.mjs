@@ -5,20 +5,28 @@ import { dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { childEnvironment } from './cloudflare-ci.mjs'
 import { command, releaseId, validateArtifacts } from './cloudflare-native-oci.mjs'
-import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { actionsMikkaRepository, hasGitHubOrigin, officialMikkaRepository } from './cloudflare-source.mjs'
+import { isValidDeploymentId } from '../lib/deployment-id.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const sha = /^[a-f0-9]{40}$/
 const digest = /^sha256:[a-f0-9]{64}$/
-const workflows = { eve: 'cloudflare-eve-image.yml', task: 'cloudflare-task-sandbox.yml' }
-const repositories = { eve: 'mikka-eve', task: 'mikka-native-task' }
+const workflows = { eve: 'cloudflare-eve-image.yml', task: 'cloudflare-task-sandbox.yml', litellm: 'cloudflare-litellm-image.yml' }
+const repositories = { eve: 'mikka-eve', task: 'mikka-native-task', litellm: 'mikka-litellm' }
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
 const output = (bin, args, options) => command(bin, args, { ...options, encoding: 'utf8' }).trim()
 
+function maintenanceRelease(value, apiRelease) {
+  assert.ok(isValidDeploymentId(value))
+  assert.match(value, /^[a-f0-9]{7,12}-[1-9][0-9]*-[1-9][0-9]*$/)
+  assert.notEqual(value, apiRelease)
+  return value
+}
+
 export function releaseIdentity(env, workload, api) {
   assert.ok(Object.hasOwn(workflows, workload))
-  assert.equal(env.GITHUB_REPOSITORY, 'alexj11324/Mikka')
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699')
+  const repository = actionsMikkaRepository(env)
+  assert.ok(repository, 'Official Mikka workflow repository required')
   assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch')
   assert.equal(env.GITHUB_REF, 'refs/heads/main')
   assert.match(env.GITHUB_SHA ?? '', sha)
@@ -26,14 +34,13 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(env.GITHUB_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
-  assert.equal(env.GITHUB_WORKFLOW_REF, 'alexj11324/Mikka/.github/workflows/' + workflows[workload] + '@' + env.GITHUB_REF)
+  assert.equal(env.GITHUB_WORKFLOW_REF, repository + '/.github/workflows/' + workflows[workload] + '@' + env.GITHUB_REF)
   for (const value of [env.GITHUB_RUN_ID, env.GITHUB_RUN_ATTEMPT]) assert.match(value ?? '', /^[1-9][0-9]*$/)
   assert.equal(api.version, 1)
   assert.equal(api.provider, 'github-actions')
-  assert.equal(api.repository, 'alexj11324/Mikka')
-  assert.equal(api.repositoryId, '1427517699')
+  assert.ok(officialMikkaRepository(api.repository, api.repositoryId), 'Original API build repository required')
   assert.equal(api.ref, 'refs/heads/main')
-  assert.equal(api.workflowRef, 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main')
+  assert.equal(api.workflowRef, api.repository + '/.github/workflows/cloudflare-api-image.yml@refs/heads/main')
   assert.equal(api.workflowSha, api.publicSha)
   assert.equal(api.actor, 'alexj11324')
   assert.equal(api.actorId, '183887963')
@@ -61,12 +68,25 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(api.publicBuildSettings.publication, 'registry-only')
   assert.match(api.image, /^registry\.cloudflare\.com\/[a-f0-9]{32}\/mikka-api@sha256:[a-f0-9]{64}$/)
   assert.equal(api.image.split('@')[1], api.digest)
-  assert.deepEqual(api.overlayCheckout, { repository: 'alexj11324/mikka-hosted-ui', requestedSha: api.privateSha, actualSha: api.privateSha })
+  assert.ok(['alexj11324/mikka-hosted-ui', 'aspectly-labs/mikka-hosted-ui'].includes(api.overlayCheckout?.repository))
+  assert.deepEqual(api.overlayCheckout, { repository: api.overlayCheckout.repository, requestedSha: api.privateSha, actualSha: api.privateSha })
   assert.equal(api.offlineVerification, 'buildkit-network-none')
+  const maintenance = env.MAINTENANCE_OWNER_RELEASE
+  if (maintenance) assert.equal(workload, 'eve')
   return { version: 1, provider: 'github-actions', repository: env.GITHUB_REPOSITORY, workload, driverSource:env.GITHUB_SHA,
     publicSha: api.publicSha, overlaySha: api.privateSha, apiProvider: api.provider, apiRunId: api.runId,
     apiRunAttempt: api.runAttempt, apiBuildId: api.buildId, apiImage: api.image,
-    release: api.release, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT }
+    release: api.release, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT,
+    ...(maintenance ? { runtimeRelease: maintenanceRelease(maintenance, api.release) } : {}) }
+}
+
+export function runtimeImageIdentity(receipt) {
+  return {
+    tag: receipt.release + (receipt.runtimeRelease ? '-maintenance-' + receipt.runtimeRelease : ''),
+    labels: { 'org.opencontainers.image.revision': receipt.publicSha, 'com.mikka.overlay': receipt.overlaySha,
+      'com.mikka.release': receipt.release,
+      ...(receipt.runtimeRelease ? { 'com.mikka.runtime-release': receipt.runtimeRelease } : {}) },
+  }
 }
 
 export function checkedResource(resource) {
@@ -170,7 +190,7 @@ function identity(env, workload) {
   const receipt = releaseIdentity(env, workload, api)
   const tools = { ...childEnvironment(env, receipt.publicSha, receipt.overlaySha), DOCKER_CONFIG: env.DOCKER_CONFIG }
   assert.equal(output('git', ['rev-parse', 'HEAD'], { env: tools, stage: 'RUNTIME_SOURCE' }), receipt.publicSha)
-  assert.ok(hasGitHubOrigin(output('git', ['remote', 'get-url', 'origin'], { env: tools, stage: 'RUNTIME_ORIGIN' }), 'alexj11324/Mikka'))
+  assert.ok(hasGitHubOrigin(output('git', ['remote', 'get-url', 'origin'], { env: tools, stage: 'RUNTIME_ORIGIN' }), env.GITHUB_REPOSITORY))
   assert.equal(output('git', ['diff', '--name-only', 'HEAD', '--'], { env: tools, stage: 'RUNTIME_CLEAN_SOURCE' }), '')
   output('git', ['fetch', '--no-tags', 'origin', 'main'], { env: tools, stage: 'RUNTIME_MAIN_HISTORY' })
   output('git', ['merge-base', '--is-ancestor', receipt.publicSha, 'FETCH_HEAD'], { env: tools, stage: 'RUNTIME_REVIEWED_SOURCE' })
@@ -207,6 +227,7 @@ async function prepare(env, workload) {
   }
   await githubEnvironment(env, { MIKKA_BUILD_REVISION: receipt.publicSha, NEXT_PUBLIC_MIKKA_BUILD: receipt.publicSha,
     MIKKA_UI_OVERLAY_SHA: receipt.overlaySha, MIKKA_DEPLOYMENT_ID: receipt.release,
+    MIKKA_RUNTIME_RELEASE: receipt.runtimeRelease ?? '', RUNTIME_IMAGE_TAG: runtimeImageIdentity(receipt).tag,
     MIKKA_EDITION: 'cloud', MIKKA_DEPLOYMENT_STAGE: 'production', MIKKA_DEPLOYMENT_ENVIRONMENT: 'production', NITRO_PRESET: 'node-server' })
 }
 
@@ -215,23 +236,24 @@ export async function packagePrebuiltEve(env, work = root) {
   assert.equal(app.revision, env.MIKKA_BUILD_REVISION)
   assert.equal(app.overlaySha, env.MIKKA_UI_OVERLAY_SHA)
   assert.equal(app.deploymentId, env.MIKKA_DEPLOYMENT_ID)
+  const release = env.MIKKA_RUNTIME_RELEASE ? maintenanceRelease(env.MIKKA_RUNTIME_RELEASE, app.deploymentId) : app.deploymentId
   await verifyResources(join(work, '.output'), app.resources)
   const { packageCloudflareEveHost } = await import('./package-cf-eve-host.mjs')
-  return packageCloudflareEveHost({ root: work, sourceSha: app.revision, uiSha: app.overlaySha, releaseId: app.deploymentId, uiSource: 'official' })
+  return packageCloudflareEveHost({ root: work, sourceSha: app.revision, uiSha: app.overlaySha, releaseId: release, uiSource: 'official' })
 }
 
 async function publish(env, workload) {
   const { api, receipt, tools } = identity(env, workload)
-  const tag = repositories[workload] + ':' + receipt.release
+  const { tag: imageTag, labels } = runtimeImageIdentity(receipt)
+  const tag = repositories[workload] + ':' + imageTag
   const image = JSON.parse(output('docker', ['image', 'inspect', tag, '--format', '{{json .}}'], { env: tools, stage: 'RUNTIME_TESTED_IMAGE' }))
   assert.match(env.RUNTIME_TESTED_IMAGE_ID ?? '', digest)
   assert.equal(image.Id, env.RUNTIME_TESTED_IMAGE_ID)
-  const labels = { 'org.opencontainers.image.revision': receipt.publicSha, 'com.mikka.overlay': receipt.overlaySha, 'com.mikka.release': receipt.release }
   for (const [name, value] of Object.entries(labels)) assert.equal(image.Config.Labels[name], value)
   const name = api.image.split('/mikka-api@')[0] + '/' + repositories[workload]
-  command('docker', ['tag', image.Id, name + ':' + receipt.release], { env: tools, stage: 'RUNTIME_REGISTRY_TAG' })
-  command('docker', ['push', name + ':' + receipt.release], { env: tools, stage: 'RUNTIME_REGISTRY_PUSH' })
-  const refs = JSON.parse(output('docker', ['image', 'inspect', name + ':' + receipt.release, '--format', '{{json .RepoDigests}}'], { env: tools, stage: 'RUNTIME_REGISTRY_DIGEST' }))
+  command('docker', ['tag', image.Id, name + ':' + imageTag], { env: tools, stage: 'RUNTIME_REGISTRY_TAG' })
+  command('docker', ['push', name + ':' + imageTag], { env: tools, stage: 'RUNTIME_REGISTRY_PUSH' })
+  const refs = JSON.parse(output('docker', ['image', 'inspect', name + ':' + imageTag, '--format', '{{json .RepoDigests}}'], { env: tools, stage: 'RUNTIME_REGISTRY_DIGEST' }))
   const matches = [...new Set(refs.filter(value => value.startsWith(name + '@')))]
   assert.equal(matches.length, 1)
   const reference = matches[0]

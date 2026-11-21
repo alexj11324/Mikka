@@ -6,7 +6,7 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { coordinatorHistory, retryCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
@@ -24,7 +24,8 @@ import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { CircleAlert, CircleHelp } from 'lucide-react'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { CircleAlert, CircleHelp } from '@/components/icons'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
@@ -37,7 +38,7 @@ import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { CoordinatorContextUsage } from './coordinator-context-usage'
-import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { isWebChatOffline, useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { useCoordinatorSubmit, type CoordinatorMessageContext } from './use-coordinator-submit'
 import { useCoordinatorAgent } from './use-coordinator-agent'
 import { activeTurn } from 'eve/events'
@@ -59,12 +60,13 @@ import { noteChipText } from '@/lib/browser/note'
 import { PERSON_BUBBLE } from '@/components/slots/chat-message'
 import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
-import { runThreadName } from '@/lib/coordinator/citations'
+import { runThreadName, runTitle } from '@/lib/coordinator/citations'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
+import { VisibleReadEnd } from '@/components/workspace/visible-read-end'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
 import { useArrivals } from '@/lib/hooks/use-arrivals'
 import { openArtifact as openArtifactWindow } from '@/components/workspace/workspace-navigation'
@@ -80,6 +82,7 @@ import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
 import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/components/browser/browser-notes'
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
+import { usePaywall } from '@/components/billing/paywall'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { chatBalanceRefusal } from '@/lib/chat-balance'
@@ -95,7 +98,7 @@ import { RetryReplyButton } from './retry-reply-button'
 import { COMPOSER_NOTICE } from './composer-notice'
 
 /** A new message's enter: a short fade (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md). */
-const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
+const ENTER = 'animate-in fade-in-0 duration-(--motion-base) motion-reduce:animate-none'
 
 /**
  * The band under the header pill (top 12px, 36px tall): nothing shows down to 56px, 8px below the pill, then rows fade
@@ -110,7 +113,7 @@ const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparen
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
 
 /** A chat read and when it was asked for, which anchors its live deadline (lib/live/list-read.ts). */
-type PersonalChatSend = ChatSubmission & { context: CoordinatorMessageContext }
+type PersonalChatSend = ChatSubmission & { context: CoordinatorMessageContext; turnPolicy?: 'queue' | 'steer' }
 
 type ChatRead = Chat & { requestedAt?: number }
 /** Pushes closer together than this share one read; the stream shows a turn's words meanwhile. */
@@ -169,23 +172,25 @@ function FollowSentMessages({ count }: { count: number | null }) {
 /** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-82). */
 const showThread = ({ runId }: { runId: string }) => openThread(runId)
 
-/** Starting goals offered in an empty Coordinator chat (coordinator's choice, 2026-11-08). */
-const STARTERS = ['fixBug', 'reviewPullRequests', 'summarizeToday', 'dailyBriefing'] as const
-
 function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, pill = true }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string
   /** A floating title pill sits over the chat on wide screens (ConversationPill): the layer's screen starts below it. */
   pill?: boolean }) {
   const t = useTranslations('Coordinator')
+  const threadCopy = useTranslations('IssueThreads')
   const cloudErrors = useTranslations('RunErrors')
   const tNav = useTranslations('Nav')
   const tCommon = useTranslations('Common')
   const botId = bot?.id ?? null
+  // Send-time paywall: a message on Mikka 额度 with nothing to pay is not sent (decision 2026-11-15-1900).
+  const paywall = usePaywall(botId)
   const name = bot?.name ?? t('label')
   const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { id: bot.id, color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const { cache, mutate: mutateAll } = useSWRConfig()
-  const selectedWorkspaceId = useLiveScope()?.workspaceId
+  const liveScope = useLiveScope()
+  const selectedWorkspaceId = liveScope?.workspaceId
+  const owner = userId ?? liveScope?.ownerId
   const reconnectStream = useRef<() => void>(() => {})
   // A read names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
   const shown = useRef<{ chat?: ChatRead; metadataStale: boolean; fullReadAt: number }>({ metadataStale: false, fullReadAt: -Infinity })
@@ -269,14 +274,32 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   if (mounted && data && initialScroll.current.following === null) initialScroll.current.following = following
   const startAtEnd = initialScroll.current.following ?? following
   const transcript = useViewScroll<HTMLDivElement>(`${stateKey}:messages`, !!data, !startAtEnd)
-  const [sending, setSending] = useState(false)
+  const [sends, setSends] = useState(0)
+  const sending = sends > 0
+  const [turnPolicy, setTurnPolicy] = useViewState<'queue' | 'steer'>('eve:turn-policy', 'queue')
+  const turnOptions = working && !resuming ? <NativeSelect size="sm" aria-label={threadCopy('deliveryMode')} value={turnPolicy}
+    onChange={event => setTurnPolicy(event.target.value === 'steer' ? 'steer' : 'queue')}>
+    <NativeSelectOption value="queue">{threadCopy('deliveryModes.queue')}</NativeSelectOption>
+    <NativeSelectOption value="steer">{threadCopy('deliveryModes.steer')}</NativeSelectOption>
+  </NativeSelect> : null
   // Words picked from a reply with 引用: they wait above the draft and head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`${stateKey}:quote`, null)
   function quoteReply(text: string) {
     setReplyQuote(text)
     inputRef.current?.focus()
   }
-  const deliveryInFlight = useRef(false)
+  // Why the last send did not go, for a card that answers through this chat (agent-interaction.tsx `answer`).
+  const lastSendFailure = useRef<string | undefined>(undefined)
+  const draftInFlight = useRef(new Set<string>())
+  const admission = useRef(Promise.resolve())
+  const waitingAdmissions = useRef(new Map<string, { cancelled: boolean }>())
+  function cancelWaitingAdmission(id: string) {
+    const entry = waitingAdmissions.current.get(id)
+    if (!entry) { toast.error(threadCopy('deliveryTooLate')); return }
+    entry.cancelled = true
+    waitingAdmissions.current.delete(id)
+    delivery.setRows(rows => rows.filter(row => row.id !== id))
+  }
   const delivery = useChatDelivery<PersonalChatSend>(stateKey, t('sendUncertain'))
   const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
   const { submit, failureMessage } = useCoordinatorSubmit(stream)
@@ -310,6 +333,14 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   const received = useMemo(() => new Set(items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : [])), [items])
   const localMessages = delivery.rows.filter(row => !received.has(row.id))
+  const waitingRows = delivery.rows.filter(row => waitingAdmissions.current.has(row.id))
+  const queuedNotice = working && waitingRows.length > 0 ? <div className="flex flex-col gap-1" aria-live="polite">
+    {waitingRows.map(row => <div key={row.id} className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-xs">{threadCopy('deliveryQueued')}</span>
+      <span className="min-w-0 flex-1 truncate text-sm">{row.text}</span>
+      <Button type="button" size="xs" variant="ghost" onClick={() => cancelWaitingAdmission(row.id)}>{threadCopy('deliveryCancel')}</Button>
+    </div>)}
+  </div> : null
   useEffect(() => {
     if (delivery.rows.some(row => received.has(row.id))) delivery.setRows(current => current.filter(row => !received.has(row.id)))
   }, [received, delivery.rows, delivery.setRows])
@@ -399,6 +430,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     {welcomeRequestFailed && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="welcome-request">{welcomeError}</AlertTitle><Button variant="ghost" size="sm" disabled={welcoming} onClick={() => { void requestWelcome(false, true) }}>{tCommon('retry')}</Button></Alert>}
     {cloudCode && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="cloud">{cloudErrors(`${cloudCode}.default`)}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><CloudFailureAction code={cloudCode} fallback={retry} /></span></Alert>}
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
+    {paywall.dialog}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
     {apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="balance">{t('apiBalance')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button></span></Alert>}
     {data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
@@ -430,9 +462,9 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     thread: id => {
       const run = sources?.[id]
       if (run?.kind !== 'run') return { title: t('citation.run') }
-      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${run.name || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
+      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${runTitle(run) || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
     },
-  }, name)
+  }, name, owner && selectedWorkspaceId ? JSON.stringify([owner, selectedWorkspaceId, botId]) : null)
   const openIssue = work.work ? work.openTask : onOpenIssue
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue: openIssue }), [sources, previews, openIssue])
   // A live reply cites tasks and threads the stored chat may not know yet; they are looked up as it streams.
@@ -472,36 +504,63 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
 
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
   async function deliver(text: string, withNotes = false, retryOf?: number, previous?: PersonalChatSend, releaseDraft?: () => void): Promise<'sent' | 'failed' | 'skipped'> {
-    if (!text || sending || resuming || deliveryInFlight.current || unavailable) return 'skipped'
+    if (!text || resuming || unavailable) return 'skipped'
+    // A double-click can enter twice before React paints the emptied draft.
+    // A different draft has its own journal ID and may enter Eve immediately.
+    const draftKey = JSON.stringify([text, retryOf ?? null])
+    if (!previous && draftInFlight.current.has(draftKey)) return 'skipped'
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     const command = previous ?? { id: crypto.randomUUID(), at: Date.now(), text,
+      ...(working ? { turnPolicy } : {}),
       context: { quote: embedded?.quote, botId, notes, expectedWorkspaceId: selectedWorkspaceId ?? undefined, expectedOwnerId: userId ?? liveOwner ?? undefined,
         ...(retryOf !== undefined ? { retryOf } : {}) } }
     if (!delivery.begin(command)) return 'skipped'
     if (command.context.retryOf !== undefined) { const position = command.context.retryOf; setRetrying(current => new Set(current).add(position)) }
-    deliveryInFlight.current = true
-    setSending(true)
+    if (!previous) draftInFlight.current.add(draftKey)
+    const prior = admission.current
+    let advance!: () => void
+    admission.current = new Promise<void>(resolve => { advance = resolve })
+    const entry = { cancelled: false }
+    waitingAdmissions.current.set(command.id, entry)
+    setSends(count => count + 1)
     releaseDraft?.()
-    const fail = (message: string) => { delivery.finish(command.id, { error: message }); return 'failed' as const }
+    const fail = (message: string) => { lastSendFailure.current = message; delivery.finish(command.id, { error: message }); return 'failed' as const }
     try {
-      if (navigator.onLine === false) return fail(t('sendOffline'))
-      if (!await checkPageBuildBeforeAction()) return fail(t('sendUpdateRequired'))
-      const outcome = await submit(command.text, command.context, command.id)
+      await prior
+      if (entry.cancelled) return 'skipped'
+      if (isWebChatOffline()) return fail(t('sendOffline'))
+      const currentBuild = await checkPageBuildBeforeAction()
+      if (entry.cancelled) return 'skipped'
+      if (!currentBuild) return fail(t('sendUpdateRequired'))
+      waitingAdmissions.current.delete(command.id)
+      const outcome = await submit(command.text, command.context, command.id, command.turnPolicy)
       if (outcome.kind !== 'accepted') return fail(failureMessage(outcome) ?? t('sendUncertain'))
       delivery.finish(command.id, {})
       if (command.context.notes) browser?.removeMany(command.context.notes.map(note => note.n))
       void mutate().catch(() => undefined)
       setLocalSend(current => ({ key: stateKey, count: current.key === stateKey ? current.count + 1 : 1 }))
       return 'sent'
-    } catch { return fail(t('sendUncertain')) } finally { deliveryInFlight.current = false; setSending(false) }
+    } catch { return fail(t('sendUncertain')) } finally {
+      waitingAdmissions.current.delete(command.id)
+      advance()
+      if (!previous) draftInFlight.current.delete(draftKey)
+      setSends(count => count - 1)
+    }
   }
   /** Sends `text`; false if it did not go. */
   async function post(text: string, withNotes = false) {
     return await deliver(text, withNotes) === 'sent'
   }
+  /** Sends a card's answer and says why it did not go, in the words the failed message itself shows. */
+  async function answer(text: string): Promise<{ sent: true } | { sent: false; reason?: string }> {
+    lastSendFailure.current = undefined
+    const outcome = await deliver(text)
+    return outcome === 'sent' ? { sent: true } : { sent: false, reason: outcome === 'failed' ? lastSendFailure.current : undefined }
+  }
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
+    if (text && await paywall.blocked({ model: true })) return
     const id = suggestion.current
     const result = text ? await deliver(withReplyQuote(text, replyQuote), true, undefined, undefined, () => {
       setDraft('')
@@ -568,6 +627,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       const artifacts = item.artifacts.flatMap(id => data?.artifacts[id] ? [{ id, name: data.artifacts[id].title }] : [])
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
       if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
+      if (!live && item.position === unreadItems.findLast(row => row.reportable)?.position)
+        parts.push({ kind: 'text', text: '', node: <VisibleReadEnd onSeen={unread.reportEnd} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
         actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}>
           <CopyAction text={replyCopyText(item.text)} />
@@ -586,10 +647,9 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [liveFailurePart] })
     const empty = data && !items.length && !stream.replies.length && !data.error && !welcomeRequestFailed ? (data.enabled
       ? <p role="status">{tNav('writingWelcome')}</p>
-      : <div className="flex flex-col gap-3"><p>{t('empty', { name })}</p>
-        {!bot && <div className="flex flex-wrap gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => setDraft(t(`starters.${key}`))}>{t(`starters.${key}`)}</Button>)}</div>}</div>) : undefined
+      : <p>{t('empty', { name })}</p>) : undefined
     const notices = <>
-      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
+      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{tCommon('retry')}</Button></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
       <EveInteractions agent={stream} />
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
@@ -604,20 +664,20 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       </p>}
       <PendingActions />
     </>
-    return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+    return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()), answer: prompt => answer(prompt.trim()) }}>
       {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. Without one (the
           hosted shell owns the header and the thread names itself) no band is left. */}
       <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col', pill && 'md:pt-14')}>
         <ThreadScreen botId={botId} name={name} mark={avatar('pill')} entries={data || localMessages.length ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
-          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: sending || resuming, editableWhileSending: sending || resuming, onSubmit: () => { void send() },
+          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: resuming, editableWhileSending: resuming, onSubmit: () => { void send() },
             attachmentScope: data?.botId ? { kind: 'bot', id: data.botId } : undefined, running: working && !stopping }}
           pending={[
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
             ...(browser?.notes ?? []).map(note => ({ id: `note-${note.n}`, name: noteChipText(note), meta: tNavAll('Editor.richText.annotate'), onRemove: () => browser?.remove(note.n) })),
           ]}
-          notices={<>{notices}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
+          notices={<>{notices}{turnOptions}{queuedNotice}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
           questions={factory.questions.map(question => {
             const reason = factoryQuestionUnavailable(question.status)
             return { id: question.questionId, revision: question.reference.questionRevision, question: question.question, task: question.task, recordedAnswer: question.recordedAnswer, unavailable: reason ? actionError(reason) : undefined, taskId: question.issueId ?? undefined,
@@ -636,7 +696,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     </AgentInteractionContext></AgentThemeProvider>
   }
 
-  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()), answer: prompt => answer(prompt.trim()) }}>
   {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
       reaches past the column is clipped here instead of scrolling the whole page sideways. */}
   <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip', CHAT_SURFACE)}>
@@ -664,13 +724,6 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <div className="m-auto flex flex-col items-center gap-3">
                 <p className="text-sm text-muted-foreground">{t('empty', { name })}</p>
-                {/* The Coordinator's first chat offers a starting move: a chip fills the composer, the person sends it (states-05). */}
-                {!bot && !embedded && <div className="flex max-w-md flex-wrap justify-center gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => {
-                  const text = t(`starters.${key}`)
-                  setDraft(text)
-                  const input = inputRef.current
-                  if (input) { input.focus(); input.setSelectionRange(text.length, text.length) }
-                }}>{t(`starters.${key}`)}</Button>)}</div>}
               </div>)}
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
@@ -721,7 +774,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
                   {row.phase === 'failed' && <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />}
-                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
+                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent size="roomy" className="flex flex-col gap-1.5 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
                 </span>
                 <span role={row.phase === 'failed' ? 'alert' : 'status'} className="flex items-center justify-end gap-1 self-end text-xs text-muted-foreground">
                   {row.phase === 'sending' ? tNavAll('HostedThread.sending') : row.error}
@@ -746,7 +799,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
-      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
+      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{tCommon('retry')}</Button></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
       <EveInteractions agent={stream} />
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
@@ -762,7 +815,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
       </p>}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || resuming} editableWhileSending={sending || resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
+      {turnOptions}{queuedNotice}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={resuming} editableWhileSending={resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
         model={<div className="flex min-w-0 items-center gap-1">
           <BotModelPicker botId={botId ?? null} running={working || sending} />

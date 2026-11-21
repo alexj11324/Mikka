@@ -66,6 +66,43 @@ test('Organization invitations grant only a verified Member without inheriting W
     { organizationId: secondOrganizationId, workspaceId: secondWorkspaceId },
   ])
 
+  await t.test('only a verified recipient can suppress their invitation email while keeping their pending invitation', async t => {
+    const { readPreferences, savePreferences } = await import('../lib/preferences')
+    const { sendOrganizationInvitationEmails } = await import('../lib/governance/organization-invitation-mail')
+    const mailOrgId = (await organization.createOrganization(owner, { name: 'Invitation email preferences' })).id
+    t.after(async () => { await check.query('delete from mikka_organizations where id=$1', [mailOrgId]) })
+    const unknownEmail = randomUUID() + '@org.example.invalid'
+    const emails = [invitee.email, outsider.email, unverified.email, unknownEmail]
+    const sent: string[] = []
+    const deliver = async (message: { to: string }) => { sent.push(message.to) }
+    const origin = 'https://app.example.test'
+    const create = () => invite.issueOrganizationInvitations(mailOrgId, owner.id, { emails })
+    const revoke = async (issued: Awaited<ReturnType<typeof create>>) => {
+      for (const outcome of issued.outcomes) {
+        assert.ok(outcome.created)
+        await invite.revokeOrganizationInvitation(mailOrgId, owner.id, { invitationId: outcome.id })
+      }
+    }
+    assert.equal((await readPreferences(invitee.id)).organizationInvitationEmails, true)
+    const issued = await create()
+    // Change the preference after the issue transaction, before the delivery job runs.
+    await savePreferences(invitee.id, { organizationInvitationEmails: false })
+    await savePreferences(unverified.id, { organizationInvitationEmails: false })
+    assert.deepEqual(await sendOrganizationInvitationEmails(issued.outcomes, origin, deliver), { acceptedByProvider: 3, failed: 0 })
+    assert.deepEqual(sent.sort(), [outsider.email, unverified.email, unknownEmail].sort())
+    assert.equal((await invite.listReceivedOrganizationInvitations(invitee)).invitations.length, 1)
+    assert.equal((await readPreferences(outsider.id)).organizationInvitationEmails, true)
+    const duplicates = await create()
+    assert.deepEqual(await sendOrganizationInvitationEmails(duplicates.outcomes, origin, deliver), { acceptedByProvider: 0, failed: 0 })
+    await revoke(issued)
+    await savePreferences(invitee.id, { organizationInvitationEmails: true })
+    const reissued = await create()
+    sent.length = 0
+    assert.deepEqual(await sendOrganizationInvitationEmails(reissued.outcomes, origin, deliver), { acceptedByProvider: 4, failed: 0 })
+    assert.deepEqual(sent.sort(), [...emails].sort())
+    await revoke(reissued)
+  })
+
   await t.test('any member can issue only Member links; duplicate and pending do not rotate the bearer', async () => {
     await assert.rejects(invite.issueOrganizationInvitations(organizationId, outsider.id, { emails: [invitee.email] }),
       (error: unknown) => (error as { detail?: string }).detail === 'access_denied')
@@ -88,6 +125,7 @@ test('Organization invitations grant only a verified Member without inheriting W
   await t.test('acceptance requires matching verified email and is single-use under concurrency', async () => {
     const original = await invite.issueOrganizationInvitations(organizationId, sender.id, { emails: [unverified.email] })
     const token = original.outcomes[0].created ? original.outcomes[0].path.split('/').at(-1)! : ''
+    await assert.rejects(invite.listReceivedOrganizationInvitations(unverified), { detail: 'access_denied' })
     await assert.rejects(invite.acceptOrganizationInvitation({ token }, unverified),
       (error: unknown) => (error as { detail?: string }).detail === 'access_denied')
     const denied = await invite.issueOrganizationInvitations(organizationId, sender.id, { emails: [invitee.email] })
@@ -104,16 +142,29 @@ test('Organization invitations grant only a verified Member without inheriting W
     const fresh = await invite.issueOrganizationInvitations(organizationId, sender.id, { emails: [invitee.email] })
     const newToken = fresh.outcomes[0].created ? fresh.outcomes[0].path.split('/').at(-1)! : ''
     assert.ok(newToken)
+    const received = (await invite.listReceivedOrganizationInvitations(invitee)).invitations
+    assert.deepEqual(received.map(row => row.id), [first.id])
+    assert.equal(received[0].organizationName, 'Member-only invitation test')
+    assert.equal(received[0].organizationId, organizationId)
+    assert.equal(received[0].inviterName, sender.name)
+    const [stored] = await workspaceDb.select({ createdAt: organizationInvitations.createdAt })
+      .from(organizationInvitations).where(eq(organizationInvitations.id, first.id))
+    assert.deepEqual(received[0].invitedAt, stored.createdAt)
+    assert.deepEqual(Object.keys(received[0]).sort(), ['expiresAt', 'id', 'invitedAt', 'inviterName', 'organizationId', 'organizationName'])
+    assert.deepEqual((await invite.listReceivedOrganizationInvitations(outsider)).invitations, [])
+    await assert.rejects(invite.listReceivedOrganizationInvitations({ ...outsider, email: invitee.email }), { detail: 'access_denied' })
+    await assert.rejects(invite.acceptOrganizationInvitation({ invitationId: first.id }, outsider), { detail: 'invalid_request' })
     await assert.rejects(invite.acceptOrganizationInvitation({ token: newToken }, outsider),
       (error: unknown) => (error as { detail?: string }).detail === 'invalid_request')
     const before = await workspaceDb.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId))
     const beforeSecond = await workspaceDb.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, secondWorkspaceId))
     const attempts = await Promise.allSettled([
-      invite.acceptOrganizationInvitation({ token: newToken }, invitee),
+      invite.acceptOrganizationInvitation({ invitationId: first.id }, invitee),
       invite.acceptOrganizationInvitation({ token: newToken }, invitee),
     ])
     assert.equal(attempts.filter(row => row.status === 'fulfilled').length, 1)
     assert.equal(attempts.filter(row => row.status === 'rejected').length, 1)
+    assert.deepEqual((await invite.listReceivedOrganizationInvitations(invitee)).invitations, [])
     const [member] = await workspaceDb.select().from(organizationMembers)
       .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, invitee.id)))
     assert.equal(member.role, 'member')
@@ -184,6 +235,8 @@ test('Organization invitations grant only a verified Member without inheriting W
     assert.equal(reissued.status, 'pending', 'a rejected old bearer must not consume its replacement')
     await workspaceDb.update(organizationInvitations).set({ expiresAt: new Date(0) })
       .where(eq(organizationInvitations.id, expired.outcomes[0].id))
+    assert.deepEqual((await invite.listReceivedOrganizationInvitations(outsider)).invitations, [])
+    await assert.rejects(invite.acceptOrganizationInvitation({ invitationId: expired.outcomes[0].id }, outsider), { detail: 'invalid_request' })
     await assert.rejects(invite.acceptOrganizationInvitation({
       token: expired.outcomes[0].path.split('/').at(-1)!,
     }, outsider))
@@ -195,6 +248,7 @@ test('Organization invitations grant only a verified Member without inheriting W
     if (!record.created) throw new Error('fixture invitation missing')
     await workspaceDb.update(organizationMembers).set({ status: 'suspended' })
       .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, other.id)))
+    assert.deepEqual((await invite.listReceivedOrganizationInvitations(outsider)).invitations, [])
     await assert.rejects(invite.acceptOrganizationInvitation({ token: record.path.split('/').at(-1)! }, outsider))
     await workspaceDb.update(organizationMembers).set({ status: 'active' })
       .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, other.id)))

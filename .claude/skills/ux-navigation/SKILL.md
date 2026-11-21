@@ -17,7 +17,7 @@ This is a **generative** skill. The default failure modes: **pattern-by-habit** 
 2. **Apply the always-true core** — system layering, wayfinding signals, visible essentials, interaction basics.
 3. **Surface the pattern decisions** (top bar vs. sidebar, hamburger, mega menu, tabs, breadcrumbs, pagination vs. infinite scroll) with trade-offs.
 
-Then it **hands off to `ux-heuristics-audit`, `ux-accessibility-audit`, `ux-aesthetics-audit`, and `ux-microcopy-audit`** — and, as a multi-screen structure, to `ux-information-architecture-audit`.
+Then it **hands off to `ux-heuristics`, `ux-accessibility-audit`, `ux-aesthetics-audit`, and `ux-microcopy-audit`** — and, as a multi-screen structure, to `ux-information-architecture-audit`.
 
 ---
 
@@ -96,7 +96,7 @@ Ask if not known; state the assumption if proceeding without an answer:
 
 After generating or revising, hand the result to the audit lenses rather than declaring it done. These are **candidate** lenses — posture is set by `docs/orchestration-policy.md`, or route the whole thing through `ux-design-review`. Here, **`heuristics` and `microcopy` are Tier A (auto-run); `accessibility`, `aesthetics`, `information-architecture`, and `mobile-responsiveness` are Tier B (offered)** — under an existing design system `aesthetics` is suppressed and `accessibility` narrows to usage; `mobile-responsiveness` applies only on mobile. If the user invoked this skill for one specific thing, respect that scope.
 
-- **`ux-heuristics-audit`** *(Tier A)* — visibility of system status (selected states), match to mental models, consistency, recognition over recall.
+- **`ux-heuristics`** *(Tier A)* — visibility of system status (selected states), match to mental models, consistency, recognition over recall.
 - **`ux-accessibility-audit`** *(Tier B — offer; narrow under a design system)* — keyboard operability of menus, touch targets, contrast, hover-dependence, focus order through nav.
 - **`ux-aesthetics-audit`** *(Tier B — offer; suppress under a design system)* — header/menu density, spacing rhythm, whether chrome overwhelms content.
 - **`ux-microcopy-audit`** *(Tier A)* — section/tab/breadcrumb label clarity and conciseness, descriptive titles.

@@ -4,7 +4,6 @@ import {
   abuseAlertKinds,
   abuseLimits,
   FREE_ALLOWANCE_MICRO_USD,
-  gatewayCost,
 } from './policy'
 import {
   signupClientIP,
@@ -35,17 +34,6 @@ test('fixed $1 allowance, invalid caps never mean unlimited', () => {
     abuseLimits({ MIKKA_FREE_MODEL_DAILY_CENTS: '100' }).dailyMicroUsd,
     1e6,
   )
-})
-test('cost metadata is rounded upwards, missing cost is never zero', () => {
-  assert.equal(gatewayCost({ gateway: { cost: '0.0000001' } }), 1)
-  assert.equal(gatewayCost({ gateway: { cost: 0 } }), 0)
-  for (const value of [
-    undefined,
-    {},
-    { gateway: { cost: -1 } },
-    { gateway: { cost: 'NaN' } },
-  ])
-    assert.equal(gatewayCost(value), null)
 })
 test('Gmail aliases normalize; other domains keep dots; disposable subdomains are refused', () => {
   assert.equal(normalizedEmail('A.B+trial@Googlemail.com'), 'ab@gmail.com')

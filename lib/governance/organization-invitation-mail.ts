@@ -1,5 +1,6 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
+import { pool } from '@/lib/db'
 import { withBasePath } from '@/lib/base-path'
 import { deliverMail, mailConfigured, type MailMessage } from '@/lib/mail-delivery'
 import type { OrganizationInvitationOutcome } from './organization-invitations'
@@ -41,15 +42,30 @@ export function organizationInvitationMail(
   }
 }
 
+async function optedOutInvitationRecipients(emails: string[]): Promise<Set<string>> {
+  const { rows } = await pool.query<{ email: string }>(
+    `SELECT lower(u.email) AS email FROM user_preferences p
+       JOIN "user" u ON u.id = p."userId"
+      WHERE NOT p."organizationInvitationEmails" AND u."emailVerified" AND lower(u.email) = ANY($1::text[])`,
+    [emails],
+  )
+  return new Set(rows.map(row => row.email))
+}
+
 /** Provider acceptance only, not mailbox delivery. Never return bearer links in logs or errors. */
 export async function sendOrganizationInvitationEmails(
   outcomes: OrganizationInvitationOutcome[],
   origin: string,
   deliver: (message: MailMessage) => Promise<void> = deliverMail,
+  optedOut: (emails: string[]) => Promise<Set<string>> = optedOutInvitationRecipients,
 ): Promise<{ acceptedByProvider: number; failed: number }> {
-  const messages = outcomes.filter(
+  const created = outcomes.filter(
     (outcome): outcome is Extract<OrganizationInvitationOutcome, { created: true }> => outcome.created,
-  ).map(outcome => organizationInvitationMail(outcome, origin))
+  )
+  if (!created.length) return { acceptedByProvider: 0, failed: 0 }
+  // Address ownership and the recipient’s preference must both be current at delivery.
+  const suppressed = await optedOut(created.map(invite => invite.email))
+  const messages = created.filter(invite => !suppressed.has(invite.email)).map(invite => organizationInvitationMail(invite, origin))
   let next = 0, acceptedByProvider = 0, failed = 0
   // Bound provider concurrency for multi-address invites; request execution has already committed.
   const worker = async () => {

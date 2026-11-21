@@ -14,6 +14,7 @@ test('host updater backs up live rows and restores them into an independent PG17
   const cwd = mkdtempSync(join(tmpdir(), 'mikka-backup-'))
   const env = { ...process.env, COMPOSE_PROJECT_NAME: 'mikka-backup-' + randomUUID(),
     COMPOSE_FILE: 'docker-compose.yml', POSTGRES_PASSWORD: randomBytes(24).toString('hex'),
+    MIKKA_LITELLM_MASTER_KEY: 'synthetic-backup-only',
     MIKKA_UPDATE_STATE_DIR: join(cwd, 'backups'), MIKKA_UPDATE_COMPOSE_FILE: 'docker-compose.yml' }
   const compose = (args, options = {}) => execFileSync('docker', ['compose', '-f', 'docker-compose.yml', ...args], {
     cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options

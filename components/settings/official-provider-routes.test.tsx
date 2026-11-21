@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import type { ReactNode } from 'react'
+import { SettingsReadError } from '@/lib/settings-data'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SWRConfig, type Middleware } from 'swr'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import en from '../../messages/en.json'
 import type { BotOverviewProps } from '../slots/bot-overview-contract'
 import type { SettingsMembersProps } from '../slots/settings-members-contract'
@@ -36,7 +37,7 @@ for (const [name, member] of [
 slot('settings-organization', { OrganizationSettings: none, ORGANIZATION_SETTINGS: false })
 slot('settings-content', { SettingsContentFrame: identity })
 slot('settings-governance', { GovernancePlan: none, GovernanceUsage: none, GovernanceTemplates: none })
-mock.module('../nav/use-save-bot', { namedExports: { useSaveBot: () => async (id: string, patch: unknown) => { writes.push({ id, patch }) } } })
+mock.module('../nav/use-save-bot', { namedExports: { useSaveBot: (workspaceId: string | undefined) => async (id: string, patch: unknown) => { writes.push({ workspaceId, id, patch }) } } })
 mock.module('./settings-sidebar', { namedExports: { SettingsSidebar: none } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace, error: readError }) } })
 mock.module('@/i18n/navigation', { namedExports: { Link: identity, usePathname: () => '/settings', useRouter: () => ({}) } })
@@ -87,7 +88,7 @@ test('frame tab, standalone column and sheet expose the same Bot identity and ed
     assert.equal(overview.conversation.id, bot.id)
     assert.equal(await overview.edit.rename(' New name '), null)
   }
-  assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ id: bot.id, patch: { name: 'New name' } })))
+  assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ workspaceId: team.workspace.id, id: bot.id, patch: { name: 'New name' } })))
   render(<ContextPanel {...props} conversation={{ ...bot, kind: 'coordinator' }} />)
   assert.equal(overview?.edit, null)
 })
@@ -100,7 +101,8 @@ test('only the visible Bot tab activates library, role or computer reads', () =>
     computerScopes.length = 0
     render(<BotOverviewBody {...props} tab={tab} />)
     const reads = cacheKeys.filter(Array.isArray).map(key => key[0])
-    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-library', 'bot-public-role'] : [])
+    // 详情 also reads the Bot Profile's settings and the workspace's Environments (components/nav/use-bot-settings.ts), once.
+    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-environments', 'bot-library', 'bot-public-role', 'bot-settings'] : [])
     assert.deepEqual(computerScopes, tab === 'computer' ? [team.workspace.id] : [])
   }
 })
@@ -126,4 +128,28 @@ test('Settings routes team and member state only through the resolved official p
   workspace = undefined
   assert.match(render(<SettingsView {...props} activeSection="teams" />), /role="status"/)
   assert.equal(members, undefined)
+})
+
+test('Members and Teams offer the scoped workspace retry after a denied or failed read', () => {
+  const props = { user: { name: 'Member', email: 'member@example.test' }, workspaceId: team.workspace.id, onRail: none, onSignOut: none, signingOut: false, accountError: '' }
+  try {
+    for (const status of [403, 500]) {
+      readError = new SettingsReadError('failed workspace response', status)
+      for (const cached of [team, undefined]) {
+        workspace = cached
+        for (const section of ['members', 'teams'] as const) {
+          members = undefined
+          const html = render(<SettingsView {...props} activeSection={section} />)
+          assert.match(html, /<button[^>]*>Retry<\/button>/)
+          assert.match(html, status === 403 ? /permission to view this workspace/ : /load the workspace/)
+          assert.equal(members, undefined)
+        }
+      }
+    }
+    const preview = render(<SettingsView {...props} activeSection="members" preview />)
+    assert.doesNotMatch(preview, /<button[^>]*>Retry<\/button>/)
+  } finally {
+    workspace = team
+    readError = undefined
+  }
 })

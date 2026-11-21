@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createComputerHandler } from './handler'
 import { ComputerError } from './store'
+import { E2BKeyError } from '../secrets/flag'
 
 const botId = 'b9b30c54-8354-4e86-9dfd-bfcf2d437fca'
 const actor = { userId: 'owner', workspaceId: 'workspace' }
@@ -20,6 +21,14 @@ function request(method = 'POST', body?: unknown, origin: string | null = 'https
   if (origin !== null) headers.origin = origin
   return new Request('https://mikka.example/api/bots', { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) })
 }
+
+test('wake returns the recognizable key setup code without provider details', async () => {
+  const f = fixture()
+  f.store.operate = async () => { throw new E2BKeyError('e2b_key_missing', 'private details') }
+  const response = await f.handle(request(), botId, 'wake')
+  assert.equal(response.status, 503)
+  assert.deepEqual(await response.json(), { error: 'e2b_key_missing' })
+})
 
 test('unauthenticated requests never reach the store and responses cannot be cached', async () => {
   const f = fixture(false)

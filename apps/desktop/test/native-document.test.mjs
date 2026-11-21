@@ -180,6 +180,7 @@ function workspaceSelectionPage({ current = false, immediateLoad = false, clickF
     },
   }
   const page = {
+    async waitForLoadState(state) { assert.equal(state, 'domcontentloaded') },
     async waitForFunction(predicate) {
       assert.equal(vm.runInNewContext('(' + predicate + ')()', { document: { documentElement: { lang: 'en' } } }), true)
     },

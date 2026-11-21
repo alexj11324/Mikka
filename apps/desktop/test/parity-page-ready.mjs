@@ -8,6 +8,7 @@ export async function selectWorkspaceMenuItem(page, item, timeout = 45_000) {
   // A switch assigns the locale home URL after its action finishes. The old URL
   // and ready DOM are not proof that the new document has loaded. An already
   // selected item is a product no-op and only closes its menu.
+  await page.waitForLoadState('domcontentloaded')
   const moved = await item.getAttribute('aria-checked') === 'true' ? undefined : page.waitForEvent('domcontentloaded', { timeout })
   void moved?.catch(() => {})
   await item.click()
@@ -157,7 +158,12 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     // Activity versions are a separate read from the task's editable fields.
     // The fixture's creation event must finish rendering before comparison.
     const activity = task.getByRole('region', { name: messages.Workspace.activity.title, exact: true })
-    await activity.getByRole('listitem').filter({ hasText: messages.Workspace.detail.createdTask }).waitFor()
+    // A task with an identifier reads 「created APP-1」. The no-code fallback stays the older sentence.
+    const createdTemplate = messages.Workspace.activity?.created
+    const created = typeof createdTemplate === 'string' && fixture.issueIdentifier
+      ? createdTemplate.replaceAll('{code}', fixture.issueIdentifier)
+      : messages.Workspace.detail.createdTask
+    await activity.getByRole('listitem').filter({ hasText: created }).waitFor()
     if (name === 'task-thread') {
       // 活动's Agent rows have no loading placeholder. The selected row, named
       // after its Agent (one row per Agent stretch), proves that read is

@@ -5,7 +5,6 @@ import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { GovernanceError } from '@/lib/governance/errors'
 import { startIdentityLink } from '@/lib/enterprise/management'
 
-export const runtime = 'nodejs'
 export const POST = freshSessionRoute(async (request: Request) => governanceResponse(async () => {
   const url = new URL(request.url)
   if (request.headers.get('origin') !== url.origin) throw new GovernanceError('access_denied')

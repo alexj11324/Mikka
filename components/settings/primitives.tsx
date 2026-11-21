@@ -16,7 +16,7 @@ export function SettingsLoading({ label, rows = 3, bare = false }: { label: stri
   return <div role="status" aria-label={label} data-loading-placeholder="" className="flex flex-col gap-1">
     <span className="sr-only">{label}</span>
     <Skeleton className="mx-1 h-4 w-24" />
-    <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border bg-card">
+    <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border bg-card">
       {skeletonRows}
     </div>
   </div>
@@ -65,7 +65,7 @@ export function SettingsSection({
         </div>
         {action && <div data-settings-section-action className="flex shrink-0 items-center gap-2">{action}</div>}
       </header>}
-      <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
+      <div data-settings-card className="overflow-hidden rounded-xl border bg-card">
         <div data-settings-rows className="divide-y divide-border">{children}</div>
       </div>
     </section>

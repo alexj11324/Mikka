@@ -26,3 +26,22 @@ export function boardProjectFilters(values: readonly string[] | undefined, proje
     return ids.length ? ids : [value]
   }))]
 }
+
+/** The key the Board's filters are kept under. `board:filters` held the retired
+ * default 「负责人：我」, which hid every task a bot holds (2026-11-13-1405). */
+export const BOARD_FILTERS_KEY = 'board:filters:v2'
+export const LEGACY_BOARD_FILTERS_KEY = 'board:filters'
+
+/**
+ * Filters saved under the old key. A value equal to the retired default was
+ * never the person's choice and is dropped, so the Board shows every task; any
+ * other saved selection is kept as it was. Empty fields do not count.
+ */
+export function migrateBoardFilters<T extends Partial<Record<string, string[]>>>(legacy: T | null | undefined): T | null {
+  if (!legacy || typeof legacy !== 'object') return null
+  const chosen = Object.entries(legacy).filter(([, values]) => Array.isArray(values) && values.length)
+  if (!chosen.length) return null
+  const [field, values] = chosen[0]!
+  if (chosen.length === 1 && field === 'assignee' && values!.length === 1 && values![0] === 'me') return null
+  return legacy
+}

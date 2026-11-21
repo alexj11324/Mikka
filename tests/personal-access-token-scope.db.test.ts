@@ -20,7 +20,7 @@ test('API requests stay in their effective workspace on thread, evidence, propos
   }
   const agent = await seedAgent(pool, owner)
   const device = randomUUID(), repo = randomUUID()
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES ($1,$2,'Laptop','local',true,now())`, [device, owner])
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES ($1,$2,'Laptop','local',true,now(),now())`, [device, owner])
   await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/repo')`, [repo, device, owner])
   const run = async (botId: string | null, issueId: string | null, workspaceId?: string) => {
     const id = await seedRun(pool, { userId: owner, agentId: agent, botId, issueId, workspaceId, status: 'succeeded', finishedAt: new Date() })
@@ -37,15 +37,15 @@ test('API requests stay in their effective workspace on thread, evidence, propos
 
   let currentHeaders = new Headers()
   let activeWorkspaceId: string | undefined = ws.id
-  mock.module('next/headers', { namedExports: { headers: async () => currentHeaders,
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && activeWorkspaceId ? { value: activeWorkspaceId } : undefined }) } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   // A browser session (no bearer token) is the owner's cookie session when `browser` is set.
   let browser = false
   const ownerName = 'pat-scope-owner'
   mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => browser ? { user: { id: owner, name: ownerName, email: `${owner}@example.invalid`, image: null }, session: { id: 'browser' } } : null } } } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: () => {} } })
   const store = await import('../lib/tokens/store')
   const token = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Scope test' })
   const personalToken = await store.createLegacyPersonalAccessToken(owner, personal.id, { name: 'Scope test personal' })

@@ -9,6 +9,7 @@ import type { createFactoryQuestions } from "./questions/store";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import { modelFallbackRecordSchema } from "../run-model-fallback-view";
 import { AgentProfileError } from "./agent-profile-definition";
+import { factoryReconcilePendingSql, pendingFactoryReconciliation } from './reconcile-pending';
 
 /** A failed run or a failed verify gate is a visible failed attempt that
  * re-enters the existing repair loop (retry at execute, repair from
@@ -104,9 +105,6 @@ export function createFactoryReconciler(
   dispatchNext?: (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<(() => Promise<void>) | undefined>,
   withWorkspace?: FactoryWorkspaceBoundary,
 ) {
-  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR
-    (t.status='pending' AND EXISTS(SELECT 1 FROM factory_events f WHERE f."taskId"=t.id AND f.request->>'kind'='request_epoch' AND f.request->>'sourceEventId'=t."sourceEventId"::text)) OR
-    (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
   const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string; completedRunId?: string }[]) => {
     let recovered = 0;
     for (const item of pending) {
@@ -419,10 +417,7 @@ export function createFactoryReconciler(
   };
   /** Coordinator-turn sweep over this user's (and Bot's) pending tasks. */
   const reconcile = async (userId: string) => {
-    const { rows: pending } = await pool.query(
-      `SELECT t.id FROM factory_tasks t WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING} ORDER BY t."updatedAt" LIMIT 50`,
-      [userId, botId],
-    );
+    const pending = await pendingFactoryReconciliation(pool, userId, botId);
     return reconcileTasks(userId, pending);
   };
   /** BE-9: only the task(s) whose current attempt is bound to this run (or to a
@@ -430,7 +425,7 @@ export function createFactoryReconciler(
   reconcile.run = async (userId: string, runId: string) => {
     const { rows: pending } = await pool.query(
       `SELECT t.id, a.id AS "attemptId",$3::uuid AS "completedRunId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
-        WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING}
+        WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${factoryReconcilePendingSql}
           AND (a."runId"=$3::uuid OR EXISTS (SELECT 1 FROM agent_runs c WHERE c.id=$3::uuid AND c."retryOf"=a."runId")
             OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid))
             OR (t.status='pending' AND EXISTS(SELECT 1 FROM factory_events f WHERE f."taskId"=t.id

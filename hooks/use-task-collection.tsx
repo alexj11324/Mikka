@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
+import { taskPresentationKeys } from '@/lib/swr/keys'
 import { getTaskPresentations } from '@/app/actions/task-domain'
 import { useLiveKeys, useLiveScope } from '@/hooks/use-live-key'
 import { groupPresentedTasks, type CollectionIssue } from '@/lib/task-collection'
@@ -17,7 +18,7 @@ export const TaskPresentationsContext = createContext<Readonly<Record<string, Ta
 export function useWorkspaceTaskPresentations(ownerId: string, workspaceId: string | undefined,
   home: string | null, issues: readonly Pick<CollectionIssue, 'id' | 'workspaceId'>[], enabled: boolean) {
   const ids = useMemo(() => issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id).sort(), [issues, workspaceId])
-  const key = workspaceId && ids.length ? ['task-presentations', ownerId, workspaceId, ids] : null
+  const key = workspaceId && ids.length ? taskPresentationKeys.collection(ownerId, workspaceId, ids) : null
   const { data, error, isLoading, mutate } = useSWR(key, async () => Object.fromEntries(await readPresentationPages(workspaceId!, ids,
     input => getTaskPresentations({ ...input, includeInboxReason: true, includeFactoryIdentity: true, includeBotDispatches: true }))), {
     revalidateOnFocus: false, shouldRetryOnError: false, isPaused: () => !enabled,

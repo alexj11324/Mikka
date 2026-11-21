@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
+import { taskPresentationKeys } from '@/lib/swr/keys'
 import { getTaskPresentations } from '@/app/actions/task-domain'
 import { useLiveKeys } from '@/hooks/use-live-key'
 import { readPresentationPages } from '@/lib/task-presentation-batch'
@@ -28,7 +29,7 @@ export function TaskCardDataProvider({ ownerId, workspaceId, children }: {
     })
   }, [])
   const ids = useMemo(() => [...new Set([...subscriptions.values()].flat())].sort(), [subscriptions])
-  const key = workspaceId && ids.length ? ['task-cards', ownerId, workspaceId, ids] : null
+  const key = workspaceId && ids.length ? taskPresentationKeys.cards(ownerId, workspaceId, ids) : null
   const cards = useSWR(key, async () => Object.fromEntries(await readPresentationPages(workspaceId!, ids,
     input => getTaskPresentations({ ...input, includeInboxReason: true, includeReview: true }))), { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKeys(key ? ids.flatMap(id => (['issue_threads', 'pull_request_status', 'factory_issue'] as const)

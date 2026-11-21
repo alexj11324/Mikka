@@ -6,8 +6,7 @@ import { chatFailure, failureMessageKey, type ChatFailure } from '@/lib/chat-fai
  * The status line for a turn that failed for a reason the person can act on,
  * for places that cannot draw the web's line: Telegram and the phone push.
  * The words are the web's own (failureMessageKey, the key
- * components/coordinator/failure-reason.tsx reads), with Mikka 默认 named on
- * its states since no mark sits beside them here. Null for any other failure:
+ * components/coordinator/failure-reason.tsx reads). Null for any other failure:
  * a crash is retried and has nothing for the person to do.
  */
 export function failureLine(error: string | null | undefined, locale: 'zh-CN' | 'en' = 'zh-CN'): string | null {
@@ -16,15 +15,13 @@ export function failureLine(error: string | null | undefined, locale: 'zh-CN' | 
   return failure && (failure.kind !== 'failed' || failure.cloudCode) ? lineFor(failure, locale) : null
 }
 
-const BRANDED = new Set(['free_allowance_used', 'points_exhausted', 'platform_paused'])
-
 function lineFor(failure: ChatFailure, locale: 'zh-CN' | 'en'): string {
   const messages = locale === 'en' ? englishMessages : chineseMessages
   const message = failureMessageKey(failure)
   const scope: Record<string, unknown> = message.namespace === 'RunErrors' ? messages.RunErrors : message.namespace === 'Billing.refusal' ? messages.Billing.refusal : messages.Coordinator
   const text = message.key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], scope)
   if (typeof text !== 'string') throw new Error(`missing message ${message.namespace}.${message.key}`)
-  return message.namespace === 'Billing.refusal' && BRANDED.has(message.key) ? messages.Billing.refusal.branded.replace('{reason}', text) : text
+  return text
 }
 
 /**

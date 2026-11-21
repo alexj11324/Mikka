@@ -1,8 +1,9 @@
 import 'server-only'
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { archiveIdleDays } from './conversation-directory-input'
 import { db } from '@/lib/db'
-import { attentionSettings, PUSH_WHEN, userPreferences } from '@/lib/db/schema'
+import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/schema'
 import { SEND_KEYS } from '@/lib/send-key'
 import { ActionFailureError } from '@/lib/action-error'
 import { setAttentionEnabled } from '@/lib/attention/store'
@@ -15,11 +16,13 @@ import { setAttentionEnabled } from '@/lib/attention/store'
  * own reader (lib/suggestions/source-settings.ts).
  */
 export interface Preferences {
+  archiveIdleAfterDays: number
   proactive: boolean
   pushDecide: boolean
   pushReview: boolean
   pushFinished: boolean
   pushBriefing: boolean
+  organizationInvitationEmails: boolean
   pushWhen: (typeof PUSH_WHEN)[number]
   memoryEnabled: boolean
   sendKey: (typeof SEND_KEYS)[number]
@@ -29,8 +32,8 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
-  sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
+  archiveIdleAfterDays: 30, proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
+  organizationInvitationEmails: true, sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
 }
 
 /** Longest the personal instructions may be, in characters (code points). */
@@ -40,8 +43,9 @@ export const personalInstructionsSchema = z.string().transform(text => text.trim
   .refine(text => [...text].length <= PERSONAL_INSTRUCTIONS_MAX, { message: 'personalInstructionsTooLong' })
 
 export const preferencesPatch = z.object({
+  archiveIdleAfterDays: z.literal(archiveIdleDays),
   proactive: z.boolean(), pushDecide: z.boolean(), pushReview: z.boolean(), pushFinished: z.boolean(), pushBriefing: z.boolean(),
-  pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
+  organizationInvitationEmails: z.boolean(), pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
   sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),
 }).partial().strict()
 
@@ -73,10 +77,10 @@ export async function readCoordinatorPromptPreferences(userId: string): Promise<
 }
 
 /** The person's settings; the defaults when they never changed one. */
-export async function readPreferences(userId: string): Promise<Preferences> {
+export async function readPreferences(userId: string, executor: Pick<typeof db, 'select'> = db): Promise<Preferences> {
   // Anchor both optional rows to the same owner without reading the user table.
   // LEFT JOIN retains each table's defaults when only the other row exists.
-  const [settings] = await db.select({ preferences: userPreferences, proactive: attentionSettings.enabled })
+  const [settings] = await executor.select({ preferences: userPreferences, proactive: attentionSettings.enabled })
     .from(sql`(values (${userId}::text)) as preference_owner("userId")`)
     .leftJoin(userPreferences, sql`${userPreferences.userId} = preference_owner."userId"`)
     .leftJoin(attentionSettings, sql`${attentionSettings.userId} = preference_owner."userId"`)
@@ -93,14 +97,22 @@ export async function readPreferences(userId: string): Promise<Preferences> {
  * dailySuggestionsNeedMemory.
  */
 export async function savePreferences(userId: string, patch: PreferencesPatch): Promise<Preferences> {
-  const { proactive, ...rest } = patch
-  const current = await readPreferences(userId)
-  const memoryEnabled = rest.memoryEnabled ?? current.memoryEnabled
-  if (rest.dailySuggestions && !memoryEnabled) throw new ActionFailureError('dailySuggestionsNeedMemory')
-  if (proactive !== undefined) await setAttentionEnabled(userId, proactive)
-  const { proactive: _proactive, ...merged } = { ...current, ...rest }
-  const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
-  await db.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
-  return readPreferences(userId)
+  return db.transaction(async tx => {
+    // An owner exists even before their first preference row. Serialize read/merge/write
+    // for that owner so simultaneous patches cannot replace each other's fields.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('no key update')
+    const { proactive, ...rest } = patch
+    const current = await readPreferences(userId, tx)
+    const memoryEnabled = rest.memoryEnabled ?? current.memoryEnabled
+    if (rest.dailySuggestions && !memoryEnabled) throw new ActionFailureError('dailySuggestionsNeedMemory')
+    if (proactive !== undefined) await setAttentionEnabled(userId, proactive, tx)
+    const { proactive: _proactive, ...merged } = { ...current, ...rest }
+    const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
+    await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
+    if (rest.archiveIdleAfterDays !== undefined && current.archiveIdleAfterDays !== rest.archiveIdleAfterDays) {
+      await (await import('./live/lists')).archivePreferenceChanged(tx, userId)
+    }
+    return readPreferences(userId, tx)
+  })
 }

@@ -132,6 +132,7 @@ export class SubscriptionWorkerClient {
           else if (frame.error) {
             timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing'))
             timing?.terminalTransport(frame.transportTiming, Object.hasOwn(frame, 'transportTiming'))
+            timing?.terminalServiceTier(frame.serviceTier, Object.hasOwn(frame, 'serviceTier'))
             const diagnostic = providerDiagnostic(frame.providerFailure, this.config.scope.provider)
             const failure = diagnostic ? captureRunFailure({ ...diagnostic, requestBodyValues: request.payload }, { runId: this.config.use?.runId, provider: this.config.scope.provider, credential: 'subscription' }) : undefined
             finish(new WorkerRefusal(safeCode(frame.error), failure))
@@ -139,6 +140,7 @@ export class SubscriptionWorkerClient {
           else if (Object.hasOwn(frame, "result")) {
             timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing'))
             timing?.terminalTransport(frame.transportTiming, Object.hasOwn(frame, 'transportTiming'))
+            timing?.terminalServiceTier(frame.serviceTier, Object.hasOwn(frame, 'serviceTier'))
             finish(undefined, frame.result)
           }
           else finish(new WorkerRefusal())
@@ -169,7 +171,7 @@ export class SubscriptionWorkerClient {
     })
     return { result, stop: abort, pause: () => child.stdout.pause(), resume: () => child.stdout.resume() }
   }
-  async call<T>(method: "status" | "oauthStart" | "oauthResume" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "nativeContext" | "prepare" | "quota" | "usage" | "allowance" | "models" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  async call<T>(method: "status" | "oauthStart" | "oauthResume" | "oauthComplete" | "oauthPoll" | "oauthHandoff" | "refresh" | "recover" | "disconnect" | "nativeAuth" | "nativeContext" | "prepare" | "prepareStream" | "quota" | "usage" | "allowance" | "models" | "cleanup", input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
     return await this.start({ ...input, method }, signal).result as T
   }
   async nativeRequest(revision: number, payload: {path: string; headers: Record<string, string>; body: unknown}, signal?: AbortSignal): Promise<{contentType: string; body: ReadableStream<Uint8Array>}> {

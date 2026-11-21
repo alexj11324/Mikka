@@ -37,6 +37,7 @@ stub('./factory/runtime.ts', { factoryRuntimeForBot: runtime })
 stub('./factory/watchdog.ts', { sweepFactoryWatchdog: sweepWatchdog })
 stub('./factory/activity-live.ts', { taskActivityChanged: activityChanged })
 stub('./db/index.ts', { pool: dbPool })
+stub('./thread-delivery-queue.ts', { deliverQueuedThreadReply: async () => false })
 stub('./coding-workspace/review-sessions.ts', { reconcileReviewSessions: reconcileReviews })
 let effects: typeof import('./run-completion-effects')
 const environment = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }

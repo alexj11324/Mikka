@@ -3,8 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getSingularPatch, Virtualizer } from '@pierre/diffs'
 import { FileDiff, VirtualizerContext } from '@pierre/diffs/react'
-import { useTranslations } from 'next-intl'
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ChevronDown, ChevronRight, ExternalLink } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -87,12 +87,6 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
       </div>
     </VirtualizerContext.Provider>
   </div>
-}
-
-/** 「改动 +128 −34」 on the thread's tab. */
-export function ChangesTabLabel({ changes }: { changes: ThreadChanges | null }) {
-  const t = useTranslations('IssueThreads')
-  return <>{t('changesTab')}{changes && <Counts additions={changes.additions} deletions={changes.deletions} />}</>
 }
 
 export function Counts({ additions, deletions }: { additions: number; deletions: number }) {

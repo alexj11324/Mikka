@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
 import { writeFile } from 'node:fs/promises'
-
-// Next already pins sharp; acceptance does not add a second native PNG stack.
-const require = createRequire(import.meta.url)
-const sharp = createRequire(require.resolve('next/package.json'))('sharp')
+import sharp from 'sharp'
 const DYNAMIC = ['[data-slot="bot-avatar"]', '[data-slot="avatar"]', 'time']
 /** Parts only the bundled app has (the server row and Settings › 服务器, #1557).
  * The hosted renderer cannot show them, so both captures leave them out. */

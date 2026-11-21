@@ -2,6 +2,7 @@
 
 import { useContext } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
+import { taskPresentationKeys } from '@/lib/swr/keys'
 import { getTaskPresentations } from '@/app/actions/task-domain'
 import { useLiveKeys } from './use-live-key'
 import { TaskPresentationsContext } from './use-task-collection'
@@ -11,7 +12,7 @@ import { TaskPresentationsContext } from './use-task-collection'
 export function useSelectedTaskPresentation(ownerId: string, workspaceId: string | null, issueId: string | undefined) {
   const collection = useContext(TaskPresentationsContext)
   const resident = issueId ? collection[issueId] : undefined
-  const key = !resident && workspaceId && issueId ? ['selected-task-presentation', ownerId, workspaceId, issueId] as const : null
+  const key = !resident && workspaceId && issueId ? taskPresentationKeys.selected(ownerId, workspaceId, issueId) : null
   const selected = useSWR(key, async ([, , scope, id]) => (await getTaskPresentations({
     workspaceId: scope, issueIds: [id], includeFactoryIdentity: true,
   })).items[id] ?? null, { revalidateOnFocus: false, shouldRetryOnError: false })

@@ -5,7 +5,7 @@ import {Pool} from 'pg'
 import {bindFixtureWorkspaceDatabase,createFixtureWorkspaceTables} from '../../tests/helpers/workspace-database'
 import {seedFixtureWorkspace} from '../../tests/helpers/task-workspace'
 import {claimCloudRun,claimLocalRun} from '../computer/claim'
-import {createExecutionClaimGuard} from '../factory/execution-claim'
+import {createExecutionClaimGuard} from '../../tests/helpers/factory-execution-claim'
 import {projectionTestTarget} from './testing/projection-target'
 
 /** Actual SQL composition in fresh retained fixtures. No historical migrations,

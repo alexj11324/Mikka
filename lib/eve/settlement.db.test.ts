@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { registerHooks } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -31,6 +32,29 @@ test('host settlement receipts preserve product publication across native RPC re
     await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name)VALUES($1,$2,'Eve settlement fixture')`,[workspaceId,ownerId])
     await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role)VALUES($1,$2,'Owner',$3,'admin')`,[workspaceId,ownerId,ownerId+'@example.invalid'])
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name)VALUES($1,$2,$3,'Eve settlement fixture')`,[botId,ownerId,workspaceId])
+    await t.test('a native finish without an Agent Kit execution does not initialize its prepare workflow', async () => {
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const sessionId = await nativeSession()
+      const imports: string[] = []
+      const loader = registerHooks({ load(url, context, next) {
+        if (url.includes('/workflows/coordinator/agent-kit-steps.')) imports.push(url)
+        return next(url, context)
+      } })
+      try {
+        const response = await handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
+          method: 'POST', headers: { authorization: internalEveAuthorization(scope) },
+          body: JSON.stringify({ operation: 'finish', sessionId, turnId: 'child_without_execution', outcome: 'completed' }),
+        }))
+        assert.equal(response.status, 200)
+        assert.deepEqual(await response.json(), { status: 'accepted' })
+        assert.deepEqual(imports, [])
+        const { beginProductAction } = await import('./product-definitions')
+        await assert.rejects(beginProductAction(scope, { sessionId, turnId: 'child_without_execution' }), /agentExecutionClosed/)
+        assert.equal((await pool.query('SELECT count(*)::int count FROM agent_kit_executions WHERE owner_id=$1 AND bot_key=$2 AND execution_key=$3',
+          [ownerId, botId, `${sessionId}:child_without_execution:0`])).rows[0].count, 0)
+      } finally { loader.deregister() }
+    })
     await t.test('native admission stays pending until its own root projection, including queued and quiet turns',async()=>{
       const {markEventAccepted}=await import('./submission')
       const {chatView,chatVersion,botChatSnapshot}=await import('../coordinator/store')
@@ -62,6 +86,43 @@ test('host settlement receipts preserve product publication across native RPC re
       await finishEveTurn(scope,{sessionId,turnId:'queued_2',outcome:'completed',messages:[{role:'assistant',content:[],mikkaStreamId:eveStreamId(sessionId,'queued_2')}]})
       chat=await chatView(ownerId,200,botId)
       assert.equal(chat.working,false);assert.equal(chatFailure(chat),null,'a successful quiet native outcome is not inferred to have crashed')
+    })
+    await t.test('admission claims its scoped event once and rolls back with the transcript', async t => {
+      const { Client } = await import('pg')
+      const { db, withDatabaseTransaction } = await import('../db')
+      const { markEventAccepted } = await import('./submission')
+      const eventId = randomUUID()
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)
+        VALUES($1,$2,$3,'user_message',($1::uuid)::text,$4)`, [eventId, ownerId, botId, {text:'Claimed once'}])
+      const delivered = async () => (await pool.query('SELECT "deliveredAt" FROM coordinator_events WHERE id=$1', [eventId])).rows[0].deliveredAt
+      const projectionCount = async () => Number((await pool.query(`SELECT count(*) FROM coordinator_messages
+        WHERE "userId"=$1 AND "botId"=$2 AND message#>>'{mikkaUserEvent,id}'=$3`, [ownerId, botId, eventId])).rows[0].count)
+      await markEventAccepted({...scope, ownerId:ownerId+'-other'}, eventId)
+      await markEventAccepted({...scope, botId:randomUUID()}, eventId)
+      assert.equal(await delivered(), null)
+      await assert.rejects(db.transaction(tx => withDatabaseTransaction(tx, async () => {
+        await markEventAccepted(scope, eventId)
+        throw new Error('rollback admission')
+      })), /rollback admission/)
+      assert.equal(await delivered(), null)
+      assert.equal(await projectionCount(), 0)
+
+      const queries = t.mock.method(Client.prototype, 'query')
+      const { createRequestDatabaseScope } = await import('../db')
+      const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+      try {
+        await routed.run(() => Promise.all([markEventAccepted(scope, eventId), markEventAccepted(scope, eventId)]))
+      } finally {
+        await routed.close()
+      }
+      const sourceStatements = queries.mock.calls.filter(call => {
+        const query = call.arguments[0] as unknown
+        const text = typeof query === 'string' ? query : (query as {text?:string})?.text
+        return /(?:from|update)\s+coordinator_events\b/i.test(text ?? '')
+      })
+      assert.equal(sourceStatements.length, 2, 'one scoped event claim for each of two competing admissions')
+      assert.ok(await delivered())
+      assert.equal(await projectionCount(), 1)
     })
     await t.test('completed root survives concurrent finish and effect committed before receipt acknowledgement',async()=>{
       const {sessionId,occurrenceId}=await scheduled()
@@ -98,6 +159,27 @@ test('host settlement receipts preserve product publication across native RPC re
         assert.equal((await pool.query('SELECT lease_token FROM schedule_occurrences WHERE id=$1',[occurrenceId])).rows[0].lease_token,newLease)
       } finally {wakeTransport.resume=priorResume;dueTimerTransport.start=priorStart}
     })
+    await t.test('native settlement replay without an execution selector reads its completed receipt once', async t => {
+      const { Client } = await import('pg')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const sessionId = await nativeSession()
+      const finish = (extra = {}) => handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
+        method: 'POST', headers: { authorization: internalEveAuthorization(scope) },
+        body: JSON.stringify({ operation: 'finish', sessionId, turnId: 'native_replay', outcome: 'completed', ...extra }),
+      }))
+      assert.equal((await finish()).status, 200)
+      const { createRequestDatabaseScope } = await import('../db')
+      const replay = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+      try {
+        const queries = t.mock.method(Client.prototype, 'query')
+        assert.equal((await replay.run(() => finish())).status, 200)
+        const reads = queries.mock.calls.map(call => String(call.arguments[0]))
+        assert.equal(reads.filter(sql => /FROM eve_turn_settlements/i.test(sql)).length, 1)
+        assert.equal(reads.filter(sql => /FROM agent_kit_executions/i.test(sql)).length, 0)
+        assert.equal((await replay.run(() => finish({ executionId: randomUUID() }))).status, 404)
+      } finally { await replay.close() }
+    })
     await t.test('compatibility reply and ended product execution finish once with exact session binding',async()=>{
       const {AgentKitStore}=await import('../agent-kit/store')
       const {DEFAULT_AGENT_DEFINITION}=await import('../agent-kit/builtin')
@@ -112,40 +194,11 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(finishEveTurn(scope,{...input,executionId:randomUUID()}),/agentExecutionClosed/)
       await assert.rejects(finishEveTurn({...scope,ownerId:'other-owner'},input))
     })
-    await t.test('the tool gateway reads one running snapshot bound to the native turn', async t => {
-      const { AgentKitStore } = await import('../agent-kit/store')
-      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
-      const { handleEveProductRequest } = await import('./product-gateway')
-      const { internalEveAuthorization } = await import('./auth')
-      const { Client } = await import('pg')
-      const store = new AgentKitStore(pool)
-      const slack = { ...scope, surface: 'slack' as const }
-      const sessionId = 'wrun_' + randomUUID()
-      await registerSession(slack, sessionId)
-      const turnId = 'turn_gateway'
-      const execution = await store.beginExecution(slack, `${sessionId}:${turnId}:0`, 'Fixture policy', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
-      const instructions = (turn: string) => handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
-        method: 'POST', headers: {authorization: internalEveAuthorization(slack)},
-        body: JSON.stringify({operation:'instructions',sessionId,turnId:turn,executionId:execution.id}),
-      }))
-      const queries = t.mock.method(Client.prototype, 'query')
-      const { createRequestDatabaseScope } = await import('../db')
-      const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
-      const response = await routed.run(() => instructions(turnId)).finally(() => routed.close())
-      assert.equal(response.status, 200)
-      assert.match((await response.json()).instructions, /Slack conversation/)
-      const reads = queries.mock.calls.filter(call => /from agent_kit_executions/i.test(String(call.arguments[0])))
-      assert.equal(reads.length, 1, 'retrieve and check the same execution row in one SQL statement')
-      assert.equal((await instructions('another_turn')).status, 404)
-      await store.finishExecution(slack, execution.id, 'completed')
-      assert.equal((await instructions(turnId)).status, 404)
-      assert.equal((await store.readExecution(slack, execution.id)).status, 'completed')
-    })
     await t.test('the product catalogue skips only inapplicable Eve approval reviews', async t => {
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
       const { handleEveProductRequest } = await import('./product-gateway')
-      const { productRpc } = await import('./product-rpc')
+      const { productCatalogue } = await import('./product-definitions')
       const { createProductTool } = await import('./product-tool')
       const { scopeAuth } = await import('./scope')
       const store = new AgentKitStore(pool)
@@ -159,7 +212,7 @@ test('host settlement receipts preserve product publication across native RPC re
         calls.push((await request.clone().json()).operation)
         return handleEveProductRequest(request)
       })
-      const { tools } = await productRpc<{tools:import('./product-rpc').ProductCatalogueEntry[]}>(scope, {...binding,operation:'catalogue'})
+      const tools = await productCatalogue(scope, binding, execution.snapshot, execution.snapshot.runtime, { scheduledRead: null })
       const read = tools.find(tool => tool.name === 'list_issues')!
       const write = tools.find(tool => tool.name === 'send_email')!
       const input = {}
@@ -171,12 +224,12 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(async () => approval.request({...context,abortSignal:AbortSignal.abort()} as never), {name:'AbortError'})
       assert.equal(await approval.request(context as never), 'not-applicable')
       assert.deepEqual(await tool.execute!(input as never, context as never), [])
-      assert.deepEqual(calls, ['catalogue','execute'])
+      assert.deepEqual(calls, ['execute'])
       assert.equal(read.needsApprovalReview, false)
       assert.equal(write.needsApprovalReview, true)
       const legacy = createProductTool(scope,binding,{...read,needsApprovalReview:undefined})
       assert.equal(await (legacy.approval as typeof approval).request(context as never), 'not-applicable')
-      assert.deepEqual(calls, ['catalogue','execute','approval'])
+      assert.deepEqual(calls, ['execute','approval'])
       // If the host adds this tool to approval review after discovery, execution
       // still requires a matching durable review before any provider dispatch.
       const priorCatalogue = createProductTool(scope,binding,{...write,needsApprovalReview:false})
@@ -189,8 +242,7 @@ test('host settlement receipts preserve product publication across native RPC re
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
       const { mailboxInputs } = await import('@mikka/protocol/mailbox')
-      const { handleEveProductRequest } = await import('./product-gateway')
-      const { internalEveAuthorization } = await import('./auth')
+      const { asProductPrincipal, productContext, productTools } = await import('./product-definitions')
       const { createRequestDatabaseScope } = await import('../db')
       const { Client } = await import('pg')
       const store = new AgentKitStore(pool)
@@ -201,13 +253,12 @@ test('host settlement receipts preserve product publication across native RPC re
       async function catalogue(turnId: string, executionId: string) {
         const before = queries.mock.callCount()
         const conn = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
-        const response = await conn.run(() => handleEveProductRequest(new Request('http://localhost/mikka/api/internal/eve/tools', {
-          method:'POST', headers:{authorization:internalEveAuthorization(scope)}, body:JSON.stringify({operation:'catalogue',sessionId,turnId,executionId})
-        }))).finally(() => conn.close())
-        assert.equal(response.status,200)
-        const {tools} = await response.json() as {tools:{name:string}[]}
+        const tools = await conn.run(() => asProductPrincipal(scope, async () => {
+          const current = await productContext(scope, { sessionId, turnId, executionId })
+          return productTools(scope, current.execution, current.sourceEventId, current.scheduledRead, current.taskEventId, current.entryOrigin)
+        })).finally(() => conn.close())
         const grants = queries.mock.calls.slice(before).filter(call => /select active_version,workspace_id from agent_kit_heads|select snapshot,status,version_id from agent_kit_executions|select definition,digest from agent_kit_versions/i.test(String(call.arguments[0])))
-        return {mail:tools.some(tool=>Object.hasOwn(mailboxInputs,tool.name)),liveChecks:grants.length}
+        return {mail:Object.keys(tools).some(name=>Object.hasOwn(mailboxInputs,name)),liveChecks:grants.length}
       }
       assert.deepEqual(await catalogue('with_mailbox',original.id), {mail:true,liveChecks:3})
       const narrowed = {...DEFAULT_AGENT_DEFINITION,tools:DEFAULT_AGENT_DEFINITION.tools.filter(name=>!Object.hasOwn(mailboxInputs,name))}

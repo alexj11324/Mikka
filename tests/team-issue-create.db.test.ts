@@ -1,6 +1,5 @@
 import { scopeSubtest,teamResumeBootstrap } from './support/scope-acceptance.mjs'
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
-import 'next/dist/server/node-environment-baseline'
 import { installTeamSessionFixture } from './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
@@ -136,21 +135,14 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const {issueForUser}=await import('../lib/issue-access')
   const {createIssueForTeam,promoteIssueToTeam,setIssueScope,saveIssue}=await import('../app/actions/issues')
   const {exchangeDocument}=await import('../app/actions/collaboration')
-  const {AfterContext}=await import('next/dist/server/after/after-context')
-  const {workAsyncStorage}=await import('next/dist/server/app-render/work-async-storage.external')
-  const {workUnitAsyncStorage}=await import('next/dist/server/app-render/work-unit-async-storage.external')
-  const {createRequestStoreForAPI}=await import('next/dist/server/async-storage/request-store')
-  const {NextRequest}=await import('next/server')
+  const {createRequestScope,runRequestScope}=await import('../apps/api/src/context')
+  const {NextRequest}=await import('../lib/server-runtime/server')
   const Y=await import('yjs')
   async function withAfter<T>(fn:()=>Promise<T>) {
-    const waits:Promise<unknown>[]=[],errors:unknown[]=[],closes:Array<()=>void>=[]
-    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{closes.push(callback)},onTaskError:error=>{errors.push(error)}})
-    const request=new NextRequest('http://127.0.0.1/mikka')
-    // Include Next 16.4's optional HMR argument; local 16.1 ignores it.
-    const requestStore:ReturnType<typeof createRequestStoreForAPI>=Reflect.apply(createRequestStoreForAPI,undefined,[request,new URL(request.url),{tags:[],expirationsByCacheKind:new Map()},undefined,undefined,undefined])
-    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,()=>workUnitAsyncStorage.run(requestStore,async()=>{
-      try{return await fn()}finally{for(const close of closes)close();await Promise.all(waits);assert.deepEqual(errors,[])}
-    }))
+    const scope=createRequestScope(new NextRequest('http://127.0.0.1/mikka'))
+    return runRequestScope(scope,async()=>{
+      try{return await fn()}finally{await scope.after.finish()}
+    })
   }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')
@@ -224,6 +216,18 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       }
       assert.equal((await request(editor, 'POST', fileId, new Uint8Array([1]))).status, 409)
       assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: true })
+      const { ensureTaskIdentifiers } = await import('../lib/task-identity-store')
+      const code = (await ensureTaskIdentifiers([{ id: taskId, ownerId: owner }])).get(taskId)
+      assert.ok(code)
+      const lookup = endpoint.replace(taskId, encodeURIComponent(code)) + `?id=${fileId}&format=url&fresh=1`
+      const metadata = await request(member, 'GET', '', data, lookup)
+      assert.equal(metadata.status, 200)
+      assert.equal(metadata.headers.get('cache-control'), 'private, no-store')
+      const link = await metadata.json()
+      assert.equal(link.expiresAt, null)
+      const resolved = new URL(link.url).href
+      assert.equal(resolved, `${endpoint}?id=${fileId}`)
+      assert.deepEqual(new Uint8Array(await (await request(member, 'GET', '', data, resolved)).arrayBuffer()), data)
       const download = await request(member, 'GET', fileId)
       assert.equal(download.status, 200)
       assert.match(download.headers.get('content-disposition')!, /^attachment;/)
@@ -232,6 +236,8 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await request(editor, 'GET', fileId, data, endpoint.replace(taskId, otherId))).status, 404)
       await app.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1`, [taskId])
       assert.equal((await request(member)).status, 404)
+      assert.equal((await request(member, 'GET', '', data, lookup)).status, 404)
+      assert.equal((await request(member, 'GET', '', data, resolved)).status, 404)
       await app.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
         VALUES('task',$1,'account',$2,ARRAY['canReadContent'])`, [taskId, racer])
       assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: false })
@@ -244,6 +250,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await request(editor, 'DELETE', fileId)).status, 204)
       assert.deepEqual(await (await request(editor)).json(), { files: [], canEdit: true })
       assert.equal((await request(editor, 'GET', fileId)).status, 404)
+      assert.equal((await request(editor, 'GET', '', data, lookup)).status, 404)
       // One more upload at the count boundary wins; declined uploads do not add rows.
       for (let n = 0; n < 9; n++) assert.equal((await request(editor, 'POST', randomUUID())).status, 200)
       const concurrent = await Promise.all([request(editor, 'POST', randomUUID()), request(editor, 'POST', randomUUID())])

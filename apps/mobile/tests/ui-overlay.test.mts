@@ -78,3 +78,11 @@ test('an installed official mobile layer may never substitute the public avatar'
     assert.equal(mobileOverlay(app, env).slots['bot-avatar'], provider)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('a shared conversation hook uses the same React and JSX runtime as its native renderer', () => {
+  const origins: string[] = []
+  const resolver = overlayResolver(app, {}, (context: { originModulePath: string }) => origins.push(context.originModulePath))
+  const hook = { originModulePath: join(repository, 'lib/hooks/use-task-continuation.ts') }
+  for (const name of ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', './task-list']) resolver(hook, name, 'ios')
+  assert.deepEqual(origins, [join(app, 'package.json'), join(app, 'package.json'), join(app, 'package.json'), hook.originModulePath])
+})

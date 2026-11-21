@@ -51,7 +51,7 @@ env:
 
 jobs:
   domain-model:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.domain_model_sha != '' || inputs.domain_model_scope != '' || (inputs.domain_model_mode != '' && inputs.domain_model_mode != 'preflight'))
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.domain_model_sha != '' || inputs.domain_model_scope != '' || (inputs.domain_model_mode != '' && inputs.domain_model_mode != 'preflight'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -221,7 +221,7 @@ jobs:
 
   smoke:
     # Only finished production deployments, plus the schedule and manual runs.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -258,7 +258,7 @@ jobs:
 
   deployment-comparison:
     # No browser/install/wait loop: quarter-hour follow-ups read the same fixed windows.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -281,9 +281,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/ops/runtime-monitor-owner.mjs
-      - name: Record verified Cloudflare runtime handoff ${{ steps.runtime.outputs.milestone }}
+      - name: Record the Cloudflare runtime owner
         if: steps.runtime.outputs.runtime == 'cloudflare'
-        run: echo 'The verified migration milestone selected Cloudflare runtime attribution.'
+        run: echo 'Production is served by Cloudflare; Cloudflare runtime attribution applies.'
       - name: Read the existing Vercel token through Infisical workload identity
         if: steps.runtime.outputs.runtime != 'cloudflare'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18

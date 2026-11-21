@@ -11,7 +11,7 @@ import { deploymentMode } from '@/lib/governance/edition'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import type { EnterprisePrincipal } from '@/lib/enterprise/principal'
-import { currentMonth, monthBounds } from '@/lib/usage/month'
+import { currentMonth, monthBounds, monthDays } from '@/lib/usage/month'
 import { readBillingAccount, billingPortalUrl, planCheckoutUrl } from './service'
 import { readCreditBillingAccount } from './history'
 import { readResourceBudgets } from './resource-budgets'
@@ -29,9 +29,10 @@ export const billingScopeSchema = z.object({ kind: z.enum(['workspace', 'organiz
 
 /** Finance metadata only. Never reads a title, prompt, output, file or credential reference. */
 export async function billingManagementView(actorId: string, target: BillingScope, selectedWorkspaceId?: string | null,
-  principal?: EnterprisePrincipal): Promise<BillingManagementView> {
+  principal?: EnterprisePrincipal, usageMemberId?: string | null): Promise<BillingManagementView> {
   billingScopeSchema.parse(target)
   if (selectedWorkspaceId) z.uuid().parse(selectedWorkspaceId)
+  if (usageMemberId != null) z.string().min(1).max(256).parse(usageMemberId)
   if (target.kind === 'workspace') {
     await workspaceDb.transaction(tx => requireWorkspace(tx, target.id, actorId, true, principal))
     await ensureLegacyVerification(target.id)
@@ -97,25 +98,43 @@ export async function billingManagementView(actorId: string, target: BillingScop
       .where(and(eq(organizationMembers.organizationId, target.id), eq(organizationMembers.status, 'active'))) : members
     const month = currentMonth(), { start, end } = monthBounds(month)
     const usageIds = available.map(row => row.id)
-    const [billing, credits, budgets, totals, external, policies] = await Promise.all([
+    const dayExpression = `to_char("createdAt" at time zone 'UTC','YYYY-MM-DD')`
+    const usageGrouping = effective.usageExport ? `grouping sets (("actorId"), (${dayExpression}))` : '"actorId"'
+    const payerFilter = `($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[]))`
+    const usageParams = [start, end, target.kind === 'organization', accountId, usageIds]
+    const [billing, credits, budgets, totals, external, policies, memberModels] = await Promise.all([
       accountId ? readBillingAccount(accountId, process.env, memberCount) : null,
       accountId ? readCreditBillingAccount(accountId) : null,
       budgetWorkspaceId ? readResourceBudgets(pool, [budgetWorkspaceId]) : [],
-      pool.query<{ id: string | null; cost: number; held: number; unknown: number }>(`select "actorId" id,
+      pool.query<{ id: string | null; day: string | null; cost: number; held: number; unknown: number }>(`select "actorId" id,
+        ${effective.usageExport ? dayExpression : 'null::text'} AS "day",
         coalesce(sum("costMicroUsd") filter(where state='settled'),0)::float8 cost,
         coalesce(sum(coalesce("costMicroUsd","holdMicroUsd")) filter(where state in ('pending','unknown')),0)::float8 held,
         count(*) filter(where state='unknown' or (state='settled' and "costMicroUsd" is null))::int unknown
         from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and state<>'failed'
-        and ($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[])) group by "actorId"`,
-        [start, end, target.kind === 'organization', accountId, usageIds]),
+        and ${payerFilter}
+        group by ${usageGrouping}
+        order by cost desc, id asc nulls last`,
+        usageParams),
       pool.query<{ count: number }>(`select count(*)::int count from agent_runs where "workspaceId"=any($1::uuid[]) and "createdAt">=$2 and "createdAt"<$3
         and "agentDefinition"->'executionIdentity'->>'version' in ('1','2') and (
         "agentDefinition"->'executionIdentity'->'billingAccount'->'model'->>'amount'='provider_unknown'
         or "agentDefinition"->'executionIdentity'->'billingAccount'->'runtime'->>'amount'='provider_unknown')`, [usageIds, start, end]),
       pool.query<{ available: boolean }>(`select to_regclass('resource_access_policies') is not null available`),
+      usageMemberId && effective.usageExport
+        ? pool.query<NonNullable<BillingManagementView['usage']['memberDetail']>['models'][number]>(`select model,
+          coalesce(sum("costMicroUsd"),0)::float8 as "costMicroUsd",
+          coalesce(sum("inputTokens"),0)::text as "inputTokens", coalesce(sum("outputTokens"),0)::text as "outputTokens",
+          count(*) filter (where "costMicroUsd" is null)::int as "unknownCalls"
+          from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and ${payerFilter} and "actorId"=$6 and state='settled'
+          group by model order by "costMicroUsd" desc, model`, [...usageParams, usageMemberId])
+        : null,
     ])
     const resources = budgetWorkspaceId && policies.rows[0]?.available ? (await pool.query<BillingManagementView['resourceTargets'][number]>(`
       select id,kind,visibility,"ownerId" from resource_access_policies where "workspaceId"=$1 and kind in ('project','thread') order by kind,id limit 200`, [budgetWorkspaceId])).rows : []
+    // A null day is the member grouping (including historical unattributed calls).
+    const byMember = totals.rows.filter(row => row.day === null)
+    const byDay = new Map(totals.rows.filter(row => row.day !== null).map(row => [row.day, row]))
     const names = new Map(attributionMembers.map(member => [member.id, member.name]))
     return { scope: { ...target, name: scopeName! }, account: account ? { workspaceId: account.id, name: account.name } : null,
       billing, credits, organizations: organizationChoices, platformAccountWorkspaceId, canPurchasePlatform: accountId === platformAccountWorkspaceId, canManagePayments: Boolean(accountId && administrable.has(accountId)), canManageRecharge,
@@ -123,9 +142,14 @@ export async function billingManagementView(actorId: string, target: BillingScop
       capacity: { plan: effective.plan, hostedMaxInFlight: effective.hostedMaxInFlight, activeHumanLimit: effective.activeHumanLimit },
       budgetWorkspaceId, workspaces: available.map(row => ({ id: row.id, name: row.name, canEdit: administrable.has(row.id) })), members,
       resourceTargets: resources, resourceTargetsAvailable: Boolean(policies.rows[0]?.available), budgets,
-      usage: { month, costMicroUsd: totals.rows.reduce((sum, row) => sum + row.cost, 0), reservedMicroUsd: totals.rows.reduce((sum, row) => sum + row.held, 0),
-        unknownCalls: totals.rows.reduce((sum, row) => sum + row.unknown, 0), externalUnknownRuns: external.rows[0]?.count ?? 0,
-        members: totals.rows.map(row => ({ id: row.id, name: row.id ? names.get(row.id) ?? null : null, costMicroUsd: row.cost, unknownCalls: row.unknown })) } }
+      usage: { month, costMicroUsd: byMember.reduce((sum, row) => sum + row.cost, 0), reservedMicroUsd: byMember.reduce((sum, row) => sum + row.held, 0),
+        unknownCalls: byMember.reduce((sum, row) => sum + row.unknown, 0), externalUnknownRuns: external.rows[0]?.count ?? 0,
+        daily: effective.usageExport ? monthDays(month).map(date => {
+          const row = byDay.get(date)
+          return { date, costMicroUsd: row?.cost ?? 0, reservedMicroUsd: row?.held ?? 0, unknownCalls: row?.unknown ?? 0 }
+        }) : undefined,
+        memberDetail: usageMemberId && memberModels ? { id: usageMemberId, models: memberModels.rows } : undefined,
+        members: byMember.map(row => ({ id: row.id, name: row.id ? names.get(row.id) ?? null : null, costMicroUsd: row.cost, unknownCalls: row.unknown })) } }
   })
 }
 

@@ -10,8 +10,8 @@ test('one person saves an environment, selects it for a Project and queues a Run
   const previousByos = process.env.MIKKA_BYOS_ENABLED
   process.env.MIKKA_BYOS_ENABLED = '1'
   t.after(() => { if (previousByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previousByos })
-  const headers = mock.module('next/headers', { namedExports: { cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() } })
-  const locale = mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
+  const headers = mock.module('@/lib/server-runtime/headers', { namedExports: { cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() } })
+  const locale = mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
   t.after(() => { headers.restore(); locale.restore() })
   const fixture = new Pool({ connectionString: dbUrl })
   const { pool } = await import('../lib/db')
@@ -25,8 +25,8 @@ test('one person saves an environment, selects it for a Project and queues a Run
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
   const repository = `https://github.com/mikka-ci/environment-${randomUUID()}.git`
   const repositoryKey = remoteKey(repository)
-  await fixture.query(`INSERT INTO devices(id,"ownerId",name,kind,harnesses,"protocolVersion","lastSeenAt")
-    VALUES($1,$2,'Single workflow fixture','local',$3,3,now())`, [deviceId, owner, JSON.stringify(codexWithModel)])
+  await fixture.query(`INSERT INTO devices(id,"ownerId",name,kind,harnesses,"protocolVersion","lastSeenAt","sessionOpenedAt")
+    VALUES($1,$2,'Single workflow fixture','local',$3,3,now(),now())`, [deviceId, owner, JSON.stringify(codexWithModel)])
   await fixture.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Single workflow Agent')`, [agentId, owner, deviceId])
   await fixture.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`, [repoId, deviceId, owner, repositoryKey, repository])
   await seedAllowedModel(fixture, owner, { workspaceId, deviceIds: [deviceId] })

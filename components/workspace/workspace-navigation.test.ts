@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { canonicalHref, closeThread, goTo, navigate, nextMark, openTask, openThread, setWorkAreaOpener, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
+import { canonicalHref, closeThread, goTo, navigate, nextMark, openTask, openThread, setWorkAreaOpener, workTabForEntry, rememberWorkTab, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
 import type { WorkspaceLocation } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
@@ -100,6 +100,18 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
 })
 
+test('a Bot sidebar thread is the main conversation, with room for a child thread beside it', () => {
+  const main = `/mikka?bot=${BOT}&mainThread=${RUN}`
+  assert.equal(workspaceHref(at(`/mikka?bot=${BOT}&thread=${ISSUE}`), { mainThread: RUN }), main)
+  assert.equal(readLocation(at(main).searchParams).mainThread, RUN)
+  const withChild = workspaceHref(at(main), { thread: ISSUE })
+  assert.equal(withChild, `${main}&thread=${ISSUE}`)
+  assert.equal(readLocation(at(withChild).searchParams).thread, ISSUE)
+  assert.equal(workspaceHref(at(withChild), { thread: null }), main)
+  assert.equal(workspaceHref(at(withChild), { mainThread: null }), `/mikka?bot=${BOT}`)
+  assert.equal(workspaceHref(at(withChild), { section: 'all-issues' }), '/mikka?section=all-issues')
+})
+
 test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
   const list = at(`/mikka?threads=all&thread=${RUN}`)
   assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')
@@ -128,6 +140,22 @@ test('a group chat is `group=<id>`; another chat drops it', () => {
   assert.equal(workspaceHref(at(`/mikka?group=${GROUP}&thread=${RUN}`), { section: 'coordinator', bot: BOT }), `/mikka?bot=${BOT}`)
   // Another page named next to it wins; the group is not part of it.
   assert.equal(readLocation(new URLSearchParams(`section=all-issues&group=${GROUP}`)).group, null)
+})
+
+test('the conversation directory has its own route alongside the default coordinator chat', () => {
+  const directory = workspaceLink({ section: 'conversations' })
+  assert.equal(directory, '/?section=conversations')
+  assert.equal(readLocation(new URL(directory, 'https://example.invalid').searchParams).section, 'conversations')
+  assert.equal(readLocation(new URLSearchParams()).section, 'coordinator')
+})
+
+test('查看运行 is `section=conversations&directoryAutomation=<id>`; the editor keeps its own `automation=<id>`', () => {
+  const runs = workspaceLink({ section: 'conversations', directoryAutomation: RUN })
+  assert.equal(runs, `/?section=conversations&directoryAutomation=${RUN}`)
+  assert.equal(readLocation(new URL(runs, 'https://example.invalid').searchParams).directoryAutomation, RUN)
+  assert.equal(workspaceHref(at(`/mikka?section=conversations&directoryAutomation=${RUN}`), { section: 'all-issues' }), '/mikka?section=all-issues', 'another page drops the filter')
+  // An open automation in the editor survives a move inside its page, such as a task opened beside it.
+  assert.equal(workspaceHref(at(`/mikka?section=automations&automation=${RUN}`), { task: ISSUE }), `/mikka?section=automations&automation=${RUN}&task=${ISSUE}`)
 })
 
 test('a saved chat is `section=agent&session=<id>`', () => {
@@ -315,4 +343,31 @@ test('a chat\'s work area takes tasks and threads opened beside it, and gives th
   openThread(RUN)
   assert.equal(opened.length, 4)
   assert.equal(readLocation(at(browser.path()).searchParams).thread, RUN)
+})
+
+test('an old 任务 link reads as the board: tasks have one entry', () => {
+  assert.equal(sectionFromQuery('tasks'), 'all-issues')
+  const location = readLocation(new URLSearchParams(`section=tasks&issue=${ISSUE}`))
+  assert.equal(location.section, 'all-issues')
+  assert.equal(location.issue, ISSUE)
+})
+
+test('an active chat work tab survives a document reload only on the same entry and account scope', () => {
+  const browser = fakeBrowser('/?section=coordinator')
+  const scope = 'owner/workspace/coordinator'
+  rememberWorkTab(scope, `thread:${RUN}`)
+  assert.deepEqual(workTabForEntry(scope), { kind: 'thread', id: RUN })
+  assert.equal(workTabForEntry('another-owner/workspace/coordinator'), null)
+  assert.equal(workTabForEntry('owner/another-workspace/coordinator'), null)
+  assert.equal(workTabForEntry('owner/workspace/another-bot'), null)
+  assert.equal(browser.path(), '/?section=coordinator')
+  assert.equal(window.history.state.__NA, true)
+  goTo({ section: 'all-issues' })
+  assert.equal(workTabForEntry(scope), null)
+  window.history.back()
+  assert.deepEqual(workTabForEntry(scope), { kind: 'thread', id: RUN })
+  rememberWorkTab(scope, `task:${ISSUE}`)
+  assert.deepEqual(workTabForEntry(scope), { kind: 'task', id: ISSUE })
+  rememberWorkTab(scope, null)
+  assert.equal(workTabForEntry(scope), null)
 })

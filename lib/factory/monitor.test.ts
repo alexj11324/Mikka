@@ -1,5 +1,10 @@
+import { observePoolCommits } from '../db/commit-effects';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
+import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
+import { builtinGateway } from '../builtin-gateway/runtime';
 import { isDeviceOnline } from '@mikka/protocol/device';
-import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { claimFixtureFactoryCheck, createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
@@ -21,7 +26,6 @@ import { execFileSync } from "node:child_process";
 import {
   factoryCheckGates,
   configureFactoryCheck,
-  createFactoryCheckClaim,
 } from "./checks";
 import { createFactoryTestAuthority } from "../../tests/helpers/factory-test-authority";
 import { createLocalPublicationAdapter } from "./local-publication";
@@ -29,7 +33,7 @@ import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
   vercelTarget,
-} from "./vercel-publication";
+} from "../../tests/helpers/factory-vercel-publication";
 import { createVercelMonitorProbe } from "./vercel-monitor";
 import { vercelProtocolFixture } from "../../tests/helpers/factory-vercel";
 import { createLocalMonitorProbe } from "./monitor-probe";
@@ -152,12 +156,13 @@ test(
   "PG17 monitor: real transactions, concurrent dedupe, original issue, restart/rollback, fences, repair and recovery",
   { skip: !target, timeout: 120_000 },
   async (t) => {
-    // Only resolve Next's compile-time marker; use actual document/Yjs/SQL behavior.
+    // Resolve the compile-time marker to an empty module; use actual
+    // document/Yjs/SQL behavior.
     const marker = registerHooks({
       resolve(specifier, context, next) {
         return next(
           specifier === "server-only"
-            ? "next/dist/compiled/server-only/empty.js"
+            ? "data:text/javascript,export {}"
             : specifier,
           context,
         );
@@ -168,8 +173,10 @@ test(
       await import("../linear-sync/document");
     const { createAppIssueFromLinear } = await import("../linear-sync/issue-sync");
     const { withDatabaseClient } = await import("../db");
-    const { workspacePool } = await import("../workspace-db");
     marker.deregister();
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(target!);
     const schema = `monitor_195_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -179,9 +186,10 @@ test(
       max: 16,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
+    const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     const scopes = new Map<string, string>();
     const workspaceFixtures = new Map<string, string>();
-    const authorityWorkspaces: string[] = [];
     const denied = new Set<string>();
     const authorize = async (
       userId: string,
@@ -253,9 +261,9 @@ test(
       const cached = ownerFixtures.get(owner);
       if (cached) {
         // This helper prepares an explicitly online Harness identity for the
-        // next scenario. Earlier scenarios can outlive the real heartbeat TTL.
+        // next scenario: an earlier scenario may have closed its session.
         const heartbeat = await pool.query(
-          'UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1 AND "ownerId"=$2',
+          'UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1 AND "ownerId"=$2',
           [cached.deviceId, owner],
         );
         assert.equal(heartbeat.rowCount, 1, "the owned fixture device still exists");
@@ -280,7 +288,7 @@ test(
         [randomUUID(), owner, "fixture-" + owner],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Local identity fixture',true,now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,$2,'Local identity fixture',true,now(),now(),'[{"harness":"codex","installed":true}]')`,
         [f.deviceId, owner],
       );
       await pool.query(
@@ -508,6 +516,7 @@ test(
         runId: execute,
       });
       await complete(execute);
+      await addFactoryVisualEvidence(pool,execute);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "candidate",
         runId: execute,
@@ -599,6 +608,7 @@ test(
           output,
         });
       }
+      await addFactoryPublicationEvidence(pool,state.task.id);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "advance",
         stage: "approval",
@@ -664,7 +674,7 @@ test(
       });
       const id = dispatched.runId;
       state = dispatched;
-      const assignment = await createFactoryCheckClaim(pool, authorize)(
+      const assignment = await claimFixtureFactoryCheck(pool, store)(
         owner,
         f.deviceId,
         id,
@@ -716,9 +726,7 @@ test(
       );
       // The importer uses the real workspace authority while this suite's app
       // rows live in its isolated schema, as in a split-database deployment.
-      const workspaceId = await seedFixtureWorkspace(workspacePool, 'owner', 'team');
-      authorityWorkspaces.push(workspaceId);
-      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId);
+      const workspaceId = await seedFixtureWorkspace(pool, 'owner', 'team');
       workspaceFixtures.set(JSON.stringify(['owner', 'workspace:a']), workspaceId);
       const { rows: [linearTeam] } = await pool.query<Parameters<typeof createAppIssueFromLinear>[0]>(
         "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\",\"workspaceId\") VALUES ($1,'owner','fixture-team','FIX','Fixture team',$2) RETURNING *",
@@ -741,28 +749,28 @@ test(
       assert.deepEqual((await pool.query('SELECT "externalTargetVerified","linearIssueId" FROM linear_issue_links WHERE "issueId"=$1', [issueId])).rows[0], { externalTargetVerified: true, linearIssueId });
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM linear_sync_outbox WHERE "issueId"=$1', [issueId])).rows[0].n, 0, "an incoming import must not enqueue itself");
       await t.test(
-        "preparing the online fixture renews an expired heartbeat without changing its authority",
+        "preparing the online fixture reopens a closed session without changing its authority",
         async () => {
           const fixture = await ensureOwner("owner");
-          const stale = await pool.query(
-            `UPDATE devices SET "lastSeenAt"=clock_timestamp()-interval '61 seconds'
+          const closed = await pool.query(
+            `UPDATE devices SET "sessionClosedAt"=clock_timestamp()
              WHERE id=$1 AND "ownerId"=$2
-             RETURNING id,"ownerId",enabled,harnesses,"lastSeenAt"`,
+             RETURNING id,"ownerId",enabled,harnesses,"sessionOpenedAt","sessionClosedAt"`,
             [fixture.deviceId, "owner"],
           );
-          assert.equal(stale.rowCount, 1);
-          assert.equal(isDeviceOnline(stale.rows[0].lastSeenAt), false);
+          assert.equal(closed.rowCount, 1);
+          assert.equal(isDeviceOnline(closed.rows[0]), false);
           assert.equal(await ensureOwner("owner"), fixture);
-          const renewed = await pool.query(
-            'SELECT id,"ownerId",enabled,harnesses,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2',
+          const reopened = await pool.query(
+            'SELECT id,"ownerId",enabled,harnesses,"sessionOpenedAt","sessionClosedAt" FROM devices WHERE id=$1 AND "ownerId"=$2',
             [fixture.deviceId, "owner"],
           );
-          assert.equal(renewed.rowCount, 1);
-          const { lastSeenAt: previousHeartbeat, ...previousIdentity } = stale.rows[0];
-          const { lastSeenAt: currentHeartbeat, ...currentIdentity } = renewed.rows[0];
+          assert.equal(reopened.rowCount, 1);
+          const { sessionOpenedAt: previousOpen, sessionClosedAt: _closedAt, ...previousIdentity } = closed.rows[0];
+          const { sessionOpenedAt: currentOpen, sessionClosedAt: _reopened, ...currentIdentity } = reopened.rows[0];
           assert.deepEqual(currentIdentity, previousIdentity);
-          assert.ok(currentHeartbeat.getTime() > previousHeartbeat.getTime());
-          assert.equal(isDeviceOnline(currentHeartbeat), true);
+          assert.ok(currentOpen.getTime() > previousOpen.getTime());
+          assert.equal(isDeviceOnline(reopened.rows[0]), true);
         },
       );
       const first = await toMonitor("owner", issueId);
@@ -1011,6 +1019,7 @@ test(
             max: 16,
             options: `-c search_path=${schema}`,
           });
+          observePoolCommits(pool);
           store = createFactoryStore(pool, authorize, integrationGates);
           monitor = makeMonitor();
           assert.deepEqual(await monitor.consume("owner", sample.input), {
@@ -1536,7 +1545,7 @@ test(
               agentId: f.agentId,
               deviceRepoId: f.repoId,
             });
-            const assignment = await createFactoryCheckClaim(pool, authorize)(
+            const assignment = await claimFixtureFactoryCheck(pool, store)(
               "owner",
               f.deviceId,
               bound.runId,
@@ -1649,12 +1658,10 @@ test(
         }),
       );
     } finally {
-      for (const workspaceId of authorityWorkspaces) {
-        await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId]);
-        await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1 AND "userId"=$2', [workspaceId, 'owner']);
-      }
       await cloud.close();
       await rm(targetRoot, { recursive: true, force: true });
+      await builtinGateway()?.stop();
+      await closeWorkspace();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

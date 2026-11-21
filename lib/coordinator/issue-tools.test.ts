@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, before, beforeEach, mock, test } from 'node:test'
-import { createIssueInput, updateIssueInput } from './issue-input'
+import { createIssueInput, requestIssueInput, updateIssueInput } from './issue-input'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { AGENT_TOOL_IDS, SCHEDULE_TOOL_IDS } from '@/lib/agent-kit/registry'
 import { issueMutationsEnabled } from './issue-tools-enabled'
@@ -102,6 +102,11 @@ test('schedule tools use the host source event and SDK call identity', async () 
 })
 
 test('schemas allow a human assignee and reject execution identities and workspace DB mutations', () => {
+  const requested = { sourceEventId: '550e8400-e29b-41d4-a716-446655440000', title: 'Review login' }
+  assert.deepEqual(requestIssueInput.parse({ ...requested, summary: '  Restore login redirects  ' }), { ...requested, summary: 'Restore login redirects' })
+  assert.deepEqual(requestIssueInput.parse(requested), requested)
+  assert.equal(requestIssueInput.safeParse({ ...requested, summary: 'a'.repeat(2001) }).success, false)
+  assert.equal(requestIssueInput.safeParse({ ...requested, workspaceId: requested.sourceEventId }).success, false)
   assert.ok(createIssueInput.safeParse({ title: 'Review login', assigneeUserId: 'person' }).success)
   assert.ok(updateIssueInput.safeParse({ issueId: '550e8400-e29b-41d4-a716-446655440000', status: 'done', assigneeUserId: null }).success)
   assert.equal(createIssueInput.safeParse({ title: 'Task', assigneeAgentId: 'worker' }).success, false)
@@ -154,7 +159,7 @@ test('one task, one thread: dispatch takes newThread from the model but the pers
   assert.match(String(dispatch.description), /never to start over/)
   assert.match(COORDINATOR_INSTRUCTIONS, /Never dispatch a second thread/)
   const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean; data?: Record<string, unknown> } }
-  const input = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', newThread: true }
+  const input = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', newThread: true, model: { harness: 'codex' as const } }
   assert.equal(schema.safeParse(input).success, true)
   // A model-supplied message id is not part of the tool's input.
   assert.equal('sourceEventId' in (schema.safeParse({ ...input, sourceEventId: 'forged' }).data ?? {}), false)
@@ -166,7 +171,7 @@ test('dispatch takes a named place: one of the person\'s computers by id, or the
   const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   const dispatch = tools.dispatch_run!
   const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean } }
-  const base = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository' }
+  const base = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', model: { harness: 'claude_code' as const } }
   assert.equal(schema.safeParse({ ...base, target: { deviceId: 'b4000000-0000-4000-8000-000000000008' } }).success, true)
   assert.equal(schema.safeParse({ ...base, target: 'cloud' }).success, true)
   assert.equal(schema.safeParse({ ...base, target: { deviceId: 'e2b.local' } }).success, false, 'a computer is named by its id from list_agents')

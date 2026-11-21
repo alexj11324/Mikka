@@ -19,6 +19,15 @@ const report = {
 }
 
 describe("run completion contract", () => {
+  it('carries only explicit public-safe capture IDs, never caller URLs or implicit sharing', () => {
+    const captureId = '50000000-0000-4000-8000-000000000001'
+    const visualEvidence = [{ captureId, publicSafe: true }]
+    expect(runReport.parse({ ...report, visualEvidence }).visualEvidence).toEqual(visualEvidence)
+    for (const entry of [{ captureId }, { captureId, publicSafe: false }, { captureId, publicSafe: true, url: 'https://private.example' }, { captureId: 'other', publicSafe: true }])
+      expect(runReport.safeParse({ ...report, visualEvidence: [entry] }).success).toBe(false)
+    expect(runReport.parse(report).visualEvidence).toBeUndefined()
+  })
+
   it("has one set of stop reasons and one report shape for both sides", () => {
     expect(STOP_REASONS).toBe(RUN_STOP_REASONS)
     expect(handoffReportSchema).toBe(runReport)

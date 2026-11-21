@@ -267,15 +267,31 @@ export function conflictedDrivePaths(
 }
 
 /**
- * The layers of Drive this repository starts with. Capy has six; Mikka starts
- * with three, and adds a layer only when a caller needs it.
+ * The storage layers selected by Files. A team-wide volume belongs to the
+ * selected team Workspace, independently of each member and Project.
  *
  * The name is `driveScope` and not `scope`: it is the layer a volume sits in,
  * not a Capy "scope" and not Mikka's tenant. `workspace` is deliberately absent
  * for the same reason — that word already means the tenant, and reusing it here
  * would make every later reader guess which one a column holds.
  */
-export const DRIVE_SCOPES = ['user', 'project', 'project-user'] as const
+const UUID_SCOPE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+export const DRIVE_SCOPES = ['user', 'project', 'project-user', 'team-workspace', 'bot', 'thread', 'environment'] as const
+/**
+ * The scopes an Agent or a Bot shares through (decision 2026-11-19-2200).
+ * Each one names a uuid (a Bot, a thread's root run, an Environment), has no
+ * person, and stores its bytes in its own `drive-scope:` namespace.
+ */
+export const AGENT_DRIVE_SCOPES = ['bot', 'thread', 'environment'] as const
+export type AgentDriveScope = (typeof AGENT_DRIVE_SCOPES)[number]
+export function isAgentDriveScope(value: unknown): value is AgentDriveScope {
+  return typeof value === 'string' && (AGENT_DRIVE_SCOPES as readonly string[]).includes(value)
+}
+/** The storage owner of an agent-scope volume: never a login, one per scope. */
+export function agentDriveOwner(workspaceId: string, driveScope: AgentDriveScope, scopeId: string): string {
+  return `drive-scope:${workspaceId}:${driveScope}:${scopeId}`
+}
 export type DriveScope = (typeof DRIVE_SCOPES)[number]
 
 export function isDriveScope(value: unknown): value is DriveScope {
@@ -285,7 +301,7 @@ export function isDriveScope(value: unknown): value is DriveScope {
 /**
  * What a volume in `scope` is called and what it points at, checked before any
  * row is written. `project-user` names both the project and the person; the
- * other two name exactly one.
+ * other layers name exactly one.
  */
 export type DriveScopeProblem = 'scope_invalid' | 'scope_id_empty' | 'scope_user_required' | 'scope_user_unexpected'
 export function driveScopeProblem(driveScope: unknown, scopeId: unknown, scopeUserId: unknown): DriveScopeProblem | null {
@@ -295,5 +311,43 @@ export function driveScopeProblem(driveScope: unknown, scopeId: unknown, scopeUs
   // unique key below collide with the project-wide volume.
   const hasUser = typeof scopeUserId === 'string' && scopeUserId.length > 0
   if (driveScope === 'project-user') return hasUser && scopeUserId.length <= 200 ? null : 'scope_user_required'
+  if (isAgentDriveScope(driveScope) && !UUID_SCOPE_ID.test(scopeId)) return 'scope_id_empty'
   return scopeUserId === null || scopeUserId === undefined ? null : 'scope_user_unexpected'
+}
+
+
+export interface DriveSkillCursor { volumeId: string; path: string }
+export interface DriveSkillMetadata extends DriveSkillCursor { versionId: string; name: string; description: string }
+export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: DriveSkillCursor | null }
+
+export type DriveFileVersion = Pick<DriveManifestEntry, 'sha256' | 'sizeBytes'> & {
+  versionId: string; createdAt: string; threadTitle: string | null; authorName: string | null
+}
+
+/** A signed-in link may narrow its underlying Drive audience, never expand it. */
+export type DriveFileLinkVisibility = 'private' | 'org'
+export type DriveFileLink = { id: string; path: string; visibility: DriveFileLinkVisibility }
+export type DriveFileLinkDetails = DriveFileLink & {
+  volumeId: string
+  url: string
+  createdBy: string | null
+  createdAt: string | null
+  manageable: boolean
+}
+export type DriveFileLinkPage = { links: DriveFileLinkDetails[]; nextCursor: string | null }
+export type DriveWorkspaceFileLink = DriveFileLinkDetails & {
+  changedAt: string | null
+  volumeName: string
+  driveScope: DriveScope
+  projectId: string | null
+}
+export type DriveWorkspaceFileLinkPage = { links: DriveWorkspaceFileLink[]; page: number; pageCount: number; total: number }
+
+/** Standalone Workspaces can share within their own membership without an
+ * Organization. Only an actual active Organization supplies its display name. */
+export type DriveShareView = DriveFileLink & {
+  type: 'file'; url: string; orgName: string | null; authorName: string | null;
+  member: { orgId: string; manageable: boolean; projectId: string | null; userId: string | null; automationId: null } | null;
+  versionId: string; versionCreatedAt: string; sizeBytes: number;
+  file: { type: 'url'; url: string; expiresAt: string };
 }

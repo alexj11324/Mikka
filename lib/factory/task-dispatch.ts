@@ -46,7 +46,7 @@ export async function factoryTaskNeedsSpec(pool: Pool, userId: string, input: {
 /** Placement is already decided. Route, attempt, queue and receipt share one commit. */
 export async function queueFactoryTask(pool: Pool, userId: string, input: {
   issueId: string; botId: string | null; agentId: string; deviceRepoId: string; note?: string
-  key?: string; sourceEventId?: string; previousRunId?: string; needsSpec?: boolean
+  key?: string; sourceEventId?: string; previousRunId?: string; needsSpec?: boolean; ownerRequested?: boolean
   selection?: unknown
   queue: FactoryQueue
 }, existing?: FactoryTaskTransaction) {
@@ -74,6 +74,12 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     }
     const { rows } = await tx.query<import('./store').FactoryTask>(`SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ORDER BY "createdAt" DESC,id DESC LIMIT 1 FOR UPDATE`, [userId, input.issueId, input.botId])
     let task: import('./store').FactoryTask | undefined = rows[0]
+    const firstOwnerRequest = input.ownerRequested && !input.previousRunId &&
+      (!task || task.sourceEventId === input.sourceEventId && task.status === 'pending' && ['spec','execute'].includes(task.stage))
+    const initializeDelegate = firstOwnerRequest
+      ? await (await import('../dispatch-delegate')).admitDispatchDelegate(tx,userId,input.issueId,
+        input.sourceEventId ? { eventId: input.sourceEventId, botId: input.botId } : undefined)
+      : null
     const pendingSpec = task?.stage === 'spec' && task.status === 'pending' && !input.previousRunId
     if (input.needsSpec && task && task.stage !== 'spec' && !['cancelled','revoked'].includes(task.status)) throw new FactoryError('factoryStale')
     if (task?.stage === 'spec' && !['cancelled','revoked'].includes(task.status)) {
@@ -130,6 +136,12 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     await existing?.prepareAttempt?.(tx, task)
     const dispatch = createFactoryDispatch(pool, runtime.store, input.queue)
     const result = await dispatch(userId, { binding: factoryBinding(task), agentId: input.agentId, deviceRepoId: input.deviceRepoId, ...(input.note ? { note: input.note } : {}) }, tx)
+    if (initializeDelegate) await initializeDelegate(result.runId)
+    if (input.previousRunId && sourceEventId && input.key === `thread:${input.previousRunId}:${sourceEventId}`)
+      await tx.query(`UPDATE thread_reply_versions v SET "resultRunId"=r.id FROM agent_runs r
+        WHERE v."sourceEventId"=$1 AND v."admissionRunId"=$2 AND v."userId"=$3 AND r.id=$4 AND r."userId"=v."userId"
+          AND r."workspaceId"=v."workspaceId" AND r."issueId"=$5 AND v."resultRunId" IS NULL`,
+      [sourceEventId,input.previousRunId,userId,result.runId,input.issueId])
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
     await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest, sourceEventId }), JSON.stringify({ runId: result.runId })])
     if (!existing) {

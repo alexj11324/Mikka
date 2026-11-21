@@ -3,6 +3,9 @@ description: >-
   Exact installed-dependency reuse, with a pnpm-store fallback on misses.
   Only main pushes and manual main runs save caches; PRs only restore.
 inputs:
+  node-version:
+    description: Node.js major used for installation and the exact dependency cache key
+    default: '24'
   profile:
     description: full, or desktop (all workspaces except the independent mobile app)
     default: full
@@ -21,7 +24,7 @@ runs:
         version: 10.34.3
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: 24
+        node-version: ${{ inputs.node-version }}
     - id: modules-key
       shell: bash
       env:

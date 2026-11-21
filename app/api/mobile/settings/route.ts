@@ -3,34 +3,33 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
 import { coordinatorSessions, linearConnections, users } from '@/lib/db/schema'
-import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit } from '@/lib/composio'
+import { getComposio } from '@/lib/composio'
+import { isComposioToolkitSlug } from '@/lib/composio-accounts'
 import { listComposioPages } from '@/lib/composio-pagination'
 import { readPreferences } from '@/lib/preferences'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { listOrganizations } from '@/lib/governance/organizations'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { isCloudEdition } from '@/lib/edition'
+import { pairedMobileCloudUI } from '@/lib/mobile-web-scope'
 import { mobileMembersPage } from '@/lib/mobile-web-target'
 import { mobilePluginConnections } from '@/lib/mobile-plugin-connections'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
-export const dynamic = 'force-dynamic'
 
-const APPS = [...COMPOSIO_TOOLKITS, 'linear'] as const
-type App = (typeof APPS)[number]
-
-/** Which apps the person connected: Composio's (Gmail, Calendar, Notion, Slack) and Linear. Connecting happens on the web. */
-async function connectedApps(userId: string): Promise<{ app: App; connected: boolean; account: string | null }[]> {
+/** Which apps the person connected: every Composio toolkit with an active account (Composio's live list), and Linear. Connecting happens on the web. */
+async function connectedApps(userId: string): Promise<{ app: string; connected: boolean; account: string | null }[]> {
   const composio = getComposio()
   const composioAccounts = composio
     ? await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor })).catch(() => [])
     : []
-  const active = new Set(composioAccounts.filter(account => isComposioToolkit(account.toolkit.slug) && account.status === 'ACTIVE').map(account => account.toolkit.slug))
+  const active = [...new Set(composioAccounts.filter(account => isComposioToolkitSlug(account.toolkit.slug) && account.status === 'ACTIVE').map(account => account.toolkit.slug))].sort()
   const [linear] = await db.select({ organizationName: linearConnections.organizationName }).from(linearConnections)
     .where(and(eq(linearConnections.userId, userId), isNull(linearConnections.revokedAt))).limit(1)
-  return APPS.map(app => app === 'linear'
-    ? { app, connected: Boolean(linear), account: linear?.organizationName ?? null }
-    : { app, connected: active.has(app), account: null })
+  return [
+    ...active.map(app => ({ app, connected: true, account: null })),
+    { app: 'linear', connected: Boolean(linear), account: linear?.organizationName ?? null },
+  ]
 }
 
 /**
@@ -57,7 +56,10 @@ async function handleGET(request: Request) {
   ])
   if (!profile) return unauthorized()
   const organization = context.role === 'admin' ? null : (await listOrganizations(user.id)).find(item => item.role === 'owner' || item.role === 'admin')
+  const pairedHumanSession = pairedMobileCloudUI() && user[enterprisePrincipal]?.kind === 'session'
   return json({
+    personalFilesAvailable: pairedHumanSession,
+    organizationSettingsAvailable: pairedHumanSession,
     billingScope: context.role === 'admin' ? { kind: 'workspace', id: context.workspace.id } : organization ? { kind: 'organization', id: organization.id } : null,
     user: { id: profile.id, name: profile.name, email: profile.email, image: profile.image },
     workspace: {

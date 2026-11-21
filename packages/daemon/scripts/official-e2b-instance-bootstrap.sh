@@ -14,6 +14,8 @@ mikka_sha=${2:?worker digest required}
 mikka_kind=${3:?official template kind required}
 mikka_mode=${4:-install}
 mikka_previous_sha=${5:-}
+mikka_prebuild=0
+if [[ "$mikka_mode" = prebuild ]]; then mikka_mode=install; mikka_prebuild=1; fi
 [[ "$mikka_mode" = install || "$mikka_mode" = stage ]] || exit 2
 [[ "$mikka_commit" =~ ^[a-f0-9]{40}$ && "$mikka_sha" =~ ^[a-f0-9]{40}$ ]] || exit 2
 [[ "$mikka_kind" = desktop || "$mikka_kind" = claude || "$mikka_kind" = codex ]] || exit 2
@@ -24,6 +26,7 @@ if [[ "$mikka_mode" = stage ]]; then
   [[ -x /opt/mikka/runtime/node/bin/node && -L /opt/mikka/worker ]] || exit 3
 elif [[ -f /opt/mikka/worker-source-sha ]]; then
   [[ "$(cat /opt/mikka/worker-source-sha)" = "$mikka_sha" ]] || exit 3
+  if [[ "$mikka_prebuild" = 0 ]]; then python3 /opt/mikka/runtime/ingress-v1/guard.py verify >/dev/null; fi
   exit 0
 fi
 # Refuse an unknown installation. Retained/legacy instances are never erased
@@ -40,6 +43,8 @@ if [[ -e "$mikka_release" || -L "$mikka_release" ]]; then
   [[ "$(cat "$mikka_release/worker-ready.sha")" = "$mikka_sha" ]] || exit 3
   [[ "$(git -C "$mikka_release/source" rev-parse HEAD)" = "$mikka_commit" ]] || exit 3
   python3 "$mikka_release/source/scripts/e2b/official-files.py" cli-check "$mikka_release/source/.mikka-original-cli.json" --kind "$mikka_kind"
+  install -d -m 0755 /opt/mikka/runtime/capture-tools
+  /opt/mikka/runtime/node/bin/node "$mikka_release/source/packages/daemon/scripts/install-capture-tools.mjs"
   printf 'mikka-official-instance-staged %s %s\n' "$mikka_commit" "$mikka_sha"
   exit 0
 fi
@@ -87,6 +92,12 @@ mikka_phase_done gh
 fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 cd "$mikka_release/source"
+# Both a fresh installation and a stage refresh need the pinned pair. The
+# versioned private directory is additive; staging never changes active links
+# or an official template's FFmpeg/system packages.
+install -d -m 0755 /opt/mikka/runtime/capture-tools
+node packages/daemon/scripts/install-capture-tools.mjs
+mikka_phase_done capture_tools
 # pnpm 10 also installs the root importer of a filtered shared-lock workspace.
 # Keep the fetched source intact and install only the worker's locked importers.
 mikka_install="$mikka_release/worker-install"
@@ -97,6 +108,20 @@ mikka_install="$mikka_release/worker-install"
   env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
 )
 python3 packages/daemon/scripts/prepare-worker-install.py "$mikka_release/source" "$mikka_install" --link
+# Every official kind can serve an authenticated run preview. Keep this pinned
+# Python dependency in Mikka's own versioned directory: no apt/system package
+# changes and no dependency installation when a person opens the preview.
+mikka_preview_deps=/opt/mikka/runtime/preview-python-3.14.0
+if [[ ! -e "$mikka_preview_deps" ]]; then
+  mikka_preview_stage=$(mktemp -d /opt/mikka/runtime/.preview-python-3.14.0-XXXXXXXX)
+  env HOME=/opt/mikka/runtime/bootstrap-home PIP_CACHE_DIR=/opt/mikka/runtime/pip-cache python3 -m pip install --disable-pip-version-check --target "$mikka_preview_stage" 'aiohttp==3.14.0'
+  env PYTHONPATH="$mikka_preview_stage" python3 -c 'import aiohttp; assert aiohttp.__version__ == "3.14.0"'
+  chmod -R go-w "$mikka_preview_stage"
+  mv -T --no-clobber "$mikka_preview_stage" "$mikka_preview_deps"
+  [[ ! -e "$mikka_preview_stage" ]] || exit 3
+fi
+[[ -d "$mikka_preview_deps" && ! -L "$mikka_preview_deps" && "$(stat -c %u "$mikka_preview_deps")" = 0 ]] || exit 3
+env PYTHONPATH="$mikka_preview_deps" python3 -c 'import aiohttp; assert aiohttp.__version__ == "3.14.0"'
 mikka_phase_done dependencies
 MIKKA_CLOUD_WORKER_BUILD_SHA="$mikka_sha" node packages/daemon/scripts/build-cloud-worker.mjs
 mikka_phase_done build
@@ -184,6 +209,19 @@ if [[ "$mikka_kind" = desktop ]]; then
 fi
 mikka_phase_done desktop
 install -d -m 710 -o root -g user /run/mikka-viewer
+python3 packages/daemon/scripts/workspace-control-install.py
+# The final prebuilt start owns its kernel/boot receipt. An official-instance
+# fallback prepares the same policy now, before returning to any credential
+# publication or worker launch. Staging exits above and cannot mint this proof.
+# The guard needs nftables >= 1.0.6. The desktop base (Ubuntu 22.04) ships
+# 1.0.2 and no newer package, and an apt change would alter official files,
+# so it gets the pinned private build the guard's tool path looks up first.
+if [[ "$mikka_kind" = desktop ]]; then bash packages/daemon/scripts/build-netfilter.sh /opt/mikka/runtime/netfilter; fi
+mikka_ingress=/opt/mikka/runtime/ingress-v1
+[[ ! -e "$mikka_ingress" && ! -L "$mikka_ingress" ]] || exit 3
+install -d -m 755 -o root -g root "$mikka_ingress"
+install -m 444 -o root -g root packages/daemon/scripts/workspace-ingress.py "$mikka_ingress/guard.py"
+if [[ "$mikka_prebuild" = 0 ]]; then python3 "$mikka_ingress/guard.py" prepare; fi
 chmod -R go-w "$mikka_release"
 printf '%s\n' "$mikka_sha" > /opt/mikka/worker-source-sha
 chmod 0444 /opt/mikka/worker-source-sha

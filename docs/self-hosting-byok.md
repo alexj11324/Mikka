@@ -37,41 +37,24 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 社区版在同一进程调用现有 broker：一次性租约、浏览器页面绑定、权限检查、截图保护和审计保持有效，不需要部署 `services/credential-broker`。云版继续使用独立 broker、AWS KMS 和 Vercel OIDC；即使意外设置本地主密钥，`MIKKA_EDITION=cloud` 也不会改用它。
 
-## 管理员配置的默认模型
+## 必需的 LiteLLM 模型出口
+
+社区版和云版都通过后台 LiteLLM 发出 Mikka 管理的模型请求，包括 Coordinator、标题、Decisions、Planning、转写，以及个人 API Key 的聊天和 Agent 运行。应用不再直连厂商、Vercel AI Gateway、Workers AI 或自部署模型。
 
 | 变量 | 用途 |
 | --- | --- |
-| `MIKKA_DEFAULT_MODEL_BASE_URL` | OpenAI-compatible Chat Completions API 根地址，例如 `https://models.example.com/v1`。 |
-| `MIKKA_DEFAULT_MODEL_API_KEY` | 自己的提供方 API Key。 |
-| `MIKKA_DEFAULT_MODEL_ID` | 提供方实际 model ID，例如 `local-model`。 |
+| `MIKKA_LITELLM_URL` | 受信任 LiteLLM 服务的根地址，例如 Compose 内网的 `http://litellm:4000`；也支持包含 `/v1` 的地址。 |
+| `MIKKA_LITELLM_MASTER_KEY` | 应用调用该 LiteLLM 的服务密钥；与 LiteLLM 的 `LITELLM_MASTER_KEY` 匹配。只放在服务端 secret 配置中，不交给 Agent。 |
 
-三项完整配置后，社区版的「Mikka 默认」、Coordinator、短标题、行动标题和资料提取使用该提供方。请求直接发送到该地址，不增加 Mikka 云服务代理，不扣 Mikka 额度，也不会在失败时自动将内容发送给另一个提供方。禁止跟随 HTTP 重定向。
+两项缺一时，模型请求不可用，没有直连 fallback。模型准入、工作区权限、原有预算预留和用量记录仍由 Mikka 执行。daemon 的 API-key 运行使用本次运行绑定的 Mikka 网关令牌，经后台 LiteLLM；不把用户真实 Key 交给 CLI。
 
-组织配置了模型准入规则时，需允许 `provider: "openai-compatible"`、规范化后的 endpoint、提供方实际 model ID、`servingProviders: ["openai-compatible"]` 和当前用户。每次 SDK 工具步骤前重新检查，修改或撤销规则不会被「Mikka 默认」这个 UI 别名绕过。
+同机运行的 Desktop/daemon 可通过 HTTP loopback 连接本地服务器：`BETTER_AUTH_URL` 必须与连接地址的 origin 完全一致（协议、主机、端口），设备类型必须是本地。服务器只下发 `mkg_` 运行令牌和对应的 Mikka 模型网关地址，不下发厂商 Key。其他 HTTP 地址和云端设备仍需 HTTPS。支持该协议的 daemon 会发送 `x-mikka-model-gateway-loopback: 1`；旧 daemon 收到 `daemonUpgradeRequired`，运行保留在队列中，升级后再领取。
 
-未配置该三项时，可以继续使用自己的 `AI_GATEWAY_API_KEY` 或原有 `ZEROCAT_BASE_URL` / `ZEROCAT_API_KEY` 路径。Coordinator 不再以运行在 Vercel 上作为社区版启用条件。云版继续保留固定 ZeroCat 路由、首 token 超时回退和现有计费。
+在 LiteLLM 中配置 `mikka-default`、`mikka-title`、`mikka-decision` 和 `mikka-planning` 别名。`mikka-title` 映射到 GPT-6 Luna；其他别名的实际模型和上游由部署者配置。Vercel AI Gateway、Neon AI Gateway、Workers AI 或自己的兼容模型都是 LiteLLM 上游；在 LiteLLM 的配置和 secret 环境中设置它们的凭据。参考同版本的 [`deploy/litellm/config.yaml`](../deploy/litellm/config.yaml)。个人 API Key 的模型和端点继续通过「模型与订阅」选择，后端将已授权的来源交给 LiteLLM，失败时不切换到 Mikka 的 Key。
 
-只连接个人 Claude / ChatGPT 订阅，或为 Bot 选择自己的 API Key，也可以聊天，不需要服务器默认模型和云连接。聊天启用、消息唤醒和原有后台重试都检查这个 Bot 的真实选项、工作区权限及当前连接状态。暂停、断开、旧版本绑定或已知耗尽的订阅不会启用聊天；过期的额度读数可提交下一次正式检查，执行前仍会重新验证。明确选择「Mikka 默认」时，不会因管理员未配置它就悄悄改用个人订阅。
+旧 `MIKKA_DEFAULT_MODEL_*`、`ZEROCAT_*`、应用内 Workers AI 配置、`DECISIONS_URL`、`DECISIONS_API_KEY`、`OPENAI_DECISIONS_API_KEY` 和 `DECISION_MODEL` 不再提供独立模型路径。把实际模型、端点和上游凭据迁到 LiteLLM 配置后，再升级应用；只设置旧变量无法启用默认模型。Decisions 使用 LiteLLM 的原生 `/v1/decisions` 协议，别名是 `mikka-decision`。
 
-## Workers AI 默认模型备用路径
-
-由服务端付费的默认模型可使用 Cloudflare Workers AI 作为 ZeroCat 的备用路径。将 `MIKKA_HOSTED_MODEL_FALLBACK` 设为 `cloudflare-workers-ai`，配置对应账户的 `CLOUDFLARE_WORKERS_AI_ACCOUNT_ID` 及已有推理权限的 `CLOUDFLARE_WORKERS_AI_TOKEN`。服务端固定调用该账户的 Workers AI API 和 `@cf/deepseek-ai/deepseek-v4.1-flash-1017`。组织或工作区开启模型准入规则时，需要显式允许此提供商、账户端点和逻辑模型。已有 Gateway 规则不会扩大该权限。
-
-此选项沿用原有的预算预留、首个 token 前的切换和流式结算。每次按供应商实际报告的输入、缓存命中和输出 token 计算用量，Startup Credit 的净额以账户账单为准。配置了 Workers AI 的主机对其他未支持的托管模型会返回准入失败。个人订阅和自行选择的自托管模型继续走各自已有的凭证路径。
-
-## Decisions
-
-| 变量 | 默认值 / 用途 |
-| --- | --- |
-| `DECISION_MODEL` | 默认 `openai/gpt-6-luna-decisions`。 |
-| `DECISIONS_URL` | 默认 `https://ai-gateway.vercel.sh/v1/decisions`。自配服务需实现相同的 Decisions 请求、回答和调用回执协议。 |
-| `DECISIONS_API_KEY` | 自配兼容服务的专用 Bearer Key，也可用于默认 Gateway。其他兼容服务可沿用管理员指定的 `AI_GATEWAY_API_KEY`。 |
-| `OPENAI_DECISIONS_API_KEY` | 原生 OpenAI Decisions 的专用凭证，用于 `https://api.openai.com/v1/decisions`。 |
-| `DECISIONS_BILLING_PROFILE` | 原生端点当前支持 `openai-global-standard`。仅在账户实际使用全球标准价格时配置。 |
-
-默认 Gateway 地址仍支持现有 `AI_GATEWAY_API_KEY` 或 Vercel OIDC。自配地址不会收到 Vercel OIDC 令牌。没有可用凭据时 `decide()` 返回 `null`，保留既有降级行为。
-
-用户发来的消息仍直接投递到所选 Bot，原任务的正式完成结果也沿用原订阅处理，不要求先调用 Decisions。其他需要语义判断的后台事件会保持待处理，不会编造分类或额外要求用户批准。
+官方 Claude Code / Codex 订阅 OAuth 保留独立连接路径，仍需完成下文部署的订阅后端。这是 [LiteLLM 决策](design/decisions/2026-11-20-0530-litellm-only-model-egress.md) 中等待兼容性验证和 Alex 决定的明确例外。未配置 LiteLLM 时，订阅连接本身不代表服务器的默认模型可用。
 
 ## PostHog 与功能缺省值
 
@@ -119,7 +102,7 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 ## Skills 搜索
 
-有 Vercel OIDC 时沿用身份请求；没有时直接读取 skills.sh 的公开 API。如果上游要求授权、不可用或返回不合规数据，接口返回固定 `skills_search_unavailable` / `invalid_skills_response`，不泄露上游响应。不需要 Mikka 账号或新增 Key。
+技能目录读取需要 Vercel OIDC。没有可用部署身份时，接口不会向上游发出未认证请求，并返回 `skills_search_identity_unavailable`；上游拒绝身份时返回 `skills_search_identity_rejected`。其他上游不可用或响应不合规时，分别返回固定 `skills_search_unavailable` / `invalid_skills_response`，不泄露上游响应。社区版或 Cloudflare 部署若没有受支持的身份，仍可从页面打开 skills.sh 浏览；不需要用户提供 Mikka Key。
 
 ## 验证
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { z } from 'zod'
 import { createBrowserRpc } from './handler'
-import { browserAuthentication, readBrowserSession, withBrowserSession } from './session'
+import { browserAuthentication, browserProfileUpdated, readBrowserSession, withBrowserSession } from './session'
 import { currentDesktopSession } from '../desktop-rpc/session'
 import { readFreshSessionsInScope, withFreshSession } from '../fresh-session'
 
@@ -81,6 +81,31 @@ test('initial/fresh SDK cookie outputs survive; only a real issued proof marks i
   assert.equal(calls, 2)
   assert.deepEqual(result.headers.getSetCookie(), ['old=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Secure', 'better-auth.session_data=validProof; Path=/; HttpOnly'])
   assert.equal(result.headers.has('x-mikka-session-token'), false); assert.equal(result.headers.has('x-mikka-session-cache'), false)
+})
+
+test('a profile write replaces only this browser’s SDK session cache and preserves chunk expiry', async () => {
+  const cacheName = '__Secure-custom.session_data'
+  const previous = new Headers()
+  previous.append('set-cookie', cacheName + '=previous; Path=/; HttpOnly')
+  previous.append('set-cookie', 'unrelated=initial; Path=/')
+  const auth = browserAuthentication(async () => ({ response: session, headers: previous }), async () => cacheName)
+  const identity = await auth.authenticate(headers())
+  assert.ok(identity)
+  const after = new Headers()
+  const issued = [
+    cacheName + '=; Max-Age=0; Path=/; HttpOnly; Secure',
+    cacheName + '.0=first; Path=/; HttpOnly; Secure',
+    cacheName + '.1=second; Path=/; HttpOnly; Secure',
+  ]
+  for (const value of [...issued, 'token=unrelated; Path=/', cacheName + '.other=unrelated; Path=/']) after.append('set-cookie', value)
+  const response = await auth.scope(identity, async () => {
+    browserProfileUpdated(headers(), after)
+    const foreign = new Headers({ 'set-cookie': cacheName + '=outOfScope; Path=/' })
+    browserProfileUpdated(headers('other'), foreign)
+    browserProfileUpdated(new Headers({ authorization: 'Bearer other', cookie: 'session=one' }), foreign)
+    return Response.json({ ok: true })
+  })
+  assert.deepEqual(response.headers.getSetCookie(), ['unrelated=initial; Path=/', ...issued])
 })
 
 test('browser RPC rejects origin, cookie/bearer confusion, unknown actions and invalid args before execution', async () => {

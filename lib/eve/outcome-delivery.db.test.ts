@@ -143,6 +143,42 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
     await f.deliver(f.scope,f.input);assert.equal(telegram.length,0,mutation)
    }
   })
+  await t.test('bound task delivery refreshes deletion metadata for every chunk without transferring the task body', async t => {
+   const body = 'rich task paragraph '.repeat(4096)
+   const client = await app.connect()
+   const socket = (client as unknown as {connection:{stream:{bytesRead:number}}}).connection.stream
+   try {
+    for (const key of ['mikka', 'orvilo']) {
+     const f = await fixture({text:'x'.repeat(9000)})
+     const issueId = randomUUID()
+     const doc = {type:'doc', attrs:{[key]:{}}, content:[{type:'paragraph',content:[{type:'text',text:body}]}]}
+     await app.query("INSERT INTO issues VALUES($1,$2,$3,'bound',$4)",[issueId,f.owner,f.workspace,doc])
+     await app.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=$1',[f.source,issueId])
+     const sent:string[] = []
+     const deliver = createEveOutcomeDelivery(client,client,{
+      safe:async()=>{}, push:async()=>{},
+      telegram:async(_thread,chunk)=>{
+       sent.push(chunk)
+       await app.query("UPDATE issues SET content=jsonb_set(content,$2::text[],to_jsonb($3::text)) WHERE id=$1",[issueId,['attrs',key,'deletedAt'],'2026-11-14T10:00:00Z'])
+      },
+     })
+     const calls = t.mock.method(client,'query')
+     const before = socket.bytesRead
+     await deliver(f.scope,f.input)
+     const wireBytes = socket.bytesRead-before
+     const reads = calls.mock.calls.filter(call=>String(call.arguments[0]).includes('FROM eve_sessions s'))
+     const issueDocs = await Promise.all(reads.map(async call=>{
+      const {rows} = await (call.result as unknown as Promise<{rows:{issueContent:unknown}[]}>)
+      return JSON.stringify(rows[0]!.issueContent)
+     }))
+     calls.mock.restore()
+     assert.deepEqual(sent,['x'.repeat(4096)])
+     assert.ok(reads.length >= 2)
+     t.diagnostic(key+' metadata: '+reads.length+' custody reads, '+issueDocs.reduce((n,doc)=>n+Buffer.byteLength(doc),0)+' issue bytes, '+wireBytes+' bytes on the PG client socket')
+     assert.ok(issueDocs.every(doc=>!doc.includes(body)), 'notification routing must not transfer the issue description')
+    }
+   } finally {client.release()}
+  })
   await t.test('no_reply suppresses partial text and all phone policy calls; quiet and cancellation do too',async()=>{
    for(const options of [{quiet:true,text:'Earlier partial commentary'},{text:'[quiet]'},{outcome:'cancelled' as const}]){const f=await fixture(options);await f.deliver(f.scope,f.input);assert.equal(telegram.length,0);assert.equal(decisions,0)}
   })
@@ -159,7 +195,7 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    const f=await fixture({kind:'matter_handoff',payload:{assessment:{verificationCode:true}},text:'Your synthetic code is 123456'});await f.deliver(f.scope,f.input);assert.equal(telegram.length,0);assert.equal(decisions,1);assert.equal(pushes[0].text,null);assert.ok(!decisionInputs[0].includes('123456'));assert.match(decisionInputs[0],/text withheld/)
   })
   await t.test('actionable native failure uses existing refusal copy; raw diagnostics and generic failures never post',async()=>{
-   const f=await fixture({outcome:'failed',text:'Private partial answer'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 默认点数已用完'}]);assert.equal(pushes[0].text,'Mikka 默认点数已用完');assert.equal(decisions,1)
+   const f=await fixture({outcome:'failed',text:'Private partial answer'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 额度已用完'}]);assert.equal(pushes[0].text,'Mikka 额度已用完');assert.equal(decisions,1)
    const unknown=await fixture({outcome:'failed',error:'turn_failed'});await unknown.deliver(unknown.scope,unknown.input);assert.equal(telegram.length,0);assert.equal(decisions,0)
   })
   await t.test('scheduled reads and blank native outcomes remain silent',async()=>{
@@ -167,7 +203,7 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    for(const options of [{text:''},{text:' \n '},{text:'',outcome:'failed' as const,error:'turn_failed'}]){const blank=await fixture(options);await blank.deliver(blank.scope,blank.input);assert.equal(telegram.length,0);assert.equal(decisions,0)}
   })
   await t.test('an actionable failure still delivers its valid refusal line when native text is blank',async()=>{
-   const f=await fixture({text:'',outcome:'failed',error:'points_exhausted'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 默认点数已用完'}]);assert.equal(decisions,1);assert.equal(pushes[0].text,'Mikka 默认点数已用完')
+   const f=await fixture({text:'',outcome:'failed',error:'points_exhausted'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 额度已用完'}]);assert.equal(decisions,1);assert.equal(pushes[0].text,'Mikka 额度已用完')
   })
  }finally{await app.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end()}
 })

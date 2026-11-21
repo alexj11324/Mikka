@@ -4,8 +4,20 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-22",
   "compatibility_flags": ["nodejs_compat"],
-  // Free plan Durable Objects are SQLite-backed. The session does not write
-  // rows on the heartbeat; the class is SQLite so the free plan can create it.
+  // Free plan Durable Objects are SQLite-backed. Pings are auto-answered and
+  // write nothing; storage holds only observer watches and undelivered device
+  // session reports. The class is SQLite so the free plan can create it.
+  //
+  // Bindings set outside this file (releases deploy with --keep-vars):
+  // - GATEWAY_PUSH_SECRET (secret, `wrangler secret put GATEWAY_PUSH_SECRET`):
+  //   the application's bearer for push and status, and the gateway's bearer
+  //   for its session reports to the application.
+  // - DEVICE_SESSION_REPORT_URL (plain text var): the application's endpoint
+  //   up to /v1/internal/device-sessions, for example
+  //   https://app.example.com/mikka/v1/internal/device-sessions. Without it
+  //   the gateway reports no device sessions and no device is online. Set it
+  //   in the dashboard or once with `wrangler deploy --var`; the release
+  //   preflight (scripts/device-gateway/deploy.mjs) refuses to deploy without it.
   "workers_dev": true,
   "observability": { "enabled": true },
   "durable_objects": {

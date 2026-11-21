@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, notExists, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { organizationInvitations, organizationMembers, organizations } from '@/lib/db/governance-schema'
 import { pool } from '@/lib/db'
@@ -15,6 +15,35 @@ const invitationIdSchema = z.uuid()
 const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
 const emailSchema = z.email().max(254)
+
+async function verifiedInvitationRecipient(user: { id: string; email: string }) {
+  const { rows: [account] } = await pool.query<{ email: string; name: string }>(
+    'SELECT lower(email) AS email,name FROM "user" WHERE id=$1 AND "emailVerified" AND lower(email)=lower($2)', [user.id, user.email])
+  if (!account) throw new GovernanceError('access_denied')
+  return account
+}
+
+/** The recipient sees only outstanding invitations they can currently accept. */
+export async function listReceivedOrganizationInvitations(user: { id: string; email: string }) {
+  const recipient = await verifiedInvitationRecipient(user)
+  const invitations = await workspaceDb.select({
+    id: organizationInvitations.id,
+    organizationId: organizations.id,
+    organizationName: organizations.name,
+    inviterName: organizationMembers.name,
+    invitedAt: organizationInvitations.createdAt,
+    expiresAt: organizationInvitations.expiresAt,
+  }).from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
+    .innerJoin(organizationMembers, and(eq(organizationMembers.organizationId, organizations.id),
+      eq(organizationMembers.userId, organizationInvitations.createdBy), eq(organizationMembers.status, 'active')))
+    .where(and(eq(organizationInvitations.email, recipient.email), eq(organizationInvitations.status, 'pending'),
+      gt(organizationInvitations.expiresAt, sql`CURRENT_TIMESTAMP`), isNull(organizations.archivedAt),
+      notExists(workspaceDb.select({ id: sql`1` }).from(organizationMembers).where(and(
+        eq(organizationMembers.organizationId, organizationInvitations.organizationId), eq(organizationMembers.userId, user.id))))))
+    .orderBy(desc(organizationInvitations.createdAt), asc(organizationInvitations.id))
+  return { invitations }
+}
 
 export type OrganizationInvitationOutcome =
   | { email: string; created: true; id: string; path: string }
@@ -47,9 +76,13 @@ export async function issueOrganizationInvitations(organizationId: string, actor
     await assertOrganizationAccountWritable(tx, actorId)
     await requireActiveOrganizationMember(tx, organizationId, actorId)
     const members = new Set((await tx.select({ email: organizationMembers.email }).from(organizationMembers)
-      .where(eq(organizationMembers.organizationId, organizationId))).map(row => row.email.toLowerCase()))
-    const existing = new Map((await tx.select().from(organizationInvitations)
-      .where(eq(organizationInvitations.organizationId, organizationId))).map(row => [row.email, row]))
+      .where(and(eq(organizationMembers.organizationId, organizationId),
+        inArray(sql`lower(${organizationMembers.email})`, emails)))).map(row => row.email.toLowerCase()))
+    const existing = new Map((await tx.select({
+      email: organizationInvitations.email, id: organizationInvitations.id,
+      status: organizationInvitations.status, expiresAt: organizationInvitations.expiresAt,
+    }).from(organizationInvitations).where(and(eq(organizationInvitations.organizationId, organizationId),
+      inArray(organizationInvitations.email, emails)))).map(row => [row.email, row]))
     const seen = new Set<string>()
     const outcomes: OrganizationInvitationOutcome[] = []
     const now = new Date()
@@ -89,9 +122,10 @@ export async function listOrganizationInvitations(organizationId: string, actorI
       id: organizationInvitations.id, email: organizationInvitations.email,
       createdBy: organizationInvitations.createdBy, status: organizationInvitations.status,
       createdAt: organizationInvitations.createdAt, expiresAt: organizationInvitations.expiresAt,
-    }).from(organizationInvitations).where(eq(organizationInvitations.organizationId, organizationId))
+    }).from(organizationInvitations).where(and(eq(organizationInvitations.organizationId, organizationId),
+      member.role === 'member' ? eq(organizationInvitations.createdBy, actorId) : undefined))
       .orderBy(asc(organizationInvitations.createdAt))
-    return { invitations: rows.filter(row => member.role !== 'member' || row.createdBy === actorId) }
+    return { invitations: rows }
   })
 }
 
@@ -117,17 +151,15 @@ export async function revokeOrganizationInvitation(organizationId: string, actor
 
 /** The signed-in verified account accepts only an invitation addressed to its current verified email. */
 export async function acceptOrganizationInvitation(input: unknown, user: { id: string; email: string; name: string }) {
-  const { token } = z.object({ token: tokenSchema }).strict().parse(input)
-  const { rows: [canonical] } = await pool.query<{ email: string; name: string; emailVerified: boolean }>(
-    'select email,name,"emailVerified" from "user" where id=$1', [user.id])
-  if (!canonical?.emailVerified || canonical.email.toLowerCase() !== user.email.toLowerCase())
-    throw new GovernanceError('access_denied')
-  const tokenHash = hashToken(token)
+  const selector = z.union([z.object({ token: tokenSchema }).strict(), z.object({ invitationId: invitationIdSchema }).strict()]).parse(input)
+  const canonical = await verifiedInvitationRecipient(user)
+  const addressedInvitation = and(eq(organizationInvitations.email, canonical.email), 'token' in selector
+    ? eq(organizationInvitations.tokenHash, hashToken(selector.token)) : eq(organizationInvitations.id, selector.invitationId))
   return workspaceDb.transaction(async tx => {
     // Read the routing ID without a row lock, then acquire the Organization lock first,
     // matching invitation writes and member removal. Recheck the invitation under lock.
     const [candidate] = await tx.select({ organizationId: organizationInvitations.organizationId })
-      .from(organizationInvitations).where(eq(organizationInvitations.tokenHash, tokenHash)).limit(1)
+      .from(organizationInvitations).where(addressedInvitation).limit(1)
     if (!candidate) throw new GovernanceError('invalid_request')
     // Acquire the account deletion guard before Organization row locks (global lock order).
     await assertOrganizationAccountWritable(tx, user.id)
@@ -136,9 +168,9 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
     if (!organization || organization.archivedAt) throw new GovernanceError('invalid_request')
     const [invitation] = await tx.select().from(organizationInvitations)
       .where(and(eq(organizationInvitations.organizationId, candidate.organizationId),
-        eq(organizationInvitations.tokenHash, tokenHash))).for('update').limit(1)
+        addressedInvitation)).for('update').limit(1)
     if (!invitation || invitation.status !== 'pending' || invitation.expiresAt <= new Date()
-      || invitation.email !== canonical.email.toLowerCase()) throw new GovernanceError('invalid_request')
+      || invitation.email !== canonical.email) throw new GovernanceError('invalid_request')
     // Pending invites cannot outlive the issuer's current Organization membership, including SCIM suspensions.
     const [issuer] = await tx.select({ userId: organizationMembers.userId }).from(organizationMembers)
       .where(and(eq(organizationMembers.organizationId, candidate.organizationId),

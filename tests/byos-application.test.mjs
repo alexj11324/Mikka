@@ -295,9 +295,13 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       // host-scoped gate without approving any tool operation; production
       // assignments obtain their gate from the authenticated server link.
       options.toolApproval = new ToolApprovalGate(options.runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true })
-      const launched = await service.launchNative('alice', consumerId, native.body.bindingId, hostedSubscriptionLauncher(options, { stateDir: runtime, sandbox: new NoSandbox(), codexBinary: binaryPath, claudeBinary: binaryPath, revocationPollMs: 30 }))
+      const launched = await service.launchNative('alice', consumerId, native.body.bindingId, hostedSubscriptionLauncher(options, { stateDir: runtime, sandbox: new NoSandbox(), codexBinary: binaryPath, claudeBinary: binaryPath }))
       sessions.push(launched)
-      if (provider === 'claude') assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
+      if (provider === 'claude') {
+        assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
+        // The server stops the run and pushes a run control; the daemon's push invalidates the gate (no poll).
+        options.toolApproval.invalidate()
+      }
       const events = []; for await (const event of launched.events()) events.push(event)
       assert.equal(events.at(-1).outcome, provider === 'codex' ? 'succeeded' : 'cancelled')
       assert.ok(!JSON.stringify(events).includes('fixture-access'))
@@ -365,7 +369,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     const require = createRequire(import.meta.url)
     const esbuild = require(require.resolve('esbuild', { paths: [require.resolve('tsx')] }))
     const bundle = join(directory, 'browser.js')
-    await esbuild.build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{NextIntlClientProvider}from'next-intl';import{SubscriptionSettings}from'./components/settings/subscription-settings';import messages from './messages/en.json';createRoot(document.getElementById('root')).render(<NextIntlClientProvider locale="en" messages={messages}><SubscriptionSettings userKey="browser-owner" workspaceId="${workspaceId}"/></NextIntlClientProvider>);`, resolveDir: root, loader: 'tsx' }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', tsconfig: resolve(root, 'tsconfig.json'), define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '""' }, logLevel: 'silent' })
+    await esbuild.build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{NextIntlClientProvider}from'@/lib/intl/i18n-client';import{SubscriptionSettings}from'./components/settings/subscription-settings';import messages from './messages/en.json';createRoot(document.getElementById('root')).render(<NextIntlClientProvider locale="en" messages={messages}><SubscriptionSettings userKey="browser-owner" workspaceId="${workspaceId}"/></NextIntlClientProvider>);`, resolveDir: root, loader: 'tsx' }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', tsconfig: resolve(root, 'tsconfig.json'), define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '""' }, logLevel: 'silent' })
     browserServer = createServer(async (incoming, outgoing) => {
       try {
         const url = `http://127.0.0.1:${browserServer.address().port}${incoming.url}`

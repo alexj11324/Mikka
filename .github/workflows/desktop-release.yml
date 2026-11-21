@@ -10,6 +10,11 @@ name: Desktop release
 # ASC_* names are mapped to the release tools' APPLE_* inputs inside the runner.
 
 on:
+  # A successful Cloudflare gateway observation that serves current main builds
+  # the installer for it; a push only notes what is waiting (docs/operations/web-deploy.md).
+  workflow_run:
+    workflows: [Cloudflare application deployment]
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -61,6 +66,8 @@ permissions:
   contents: read
 
 env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.
@@ -70,11 +77,13 @@ env:
 
 jobs:
   preflight:
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Replace obsolete Web waits without interrupting an already signing app.
+    # Replace stale waits for the same release path. A receiptless push or another
+    # deployment phase cannot cancel a preflight that verifies a promotion.
     concurrency:
-      group: ${{ github.ref == 'refs/heads/main' && 'desktop-release-preflight' || format('desktop-release-preflight-{0}', github.ref) }}
+      group: desktop-release-preflight-${{ github.ref }}-${{ github.event_name == 'workflow_run' && format('observed-{0}', github.event.workflow_run.id) || github.event_name == 'push' && 'push' || 'promoted' }}
       cancel-in-progress: true
     permissions:
       contents: read
@@ -84,7 +93,11 @@ jobs:
       EXPECTED_UI_OVERLAY_SHA: ${{ inputs.overlay-sha }}
     outputs:
       version: ${{ steps.version.outputs.version }}
-      overlay-sha: ${{ steps.promoted.outputs.overlay-sha || steps.overlay.outputs.overlay-sha }}
+      overlay-sha: ${{ steps.promoted.outputs.overlay-sha }}
+      # The served commit the installer is built from; main may have moved on since.
+      product: ${{ steps.promoted.outputs.product }}
+      release: ${{ steps.promoted.outcome == 'success' }}
+      receipt: ${{ github.event.inputs.cloudflare_receipt || steps.trigger.outputs.receipt }}
     steps:
       - name: Require main
         run: |
@@ -98,22 +111,32 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      # The Cloudflare deployment workflow promotes production Web after a push.
+      # The installer is built from the commit that promotion serves, once it is
+      # on main, so it never ships ahead of the Web it talks to.
+      - name: Leave the installer to the Cloudflare promotion
+        if: github.event_name == 'push'
+        run: |
+          echo "::notice title=Desktop waits for Cloudflare::This push builds nothing. The installer is built by itself once Cloudflare serves this commit."
+          printf '### No installer from this push\n\nThe installer is built by itself when the Cloudflare gateway observation shows this commit being served (docs/operations/web-deploy.md).\n' >> "$GITHUB_STEP_SUMMARY"
+      - name: Use a Cloudflare gateway observation whose served commit is on main
+        id: trigger
+        if: github.event_name == 'workflow_run'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/cloudflare-promoted-web.mjs trigger desktop
+      - name: Require the Cloudflare promotion receipt
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.cloudflare_receipt == ''
+        run: |
+          echo "::error title=cloudflare_receipt required::Production Web is promoted by the Cloudflare deployment workflow. Dispatch again with that promotion's cloudflare_receipt."
+          exit 1
       - name: Verify the promoted Cloudflare Web before allocating macOS
         id: promoted
-        if: github.event.inputs.cloudflare_receipt != ''
+        if: github.event_name == 'workflow_dispatch' || steps.trigger.outputs.ready == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt || steps.trigger.outputs.receipt }}
         run: node scripts/release/cloudflare-promoted-web.mjs desktop
-      - name: Require the matching production Web deployment
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/web-deploy.mjs await-desktop-web
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Select the legacy production Web overlay
-        id: overlay
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/hosted-ui.mjs production
       - name: Version from workflow run
         id: version
         run: |
@@ -124,6 +147,7 @@ jobs:
 
   macos:
     needs: preflight
+    if: needs.preflight.outputs.release == 'true'
     runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
     timeout-minutes: 90
     # Finish the active signed candidate; GitHub keeps only the latest pending job.
@@ -140,18 +164,25 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
       MIKKA_UI_OVERLAY_SHA: ${{ needs.preflight.outputs.overlay-sha }}
+      MIKKA_DESKTOP_SOURCE: ${{ needs.preflight.outputs.product }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ needs.preflight.outputs.product }}
           persist-credentials: false
       - name: Verify production credential delivery boundaries
         run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
       - name: Recheck the promoted Web before loading private credentials
-        if: github.event.inputs.cloudflare_receipt != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ needs.preflight.outputs.receipt }}
         run: node scripts/release/cloudflare-promoted-web.mjs desktop
+      - name: Validate the selected private UI owner before credential access
+        run: |
+          node --input-type=module - <<'JS'
+          import { privateMikkaRepository } from './scripts/cloudflare-source.mjs'
+          privateMikkaRepository('mikka-hosted-ui')
+          JS
       - name: Read the private UI checkout credential
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -166,7 +197,7 @@ jobs:
       - name: Check out the production Web UI revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: alexj11324/mikka-hosted-ui
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: ${{ needs.preflight.outputs.overlay-sha }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui
@@ -357,25 +388,15 @@ jobs:
         env:
           RELEASE_MANIFEST_SHA256: ${{ steps.seal.outputs.manifest-sha256 }}
         run: node scripts/release/evidence.mjs verify "$RUNNER_TEMP/mikka-desktop-release-candidate"
-      - name: Reject a changed legacy overlay before waiting for its Web build
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/hosted-ui.mjs production
-      - name: Require the matching production Web deployment
-        if: github.event.inputs.cloudflare_receipt == ''
-        # The deployed Web source must contain the installed UI's source before publication.
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/web-deploy.mjs await-desktop-web
       - name: Recheck the promoted Web before publishing the signed installers
-        if: github.event.inputs.cloudflare_receipt != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ needs.preflight.outputs.receipt }}
         run: node scripts/release/cloudflare-promoted-web.mjs desktop
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: desktop-${{ env.RELEASE_VERSION }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.preflight.outputs.product }}
           name: Mikka Desktop ${{ env.RELEASE_VERSION }}
           draft: ${{ inputs.skip_notarization == true }}
           # electron-updater follows releases/latest; 'legacy' compares tags as text, so .9 outranked .31.

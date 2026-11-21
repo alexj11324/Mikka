@@ -66,7 +66,7 @@ mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, {
   welcomeCoordinator: async () => { welcomeCalls++; if (welcomeReply instanceof Error) throw welcomeReply; if (typeof welcomeReply === 'function') return welcomeReply(); return welcomeReply }, coordinatorCitationSources: async () => ({}),
 } })
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: { getBotModelMenu: async () => ({}) } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => (key: string) => `Errors.${key}` } })
 mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => refusalCode } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
@@ -81,7 +81,7 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
   desktopBelowMinimum: () => false,
   readAppVersion: async () => { versionReads++; return serverVersion },
 } })
-mock.module('next/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
 mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: chatEnabled, working: false, error: chatError, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
@@ -284,6 +284,42 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   await act(async () => composer.onChange('a later explicit message'))
   await act(async () => composer.onSubmit())
   assert.equal(submissions, valid ? 2 : 1)
+})
+
+test('two independent drafts are journaled before acknowledgement and reach Eve in order', async () => {
+  let release!: (valid: boolean) => void
+  const first = new Promise<boolean>(resolve => { release = resolve })
+  let probes = 0
+  buildCheck = () => ++probes === 1 ? first : Promise.resolve(true)
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('First draft'))
+  await act(async () => { composer.onSubmit() })
+  await act(async () => composer.onChange('Second independent draft'))
+  await act(async () => composer.onSubmit())
+  assert.equal(composer.value, '')
+  assert.equal(container.querySelectorAll('[data-testid="local-message"]').length, 2)
+  assert.equal(submissions, 0)
+  await act(async () => release(true))
+  assert.deepEqual(submitted.map(command => command.text), ['First draft','Second independent draft'])
+})
+
+for (const bundled of [false, true]) test(`an offline renderer ${bundled ? 'submits through the bundled main process' : 'keeps the web message for explicit retry'}`, async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  if (bundled) Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('deliver once'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, bundled ? 1 : 0)
+  if (bundled) assert.equal(submitted[0].text, 'deliver once')
+  else {
+    const failed = container.querySelector('[data-testid="failed-message"]')
+    assert.match(failed?.textContent ?? '', /deliver once/)
+    assert.ok(failed?.querySelector('button'))
+  }
 })
 
 test('a stale send moves its original text and attachments to the retry bubble and preserves browser notes', async () => {

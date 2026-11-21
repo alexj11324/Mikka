@@ -190,5 +190,25 @@
       }
     }
   },
-  "certificateRelinksSha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+  "certificateRelinksSha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+  "rotatingProviderCertificates": {
+    "pattern": "/usr/local/share/ca-certificates/e2b-(?:[0-9a-f]{64}|ca)\\.crt|/etc/ssl/certs/e2b-(?:[0-9a-f]{64}|ca)\\.pem|/etc/ssl/certs/1560546e\\.[0-9]+",
+    "templates": [
+      "claude",
+      "codex",
+      "desktop"
+    ],
+    "observed": "per build: one /usr/local/share/ca-certificates/e2b-<sha256>.crt at mode 0644 changes to 0777 at ready; per create: it is removed, a new e2b-<sha256>.crt is written and /etc/ssl/certs/1560546e.N relinks to the new e2b-<sha256>.pem; the fixed-name provider root /usr/local/share/ca-certificates/e2b-ca.crt, when written during the build, is likewise removed on fresh create; its /etc/ssl/certs/e2b-ca.pem alias is then relinked to the replaced root and dangles",
+    "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/43921160007",
+    "controlOpsCommit": "5b4e9cf2f3ebb7ad0a487444ab99db5d4920f764",
+    "artifactId": 14253647447,
+    "artifactZipBytes": 93389,
+    "artifactZipSha256": "96f5d24fb83d06b22f13708a4cb91a1b12e1f83bdaacc713791b338a8b5dfed5",
+    "evidence": "docs/operations/evidence/2026-11-16-official-rotating-provider-ca-control.json",
+    "releaseFailure": "https://github.com/alexj11324/Mikka/actions/runs/43914220258",
+    "validationRuns": [
+      "https://github.com/alexj11324/Mikka/actions/runs/43922227579",
+      "https://github.com/alexj11324/Mikka/actions/runs/43923511902"
+    ]
+  }
 }

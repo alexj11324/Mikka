@@ -1,6 +1,6 @@
 import { filterHook, filterRun } from './records.mjs'
 import {
-  EntityConflictError, HookConflictError, HookNotFoundError,
+  EntityConflictError, HookConflictError, HookForceClaimedError, HookNotFoundError,
   RunExpiredError, TooEarlyError, WorkflowRunNotFoundError, WorkflowWorldError,
 } from '@workflow/errors'
 import { eventIdToSlot, stripEventDataRefs } from '@workflow/world'
@@ -75,6 +75,7 @@ export function createAdmissionStorage(authority) {
           case 'HOOK_CONFLICT': throw new HookConflictError(result.token, result.conflictingRunId)
           case 'RUN_NOT_FOUND': throw new WorkflowRunNotFoundError(runId)
           case 'HOOK_NOT_FOUND': throw new HookNotFoundError(request.correlationId)
+          case 'HOOK_FORCE_CLAIMED': throw new HookForceClaimedError(result.token, result.claimedByRunId, result.claimedByHookId)
           case 'ENTITY_CONFLICT': throw new EntityConflictError('Workflow entity already exists')
           case 'TOO_EARLY': throw new TooEarlyError('Workflow step retry is not due', { retryAfter: result.retryAfter })
           case 'RUN_EXPIRED': throw new RunExpiredError('Workflow run has ended')
@@ -97,4 +98,4 @@ export function createAdmissionStorage(authority) {
   }
 }
 
-export const admissionCapabilities = { atomicStartHook: { active: true } }
+export const admissionCapabilities = { atomicStartHook: { active: true }, hookForceClaim: true }

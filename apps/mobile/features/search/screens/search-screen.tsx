@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { SectionList, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Search } from 'lucide-react-native'
 import { ChatRowView, rowKey, useChatRows, type ChatRow } from '@/components/ChatList'
 import { NavBar, underBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
-import { Spinner } from '@/components/icons'
 import { mobileMessages } from '@/lib/messages'
-import { Text } from '@/components/Text'
 import { TaskListContinuation, TaskRowView, useTasks } from '@/features/tasks/components/task-list'
 import { botPath } from '@/lib/pins'
 import type { Task } from '@/lib/types'
 import { colors } from '@/lib/theme'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import { ListSectionHeader } from '@/shared/components/list-section'
 
 type Section = { title: string; data: ({ kind: 'chat'; row: ChatRow } | { kind: 'task'; task: Task })[] }
@@ -50,8 +50,8 @@ export function SearchScreen() {
           <ReadNotice error={tasks.error} hasData={Boolean(tasks.data)} label={mobileMessages.Nav.tasks} onRetry={tasks.reload} />
         </> : undefined}
         ListFooterComponent={needle ? <TaskListContinuation paging={tasks.paging} /> : undefined}
-        ListEmptyComponent={!needle ? undefined : loading ? <View style={styles.loading}><Spinner /></View>
-          : complete ? <Text style={styles.none}>{mobileMessages.Shell.searchEmpty}</Text> : undefined}
+        ListEmptyComponent={!needle ? undefined : loading ? <ListLoading />
+          : complete ? <EmptyState icon={<Search size={20} color={colors.secondary} strokeWidth={1.8} />} title={mobileMessages.Shell.searchEmpty} /> : undefined}
         renderSectionHeader={({ section }) => <ListSectionHeader title={section.title} count={section.data.length} />}
         renderItem={({ item }) => item.kind === 'chat'
           ? <ChatRowView row={item.row} onPress={() => router.push(item.row.kind === 'bot' ? botPath(item.row.bot) : `/groups/${item.row.group.id}`)} />
@@ -63,6 +63,4 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  loading: { paddingTop: 40, alignItems: 'center' },
-  none: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
 })

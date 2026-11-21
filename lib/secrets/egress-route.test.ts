@@ -18,7 +18,7 @@ const request = (value: unknown = body(), headers: Record<string, string> = {}) 
 
 test('the real egress envelope injects only at the trusted upstream and returns a bounded response', async () => {
   let calls = 0
-  const response = await taskSecretEgressResponse(request(), runId, (input, expected, options) => executeEgressRequest(input, expected, { ...options, env,
+  const response = await taskSecretEgressResponse(request(), runId, (input, expected, options) => executeEgressRequest(input, expected, { ...options, env, bindingActive: async () => true,
     resolve: async () => [{ address: '93.184.216.34', family: 4 }],
     transport: async target => {
       calls++

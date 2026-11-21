@@ -98,7 +98,7 @@ registerHooks({
   load(url,context,next){
     if(url==='scope-store:db')return {format:'module',source:`export {scopeStoreDatabase as db,scopeStorePool as pool} from ${JSON.stringify(import.meta.url)}`,shortCircuit:true}
     if(url==='scope-store:workspace')return {format:'module',source:`export {scopeStoreWorkspaceDatabase as workspaceDb,scopeStorePool as workspacePool} from ${JSON.stringify(import.meta.url)}`,shortCircuit:true}
-    if(url==='scope-store:acting-user')return {format:'module',source:'export async function currentUser(){throw Error("scope store already receives its authenticated actor")}',shortCircuit:true}
+    if(url==='scope-store:acting-user')return {format:'module',source:'export async function currentUser(){throw Error("scope store already receives its authenticated actor")};export async function requireUser(){throw Error("scope store already receives its authenticated actor")}',shortCircuit:true}
     if(url==='scope-store:view')return {format:'module',source:'export async function issueView(issue){return issue}',shortCircuit:true}
     return next(url,context)},
 })

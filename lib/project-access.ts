@@ -1,11 +1,11 @@
 import 'server-only'
-import { and, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { projectDb, projects, projectTasks, projectMembers } from '@/lib/db/projects'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
-import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
+import { activeTaskWorkspaces, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import type { ResourceReference } from '@/lib/resource-access/contract'
 
 export type ProjectTransaction = Parameters<Parameters<typeof projectDb.transaction>[0]>[0]
@@ -46,18 +46,55 @@ export async function accessibleProjectReferences(reader: ProjectReader, workspa
   return (await readProjectAccess(reader, workspaceId)).map(({ id, workspaceId }) => ({ kind: 'project', id, workspaceId }))
 }
 
-/** Caller holds withTaskWorkspace and lockTeamRelations before taking this row lock.
- * It intentionally uses only the Workspace DB; the content ACL lock belongs to
- * the caller's withResourceAccess lease. */
-export async function requireProjectWrite(tx: ProjectTransaction, reader: ProjectReader, projectId: string, workspaceId: string, options: { allowArchived?: boolean } = {}) {
+/** Only the names needed by a selected-workspace picker. Load from the
+ * canonical Project table after the current content ACL has selected the IDs. */
+export async function accessibleProjectNames(reader: ProjectReader, workspaceId: string, tx: ProjectTransaction, fileLinkProjectIds?: ReadonlySet<string>) {
+  const references = await accessibleProjectReferences(reader, workspaceId)
+  const ids = references.map(reference => reference.id).filter(id => !fileLinkProjectIds || fileLinkProjectIds.has(id))
+  if (!ids.length) return []
+  const query = tx.select({ id: projects.id, name: projects.name }).from(projects)
+    .where(and(
+      eq(projects.workspaceId, workspaceId),
+      isNull(projects.archivedAt),
+      sql`${projects.id} = any(${sql.param(ids)}::uuid[])`,
+    ))
+    .orderBy(projects.name, projects.id)
+  // File metadata resides in the installation database. Keep these canonical
+  // rows active until the subsequent content query finishes.
+  return fileLinkProjectIds ? query.for('share', { of: projects }) : query
+}
+
+/** Workspace membership is already held. Readers then pin just this Project
+ * and its ACL. Lifecycle writers keep their established relation lock order. */
+async function lockProjectRow(tx: ProjectTransaction, reader: ProjectReader, projectId: string, workspaceId: string, strength: 'share' | 'update') {
   const [row] = await tx.select({ project: projects }).from(projects)
     .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, projects.workspaceId))
     .where(and(eq(projects.id, projectId), projectMembership(reader, workspaceId)))
-    .for('update', { of: projects })
+    .for(strength, { of: projects })
   if (!row) throw new ActionFailureError('projectNotFound')
-  if (row.project.archivedAt && !options.allowArchived) throw new ActionFailureError('projectArchived')
   return row.project
+}
+
+/** Caller holds withTaskWorkspace and lockTeamRelations before taking this row lock.
+ * It intentionally uses only the Workspace DB; the content ACL lock belongs to
+ * the caller's withResourceAccess lease. */
+export async function requireProjectWrite(tx: ProjectTransaction, reader: ProjectReader, projectId: string, workspaceId: string, options: { allowArchived?: boolean } = {}) {
+  const project = await lockProjectRow(tx, reader, projectId, workspaceId, 'update')
+  if (project.archivedAt && !options.allowArchived) throw new ActionFailureError('projectArchived')
+  return project
+}
+
+/** Hold the canonical source row and content authorization while serving private
+ * files. A shared source-row lock orders archive/deletion with this operation
+ * without serializing unrelated Projects, teams or other readers. */
+export async function withReadableProject<T>(reader: ProjectReader, workspaceId: string, projectId: string, read: (app: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>, permission: 'canReadContent' | 'canSteer' = 'canReadContent') {
+  return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
+    const project = await lockProjectRow(tx, reader, projectId, workspaceId, 'share')
+    if (project.archivedAt) throw new ActionFailureError('projectNotFound')
+    const { withResourceAccess } = await import('@/lib/resource-access/store')
+    return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, permission, (_policy, app) => read(app))
+  })
 }
 
 /** Explicit active tenant only. No creator, Team, name or legacy JSONB fallback.

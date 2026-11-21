@@ -19,6 +19,6 @@ export default defineAgent({
   limits: { sessionTimeoutMs: false },
   experimental: { workflow: {
     retention: 'default',
-    ...(process.env.MIKKA_EVE_WORKFLOW_WORLD === 'cloudflare' ? { world: '@mikka/eve-cloudflare-world' } : {}),
+    ...(process.env.WORKFLOW_TARGET_WORLD ? { world: process.env.WORKFLOW_TARGET_WORLD } : {}),
   } },
 })

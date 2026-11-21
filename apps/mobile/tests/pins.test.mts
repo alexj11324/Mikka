@@ -1,4 +1,4 @@
-// 对话's pinned row: the star is the pin, the same for every bot, the Coordinator included.
+// 线程's pinned row: the star is the pin, the same for every bot, the Coordinator included.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { botPath, splitPinned } from '../lib/pins.ts'

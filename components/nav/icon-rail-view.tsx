@@ -1,8 +1,8 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useEffect, useState } from 'react'
-import { CircleArrowDown } from 'lucide-react'
+import { CircleArrowDown, SquarePen } from '@/components/icons'
 import { RAIL_ITEMS, type RailProps } from '@/components/nav/rail-items'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { Sidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 
-const ITEM = 'group/rail-item size-9 rounded-sm text-muted-foreground/80 shadow-none hover:bg-transparent hover:text-muted-foreground/80 aria-[current=page]:text-foreground dark:hover:bg-transparent'
+const ITEM = 'group/rail-item size-9 rounded-sm text-muted-foreground shadow-none hover:bg-transparent hover:text-muted-foreground aria-[current=page]:text-foreground dark:hover:bg-transparent'
 const ITEM_ICON = 'flex rounded-sm p-2 group-hover/rail-item:bg-sidebar-item in-data-desktop-translucent:group-hover/rail-item:bg-control'
 
 
@@ -26,6 +26,7 @@ export function IconRailView({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
   // A non-collapsing Sidebar, as in shadcn's nested icon-rail pattern; phones get these items in the list footer.
   return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-17 shrink-0 items-center gap-1 bg-transparent pt-1 pb-1 md:flex">
+    {menu.chats?.onNewConversation && <Button size="icon" variant="ghost" aria-label={i18nText('Nav.startConversation')} title={i18nText('Nav.startConversation')} onClick={menu.chats.onNewConversation}><SquarePen /></Button>}
     {RAIL_ITEMS.map(item => {
       const selected = active === item.id
       const Icon = selected ? item.selectedIcon : item.icon
@@ -60,7 +61,7 @@ export function UpdateButton() {
   if (!version) return null
   const label = i18nText('Nav.restartToUpdate', { version })
   return <Tooltip>
-    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'text-sidebar-primary hover:text-sidebar-primary animate-in fade-in-0 duration-200 motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
+    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'text-sidebar-primary hover:text-sidebar-primary animate-in fade-in-0 duration-(--motion-base) motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
       {/* The accent (R-30) and a 24px icon in the same 36px target as the other items. */}
       <span className={cn(ITEM_ICON, 'p-1.5')}><CircleArrowDown className="size-6" /></span>
     </TooltipTrigger>

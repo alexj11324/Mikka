@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useActionError } from '@/lib/use-action-error'
 import { prepareThreadReply } from '@/lib/thread-submission-input'
@@ -9,12 +9,17 @@ import { useViewState } from './view-state'
 import { useChatDeliveryState, type ChatDelivery, type ChatSubmission } from './chat-delivery-state'
 export type { ChatDelivery, ChatSubmission } from './chat-delivery-state'
 
+// The packaged renderer sends through the main process, which can reach the backend while the page is offline.
+export function isWebChatOffline() {
+  return navigator.onLine === false && !window.mikka?.bundled
+}
+
 export function useChatDelivery<T extends ChatSubmission>(scope: string, uncertain: string) {
   const [rows, setRows] = useViewState<ChatDelivery<T>[]>(`chat-send:${scope}`, [])
   return useChatDeliveryState(rows, setRows, uncertain)
 }
 
-type BoundThreadReply = Pick<ChatSubmission, 'id' | 'text'> & { runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }
+type BoundThreadReply = Pick<ChatSubmission, 'id' | 'text'> & { runId: string; delivery?: import('../thread-delivery').ThreadDeliveryMode; expectedOwnerId?: string; expectedWorkspaceId?: string; modelChoice?: import('@/lib/thread-model-choice').ThreadModelChoice }
 type OriginalSessionRetry = { retryOriginalSession: true; runId: string; text: string; questionWakeGeneration?: string }
 type ThreadReplyReceipt = { status: 'accepted' } | { status: 'failed' | 'uncertain'; error: string }
 
@@ -23,7 +28,7 @@ export function useThreadReplyCommand() {
   const feedback = useTranslations('Coordinator')
   const actionError = useActionError()
   async function preflight() {
-    if (navigator.onLine === false) return feedback('sendOffline')
+    if (isWebChatOffline()) return feedback('sendOffline')
     if (!await checkPageBuildBeforeAction()) return feedback('sendUpdateRequired')
     return null
   }
@@ -33,7 +38,8 @@ export function useThreadReplyCommand() {
       if (blocked) return { status: 'failed', error: blocked }
       const request = 'retryOriginalSession' in command ? command : {
         requestId: command.id, runId: command.runId, text: command.text,
-        expectedOwnerId: command.expectedOwnerId, expectedWorkspaceId: command.expectedWorkspaceId,
+        expectedOwnerId: command.expectedOwnerId, expectedWorkspaceId: command.expectedWorkspaceId, ...(command.delivery ? { delivery: command.delivery } : {}),
+        ...(command.modelChoice ? { modelChoice: command.modelChoice } : {}),
       }
       const { sendIssueThreadReply } = await import('@/app/actions/agents')
       const result = await sendIssueThreadReply({ issueId, ...request })

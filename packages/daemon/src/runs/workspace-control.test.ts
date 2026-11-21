@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, chown, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -53,6 +53,24 @@ describe.runIf(process.getuid?.() === 0)('actual fixed-inode cloud execution fen
     expect(await held(f.root)).toBe(true)
     control.setWorktree(f.worktree); await control.release(false)
     expect(JSON.parse(await readFile(join(f.root, 'machine.json'), 'utf8'))).toMatchObject({ phase: 'unsafe', nativeExited: false })
+  })
+
+  it('the execution user holds the fence through a directory it may only search', async () => {
+    const f = await fixture(), group = 65534
+    await chown(f.root, 0, group)
+    for (const [name, mode] of [['version', 0o440], ['machine.lock', 0o660], ['machine.json', 0o660]] as const) {
+      await chown(join(f.root, name), 0, group); await chmod(join(f.root, name), mode)
+    }
+    const bin = await mkdtemp(join(tmpdir(), 'mikka-execution-user-')); roots.push(bin)
+    await chmod(bin, 0o755)
+    await writeFile(join(bin, 'python3'), `#!/bin/sh\nexec runuser -u nobody -- /usr/bin/python3 "$@"\n`, { mode: 0o755 })
+    vi.stubEnv('PATH', `${bin}:${process.env.PATH}`)
+    try {
+      const control = await acquireCloudWorkspaceControl(f.input, f.root); controls.push(control)
+      expect(await held(f.root)).toBe(true)
+      control.setWorktree(f.worktree); await control.release(true)
+      expect(JSON.parse(await readFile(join(f.root, 'machine.json'), 'utf8'))).toMatchObject({ phase: 'idle', nativeExited: true })
+    } finally { vi.unstubAllEnvs() }
   })
 
   it('rejects a writable parent and substituted marker before publishing an idle receipt', async () => {

@@ -3,14 +3,14 @@ import { isBotListKey } from '@/lib/live/list-read'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from 'motion/react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import useSWR, { useSWRConfig } from 'swr'
-import { CheckIcon } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { createBot, listBots, type BotView } from '@/app/actions/bots'
 import { completeOnboarding } from '@/app/actions/onboarding'
 import { BOT_MOOD_SECONDS, BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotMood, type BotShape } from '@/components/nav/bot-avatar'
 import { BotLookPicker } from '@/components/nav/bot-look-picker'
-import { AppTile, useConnectedApps } from '@/components/plugins/connected-apps'
+import { AppTile, useConnectedApps, useStoreCatalog } from '@/components/plugins/connected-apps'
 import { readSubscriptions, SubscriptionSettings, subscriptionsKey } from '@/components/settings/subscription-settings'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
-import { COMPOSIO_APP_IDS, type ComposioAppId } from '@/lib/composio-accounts'
+import { suggestedConnectApps, type StoreApp } from '@/lib/plugins/catalog'
 import { EASE_OUT } from '@/lib/ease'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -40,6 +40,8 @@ type Card = 'intro' | 'name' | 'subscription' | 'computer' | 'key' | 'apps' | 'w
 
 /** The guide's pacing, in ms (docs/design/onboarding.md §5). */
 const PACE = { dim: 3000, autoStart: 8000, travel: 640, firstLine: 400, botGap: 2500, replyBeat: 1000, lastBeat: 1200, rise: 700 }
+/** How many apps the apps step offers (Composio's most used one-click apps). */
+const ONBOARDING_APPS = 4
 const IDLE_MOVES: BotMood[] = ['wink', 'wide', 'hexagon']
 const BUBBLE_SPRING = { type: 'spring', stiffness: 520, damping: 27, mass: 0.52 } as const
 
@@ -52,13 +54,13 @@ const BUBBLE_SPRING = { type: 'spring', stiffness: 520, damping: 27, mass: 0.52 
  */
 export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: { computer?: OnboardingComputer; saveKey?: (apiKey: string) => Promise<E2BKeyResult>; workspaceId?: string; onDone: (bot: BotView | null) => void }) {
   const t = useTranslations('Onboarding')
-  const tApps = useTranslations('Settings.integrations')
   const locale = useLocale()
   const actionError = useActionError()
   const reduce = useReducedMotion() ?? false
   const { mutate } = useSWRConfig()
   const { data: bots } = useSWR('bots', listBots)
   const apps = useConnectedApps()
+  const catalog = useStoreCatalog()
   const appsRef = useRef(apps)
   appsRef.current = apps
   // The same cache as Settings › 模型订阅: the step's rows and this read are one list.
@@ -184,7 +186,7 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
     if (!trimmed || busy) return
     setBusy(true); setError('')
     try {
-      const created = await createBot({ name: trimmed, color, shape })
+      const created = await createBot({ name: trimmed, color, shape }, workspaceId)
       void mutate(isBotListKey)
       setBot(created)
       setCard(null)
@@ -277,10 +279,11 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
     setCard('apps')
   }
 
-  const connected = COMPOSIO_APP_IDS.filter(app => apps.accountsFor(app).length > 0)
+  const offered = suggestedConnectApps(catalog.data, ONBOARDING_APPS, apps.connectedToolkits())
+  const connected = offered.filter(app => apps.accountsFor(app.id).length > 0).map(app => app.id)
   function doneApps() {
     setCard(null)
-    const names = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(connected.map(app => tApps(app)))
+    const names = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(offered.filter(app => connected.includes(app.id)).map(app => app.name))
     reply(connected.length ? t('appsReplyDone') : t('appsNo'))
     void run(async () => {
       if (connected.length) { act('wink'); hop() }
@@ -335,9 +338,9 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
       {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 w-full flex-col gap-4 overflow-y-auto">
         <AnimatePresence initial={false}>
           {lines.map(line => line.from === 'bot'
-            ? <motion.p key={line.id} className="text-base" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
+            ? <motion.p key={line.id} className="text-md" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
             : <motion.div key={line.id} className="flex justify-end" initial={{ opacity: 0, y: reduce ? 0 : 40, scale: reduce ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduce ? { duration: 0 } : BUBBLE_SPRING}>
-              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent className="rounded-2xl px-4 py-3">{line.text}</BubbleContent></Bubble>
+              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent size="roomy">{line.text}</BubbleContent></Bubble>
             </motion.div>)}
         </AnimatePresence>
       </div>}
@@ -398,9 +401,9 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
 
           {card === 'apps' && <div className="flex flex-col gap-4 rounded-xl bg-muted p-4">
             <div role="list" className="flex flex-col gap-1">
-              {!apps.state
-                ? COMPOSIO_APP_IDS.map(app => <Skeleton key={app} className="h-14 w-full rounded-lg" />)
-                : COMPOSIO_APP_IDS.map(app => <AppRow key={app} app={app} connected={connected.includes(app)} pending={apps.pending === app} disabled={Boolean(apps.pending)} onConnect={() => { void apps.connect(app) }} />)}
+              {!apps.state || !catalog.data
+                ? Array.from({ length: ONBOARDING_APPS }, (_, index) => <Skeleton key={index} className="h-14 w-full rounded-lg" />)
+                : offered.map(app => <AppRow key={app.id} app={app} connected={connected.includes(app.id)} pending={apps.pending === app.id} disabled={Boolean(apps.pending)} onConnect={() => { void apps.connect(app.id) }} />)}
             </div>
             {(apps.error || apps.notice?.tone === 'alert') && <FieldError>{apps.error || apps.notice?.text}</FieldError>}
             <div className="flex justify-end gap-2">
@@ -423,18 +426,18 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
   </div>
 }
 
-function AppRow({ app, connected, pending, disabled, onConnect }: { app: ComposioAppId; connected: boolean; pending: boolean; disabled: boolean; onConnect: () => void }) {
+function AppRow({ app, connected, pending, disabled, onConnect }: { app: StoreApp; connected: boolean; pending: boolean; disabled: boolean; onConnect: () => void }) {
   const t = useTranslations('Onboarding')
-  const tApps = useTranslations('Settings.integrations')
+  const key = `apps.${app.id}`
   return <Item role="listitem" size="sm" className="rounded-lg px-2">
-    <ItemMedia><AppTile app={app} /></ItemMedia>
+    <ItemMedia><AppTile app={app.id} iconUrl={app.iconUrl} /></ItemMedia>
     <ItemContent>
-      <ItemTitle>{tApps(app)}</ItemTitle>
-      <ItemDescription>{t(`apps.${app}`)}</ItemDescription>
+      <ItemTitle>{app.name}</ItemTitle>
+      <ItemDescription className="line-clamp-2">{t.has(key as never) ? t(key as never) : app.description}</ItemDescription>
     </ItemContent>
     <ItemActions>
       {connected
-        ? <span className="flex items-center gap-1 text-sm text-muted-foreground"><CheckIcon aria-hidden="true" className="size-4" />{t('connected')}</span>
+        ? <span className="flex items-center gap-1 text-sm text-muted-foreground"><Check aria-hidden="true" className="size-4" />{t('connected')}</span>
         : <Button size="sm" variant="outline" disabled={disabled} onClick={onConnect}>{pending && <Spinner data-icon="inline-start" />}{t('connect')}</Button>}
     </ItemActions>
   </Item>

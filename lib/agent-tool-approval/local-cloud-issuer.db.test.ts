@@ -8,7 +8,7 @@ import { Pool } from 'pg'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { requestDevicePolicyIssuer } from './local-cloud-issuer'
 import { issuePolicySnapshot, policyDistributionContext } from './policy-distribution'
 import { BASE_PATH } from '../base-path'
@@ -33,7 +33,7 @@ if (process.env.LOCAL_CLOUD_ISSUER_FIXTURE !== '1') {
 } else test('raw HTTP policy claim and metadata use only the operator-bound live cloud issuer', { skip: !ready, timeout: 60_000 }, async () => {
   const admin = new Pool({ connectionString: process.env.E2E_DATABASE_URL })
   const name = `cloud_issuer_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(process.env.E2E_DATABASE_URL!); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.href })
   const oldSecret = process.env.BETTER_AUTH_SECRET

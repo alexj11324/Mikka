@@ -20,10 +20,11 @@ export function useInboxCount(ownerId: string, workspaceId: string | undefined, 
   useLiveKeys(key && workspaceId ? [
     { kind: 'pending_actions', id: workspaceId }, { kind: 'issue_list', id: workspaceId },
   ] : [], key ? [unstable_serialize(key)] : [], workspaceId)
-  const count = readableInboxCount(data, error)
+  const counts = readableInboxCount(data, error)
+  const unreadable = counts === undefined
   useEffect(() => {
     // Also retire a revoked count on standard in-memory SWR providers. A later network error cannot resurrect it.
-    if (data !== undefined && count === undefined) void mutate(undefined, { revalidate: false })
-  }, [count, data, mutate])
-  return key ? count ?? 0 : 0
+    if (data !== undefined && unreadable) void mutate(undefined, { revalidate: false })
+  }, [unreadable, data, mutate])
+  return key ? counts : undefined
 }

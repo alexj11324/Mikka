@@ -6,7 +6,7 @@ import { once } from 'node:events'
 import test, { mock } from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { liveChannelId } from './scope'
@@ -17,8 +17,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 test('real Factory notifications retain their database across COMMIT and delayed Next after callbacks', { skip: !url, timeout: 180_000 }, async t => {
   const queued: (() => Promise<void>)[] = []
-  const nextServer = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
+  const nextServer = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { queued.push(work) },
   } })
   // Keep the unrelated model consumer offline; submission, PostgreSQL commit
@@ -43,7 +43,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
   const databaseNames = ['default', 'request'].map(name => `live_context_${name}_${randomUUID().replaceAll('-', '')}_e2e`)
   const pools: Pool[] = []
   for (const name of databaseNames) {
-    await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+    await createTestDatabase(admin, name, 'template0')
     const target = new URL(url!); target.pathname = `/${name}`
     const pool = new Pool({ connectionString: target.toString(), max: 4 })
     observePoolCommits(pool); pools.push(pool)
@@ -216,8 +216,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
         const result = await submit()
         assert.ok(!('error' in result)); artifactId = result.artifactId
         assert.equal((await requestPool.query('SELECT id FROM artifacts WHERE id=$1', [artifactId])).rowCount, 0)
-        // Draining even while the transaction is open would expose an eager
-        // notification. Only the unrelated Coordinator scheduler can run now.
+        // Draining while the transaction is open would expose an eager notification.
         await drain(); await drain()
         assert.deepEqual(taskDeliveries(before), [])
       }))))

@@ -1,36 +1,46 @@
-import { Circle, CircleDashed, CircleDot, CircleCheck, CircleX, CircleSlash2, CircleGauge, CircleAlert, SignalHigh, SignalMedium, SignalLow, type LucideIcon } from 'lucide-react'
+import { type LucideIcon } from 'lucide-react'
 
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssuePriority, type IssueStatus } from '@/lib/issue-meta'
-import { statusTone } from '@/lib/status-appearance'
+import { ISSUE_PRIORITY_MARKS, ISSUE_STATUS_MARKS, stateMarkTone } from '@/lib/state-mark'
+import { statusIconTints } from '@/lib/status-appearance'
+import { PRIORITY_ICONS, STATUS_ICONS } from './state-mark'
 
 type Option = { label: string; icon: LucideIcon }
-type StatusOption = Option & { indicatorClassName: string; surfaceClassName: string; borderClassName: string }
-type PriorityOption = Option & { iconProps: { strokeWidth: number; viewBox?: string } }
+type StatusOption = Option & { surfaceClassName: string; borderClassName: string }
+/** A priority's mark is the registry's bars, one filled (low) to three (high), and 紧急 its amber square. */
+type PriorityOption = { label: string; icon: LucideIcon }
 
+// A status glyph and a priority glyph are both the mark registry's (`components/workspace/state-mark.tsx`): a status
+// draws its own mark, wrapped as an icon for the call sites that take one, so the menu row, the chip and the dot
+// beside them can never drift into three drawings of the same state.
 const statusOptions = {
-  backlog: { label: 'Backlog', icon: CircleDashed, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
-  todo: { label: 'Todo', icon: Circle, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
-  doing: { label: 'In Progress', icon: CircleDot, indicatorClassName: 'text-warning-foreground', surfaceClassName: 'bg-warning/5', borderClassName: 'border-warning/20' },
-  review: { label: 'In Review', icon: CircleGauge, indicatorClassName: 'text-info-foreground', surfaceClassName: 'bg-info/5', borderClassName: 'border-info/20' },
-  done: { label: 'Done', icon: CircleCheck, indicatorClassName: 'text-success-foreground', surfaceClassName: 'bg-success/5', borderClassName: 'border-success/20' },
-  canceled: { label: 'Canceled', icon: CircleX, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
-  duplicate: { label: 'Duplicate', icon: CircleSlash2, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
+  backlog: { label: 'Backlog', icon: STATUS_ICONS.backlog, surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
+  todo: { label: 'Todo', icon: STATUS_ICONS.todo, surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
+  doing: { label: 'In Progress', icon: STATUS_ICONS.doing, surfaceClassName: 'bg-warning/5', borderClassName: 'border-warning/20' },
+  review: { label: 'In Review', icon: STATUS_ICONS.review, surfaceClassName: 'bg-info/5', borderClassName: 'border-info/20' },
+  done: { label: 'Done', icon: STATUS_ICONS.done, surfaceClassName: 'bg-success/5', borderClassName: 'border-success/20' },
+  canceled: { label: 'Canceled', icon: STATUS_ICONS.canceled, surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
+  duplicate: { label: 'Duplicate', icon: STATUS_ICONS.duplicate, surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
 } as const satisfies Record<IssueStatus, StatusOption>
 
 const priorityOptions = {
-  urgent: { label: 'Urgent', icon: CircleAlert, iconProps: { strokeWidth: 2.5 } },
-  high: { label: 'High', icon: SignalHigh, iconProps: { strokeWidth: 3, viewBox: '-0.5 4 20 20' } },
-  normal: { label: 'Normal', icon: SignalMedium, iconProps: { strokeWidth: 3, viewBox: '-3 6 20 20' } },
-  low: { label: 'Low', icon: SignalLow, iconProps: { strokeWidth: 3, viewBox: '-5.5 8 20 20' } },
+  urgent: { label: 'Urgent', icon: PRIORITY_ICONS.urgent },
+  high: { label: 'High', icon: PRIORITY_ICONS.high },
+  normal: { label: 'Normal', icon: PRIORITY_ICONS.normal },
+  low: { label: 'Low', icon: PRIORITY_ICONS.low },
 } as const satisfies Record<IssuePriority, PriorityOption>
 
-export const ISSUE_STATUSES = ISSUE_STATUS_CODES.map(value => ({ value, ...statusOptions[value], tone: statusTone(value) }))
-export const ISSUE_PRIORITIES = ISSUE_PRIORITY_CODES.map(value => ({ value, ...priorityOptions[value], tone: statusTone(value) }))
+// The tone of a status or a priority is its mark's (`stateMarkTone`), never a second table: that is what keeps a
+// chip and the badge or dot beside it one colour.
+export const ISSUE_STATUSES = ISSUE_STATUS_CODES.map(value => {
+  const tone = stateMarkTone(ISSUE_STATUS_MARKS[value])
+  return { value, ...statusOptions[value], indicatorClassName: statusIconTints[tone], tone }
+})
+export const ISSUE_PRIORITIES = ISSUE_PRIORITY_CODES.map(value => ({ value, ...priorityOptions[value], tone: stateMarkTone(ISSUE_PRIORITY_MARKS[value]) }))
 
 export type { IssueStatus }
 export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | IssueStatus
-export const WORKSPACE_NAME = 'Mikka'
-export const WORKSPACE_SLUG = 'mikka'
+export { WORKSPACE_NAME, WORKSPACE_SLUG } from '@/lib/workspace-defaults'
 
 /**
  * Shows the id the server resolved with `taskIdentifier` (lib/task-identifier.ts): `MIK-12` or `ALEX-12`.

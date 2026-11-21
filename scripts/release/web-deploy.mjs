@@ -1,66 +1,13 @@
-// Production web build on GitHub Actions (docs/operations/web-deploy.md).
-// `vercel pull` writes the production environment to .vercel/.env.production.local,
-// but Vercel returns "sensitive" variables empty. The job reads prod:/vercel from
-// Infisical (the source Vercel production is synced from) and this fills every
-// pulled key that came back empty, so the build sees what a Vercel build saw. It
-// also pins the Git identity the migration guard checks and refuses to build
-// with a required value missing. The deployment's runtime environment still
-// comes from the Vercel project; nothing here is uploaded as configuration.
-import { readFileSync, writeFileSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
+// Release evidence for the Web Cloudflare serves: GitHub reads, the current-main fence,
+// Desktop source ancestry and the exact-source wait used by acceptance drivers.
 import { setTimeout as sleep } from 'node:timers/promises'
-import { shouldSkip } from '../vercel-ignore-build.mjs'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
-/** Must be non-empty in the final build environment: inlined client keys, the migration targets, the worker build. */
-export const REQUIRED = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
-  'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'MIKKA_BUILD_BYOS_WORKER', 'NEXT_PUBLIC_COMPUTER_ENABLED']
-
-const LINE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/
 const SHA = /^[a-f0-9]{40}$/
 export const PRODUCTION_VERSION_URL = 'https://app.aspectlylabs.com/mikka/api/version'
-const REPOSITORY = 'alexj11324/Mikka'
 const WEB_WORKFLOW = '.github/workflows/web-deploy.yml'
 const BUILD_STEPS = ['Build (runs migrations last, as the Vercel build did)',
   'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
-
-function parse(text) {
-  const entries = new Map()
-  for (const line of text.split('\n')) {
-    const match = LINE.exec(line)
-    if (!match) continue
-    const raw = match[2].trim()
-    let value = raw
-    if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-      try { value = JSON.parse(raw) } catch { value = raw.slice(1, -1) }
-    } else if (raw.startsWith("'") && raw.endsWith("'") && raw.length >= 2) value = raw.slice(1, -1)
-    entries.set(match[1], value)
-  }
-  return entries
-}
-
-/** Resolves production values; throws with variable names only, never values. */
-export function buildEnvironmentValues(text, job) {
-  if (!SHA.test(job.GITHUB_SHA ?? '')) throw Error('webDeploy:commitShaRequired')
-  const entries = parse(text)
-  // Only keys the production environment defines, and only where Vercel withheld the value.
-  for (const [key, value] of entries) if (!value && job[key]) entries.set(key, job[key])
-  entries.set('VERCEL_GIT_PROVIDER', 'github')
-  entries.set('VERCEL_GIT_REPO_OWNER', 'alexj11324')
-  entries.set('VERCEL_GIT_REPO_SLUG', 'Mikka')
-  entries.set('VERCEL_GIT_COMMIT_REF', 'main')
-  entries.set('VERCEL_GIT_COMMIT_SHA', job.GITHUB_SHA)
-  if (entries.get('VERCEL_ENV') !== 'production') throw Error('webDeploy:productionEnvironmentRequired')
-  const missing = REQUIRED.filter(key => !entries.get(key))
-  if (missing.length) throw Error(`webDeploy:missing:${missing.join(',')}`)
-  return Object.fromEntries(entries)
-}
-
-/** The build file uses JSON string values; the direct build reuses the object
- * above rather than interpreting those escapes with a different dotenv parser. */
-export function buildEnvironment(text, job) {
-  return Object.entries(buildEnvironmentValues(text, job))
-    .map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n'
-}
 
 /** Current production deployment's commit, read through the public alias. */
 export async function productionSha({ token, fetchImpl = fetch }) {
@@ -77,7 +24,7 @@ export async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 })
   if (!token) throw Error('webDeploy:githubTokenRequired')
   let response
   try {
-    response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
+    response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}${path}`, {
       headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
       signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error', cache: 'no-store',
     })
@@ -94,19 +41,14 @@ export async function assertCurrentMain({ expectedBuild, token, fetchImpl = fetc
   if (ref.object.sha !== expectedBuild) throw Error(`webDeploy:mainChanged:expected=${expectedBuild}:actual=${ref.object.sha}`)
 }
 
-async function publicBuild(fetchImpl, timeoutMs, expectedOverlay, requireLegacyDesktop = false) {
+async function publicBuild(fetchImpl, timeoutMs, expectedOverlay) {
   try {
     const response = await fetchImpl(PRODUCTION_VERSION_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' },
       signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error' })
     if (!response.ok) { await response.body?.cancel(); return null }
-    if (requireLegacyDesktop && (!response.headers.get('x-vercel-id') || response.headers.has('x-mikka-gateway-version-sha256'))) {
-      await response.body?.cancel()
-      throw Error('webDeploy:desktopProviderRequiresReceipt')
-    }
     const value = await response.json()
     return SHA.test(value?.build ?? '') && (!expectedOverlay || value.overlaySha === expectedOverlay) ? value.build : null
-  } catch (error) {
-    if (error?.message === 'webDeploy:desktopProviderRequiresReceipt') throw error
+  } catch {
     return null
   }
 }
@@ -127,7 +69,8 @@ export async function containsDesktopSource({ expectedBuild, publicCommit, token
   if (publicCommit === expectedBuild) return true
   const path = `/compare/${expectedBuild}...${publicCommit}`
   const comparison = await githubRead(path + '?per_page=1', { token, fetchImpl, timeoutMs })
-  if (comparison.url !== `https://api.github.com/repos/${REPOSITORY}${path}`
+  if (!['alexj11324/Mikka', 'aspectly-labs/Mikka'].some(repository =>
+    comparison.url === `https://api.github.com/repos/${repository}${path}`)
     || comparison.base_commit?.sha !== expectedBuild || !SHA.test(comparison.merge_base_commit?.sha ?? '')
     || !['ahead', 'behind', 'diverged', 'identical'].includes(comparison.status)
     || !Number.isSafeInteger(comparison.ahead_by) || comparison.ahead_by < 0
@@ -138,18 +81,10 @@ export async function containsDesktopSource({ expectedBuild, publicCommit, token
     && comparison.merge_base_commit.sha === expectedBuild
 }
 
-/** Keep the runtime's queued Web wait separate from Desktop and direct callers. */
-export function webDeploymentWaitOptions(command) {
-  return {
-    allowDescendant: command === 'await-desktop-web',
-    maxWaitMs: (command === 'await-web' ? 90 : 40) * 60_000,
-  }
-}
-
 /** This read-only wait runs OUTSIDE web-deploy-production: GitHub can still be
  * building while Vercel only knows the previous READY deployment. A successful
  * docs-only workflow is not a successful application build. */
-export async function waitForWebDeployment({ expectedBuild, allowDescendant = false, expectedOverlay, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
+export async function waitForWebDeployment({ expectedBuild, expectedOverlay, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
   intervalMs = 10_000, now = () => performance.now(), wait = sleep }) {
   if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
   if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) throw Error('webDeploy:invalidVerificationWait')
@@ -158,29 +93,17 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
   const started = now(), remaining = () => maxWaitMs - (now() - started)
   let checkedPublisher = false
   while (remaining() > 0) {
-    let webBuild = expectedBuild
-    if (allowDescendant === true) {
-      // The live public build is the candidate, not whichever main head happens
-      // to exist while signing. A newer docs-only main does not need a Web build.
-      webBuild = await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay, allowDescendant)
-      if (remaining() <= 0) break
-      if (!webBuild || !await containsDesktopSource({ expectedBuild, publicCommit: webBuild,
-        token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })) {
-        if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
-        continue
-      }
-    } else {
-      // Web/runtime mutation callers retain the original exact-main fence.
-      await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
-    }
+    const webBuild = expectedBuild
+    await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
     if (remaining() <= 0) break
     const data = await githubRead(`/actions/workflows/web-deploy.yml/runs?head_sha=${webBuild}&branch=main&per_page=100`,
       { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
     const runs = (data.workflow_runs ?? []).filter(run => run.head_sha === webBuild && run.head_branch === 'main'
-      && run.path === WEB_WORKFLOW && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY
+      && run.path === WEB_WORKFLOW && [run.repository, run.head_repository].every(repository => officialMikkaRepository(repository?.full_name,
+        String(repository?.id), repository?.owner?.id === undefined ? undefined : String(repository.owner.id)))
       && ['push', 'workflow_dispatch'].includes(run.event)).sort((a, b) => b.id - a.id)
     const run = runs[0]
-    if (!run && !allowDescendant && !checkedPublisher) {
+    if (!run && !checkedPublisher) {
       const publisher = await githubRead('/actions/workflows/web-deploy.yml', {
         token, fetchImpl, timeoutMs: Math.min(20_000, remaining()),
       })
@@ -215,8 +138,8 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         continue
       }
       if (remaining() <= 0) break
-      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay, allowDescendant) === webBuild && remaining() > 0) {
-        if (allowDescendant !== true) await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
+      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
+        await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
         if (remaining() > 0) return { sourceCommit: expectedBuild, webRunId: run.id, webAttempt: run.run_attempt,
           publicBuild: webBuild, verifiedAt: new Date().toISOString() }
       }
@@ -224,77 +147,4 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
     if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
   }
   throw Error('webDeploy:matchingWebDeploymentTimedOut')
-}
-
-export async function deploymentPlan({ expectedBuild, runtimeRefresh = false, token, fetchImpl = fetch, classify = shouldSkip }) {
-  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
-  // A prior attempt may have written env and then failed its build. The explicit
-  // refresh reuses the validated runtime pair and must still build that source.
-  if (runtimeRefresh) return { skip: false, reason: 'verified runtime refresh' }
-  const previous = await productionSha({ token, fetchImpl })
-  return classify({ VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: previous, VERCEL_GIT_COMMIT_SHA: expectedBuild })
-}
-
-/** Verify the public application while this job still owns the deployment
- * queue. Deployment metadata alone does not prove what the public route serves. */
-export async function verifyProductionBuild({ expectedBuild, fetchImpl = fetch, maxWaitMs = 120_000,
-  intervalMs = 2_000, now = () => performance.now(), wait = sleep }) {
-  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
-  if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) {
-    throw Error('webDeploy:invalidVerificationWait')
-  }
-  const started = now()
-  let status = 'unavailable', build = 'unavailable', attempts = 0
-  while (now() - started < maxWaitMs) {
-    attempts++
-    try {
-      const remaining = maxWaitMs - (now() - started)
-      if (remaining <= 0) break
-      const response = await fetchImpl(PRODUCTION_VERSION_URL, {
-        cache: 'no-store', headers: { 'cache-control': 'no-cache' },
-        signal: AbortSignal.timeout(Math.max(1, Math.min(10_000, Math.ceil(remaining)))),
-      })
-      status = String(response.status)
-      build = 'unavailable'
-      if (response.ok) {
-        const value = await response.json()
-        build = SHA.test(value?.build ?? '') ? value.build : 'invalid'
-        if (build === expectedBuild && now() - started < maxWaitMs) return { url: PRODUCTION_VERSION_URL, build, status: response.status,
-          verifiedAt: new Date().toISOString(), attempts }
-      } else await response.body?.cancel()
-    } catch {
-      // Public error bodies and transport messages are not deployment evidence.
-      status = 'unavailable'; build = 'unavailable'
-    }
-    const remaining = maxWaitMs - (now() - started)
-    if (remaining > 0) await wait(Math.min(intervalMs, remaining))
-  }
-  throw Error(`webDeploy:productionVersionUnverified:expected=${expectedBuild}:status=${status}:build=${build}:attempts=${attempts}`)
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [command, file] = process.argv.slice(2)
-  if (command === 'env') {
-    writeFileSync(file, buildEnvironment(readFileSync(file, 'utf8'), process.env), { mode: 0o600 })
-    console.log('Build environment ready')
-  } else if (command === 'skip') {
-    // Same documentation-only rule Vercel's Ignored Build Step used, against what production serves now.
-    const { skip, reason } = await deploymentPlan({ expectedBuild: process.env.GITHUB_SHA, token: process.env.VERCEL_TOKEN,
-      runtimeRefresh: process.env.RUNTIME_REFRESH === 'true' })
-    console.log(`${skip ? 'Skipping' : 'Building'}: ${reason}`)
-    if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`, { flag: 'a' })
-  } else if (command === 'main') {
-    await assertCurrentMain({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
-    console.log('Current main matches this release')
-  } else if (command === 'await-web' || command === 'await-desktop-web') {
-    const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA,
-      ...webDeploymentWaitOptions(command),
-      expectedOverlay: process.env.EXPECTED_UI_OVERLAY_SHA || (command === 'await-desktop-web' ? process.env.MIKKA_UI_OVERLAY_SHA : undefined), token: process.env.GITHUB_TOKEN })
-    console.log(JSON.stringify({ event: 'matching_web_deployment_verified', ...result }))
-  } else if (command === 'verify') {
-    const result = await verifyProductionBuild({ expectedBuild: process.env.GITHUB_SHA })
-    console.log(JSON.stringify({ event: 'production_version_verified', ...result }))
-    if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY,
-      `\n### Public production version verified\n${result.url}\n\nBuild: \`${result.build}\`\n\nUTC: ${result.verifiedAt}\n`, { flag: 'a' })
-  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | await-web | await-desktop-web | verify')
 }

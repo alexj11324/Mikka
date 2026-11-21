@@ -1,15 +1,17 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import { randomUUID } from "node:crypto";
 import { factoryChanged, factoryCommitted } from '../live/factory';
 import { issueListChanged } from '../live/lists';
 import { documentChanged } from '../live/panels';
 import { issueRelationsChanged } from '../live/issue-detail';
 import { userActor } from '../activity-actor';
+import { advanceIssueStatus } from '../task-status-advance';
 import { reviewSessionsRevoked } from '../coding-workspace/review-sessions';
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryActor, type FactoryBinding } from "./approval-contract";
 import type { FactoryApprovalStore, FactoryAuthorize, FactoryTask } from "./approval-dependencies";
-import { approvalEvidence, digest } from "./evidence";
+import { approvalEvidence, blockFactoryApprovalWithoutEvidence, digest } from "./evidence";
 import { requestBudgetSignal, type RequestBudget } from '../request-budget';
 
 // #528: acceptance is the person's own merge of the candidate PR (Warp
@@ -156,7 +158,7 @@ export function githubMergeApi(fetcher: typeof fetch = fetch, budget?: RequestBu
 }
 
 /** GitHub's refusal of PUT /merge, as a stable code. */
-function refusalFor(status: number, mergeableState: string | null): MergeRefusal {
+export function refusalFor(status: number, mergeableState: string | null): MergeRefusal {
   if (status === 401) return "githubMergeAuthorizationRequired";
   if (status === 403 || status === 404) return "githubMergeForbidden";
   if (status === 409) return "githubMergeHeadMoved";
@@ -189,7 +191,7 @@ export function createFactoryMerges(
   github: GitHubMergePort,
 ) {
   async function transaction<T>(fn: (tx: PoolClient) => Promise<T>) {
-    const tx = await pool.connect();
+    const tx = await connectForCommitEffects(pool);
     try {
       await tx.query("BEGIN");
       const result = await fn(tx);
@@ -225,29 +227,20 @@ export function createFactoryMerges(
   /** Human acceptance completes the reviewed issue in the same commit as its receipt.
    * A stale acceptance cannot close later work, or undo a person's status change. */
   async function completeDeliverableIssue(tx: PoolClient, task: FactoryTask, actor: FactoryActor) {
-    const activity = userActor(actor.userId);
-    // Routing holds this issue FOR SHARE. Read successors only after it yields,
-    // in a fresh statement, so an already-committing task cannot be overlooked.
+    // Routing locks the issue FOR SHARE. After it yields, recheck the current
+    // candidate and successors using a fresh snapshot before advancing status.
     await tx.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [task.issueId]);
-    const { rows } = await tx.query<{ id: string }>(`WITH accepted AS (
-      SELECT id,"issueId","createdAt" FROM factory_tasks
-      WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 AND "candidateId"=$4
-        AND stage='approval' AND status='passed'
-    ), saved AS (
-      UPDATE issues i SET status='done',revision=i.revision+1,"updatedAt"=now()
-      FROM accepted a WHERE i.id=a."issueId" AND i.status='review'
+    const { rows: [accepted] } = await tx.query<{ createdAt: Date }>(`
+      SELECT a."createdAt" FROM factory_tasks a
+      WHERE a.id=$1 AND a."userId"=$2 AND a."issueId"=$3 AND a."candidateId"=$4
+        AND a.stage='approval' AND a.status='passed'
         AND NOT EXISTS (SELECT 1 FROM factory_tasks newer WHERE newer."issueId"=a."issueId"
           AND (newer."createdAt",newer.id)>(a."createdAt",a.id))
         AND NOT EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=a."issueId"
-          AND r.status IN ('queued','preparing','running','finishing','paused','waiting_input'))
-      RETURNING i.id,i."userId",i.revision,i.title,i.content,i.status,i.priority
-    ), history AS (
-      INSERT INTO issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id)
-      SELECT gen_random_uuid(),id,"userId",revision,title,content,status,priority,$5,$6 FROM saved
-      RETURNING "issueId"
-    ) SELECT "issueId" AS id FROM history`,
-    [task.id, task.userId, task.issueId, task.candidateId, activity.actorType, activity.actorId]);
-    if (rows.length) {
+          AND r.status IN ('queued','preparing','running','finishing','paused','waiting_input'))`,
+    [task.id, task.userId, task.issueId, task.candidateId]);
+    if (accepted && await advanceIssueStatus(tx, { issueId: task.issueId, to: 'done', since: accepted.createdAt,
+      source: 'factory-acceptance', actor: userActor(actor.userId) })) {
       reviewSessionsRevoked(tx, { taskId: task.issueId }, 'task_changed');
       await issueListChanged(tx, task.issueId);
       await documentChanged(tx, task.issueId);
@@ -329,6 +322,8 @@ export function createFactoryMerges(
           if (prior) return { accepted: prior.id as string, task };
           if (digest(bindingOf(task)) !== digest(req.binding)) fail('factoryStale');
           if (task.stage !== 'approval' || !['pending','waiting'].includes(task.status)) fail('factoryTransition');
+          const refusal = await blockFactoryApprovalWithoutEvidence(tx, task, store, req.eventId);
+          if (refusal) return refusal;
           const evidence = await approvalEvidence(tx, task);
           const id = randomUUID();
           await tx.query('INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId") VALUES ($1,$2,$3,$4,$5,$6)', [id, task.id, task.candidateId, actor.userId, actor.sessionId, req.eventId]);
@@ -356,6 +351,8 @@ export function createFactoryMerges(
         if (active) { await boundary?.existing(tx, active); return { existing: active, task }; }
         if (digest(bindingOf(task)) !== digest(req.binding)) fail("factoryStale");
         if (task.stage !== "approval" || !["pending", "waiting"].includes(task.status)) fail("factoryTransition");
+        const refusal = await blockFactoryApprovalWithoutEvidence(tx, task, store, req.eventId);
+        if (refusal) return refusal;
         const pull = await candidatePull(tx, task);
         if (!credential && typeof token === 'function') credential = await token();
         if (!credential) throw new FactoryMergeRefused("githubMergeAuthorizationRequired", pull.url);
@@ -369,6 +366,7 @@ export function createFactoryMerges(
         return { id, pull };
       });
 
+      if (claim instanceof FactoryError) throw claim;
       if (typeof claim.accepted === 'string' && claim.task) return { status: 'accepted', acceptanceId: claim.accepted, binding: bindingOf(claim.task) };
       if ("existing" in claim) {
         const row = claim.existing;

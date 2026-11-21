@@ -6,7 +6,7 @@ import { once } from 'node:events'
 import test, { mock } from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { liveChannelId } from './scope'
@@ -20,8 +20,8 @@ const action = 'append_notion_paragraph'
 
 test('approved writes publish only committed owner-personal invalidations through the real service', { skip: !url, timeout: 180_000 }, async t => {
   const queued: (() => Promise<void>)[] = []
-  const next = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
+  const next = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
   const sent: { path: string; events: unknown }[] = []
   const receiver = createServer(async (request, response) => {
     let body = ''
@@ -42,7 +42,7 @@ test('approved writes publish only committed owner-personal invalidations throug
   let requestScope: ReturnType<typeof import('../db/request-scope')['createRequestDatabaseScope']> | undefined
   try {
     for (const name of names) {
-      await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+      await createTestDatabase(admin, name, 'template0')
       const target = new URL(url!); target.pathname = `/${name}`
       const pool = new Pool({ connectionString: target.toString(), max: 6 })
       observePoolCommits(pool); pools.push(pool)

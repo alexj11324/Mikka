@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { api, apiConnection } from '@/lib/api'
 import { API_URL, currentAccount } from '@/lib/config'
 import { finishAppleDeletionHandoff } from './apple-auth'
+import { showSystemAlert } from './system-alert'
 import { mobileMessages as messages } from './messages'
 import { apiCache } from './api-cache'
 import { mobileTaskTarget } from '../../../lib/mobile-task-handoff'
@@ -11,7 +12,7 @@ export { webChatPath } from './web-chat'
 
 export async function openPrivacyPolicy(): Promise<void> {
   try { await Linking.openURL('https://aspectlylabs.com/privacy') }
-  catch { Alert.alert(messages.Auth.webOpenUnconfirmed) }
+  catch { showSystemAlert(messages.Auth.webOpenUnconfirmed) }
 }
 
 /**
@@ -21,16 +22,15 @@ export async function openPrivacyPolicy(): Promise<void> {
  * shows the target account for confirmation before setting its session. Without a
  * token the native page stays open; it cannot fall into another browser session.
  */
-export async function openOnWeb(path: string): Promise<void> {
+export async function openOnWeb(path: string, options?: { confirmAccount?: boolean }): Promise<void> {
   const connection = apiConnection()
   const web = Platform.OS === 'web'
-  if (web && !mobileTaskTarget(path)) {
+  if (web && !options?.confirmAccount && !mobileTaskTarget(path)) {
     // The app root is /mikka, not /mikka/ (lib/base-path.ts).
     window.open(`${API_URL}${path.startsWith('/?') || path === '/' ? path.slice(1) : path}`, '_blank', 'noopener')
     return
   }
-  // Reserve the tab during the gesture. The authorized handoff resolves the
-  // Task's workspace and selects the official client for self-hosted servers.
+  // Reserve the tab during the gesture, before the account confirmation opens.
   const tab = web ? window.open('about:blank', '_blank') : null
   if (tab) tab.opener = null
   const context = apiCache.context()
@@ -49,7 +49,7 @@ export async function openOnWeb(path: string): Promise<void> {
   } catch {
     tab?.close()
     if (web) window.alert(messages.Auth.webOpenUnconfirmed)
-    else Alert.alert(messages.Auth.webOpenUnconfirmed)
+    else showSystemAlert(messages.Auth.webOpenUnconfirmed)
   }
 }
 
@@ -60,9 +60,9 @@ export async function openAccountDeletion(): Promise<void> {
   try {
     if (await finishAppleDeletionHandoff(accountId)) Alert.alert(messages.Auth.appleAuthorizationTitle, messages.Auth.appleRevocationBody, [
       { text: messages.Common.close, style: 'cancel' },
-      { text: messages.Auth.manageAppleAuthorization, onPress: () => { void Linking.openURL('https://account.apple.com/').catch(() => Alert.alert(messages.Auth.webOpenUnconfirmed)) } },
+      { text: messages.Auth.manageAppleAuthorization, onPress: () => { void Linking.openURL('https://account.apple.com/').catch(() => showSystemAlert(messages.Auth.webOpenUnconfirmed)) } },
     ])
-  } catch { Alert.alert(messages.Auth.accountDeletionUnconfirmed) }
+  } catch { showSystemAlert(messages.Auth.accountDeletionUnconfirmed) }
 }
 
 /** The selected server checks the issuer and billing workspace. Never pass its
@@ -86,5 +86,5 @@ export async function openCloudBilling(): Promise<void> {
       || url.searchParams.getAll('section').length !== 1 || url.searchParams.getAll('workspace').length !== 1
       || [...url.searchParams.keys()].some(key => key !== 'section' && key !== 'workspace')) throw new Error('cloud_billing_unconfirmed')
     await WebBrowser.openBrowserAsync(url.href)
-  } catch { if (current()) Alert.alert(messages.Auth.webOpenUnconfirmed) }
+  } catch { if (current()) showSystemAlert(messages.Auth.webOpenUnconfirmed) }
 }

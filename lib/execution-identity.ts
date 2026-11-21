@@ -77,15 +77,12 @@ export async function freezeExecutionIdentity(query: Query, run: RunAuthority, m
     resourceBindings.push({ kind: 'api_key', id: definition.apiKey.keyId, ownerId: key.ownerId, access: key.ownerId === run.userId ? 'owner' : 'workspace_share' })
     model = { kind: 'api_key', ownerId: key.ownerId, resourceId: definition.apiKey.keyId, amount: 'provider_unknown' }
   } else if (definition.subscription) {
-    const { rows: [binding] } = await query.query<{ ownerId: string; workspaceId: string; revision: string; modelId: string; route: string; shared: boolean }>(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route,
-      EXISTS (SELECT 1 FROM workspace_subscription_shares s WHERE s."ownerId"=b."ownerId" AND s."workspaceId"=$2 AND s."allowOthers"
-      AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions)) AS shared
+    const { rows: [binding] } = await query.query<{ ownerId: string; workspaceId: string; revision: string; modelId: string; route: string }>(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route
       FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
-      AND c.state='connected' AND NOT c.paused AND c.epoch=b."connectionRevision" WHERE b.id=$1`, [definition.subscription.bindingId, workspaceId])
-    if (!binding || binding.modelId !== definition.subscription.modelId || binding.route !== definition.subscription.route ||
-      (binding.ownerId !== run.userId && (!workspaceId || binding.workspaceId !== workspaceId || !binding.shared || !await executionMembersActive(workspaceId, [run.userId, binding.ownerId], membership)))) return denied()
-    if (binding.ownerId !== run.userId && !await organizationResourceAllowed(workspaceId!, 'subscription', binding.ownerId, binding.ownerId, membership)) return denied()
-    resourceBindings.push({ kind: 'subscription', id: definition.subscription.bindingId, ownerId: binding.ownerId, access: binding.ownerId === run.userId ? 'owner' : 'workspace_share', revision: binding.revision })
+      AND c.state='connected' AND NOT c.paused AND c.epoch=b."connectionRevision" WHERE b.id=$1`, [definition.subscription.bindingId])
+    // A subscription serves its owner only (decision 2026-11-17).
+    if (!binding || binding.modelId !== definition.subscription.modelId || binding.route !== definition.subscription.route || binding.ownerId !== run.userId) return denied()
+    resourceBindings.push({ kind: 'subscription', id: definition.subscription.bindingId, ownerId: binding.ownerId, access: 'owner', revision: binding.revision })
     model = { kind: 'subscription', ownerId: binding.ownerId, resourceId: definition.subscription.bindingId, amount: 'provider_unknown' }
   } else if (device.kind === 'cloud') return denied()
   const placement=definition.taskMachine

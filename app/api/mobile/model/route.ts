@@ -8,10 +8,9 @@ import { botModelMenu, botModelScope, chooseBotModel, refreshBotModelMenu } from
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 
-export const dynamic = 'force-dynamic'
 
 const botParam = z.uuid().nullable()
-// An option id as the menu lists it: a binding uuid, Mikka 默认, or `apikey:<keyId>:<model>` (lib/bot-model-menu-view.ts).
+// An option id as the menu lists it: a binding uuid, `credits:<vendor/model>` (Mikka 额度), or `apikey:<keyId>:<model>` (lib/bot-model-menu-view.ts).
 const choice = z.strictObject({ bot: botParam, id: z.string().min(1).max(300) })
 const temporaryChoice = z.strictObject({ bot: z.uuid(), id: z.uuid(), mode: z.literal('temporary-if-absent') })
 const restoreChoice = z.strictObject({ bot: z.uuid(), mode: z.literal('restore-implicit'), bindingId: z.uuid(), revision: z.string().regex(/^[0-9]{1,10}$/) })

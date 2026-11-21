@@ -11,7 +11,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@/components/ui/input-group'
-import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react"
+import { ChevronDown, X, Check } from "@/components/icons"
 
 const Combobox = ComboboxPrimitive.Root
 
@@ -31,14 +31,14 @@ function ComboboxTrigger({
       {...props}
     >
       {children}
-      <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground" />
+      <ChevronDown className="pointer-events-none size-4 text-muted-foreground" />
     </ComboboxPrimitive.Trigger>
   )
 }
 
 function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
   return (
-    <ComboboxPrimitive.Clear data-slot="combobox-clear" className={cn(className)} {...props} render={<InputGroupButton variant="ghost" size="icon-xs"><XIcon className="pointer-events-none" /></InputGroupButton>} />
+    <ComboboxPrimitive.Clear data-slot="combobox-clear" className={cn(className)} {...props} render={<InputGroupButton variant="ghost" size="icon-xs"><X className="pointer-events-none" /></InputGroupButton>} />
   )
 }
 
@@ -139,7 +139,7 @@ function ComboboxItem({
       {...props}
     >
       {children}
-      <ComboboxPrimitive.ItemIndicator render={<span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center"><CheckIcon className="pointer-events-none" /></span>} />
+      <ComboboxPrimitive.ItemIndicator render={<span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center"><Check className="pointer-events-none" /></span>} />
     </ComboboxPrimitive.Item>
   )
 }
@@ -235,7 +235,7 @@ function ComboboxChip({
     >
       {children}
       {showRemove && (
-        <ComboboxPrimitive.ChipRemove className="-ml-1 opacity-50 hover:opacity-100" data-slot="combobox-chip-remove" render={<Button variant="ghost" size="icon-xs"><XIcon className="pointer-events-none" /></Button>} />
+        <ComboboxPrimitive.ChipRemove className="-ml-1 opacity-50 hover:opacity-100" data-slot="combobox-chip-remove" render={<Button variant="ghost" size="icon-xs"><X className="pointer-events-none" /></Button>} />
       )}
     </ComboboxPrimitive.Chip>
   )

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { apiProxyOptions, developmentPages } from './dev-http.mjs'
+import { installOverlay, prepareDevelopment, provisionDevelopmentAccount } from './dev-preflight.mjs'
 import { assertApiBuildConfiguration, nodeRuntimePackages } from '../build-contract.mjs'
 import { startEveService } from '../../../scripts/eve-service.mjs'
 
@@ -33,7 +34,9 @@ export function developmentOptions(args = [], env = process.env) {
   return { port: Number(port), host, allowStaleRoutes, origin: `http://${browserHost}:${Number(port)}` }
 }
 
-export function developmentTracing(nitro, tracing) {
+export function configureDevelopmentWorker(nitro, tracing) {
+  // Nitro keeps the old worker until its admitted HTTP exchanges finish.
+  nitro.options.devServer.drain = true
   const config = nitro.options.rolldownConfig ?? {}
   nitro.options.rolldownConfig = {
     ...config,
@@ -171,6 +174,15 @@ export async function developmentResponse(worker, origin, signal, read = fetch) 
   } finally { worker.dispose() }
 }
 
+/** The public port is the last thing that opens. A browser that reaches it
+ * before the worker has an address gets the runner's own wait as a 500
+ * ("Runner did not become ready in time"), which the workspace shows as a
+ * thread that failed to load for a server that is merely still starting. */
+export async function openPublicPort(worker, listen, deadline) {
+  await worker.wait(deadline)
+  await listen()
+}
+
 export async function closeDevelopment(development, log = console.error) {
   try { await development?.close(); return 0 }
   catch (error) {
@@ -196,6 +208,13 @@ export async function startDevelopment({ args = [], root = repository, log = con
   process.env.WORKFLOW_LOCAL_BASE_URL ??= options.origin
   process.env.WORKFLOW_LOCAL_DATA_DIR ??= join(directory, 'workflow')
   process.env.BETTER_AUTH_URL ??= options.origin
+  // One command: the loopback database exists and is migrated, and the official
+  // UI overlay's own dependencies are installed, decided before anything listens.
+  // Both used to fail on the first request instead, as a missing relation or an
+  // opaque SERVER_DOCUMENT_CANNOT_LOAD_WORKSPACE inside a React boundary.
+  const prepared = await prepareDevelopment({ root, log: message => process.stderr.write(`${message}\n`) })
+  Object.assign(process.env, prepared.env)
+  if (prepared.overlay.missingDependencies) installOverlay(join(root, process.env.MIKKA_UI_OVERLAY_DIR))
   const [{ build, createDevServer, createNitro, prepare }, { compileTracing }, { frontendConfig }] = await Promise.all([
     import('nitro/builder'), import('./finalize-build.mjs'), import('../../frontend/vite.config.mjs'),
   ])
@@ -236,7 +255,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     // Config merging appends arrays; explicitly remove production public assets
     // so a clean development checkout needs no previous frontend build.
     nitro.options.publicAssets = []
-    developmentTracing(nitro, await compileTracing(root))
+    configureDevelopmentWorker(nitro, await compileTracing(root))
     const api = createDevServer(nitro)
     workerReady = developmentWorkerReady(api)
     const compiled = Promise.withResolvers()
@@ -273,15 +292,19 @@ export async function startDevelopment({ args = [], root = repository, log = con
     }
     vite.watcher.add(join(root, 'app'))
     for (const event of ['add', 'change', 'unlink']) vite.watcher.on(event, routeChanged)
-    await vite.listen()
     await prepare(nitro)
     await build(nitro)
-    // build() installs a watcher. Wait for the first real graph and one existing
-    // DB-free API through the public proxy before announcing readiness.
+    // build() installs a watcher. Wait for the first real graph, then for the
+    // worker's own address, and only then open the port a browser can reach:
+    // one existing DB-free API through the public proxy announces readiness.
     await compiled.promise
+    await openPublicPort(workerReady, () => vite.listen(), AbortSignal.timeout(30_000))
     await developmentResponse(workerReady, options.origin, AbortSignal.timeout(30_000))
     log(`[dev] Local: ${options.origin}/mikka`)
     log(`[dev] Ready in ${Math.ceil(performance.now() - started)}ms (Vite + Nitro)`)
+    if (process.env.MIKKA_LOCAL_TEST_ACCOUNTS === '1') {
+      await provisionDevelopmentAccount(root, `${options.origin}/mikka`, log).catch(() => {})
+    }
     return { ...options, nitro, vite, close }
   } catch (error) {
     await close()
@@ -294,16 +317,32 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const stop = () => stopping ??= Promise.resolve().then(() => closeDevelopment(development)).then(code => {
     process.exitCode = Math.max(Number(process.exitCode) || 0, code)
   })
-  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void stop() })
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { void stop() })
   try {
     development = await startDevelopment({ args: process.argv.slice(2) })
     if (stopping) await development.close()
+    else if (process.send) process.send({ type: 'api-ready', origin: development.origin })
   } catch (error) {
     // A stale route manifest is a condition the developer can fix, and the
     // refusal text is the whole value of stopping: print it as written rather
     // than folding it into the one-line diagnostic that hides its detail.
     if (error?.code === 'API_DEV_ROUTES_STALE') console.error(error.message)
-    else console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? 'API_DEV_START_FAILED' })
+    else {
+      // A startup refusal is only diagnosable if its own words survive. The
+      // preflight decides the database and the overlay before anything listens,
+      // and its two codes are the ones a person can act on, so they are named
+      // rather than folded into the generic one; the message carries the rest.
+      const known = new Set(['EVE_SERVICE_START_FAILED', 'EVE_SERVICE_START_TIMEOUT', 'EVE_SERVICE_EXITED', 'EVE_SERVICE_STORAGE_MISMATCH', 'API_CONFIG_NOT_LOADED', 'API_DEV_LOCAL_WORLD_REQUIRED', 'DEV_DATABASE_UNREACHABLE', 'DEV_DATABASE_MISSING'])
+      const message = String(error?.message ?? '')
+      const named = [...known].find(code => message.startsWith(code)) ?? (known.has(message) ? message : null)
+      console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? named ?? 'API_DEV_START_FAILED', message: message.slice(0, 300) })
+      // The peer's own stderr is the only place its refusal is explained — "A dev
+      // server is already running for this eve agent", a module error, a port
+      // clash. A bare EVE_SERVICE_EXITED would send the developer hunting for a
+      // cause this process already has in hand.
+      const words = error?.detail?.reason ?? error?.detail?.stderr?.trim()
+      if (words) for (const line of words.split('\n').slice(-12)) console.error(`[dev] eve: ${line}`)
+    }
     process.exitCode = 1
   }
 }

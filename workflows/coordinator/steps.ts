@@ -1,4 +1,4 @@
-import { AgentProfileError, builtinAgentProfileSelection } from '@/lib/factory/agent-profile-definition'
+import { AgentProfileError, builtinAgentProfileSelection, profileFixedModel } from '@/lib/factory/agent-profile-definition'
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { queueTaskRun } from '@/lib/factory/queue-local'
 import { deploymentSwitch } from '@/lib/deployment-switches'
@@ -6,19 +6,11 @@ import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { FatalError } from 'workflow'
-import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
-import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
-import { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/check-recovery'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { FactoryError } from '@/lib/factory/contract'
 import { publicFactoryReceipt } from '@/lib/factory/public-receipt'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
-import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
-import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import type { MailboxToolRequest } from '@/lib/mailbox-tools'
-import type { MailboxToolName } from '@mikka/protocol/mailbox'
-import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
-import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import type { WorkerDefinitionSnapshot, WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -30,11 +22,7 @@ import { actAs } from '@/lib/acting-user'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { coordinatorTaskWorkspace } from '@/lib/coordinator/issue-team'
 import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
-import { forgetNotes, cachedContextLines, promptWithCachedContext, rememberNote } from '@/lib/coordinator/context'
-import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
-import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
-import { botInstructions } from '@/lib/coordinator/bot-instructions'
-import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
+import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
@@ -55,6 +43,7 @@ import { recordDecision } from '@/lib/attention/store'
 import type { CreateIssueInput, UpdateIssueInput } from '@/lib/coordinator/issue-input'
 import { systemActor } from '@/lib/activity-actor'
 import { timedPhase, withDispatchTiming } from '@/lib/dispatch-timing'
+import { withRunSpan } from '@/lib/tracing/context'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -69,7 +58,7 @@ export async function computerToolsEnabled() {
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
-    return await fn()
+    return await withRunSpan('coordinator.tool', {}, fn)
   } catch (error) {
     if (error instanceof ActionFailureError) {
       // A refused run says why, so the Coordinator acts on the cause instead of guessing one.
@@ -108,54 +97,6 @@ export async function recordAttention(userId: string, input: { matterId: string;
 }
 
 /** Product context only: eve supplies history and owns pruning and compaction. */
-export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
-  const withoutSkills = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
-  return prepareInstructions(userId, botId, withoutSkills, nativeTurn)
-}
-
-async function prepareInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
-  if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
-    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
-    await factoryRuntimeForBot(botId).reconcile(userId)
-  }
-  const conversation = await store.loadProductPromptContext(userId, botId)
-  const { memory } = conversation
-  const mailboxTools: readonly MailboxToolName[] = []
-  const githubScope = { hosted: true, readOnly: false, effectiveTools: snapshot?.effectiveTools }
-  // The hosted Coordinator renders OpenUI like the native one, so it gets the same presentation rules and catalog.
-  const base = withCoordinatorPresentation(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS))
-  const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
-  const factoryPolicy = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle') ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
-  // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
-  // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
-  const { githubPromptContext } = await import('@/lib/coordinator/github-context')
-  const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const { memoryForBotPrompt } = await import('@/lib/profile/memory')
-  const [execution, rules, github, approvedFacts] = await Promise.all([
-    executionContextParts(userId, botId),
-    withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined),
-    githubPromptContext(userId, githubScope, undefined, undefined, botId),
-    conversation.memoryEnabled ? memoryForBotPrompt(userId, botId, conversation.memoryEnabled, nativeTurn) : Promise.resolve(''),
-  ])
-  // What Mikka has learnt about the person (R-73). It reaches only the chat's own
-  // repositories' facts, so one project's habits never surface in another's
-  // conversation. A profile read that fails leaves the section out; it never
-  // fails the turn. The `memory` switch governs it exactly as it governs the
-  // person's own notes: with 记忆 off, conversationWithMemory already emptied
-  // `memory`, and nothing learnt is stated either.
-  const profile = memory ? await (async () => {
-    const [{ profilePromptSection }, { usedRepositoriesForBot }] = await Promise.all([
-      import('@/lib/profile/store'), import('@/lib/coordinator/github-context'),
-    ])
-    return profilePromptSection(userId, await usedRepositoriesForBot(userId, botId))
-  })().catch(() => '') : ''
-  // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
-  // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
-  // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), [memory, approvedFacts].filter(Boolean).join('\n'), factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
-  return prompt.instructions
-}
-
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
 
 export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
@@ -218,11 +159,10 @@ export async function forget(userId: string, input: { text: string }, scope: Nat
 async function appBlockedForBot(botId: string | undefined, action: ComposioActionName) {
   if (!botId) return false
   const { botMayUseApp } = await import('@/lib/app-policy/store')
-  const { isPolicyApp } = await import('@/lib/app-policy/apps')
   // Loaded here, not at module top: steps.ts is imported by suites that stub 'ai', which composio-actions needs.
   const { COMPOSIO_ACTIONS } = await import('@/lib/composio-actions')
   const toolkit = COMPOSIO_ACTIONS[action]?.toolkit
-  return Boolean(toolkit && isPolicyApp(toolkit) && !(await botMayUseApp(botId, toolkit)))
+  return Boolean(toolkit && !(await botMayUseApp(botId, toolkit)))
 }
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
@@ -325,7 +265,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
-    thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
+    thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl, agent: latest.harness } : null,
     ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listPublicForIssue(userId,issue.id) } : {}),
   }
   })
@@ -409,6 +349,10 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   const { newThread, sourceEventId, target: offeredTarget, ...request } = input
   let target = offeredTarget
   let creation: { eventId: string; botId: string; workspaceId: string } | undefined
+  let botDefaults: import('@/lib/bot-settings').BotDispatchDefaults | null = null
+  // The task form's or schedule's Agent: undefined without one of those commands, null when it named none.
+  let commanded: 'claude_code' | 'codex' | null | undefined
+  let commandedModel: string | undefined
   requestEventId ??= sourceEventId
   try {
     const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
@@ -419,8 +363,23 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
       request.requestKey = `task-command:${requestEventId}`
     }
     request.profileId = selection.profileId
+    botDefaults = await timedPhase('botDispatchDefaults', async () => (await import('@/lib/bot-settings-store')).botDispatchDefaults(pool, botId))
+    // Task explicit > Bot default > the person's own defaults (lib/bot-settings.ts withBotDispatchDefaults).
+    if (selection.commandIssueId) { commanded = selection.agent ?? botDefaults?.defaultAgent ?? null; commandedModel = selection.model }
     if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
+    // The computer the person named, when the model left the place out, and
+    // its Agent whatever the model passed. A different place stays refused.
+    if (selection.taskDestination?.kind === 'device') {
+      if (target === undefined) target = { deviceId: selection.taskDestination.deviceId }
+      if (selection.taskDestination.agentId) request.agentId = selection.taskDestination.agentId
+    }
   } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
+  // The Agent the person picked in the task form, or the schedule stored, is the
+  // task's, whatever the model passed; a command that named none is refused.
+  if (commanded === null) return { error: 'agentRequired' as const, issueId: request.issueId }
+  if (commanded && request.model?.harness !== commanded) request.model = { harness: commanded }
+  // The command's own model (an automation's) wins over one the Bot named.
+  if (commanded && commandedModel) request.model = { harness: commanded, model: commandedModel }
   // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
   if (request.model) {
     const { modelNotAllowed } = await import('@/lib/model-dispatch')
@@ -437,10 +396,21 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   }
   // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
   const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
+  const { withBotDispatchDefaults } = await import('@/lib/bot-settings')
   // A new thread runs in the repository named; the thread's next run only ever in the thread's own (never the one the model passed).
-  const byRules = (note: string | undefined, place: import('@/lib/dispatch-target').DispatchTarget | undefined, named: string | null | undefined, previousRunId?: string) => {
+  // A new thread runs on the Agent the dispatch names; nothing picks one (decision 2026-11-17-1800).
+  // The thread's next run keeps the thread's own Agent, never the other one.
+  const byRules = (note: string | undefined, place: import('@/lib/dispatch-target').DispatchTarget | undefined, named: string | null | undefined, previous?: { id: string; harness: string | null }) => {
     if (!named?.trim()) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
-    return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, repo, note, threadRunId: previousRunId }, scope, botId, execution, requestEventId, place))
+    const own: { harness: 'claude_code' | 'codex' } | undefined = previous?.harness === 'claude_code' || previous?.harness === 'codex' ? { harness: previous.harness } : undefined
+    // A new thread falls back on the Bot's defaults for what the task left open; a thread's next run keeps its own (never a move).
+    const asked = previous
+      ? { place, model: request.model ?? own, profileId: request.profileId, agentId: request.agentId }
+      : withBotDispatchDefaults({ place, model: request.model, profileId: request.profileId, agentId: request.agentId }, botDefaults)
+    if (!asked.model && !asked.agentId) return Promise.resolve({ error: 'agentRequired' as const, issueId: request.issueId })
+    const sponsoredDefault = 'sponsored' in asked && asked.sponsored === true
+    return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, ...(asked.model ? { model: asked.model } : {}), ...(asked.profileId ? { profileId: asked.profileId } : {}), ...(asked.agentId ? { agentId: asked.agentId } : {}), repo, note, threadRunId: previous?.id,
+      ...(sponsoredDefault ? { sponsoredDefault: true as const } : {}) }, scope, botId, execution, requestEventId, asked.place))
   }
   // The thread's repository is not the one named: a different one, or a name that is not one repository yet (its card comes from the new thread's lookup).
   let repositoryMove = false
@@ -458,7 +428,7 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
     explicit: async () => (repositoryMove && await personNamed(userId, botId, sourceEventId, request.repo!)) || explicitNewThread(userId, botId, sourceEventId),
     start: async (previous, note, replaces) => {
       // A new thread runs in the repository the person named, else in the one of the thread it replaces.
-      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl)
+      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl || botDefaults?.repository)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       // It keeps the thread's own model and account, or the one the person just named; never another one silently.
       const { latestThreadRunModel, chooseCloudRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
@@ -489,7 +459,7 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
       }
       // Where the thread ran could not take it: placed by the rules, in the thread's repository and at the place the person named, if any.
       if (customProfile) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
-      return byRules(note, target, previous.remoteUrl, previous.id)
+      return byRules(note, target, previous.remoteUrl, previous)
     },
   })))
 }
@@ -504,7 +474,20 @@ async function personNamed(userId: string, botId: string, sourceEventId: string 
 }
 
 /** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */
-async function dispatchByRules(userId: string, input: { threadRunId?: string; issueId: string; profileId?: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; origin?: RunOrigin; originRef?: RunOriginRef | null; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+/**
+ * The Agent a run on a named computer uses. A computer registers one Agent per
+ * installed CLI, so the choice is explicit or unambiguous, never a default:
+ * agentRequired when several remain, agentHarnessMissing when the named Agent
+ * (or the model's harness) is not one of this computer's installed Agents.
+ */
+async function namedDeviceAgent(userId: string, deviceId: string, agentId: string | undefined, harness: string | undefined): Promise<{ id: string } | { error: 'agentRequired' | 'agentHarnessMissing' }> {
+  const { rows: [device] } = await pool.query<{ harnesses: { harness: string; installed?: boolean }[] | null }>('SELECT harnesses FROM devices WHERE id=$1 AND "ownerId"=$2', [deviceId, userId])
+  const installed = new Set((device?.harnesses ?? []).filter(item => item.installed).map(item => item.harness))
+  const { rows } = await pool.query<{ id: string; harness: string }>('SELECT id,harness FROM agents WHERE "userId"=$1 AND "deviceId"=$2 ORDER BY "createdAt",id', [userId, deviceId])
+  return (await import('@/lib/dispatch-target')).chooseDeviceAgent(rows, installed, agentId, harness)
+}
+
+async function dispatchByRules(userId: string, { followed, sponsoredDefault, ...input }: { threadRunId?: string; issueId: string; profileId?: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; origin?: RunOrigin; originRef?: RunOriginRef | null; model?: { harness: 'claude_code' | 'codex'; model?: string }; followed?: true; /** The Bot's default is the Cloudflare coding machine and the task named no place. */ sponsoredDefault?: true }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   if (!input.threadRunId) input = { ...input, needsSpec: await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, userId, { issueId: input.issueId, botId, needsSpec: input.needsSpec }) }
   const stage = input.needsSpec ? 'spec' : 'execute'
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
@@ -517,11 +500,18 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     // The named computer fixes where; the model is chosen as for any run (the thread's own, else 优先使用的模型 in order), among what this computer runs.
     const { issueForUser } = await import('@/lib/issue-access')
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
+    // Which of the computer's Agents runs it is decided here, never by a default:
+    // the named Agent, the model's own Agent, or the computer's only one. A
+    // computer with several Agents and nothing naming one refuses at once.
+    const agentId = await namedDeviceAgent(userId, device.deviceId, input.agentId, input.model?.harness)
+    // A computer that lacks the asked harness keeps its own card (这台电脑没装 …) from the planner below.
+    if ('error' in agentId && (agentId.error === 'agentRequired' || input.agentId)) return { error: agentId.error, issueId: input.issueId }
+    if (!('error' in agentId)) input = { ...input, agentId: agentId.id }
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
     const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: 'local', deviceId: device.deviceId, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) })
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
-    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), location: 'local', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) }
+    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), location: 'local', entry: target.entry, ...(followed ? { followed } : {}) }
     const result = await queueTaskRun(userId, { ...input, agentId: target.agentId, model: target.model, modelDispatch, agentProfile, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, { origin: input.origin ?? 'web', originRef: input.originRef ?? null })
     return { ...result, status: 'queued' as const }
   }
@@ -536,7 +526,7 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const workspaceId = await timedPhase('executionWorkspace', () => executionWorkspace(userId, botId))
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
-    let sponsored = false
+    let sponsored = place === 'cloud' && sponsoredDefault === true
     if (requestEventId) {
       const event=(await pool.query(`SELECT "userId","botId","issueId",kind,"deliveredAt",
         payload ? 'taskDestination' AS "hasTaskDestination",payload->'taskDestination' AS "taskDestination"
@@ -567,7 +557,7 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const onDevice = async (device: Extract<typeof target, { kind: 'device' }>, threadRunId = input.threadRunId) => {
       // Automatic placement selects the initial worker, not an owner-pinned
       // destination. Only the named-device branch above freezes that constraint.
-      const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), entry: device.entry, ...(device.routing ? { routing: device.routing } : {}) }
+      const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), entry: device.entry, ...(followed ? { followed } : {}) }
       const selectedProfile = agentProfile?.source === 'default' ? builtinAgentProfileSelection(agentProfile.scope, device.entry)
         : agentProfile ? { ...structuredClone(agentProfile), targetEntry: structuredClone(device.entry) } : undefined
       const result = await queueTaskRun(userId, { ...input, threadRunId, agentId: device.agentId, model: device.model, modelDispatch, agentProfile: selectedProfile, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId, { origin: input.origin ?? 'web', originRef: input.originRef ?? null })
@@ -582,18 +572,16 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const { bindAgentToConnection } = await import('@/lib/model-dispatch')
     const source = target.entry.source
     const subscriptionBindingId = runtime && source.kind === 'subscription' ? await timedPhase('bindAgentToConnection', () => bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model)) : undefined
-    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), ...(place === 'cloud' ? { location: 'cloud' as const } : {}), entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) }
+    const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), ...(place === 'cloud' ? { location: 'cloud' as const } : {}), entry: target.entry, ...(followed ? { followed } : {}) }
     const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,modelDispatch,agentProfile,repo:input.repo,threadRunId:input.threadRunId,sourceEventId:requestEventId,factoryBotId:botId,needsSpec:input.needsSpec,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {}),origin: input.origin ?? 'web', originRef: input.originRef ?? null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution,place !== 'cloud' ? true : undefined) : { error: 'cloudComputerUnavailable' as const }
     if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
     // 云端 could not start it (the key refused, a limit, the template, E2B down, the worker never came up;
     // the queued cloud run is already ended): a server, else a computer, unless the person asked for the cloud.
     if (place !== 'cloud' && !('recoveryBlocked' in cloud && cloud.recoveryBlocked)) {
-      const exact = selectionMode === 'picked' || agentProfile?.definition.model.mode === 'fixed'
-      const profileHarness = agentProfile?.definition.harness
+      // A computer instead of the cloud, never another Agent: the thread keeps the one it was given (decision 2026-11-17-1800).
+      const exact = selectionMode === 'picked' || profileFixedModel(agentProfile) !== undefined
       const fallback = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, undefined, {
-        withoutCloud: true, agentId: input.agentId,
-        routing: { issueId: input.issueId, stage, note: input.note, effort: agentProfile?.effort },
-        ...(exact ? { exactEntry: target.entry, harness: target.entry.harness } : profileHarness && profileHarness !== 'auto' ? { harness: profileHarness } : {}),
+        withoutCloud: true, agentId: input.agentId, harness: target.entry.harness, ...(exact ? { exactEntry: target.entry } : {}),
       })
       // An admitted but unclaimed startup failure is the same Factory intent.
       // Its server-confirmed failed run supplies ancestry for the normal retry.
@@ -703,11 +691,13 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
           runModel = kept
         }
       } else {
+        // A new thread names its Agent; the host never picks one (decision 2026-11-17-1800).
+        if (!request.harness) return { error: 'agentRequired' as const, issueId: request.issueId }
         request.needsSpec = await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, userId, { issueId: request.issueId, botId: chatBotId ?? request.botId, needsSpec: request.needsSpec })
         const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
         const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: bot.workspaceId, botId: request.botId }, {
           issueId: request.issueId, stage: request.needsSpec ? 'spec' : 'execute', note, profileId: request.profileId, location: 'cloud', cloudPurpose: 'desktop',
-          ...(request.harness ? { asked: { harness: request.harness, ...(asked ? { model: asked } : {}) } } : {}),
+          asked: { harness: request.harness, ...(asked ? { model: asked } : {}) },
         })
         if (target.kind !== 'cloud') return { error: 'machineUnavailable' as const, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
         const runtime = await (await import('@/lib/computer/auto-runtime')).ensureBotCloudRuntime(pool, { userId, workspaceId: bot.workspaceId }, request.botId, { harness: target.harness })
@@ -716,7 +706,7 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
         const subscriptionBindingId = source.kind === 'subscription' ? await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool,
           { ownerId: userId, workspaceId: bot.workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model) : undefined
         harness = target.harness
-        runModel = { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? (request.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+        runModel = { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? (request.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry },
           ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(source.kind === 'api_key' ? { apiKeyId: source.keyId } : {}) }
       }
       // A repository thread stays on its admitted repository even when its
@@ -1007,21 +997,4 @@ export async function scheduleCommand(userId:string,botId:string|null,sourceEven
   await assertNativeToolScope(userId,scope)
   const {executeScheduleCommand}=await import('@/lib/schedules/runtime')
   return executeScheduleCommand(userId,botId,sourceEventId,input)
-}
-export async function assertScheduleRead(userId:string,botId:string,scope:import('@/lib/schedules/contract').ScheduledRead){
-  'use step'
-  const {assertScheduledRead}=await import('@/lib/schedules/runtime')
-  await assertScheduledRead(userId,botId,scope)
-}
-export async function completeScheduleRead(userId:string,botId:string,scope:import('@/lib/schedules/contract').ScheduledRead,text:string,streamId?:string){
-  'use step'
-  const {schedules}=await import('@/lib/schedules/runtime')
-  await schedules().completeRead(userId,botId,scope,text,streamId)
-  return (await store.conversationForDisplay(userId,1,botId))[0]?.position ?? 0
-}
-export async function failScheduleRead(scope:import('@/lib/schedules/contract').ScheduledRead,denied=false){
-  'use step'
-  const {failScheduledRead}=await import('@/lib/schedules/runtime')
-  const {ScheduleError}=await import('@/lib/schedules/contract')
-  await failScheduledRead({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
 }

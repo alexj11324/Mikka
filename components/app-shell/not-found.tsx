@@ -1,4 +1,4 @@
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 

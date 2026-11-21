@@ -16,7 +16,7 @@ by workspace and owner. A task's cloud machine belongs exclusively to that task.
 
 - Design review page: https://claude.ai/artifact/G8aEuFM4rwvGFeZbPYyVwU
 - Figma: file `zPe5LKycb2XuT1ivCLRw07`, section "云端电脑" (node `102:65`)
-- Related: #147 (computer use), #161 (local CUA driver, approvals), #157
+- Related: #147 (computer use), #161 (local CUA driver, workspace computer policy), #157
   (remote desktop, superseded by this document)
 
 ## 1. What the user sees
@@ -32,8 +32,9 @@ The Bot computer is keyed by `bots.id`, never `agents.id`.
 - **Full-window viewer**: starts view-only (仅观看). 取得控制权 pauses the agent
   and gives the user mouse and keyboard (你在操作); 交还给 <Bot 名> hands control back.
 - **Chat**: one 电脑 card per computer task. It shows the task sentence, a state
-  (<Bot 名> 操作中 / 等你审批 / 完成) and the live screen. Approval happens inside
-  the card (允许 / 拒绝 / 本任务内都允许). There is no step list and no operation
+  (<Bot 名> 操作中 / 完成 / 失败) and the live screen. There is no approval step:
+  the workspace 电脑 policy decides whether Bots may use a computer, and the
+  person takes control when they want. There is no step list and no operation
   log anywhere.
 - **Sleep**: the computer sleeps when idle and keeps its disk. It wakes
   automatically when an agent needs it, or when the user presses 唤醒.
@@ -198,17 +199,15 @@ Reuse, don't rewrite:
 
 - `packages/daemon/src/computer/driver.mjs`: driver detection, pinned version,
   binary fingerprint, call normalization.
-- `packages/daemon/src/computer/broker.mjs`: the request-only MCP proxy and the
-  exact-operation approval wait.
+- `packages/daemon/src/computer/broker.mjs`: the request-only MCP proxy; the
+  driver executes what the workspace policy allows, with no per-operation review.
 - `packages/protocol/src/computer.ts`: the request and decision schemas.
-- The web review ledger (`local_computer_reviews` migration, `/devices/approvals`
-  flow): owner, run, expiry and digest binding.
 
 New on top of #161:
 
 - A display is chosen per call.
 - The cloud device kind.
-- The "allow for this run" scope.
+- Workspace-level allow/deny and the device binding; no per-run scope.
 - Wake, sleep, viewer and control.
 
 ## 3. Verify before building
@@ -235,8 +234,11 @@ Report findings in the issue before building on an assumption that failed.
   (`sleeping | waking | running | error`), lastActiveAt.
 - `bot_desktops`: workspaceId, botId (references `bots.id`; unique pair), display number, control
   (`agent | user | idle`), controlledBy (userId, nullable), lastActiveAt.
-- `thread_machines`: runId (unique), sandboxId, snapshotId, state
-  (`starting | running | paused | ended | error`), desktop (boolean),
+- `thread_machines`: runId (unique), sandboxId, snapshotId (the
+  template/image it was created from, never a filesystem snapshot),
+  filesystemSnapshotId / snapshotState / snapshotTakenAt (the task's own
+  restore image), state
+  (`starting | running | paused | restore | ended | error`), desktop (boolean),
   lastActiveAt.
 - `bot_subagents`: id, workspaceId, botId, task (one sentence, R-45), state
   (`queued | running | needs_you | done | failed | stopped`), step (the
@@ -244,9 +246,8 @@ Report findings in the issue before building on an assumption that failed.
   context id, createdAt, endedAt. No credential column.
 - Saved logins: the #180 vault, keyed by user account and site
   (`credential-vault.md`); only ciphertext is stored.
-- Approval rows: reuse the #161 ledger. Add `scope: once | run` so that
-  本任务内都允许 auto-approves later operations of the same run on the same
-  desktop. A workspace `deny` still wins.
+- Authorization: the workspace 电脑 policy (allow / deny) and the device
+  binding; a workspace `deny` still wins. No approval rows are stored.
 
 Additive migrations only, tested against a real Postgres; see `docs/migration-bootstrap.md` for when they run.
 
@@ -267,13 +268,11 @@ import them.
   controlledBy?: { userId: string }    // when control === "user"
   lastAction?: { tool: "click" | "type" | "key" | "scroll", x?: number, y?: number,
                  rect?: { x: number, y: number, w: number, h: number }, at: string }
-  pendingApproval?: ApprovalView       // see below
 }
 ```
 
 The frontend draws the blue target ring and cursor from `lastAction`, in screen
-coordinates of a fixed 1280×800 desktop, and the orange ring from
-`pendingApproval`.
+coordinates of a fixed 1280×800 desktop. There is no approval ring.
 
 `POST /api/bots/:botId/computer/wake` returns `202` and drives
 `machine: waking → running`.
@@ -303,21 +302,11 @@ thumbnail, the chat card and the full-window viewer all use `view`.
 - Only one user can hold control at a time. A second takeover gets `409` with
   `controlledBy`.
 
-### Approvals
+### Authorization
 
-```ts
-type ApprovalView = {
-  id: string, digest: string, runId: string, botId: string,
-  action: { tool: "click" | "type" | "key" | "scroll", x?: number, y?: number, text?: string },
-  summary: string,     // e.g. 点击「登录」 — short, from the operation, no screenshot
-  expiresAt: string,
-}
-```
-
-`POST /api/computer/approvals/:id` with body
-`{ digest, decision: "approve" | "deny", scope: "once" | "run" }`. This keeps
-#161's guarantees: the digest must match, the request expires and cannot be
-replayed, and the response says "queued", never an invented success.
+Computer use is authorized once per workspace and device: the workspace 电脑
+policy (allow / deny) and the device binding. There is no per-operation
+approval endpoint and no `ApprovalView`.
 
 ### Events
 
@@ -325,7 +314,7 @@ The UI needs push, not polling. Emit these as run events (AI SDK
 `UIMessageChunk` data parts on the existing `/v1/runs/:runId/events` path) so
 that they land in the conversation:
 
-- `data-computer` with `{ botId, runId, task: string, state: "working" | "approval" | "done" | "failed", approvalId? }`.
+- `data-computer` with `{ botId, runId, task: string, state: "working" | "done" | "failed" }`.
   This is one card per computer task. `task` is the one-sentence task shown on
   the card.
 - `data-subagent` with `{ botId, subagentId, task: string, state: "queued" | "running" | "needs_you" | "done" | "failed" | "stopped", step?: string, needs?: { kind: "login" | "code", site: string, account?: string } }`
@@ -342,7 +331,6 @@ after an invalidation. The original proposed event categories were
 - `computer.machine`: `{ state }`
 - `computer.control`: `{ botId, control, controlledBy? }`
 - `computer.action`: `{ botId, lastAction }`, throttled to at most 4/s
-- `computer.approval`: `{ botId, approval | null }`
 
 ### Add device (user's own machines)
 

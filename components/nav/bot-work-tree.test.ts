@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { directoryPullRequests } from '@/lib/pull-request-appearance'
 import assert from 'node:assert/strict'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskPresentation, type TaskPresentation } from '@/lib/task-presentation'
@@ -7,7 +8,7 @@ import { botWorkTree } from './bot-work-tree'
 type Issue = Parameters<typeof botWorkTree>[3][number]
 type Thread = Parameters<typeof botWorkTree>[2][number]
 const issue = (id: string, status = 'doing'): Issue => ({
-  id, status, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`, shortTitle: null,
+  id, status, stateId: null, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`,
   ownerId: 'owner', ownerName: 'Owner', ownerImage: null, teamId: null,
   workspaceId: 'workspace', projectId: null,
   scope: 'personal', priority: 'normal', revision: 1,
@@ -42,6 +43,14 @@ test('historical dispatch and current dispatch share the workspace projection ev
   assert.equal(tree.has('unrelated'), false)
 })
 
+test('a bot work row summarizes PR states only across its authorized dispatches', () => {
+  const task = issue('a')
+  const runs = [{ ...run('1', 'a'), pullState: 'merged' as const }, { ...run('2', 'a'), pullState: 'open' as const }]
+  const tree = botWorkTree('workspace', ['bot'], runs, [task], { a: present(task, ['bot']) })
+  assert.equal(tree.get('bot')?.[0].pullState, 'open')
+  assert.equal(botWorkTree('other', ['bot'], runs, [task], { a: present(task, ['bot']) }).size, 0)
+})
+
 test('a missing projection, an out-of-workspace issue or an unauthorized Bot cannot enter the tree', () => {
   const a = issue('a'), foreign = { ...issue('foreign'), workspaceId: 'another' }
   const runs = [run('a-run', 'a'), run('foreign-run', 'foreign'), run('other', null, 'another-bot'), run('null-bot', null, null)]
@@ -64,14 +73,26 @@ test('a closed task stays closed while its run is active', () => {
   assert.equal(row.state, 'done')
 })
 
-test('sidebar task names use the existing short title and bound pending/manual titles; standalone runs are bounded too', () => {
-  const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面', shortTitle: '登录回调修复' }
-  const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短', shortTitle: null }
+test('sidebar task names bound the task title; standalone runs are bounded too', () => {
+  const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面' }
+  const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短' }
   const standalone = { ...run('c', null), prompt: 'one two three four five six seven eight' }
   const rows = botWorkTree('workspace', ['bot'], [run('a', 'a'), run('b', 'b'), standalone], [generated, pending], { a: present(generated, ['bot']), b: present(pending, ['bot']) }).get('bot')!
-  assert.equal(rows[0].name, 'MIK-a 登录回调修复')
+  assert.equal(rows[0].name, 'MIK-a 完整的任务需求原文不应该')
   assert.equal(rows[0].fullName, 'MIK-a 完整的任务需求原文不应该出现在紧凑的导航里面')
   assert.equal(rows[1].name, 'MIK-b 这是一个超过十二字限制的')
   assert.equal(rows[2].name, 'one two three four five six')
   assert.equal(generated.title, '完整的任务需求原文不应该出现在紧凑的导航里面')
+})
+
+test('each GitHub PR retains every authorized conversation across directory pages', () => {
+  const open = { url: 'https://github.com/First/Repo/pull/8', state: 'open' as const }
+  const merged = { url: 'https://github.com/second/repo/pull/8', state: 'merged' as const }
+  const rows = [
+    { id: 'one', pulls: [open, merged] },
+    { id: 'two', pulls: [{ ...open, url: open.url.toLowerCase() + '/' }] },
+  ]
+  assert.deepEqual(directoryPullRequests(rows, 'all').map(entry => [entry.pull.url, entry.conversations.map(row => row.id)]),
+    [[open.url, ['one', 'two']], [merged.url, ['one']]])
+  assert.deepEqual(directoryPullRequests(rows, 'merged').map(entry => entry.pull), [merged])
 })

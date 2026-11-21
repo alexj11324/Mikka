@@ -78,6 +78,7 @@ test('detail and activity revalidate current access while returning only changed
     const snapshot = history.snapshot
     assert.equal(snapshot.items.length, 50)
     assert.ok(snapshot.items.every(version => !version.content.content), 'activity summaries contain no historical document body')
+    assert.equal(snapshot.items.find(version => version.revision === 2)?.descriptionChanged, false, 'identical bodies do not manufacture description activity')
     assert.equal(detail.issue.content.content?.[0].content?.[0].text, content.content[0].content[0].text)
     assert.ok(cold.resultBytes * 5 < legacy.resultBytes, `cold summary path ${cold.resultBytes} JSON bytes vs legacy ${legacy.resultBytes}`)
 
@@ -112,6 +113,7 @@ test('detail and activity revalidate current access while returning only changed
     const changedHistory = delta.value.snapshot
     assert.equal(changedHistory.delta, true)
     assert.deepEqual(changedHistory.items.map(row => row.id), [newVersion])
+    assert.equal(changedHistory.items[0].descriptionChanged, true, 'body change is detected without returning the body')
     const combined = mergeList(snapshot.items, changedHistory)
     assert.equal(combined.length, 51, 'the creation stays beside the fifty-version window')
     assert.ok(combined.some(version => version.revision === 1))
@@ -130,9 +132,9 @@ test('detail and activity revalidate current access while returning only changed
     const paged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
     assert.ok(paged.snapshot && !('unchanged' in paged.snapshot))
     const window = mergeList(combined, paged.snapshot)
-    assert.equal(window.length, 51)
+    assert.equal(window.length, 52, 'older activity is retained instead of being displaced by new revisions')
     assert.equal(window.at(-1)?.revision, 1)
-    assert.ok(!window.some(row => row.revision === 2))
+    assert.ok(window.some(row => row.revision === 2))
 
     assert.equal((await actAs(stranger, () => pollIssue(id, bodyChanged.version))).error, 'issueNotFound')
     assert.equal((await actAs(stranger, () => pollIssueVersionSummaries(id, snapshot.version, snapshot.positions))).error, 'issueNotFound')

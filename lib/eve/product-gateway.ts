@@ -1,9 +1,8 @@
 import 'server-only'
-import { asSchema, type ToolSet } from 'ai'
+import { asSchema } from 'ai'
 import { z } from 'zod'
-import type { AgentExecution } from '../agent-kit/store'
-import { requiresEveProductApproval } from './approval-bridge'
-import { snapshotMailboxTools } from '../personal-mailbox-capability'
+import type { EveScope } from './scope'
+import { asProductPrincipal, productContext, productTools } from './product-definitions'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
@@ -13,15 +12,12 @@ const approvalResponder = z.object({
   attributes: z.object({ botId: z.uuid(), workspaceId: z.uuid(), surface: z.enum(['web', 'slack']) }).strict(),
 }).strict()
 const requestSchema = z.discriminatedUnion('operation', [
-  z.object({ ...common, operation: z.literal('prepare') }).strict(),
-  z.object({ ...common, operation: z.literal('instructions') }).strict(),
-  z.object({ ...common, operation: z.literal('catalogue') }).strict(),
   z.object({ ...toolCall, operation: z.literal('approval') }).strict(),
   z.object({ ...toolCall, operation: z.literal('execute'), approvalResponder: approvalResponder.optional() }).strict(),
   z.object({ ...common, operation: z.literal('finish'), outcome: z.enum(['completed', 'failed', 'cancelled']), messages: z.array(z.unknown()).optional() }).strict(),
 ])
 type Input = z.infer<typeof requestSchema>
-type Scope = { ownerId: string; botId: string; workspaceId: string; surface: 'web' | 'slack' }
+type Scope = EveScope
 
 /** Test seam is the authenticated product boundary, independent of eve's model/tool loop. */
 export interface EveProductGatewayServices {
@@ -76,45 +72,13 @@ const defaultServices: EveProductGatewayServices = {
     await assertSessionScope(scope, sessionId)
   },
   async run(scope, input, signal, request) {
-    const { actAs } = await import('../acting-user')
-    const { tokenWorkspace } = await import('../tokens/principal')
-    return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, async () => {
-      const kit = await import('../../workflows/coordinator/agent-kit-steps')
-      if (input.operation === 'prepare') {
-        const execution = await kit.beginAgentExecution(scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}`, 0, { harness: 'ai_sdk' })
-        return { execution, runtime: execution?.snapshot.runtime ?? await kit.botRuntime(scope.ownerId, scope.botId) }
-      }
+    return asProductPrincipal(scope, async () => {
       if (input.operation === 'finish') {
         const { finishEveTurn } = await import('./settlement')
         return finishEveTurn(scope, input)
       }
-      const execution = await gatewayExecution(scope, input)
-      const { pool } = await import('../db')
-      const source = (await pool.query<{ source_event_id: string; id: string | null; payload: Record<string, unknown> }>(`SELECT t.source_event_id,e.id,e.payload FROM eve_turn_sources t
-        LEFT JOIN coordinator_events e ON e.id=t.source_event_id AND e."userId"=$3 AND e."botId"=$4
-        WHERE t.session_id=$1 AND t.turn_id=$2`, [input.sessionId, input.turnId, scope.ownerId, scope.botId])).rows[0]
-      if (source && !source.id) throw new Error('notFound')
-      const sourceEventId = source?.source_event_id
-      const requestSource = source ? await (await import('./retry-source')).eveOriginalRequestSource(scope,source.source_event_id,source.payload) : undefined
-      const taskEventId = requestSource ? await (await import('./retry-source')).eveTaskRequestSource(scope,requestSource.id,requestSource.payload) : undefined
-      const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope, sourceEventId) : null
-      const entryOrigin = (await import('./run-origin')).eveRunOrigin(scope.surface,requestSource?.payload,Boolean(scheduledRead))
-      if (input.operation === 'instructions') {
-        if (scheduledRead) return { instructions: `This is a scheduled read-only task. Use only its allowed read tools, perform no writes and request no approval.\n${scheduledRead.prompt}` }
-        if (scope.surface === 'slack') {
-          const { COORDINATOR_INSTRUCTIONS } = await import('../coordinator/instructions')
-          return { instructions: COORDINATOR_INSTRUCTIONS + '\nUse only this Slack conversation. Do not access private web conversation history, memories or profile. Reply in this thread, or call no_reply when no useful response is needed.' }
-        }
-        const { prepareEveInstructions } = await import('../../workflows/coordinator/steps')
-        return { instructions: await prepareEveInstructions(scope.ownerId, scope.botId, execution?.snapshot, { sessionId: input.sessionId, turnId: input.turnId }) }
-      }
+      const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, input)
       const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
-      if (input.operation === 'catalogue') {
-        return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({
-          name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema,
-          needsApprovalReview: requiresEveProductApproval(name),
-        }))) }
-      }
       const tool = Object.hasOwn(tools, input.name) ? tools[input.name] : undefined
       if (!tool?.execute) throw new Error('notFound')
       const validator = asSchema(tool.inputSchema).validate
@@ -123,8 +87,8 @@ const defaultServices: EveProductGatewayServices = {
       if (!checked.success) throw new Error('validationGeneric')
       signal.throwIfAborted()
       const { withEveProductAuthority } = await import('../enterprise/execution-authority')
-      const output = await withEveProductAuthority(request, input, async () => {
-        const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: input.executionId, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
+      const output = await withEveProductAuthority(request, { ...input, executionId: execution?.id }, async () => {
+        const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: execution?.id, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
         const { reviewEveProductApproval, executeEveApprovedWrite } = await import('./product-approval')
         if (input.operation === 'approval') return reviewEveProductApproval(call, signal)
         const approved = await executeEveApprovedWrite(call, input.approvalResponder, signal)
@@ -138,28 +102,4 @@ const defaultServices: EveProductGatewayServices = {
       return { output: safe }
     })
   },
-}
-
-async function gatewayExecution(scope: Scope, input: Input): Promise<AgentExecution | null> {
-  const { agentKitEnabled, agentKitStore, agentScope } = await import('../agent-kit/service')
-  if (!input.executionId) {
-    if (agentKitEnabled()) throw new Error('agentExecutionClosed')
-    return null
-  }
-  return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
-}
-
-async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId: string | undefined,entryOrigin:import('../run-origin').ResolvedRunOrigin): Promise<ToolSet> {
-  const steps = await import('../../workflows/coordinator/steps')
-  const { coordinatorTools, readCoordinatorSwitches } = await import('../../workflows/coordinator/tools')
-  const mailboxEnabled = !scheduledRead && snapshotMailboxTools(execution?.snapshot).length > 0 && await steps.mailboxToolsEnabled()
-  const tools = coordinatorTools(scope.ownerId, scope.botId, scheduledRead ? { scheduledRead: { botId: scope.botId, occurrence: scheduledRead } } : undefined, {
-    execution, sourceEventId, ...(taskEventId ? { taskEventId } : {}),...entryOrigin,
-    switches: readCoordinatorSwitches(), coordinator: await steps.isCoordinatorChat(scope.ownerId, scope.botId),
-    computerEnabled: !scheduledRead && await steps.computerToolsEnabled(), writeEnabled: !scheduledRead && await steps.personalWriteToolsEnabled(),
-    mailboxEnabled, mailboxTools: mailboxEnabled ? await steps.mailboxCatalogue(scope.ownerId, scope.botId, execution?.id) : [],
-    ...(scheduledRead ? { readOnly: true, readToolIds: scheduledRead.allowedActions } : {}),
-  })
-  // Discovery, skills and generic MCP execution belong to eve's native capabilities.
-  return Object.fromEntries(Object.entries(tools).filter(([name]) => !['load_skill', 'read_personal_skill', 'list_personal_mcp_tools', 'call_personal_mcp_tool'].includes(name)))
 }

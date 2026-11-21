@@ -3,7 +3,7 @@
 import { issueKeys } from '@/lib/swr/keys'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { createLinkedIssue, setIssueDeleted, toggleIssuePreference, updateIssueRelation } from '@/app/actions/issue-operations'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
@@ -27,7 +27,9 @@ export type IssueActionRequest = { kind: RelationKind | 'createChild' | 'dueDate
 type OperationResult = { issue?: Issue; error?: string }
 
 type ActionsProps = {
-  task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string) => void; onPriority: (value: string) => void
+  task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string, stateId?: string | null) => void; onPriority: (value: string) => void
+  /** The workspace's states as Status items (issue-state-menu.tsx); absent: the seven categories. */
+  statusItems?: TaskMenuItem[]
 }
 
 export function useIssueDetailActions({ task, userId, disabled, request, getCurrent, onSaved, onOpen, onDeleted }: ActionsProps) {
@@ -87,7 +89,15 @@ export function useIssueDetailActions({ task, userId, disabled, request, getCurr
       const latest = await getCurrent()
       if (!latest) throw new Error(t('saveCurrentFirst'))
       const result = await operation(latest)
-      if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
+      if (!result.issue) {
+        if (result.error === 'issueOutdated') {
+          const refreshed = await mutate<Issue>(issueKeys.detail(task.id))
+          if (refreshed?.id === latest.id && refreshed.revision > latest.revision) {
+            throw new Error(actionError('issueStale'))
+          }
+        }
+        throw new Error(actionError(result.error ?? 'generic'))
+      }
       const updatesCurrent = mode === 'current' || mode === 'favorite' || mode === 'unfavorite'
       if (updatesCurrent) onSaved(result.issue)
       // A deleted task can no longer serve its connections. Its surrounding list still needs the ACK.
@@ -103,6 +113,22 @@ export function useIssueDetailActions({ task, userId, disabled, request, getCurr
       return true
     } catch (error) { const message = error instanceof Error ? error.message : t('operationFailed'); setError(message); toast.error(message); return false }
     finally { busy.current = false; setPending(false) }
+  }
+  function createChild(title: string) {
+    return run(issue => createLinkedIssue({ id: issue.id, revision: issue.revision, kind: 'child', title, includeSubissues: false }), 'child')
+  }
+  async function submitDialog(entered: string) {
+    if (!dialog) return
+    let saved: boolean
+    if (dialog === 'createChild') {
+      saved = await createChild(entered)
+    } else if (dialog === 'duplicate') {
+      saved = await run(issue => createLinkedIssue({ id: issue.id, revision: issue.revision, kind: 'duplicate', title: entered, includeSubissues }), 'duplicate')
+    } else {
+      const patch = dialog === 'dueDate' ? { dueDate: entered || null } : { estimate: entered === '' ? null : Number(entered) }
+      saved = await run(issue => updateIssueMetadata({ id: issue.id, revision: issue.revision, patch }))
+    }
+    if (saved) setDialog(null)
   }
   async function copy(kind: 'link' | 'id' | 'title' | 'markdown' | 'branch') {
     try {
@@ -127,23 +153,23 @@ export function useIssueDetailActions({ task, userId, disabled, request, getCurr
   const unavailable = disabled || pending
   const dialogs = <>
     {relation && <IssueRelationPicker task={task} kind={relation} validationError={error} open onOpenChange={open => { if (!open) setRelation(null) }} pending={pending} onSelect={targetId => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, kind: relation, targetId })).then(success => { if (success) setRelation(null) }) }} />}
-    <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !pending) setDialog(null) }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{dialog === 'createChild' ? tDialog('createChildTitle') : dialog === 'duplicate' ? tDialog('duplicateTitle') : dialog === 'dueDate' ? tDialog('dueDateTitle') : tDialog('estimateTitle')}</DialogTitle></DialogHeader><form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); const kind = dialog; if (!kind) return; const entered = fieldRef.current?.value ?? ''; void run(issue => kind === 'createChild' || kind === 'duplicate' ? createLinkedIssue({ id: task.id, revision: issue.revision, kind: kind === 'createChild' ? 'child' : 'duplicate', title: entered, includeSubissues: kind === 'duplicate' && includeSubissues }) : updateIssueMetadata({ id: task.id, revision: issue.revision, patch: kind === 'dueDate' ? { dueDate: entered || null } : { estimate: entered === '' ? null : Number(entered) } }), kind === 'createChild' ? 'child' : kind === 'duplicate' ? 'duplicate' : 'current').then(success => { if (success) setDialog(null) }) }}><FieldGroup><Field><FieldLabel htmlFor="issue-action-value">{dialog === 'dueDate' ? tDialog('dueDateLabel') : dialog === 'estimate' ? tDialog('estimateLabel') : tDialog('taskTitleLabel')}</FieldLabel><Input ref={fieldRef} key={fieldKey} id="issue-action-value" autoFocus type={dialog === 'dueDate' ? 'date' : dialog === 'estimate' ? 'number' : 'text'} min={dialog === 'estimate' ? 0 : undefined} max={dialog === 'estimate' ? 100 : undefined} step={dialog === 'estimate' ? 1 : undefined} defaultValue={fieldDefault} disabled={pending} required={dialog === 'createChild' || dialog === 'duplicate'} maxLength={200} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} /></Field>{dialog === 'duplicate' && <Field orientation="horizontal"><Checkbox id="duplicate-subissues" checked={includeSubissues} onCheckedChange={checked => setIncludeSubissues(!!checked)} /><FieldLabel htmlFor="duplicate-subissues">{tDialog('duplicateSubissues')}</FieldLabel></Field>}</FieldGroup>{error && <FieldError>{error}</FieldError>}<DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setDialog(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={pending}>{pending ? tCommon('saving') : dialog === 'createChild' || dialog === 'duplicate' ? tIssue('create.submit') : tCommon('save')}</Button></DialogFooter></form></DialogContent></Dialog>
+    <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !pending) setDialog(null) }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{dialog === 'createChild' ? tDialog('createChildTitle') : dialog === 'duplicate' ? tDialog('duplicateTitle') : dialog === 'dueDate' ? tDialog('dueDateTitle') : tDialog('estimateTitle')}</DialogTitle></DialogHeader><form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void submitDialog(fieldRef.current?.value ?? '')}}><FieldGroup><Field><FieldLabel htmlFor="issue-action-value">{dialog === 'dueDate' ? tDialog('dueDateLabel') : dialog === 'estimate' ? tDialog('estimateLabel') : tDialog('taskTitleLabel')}</FieldLabel><Input ref={fieldRef} key={fieldKey} id="issue-action-value" autoFocus type={dialog === 'dueDate' ? 'date' : dialog === 'estimate' ? 'number' : 'text'} min={dialog === 'estimate' ? 0 : undefined} max={dialog === 'estimate' ? 100 : undefined} step={dialog === 'estimate' ? 1 : undefined} defaultValue={fieldDefault} disabled={pending} required={dialog === 'createChild' || dialog === 'duplicate'} maxLength={200} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} /></Field>{dialog === 'duplicate' && <Field orientation="horizontal"><Checkbox id="duplicate-subissues" checked={includeSubissues} onCheckedChange={checked => setIncludeSubissues(!!checked)} /><FieldLabel htmlFor="duplicate-subissues">{tDialog('duplicateSubissues')}</FieldLabel></Field>}</FieldGroup>{error && <FieldError>{error}</FieldError>}<DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setDialog(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={pending}>{pending ? tCommon('saving') : dialog === 'createChild' || dialog === 'duplicate' ? tIssue('create.submit') : tCommon('save')}</Button></DialogFooter></form></DialogContent></Dialog>
     <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{tDialog('deleteTitle', { id: issueIdentifier(task, `「${task.title}」`) })}</AlertDialogTitle><AlertDialogDescription>{tDialog('deleteDescription')}</AlertDialogDescription></AlertDialogHeader>{error && <FieldError>{error}</FieldError>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); void run(issue => setIssueDeleted({ id: task.id, revision: issue.revision }), 'delete').then(success => { if (success) setDeleteOpen(false) }) }}>{pending ? tDialog('deleting') : tDialog('deleteAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>
-  return { t, tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, queuedRelation, setRelation, setError, openDialog, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs }
+  return { t, tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, queuedRelation, setRelation, setError, openDialog, createChild, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs }
 }
 
 /**
  * The same ⋯ menu as data, for a layer that draws it with its own menu (components/slots/task-detail-contract.ts).
  * Items `assignee`, `project` and `labels` call onProperty; a layer with its own choices puts them in a submenu.
  */
-export function useIssueDetailMenu(props: ActionsProps): { items: TaskMenuItem[]; favorite: { on: boolean; label: string; toggle: () => void; disabled: boolean }; subscribed: boolean; toggleSubscribed: () => void; disabled: boolean; dialogs: ReactNode; copyLink: () => void } {
+export function useIssueDetailMenu(props: ActionsProps): { items: TaskMenuItem[]; favorite: { on: boolean; label: string; toggle: () => void; disabled: boolean }; subscribed: boolean; toggleSubscribed: () => void; disabled: boolean; dialogs: ReactNode; copyLink: () => void; createChild: (title: string) => Promise<boolean> } {
   const { task, userId, documentTools, onStatus, onPriority, onProperty, onHistory, onMembers, onDocumentTools } = props
-  const { tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, setRelation, setError, openDialog, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs } = useIssueDetailActions(props)
+  const { tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, setRelation, setError, openDialog, createChild, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs } = useIssueDetailActions(props)
   const relation = (kind: RelationKind) => () => { setError(''); setRelation(kind) }
-  const subscribe = () => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }
+  const subscribe = () => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe', enabled: !subscribed })) }
   const items: TaskMenuItem[] = [
-    { id: 'status', label: tMenu('setStatus'), mark: { kind: 'icon', icon: 'status' }, submenu: statusOptions.map(status => ({ id: status.value, label: status.label, mark: { kind: 'status', value: status.value }, checked: task.status === status.value, onSelect: () => onStatus(status.value) })) },
+    { id: 'status', label: tMenu('setStatus'), mark: { kind: 'icon', icon: 'status' }, submenu: props.statusItems ?? statusOptions.map(status => ({ id: status.value, label: status.label, mark: { kind: 'status', value: status.value }, checked: task.status === status.value, onSelect: () => onStatus(status.value) })) },
     { id: 'priority', label: tMenu('setPriority'), mark: { kind: 'icon', icon: 'priority' }, submenu: priorityOptions.map(priority => ({ id: priority.value, label: priority.label, mark: { kind: 'priority', value: priority.value }, checked: task.priority === priority.value, onSelect: () => onPriority(priority.value) })) },
     { id: 'assignee', label: tMenu('assignAssignee'), mark: { kind: 'icon', icon: 'person' }, onSelect: () => onProperty('assignee') },
     { id: 'project', label: tMenu('moveToProject'), mark: { kind: 'icon', icon: 'project' }, onSelect: () => onProperty('project') },
@@ -166,5 +192,5 @@ export function useIssueDetailMenu(props: ActionsProps): { items: TaskMenuItem[]
     { id: 'documentTools', label: documentTools ? tMenu('backToDescription') : tWorkspaceDetail('advancedTools'), mark: { kind: 'icon', icon: 'document' }, onSelect: onDocumentTools },
     ...task.userId === userId ? [{ id: 'delete', label: tMenu('deleteTask'), mark: { kind: 'icon', icon: 'delete' }, danger: true, divider: true, onSelect: () => { setError(''); setDeleteOpen(true) } } satisfies TaskMenuItem] : [],
   ]
-  return { items, favorite: { on: favorite, label: favorite ? tMenu('unfavorite') : tMenu('favorite'), toggle: () => { void toggleFavorite() }, disabled: unavailable }, subscribed, toggleSubscribed: subscribe, disabled: unavailable, dialogs, copyLink: () => { void copy('link') } }
+  return { items, favorite: { on: favorite, label: favorite ? tMenu('unfavorite') : tMenu('favorite'), toggle: () => { void toggleFavorite() }, disabled: unavailable }, subscribed, toggleSubscribed: subscribe, disabled: unavailable, dialogs, createChild, copyLink: () => { void copy('link') } }
 }

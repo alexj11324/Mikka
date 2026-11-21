@@ -73,7 +73,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
 test('注册、创建任务、菜单、搜索、视图切换和退出登录', { tag: ['@smoke', '@turnstile'] }, async ({ page }) => {
   const account = await register(page)
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
   // Without Linear the toolbar button is a plain refresh, not a success state.
   await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
@@ -122,7 +122,7 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', { 
   await page.getByRole('button', { name: '登录工作台', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))
   await captureAuthenticationCookies(page.context())
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   // The board keeps its filters across signing out and in: still 我创建的.
   await expect(page.getByRole('toolbar', { name: '看板工具栏', exact: true }).getByRole('group', { name: '我创建的', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()

@@ -2,38 +2,36 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { hostedBillingScope } from './context'
 import { resourceBudgetAdmission } from '../billing/resource-budgets'
+import { connectForCommitEffects } from '../db/commit-effects'
 import {
   abuseLimits,
-  FREE_ALLOWANCE_MICRO_USD,
   HOSTED_CALL_HOLD_MICRO_USD,
   HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE,
   MICRO_USD_PER_POINT,
   PaidResourceError,
-  TRIAL_MESSAGES,
 } from './policy'
 
+const abandonedHold = `"settledAt" IS NULL AND "createdAt" < now() - interval '10 minutes'
+  AND (state='pending' OR (state='unknown' AND "generationId" IS NULL))`
 type Query = Pick<PoolClient, 'query'>
 export type HostedQuotaLease = { limit: number; close(): Promise<void>;
   billingAccount?: { workspaceId: string; organizationId: string | null } }
 export class HostedUsageStore {
   readonly metered: boolean
-  readonly allowTrial: boolean
   private readonly quota?: (workspaceId: string) => Promise<HostedQuotaLease>
   private readonly workspaceDatabase: Pick<Pool, 'query'>
   constructor(readonly pool: Pool, options: {
     metered?: boolean
-    allowTrial?: boolean
     quota?: (workspaceId: string) => Promise<HostedQuotaLease>
     /** Workspace identity lives in WS DB; APP-only deployments must supply it. */
     workspaceDatabase?: Pick<Pool, 'query'>
   } = {}) {
     this.metered = options.metered ?? true
-    this.allowTrial = options.allowTrial ?? true
     this.quota = options.quota
     this.workspaceDatabase = options.workspaceDatabase ?? pool
   }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
-    const tx = await this.pool.connect()
+    const tx = await connectForCommitEffects(this.pool)
     try {
       await tx.query('BEGIN')
       const result = await work(tx)
@@ -63,8 +61,7 @@ export class HostedUsageStore {
   private async releaseAbandoned(tx: Query, workspaceId: string) {
     const reaped = await tx.query<{ reservedFree: string }>(
       `UPDATE hosted_usage SET state='failed',"settledAt"=now()
-       WHERE "workspaceId"=$1 AND "settledAt" IS NULL AND "createdAt" < now() - interval '10 minutes'
-         AND (state='pending' OR (state='unknown' AND "generationId" IS NULL))
+       WHERE "workspaceId"=$1 AND (${abandonedHold})
        RETURNING "reservedFree"`,
       [workspaceId],
     )
@@ -111,17 +108,14 @@ export class HostedUsageStore {
             )
           ).rowCount,
         )
-      if (first)
-        await tx.query(
-          'INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-          [workspaceId, FREE_ALLOWANCE_MICRO_USD],
-        )
+      // No free allowance for new verifications (decision 2026-11-15-1900: no trial).
+      // Allowances granted before stay usable through balance().
       await tx.query(
         `INSERT INTO workspace_audit_events (id,"workspaceId","actorType","actorName",action,category,metadata) VALUES ($1,$2,'system','Stripe','billing.card_verified','billing',$3)`,
         [
           randomUUID(),
           workspaceId,
-          JSON.stringify({ allowanceGranted: first }),
+          JSON.stringify({ allowanceGranted: false }),
         ],
       )
       return first
@@ -162,45 +156,12 @@ export class HostedUsageStore {
     return rows.every(row => row.limit - row.spent > 0 && row.limit - row.spent >= estimate)
       && resourceBudgetAdmission(tx, workspaceId, this.attribution(workspaceId), estimate, requireCompleteAttribution)
   }
-  /**
-   * The free messages left before a card is needed (TRIAL_MESSAGES), for a
-   * workspace with no verified card and no purchased points; null for any
-   * other. The allowance is the person's, not the workspace's: it counts the
-   * messages sent in the chats of every workspace created by this workspace's
-   * creator, so a second workspace adds none. Not a 重试, not the welcome
-   * request; the one being answered is included, so its turn is admitted
-   * while this is 0 or more.
-   */
-  private async trialWorkspaces(workspaceId: string) {
-    const { rows } = await this.workspaceDatabase.query<{ id: string }>(
-      'select id from mikka_workspaces where "userId"=(select "userId" from mikka_workspaces where id=$1)', [workspaceId])
-    return rows.map(row => row.id)
-  }
-  async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool, workspaceIds?: string[]) {
-    if (!this.metered) return null
-    if (balance.verified || balance.purchased > 0) return null
-    const scope = workspaceIds ?? await this.trialWorkspaces(workspaceId)
-    const { rows: [row] } = await tx.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM coordinator_events e JOIN bots b ON b.id=e."botId"
-       WHERE b."workspaceId"=ANY($1::uuid[]) AND e.kind='user_message' AND e.payload->>'retry' IS NULL AND coalesce(e.payload->>'text','') NOT LIKE '[Welcome]%'`,
-      [scope],
-    )
-    return TRIAL_MESSAGES - Number(row?.n ?? 0)
-  }
   async canUseMikkaPaid(workspaceId: string) {
     const balance = await this.balance(workspaceId)
     if (!this.metered) return balance
     if (!await this.budget(workspaceId, this.attribution(workspaceId).workspaceId, 0)) throw new PaidResourceError('usage_budget_exhausted')
-    if (!balance.verified && balance.purchased <= 0) {
-      if (!this.allowTrial) throw new PaidResourceError('verification_required')
-      const left = await this.trialLeft(workspaceId, balance)
-      if (left !== null && left >= 0) return { ...balance, trialLeft: left }
-      throw new PaidResourceError('verification_required')
-    }
-    if (balance.free + balance.plan + balance.purchased <= 0)
-      throw new PaidResourceError(
-        balance.verified ? 'free_allowance_used' : 'points_exhausted',
-      )
+    // No trial (decision 2026-11-15-1900): an unfunded workspace spends nothing.
+    if (balance.free + balance.plan + balance.purchased <= 0) throw new PaidResourceError('points_exhausted')
     return balance
   }
   /** Holds and slots of this workspace's calls that have not settled. */
@@ -209,7 +170,7 @@ export class HostedUsageStore {
       rows: [row],
     } = await tx.query(
       `SELECT COALESCE(sum("holdMicroUsd"),0)::float8 AS held, count(*) FILTER (WHERE state='pending')::int AS calls
-       FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown')`,
+       FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown') AND NOT (${abandonedHold})`,
       [workspaceId],
     )
     return row as { held: number; calls: number }
@@ -226,7 +187,6 @@ export class HostedUsageStore {
     const attribution = this.attribution(workspaceId)
     // Resolve WS identity before pinning either pool's transaction. WS and APP
     // can both have max=1; no cross-database JOIN or nested pool checkout occurs.
-    const trialWorkspaces = this.allowTrial ? await this.trialWorkspaces(workspaceId) : undefined
     // Pin plan authority before reserving an APP connection, matching the
     // workspace -> APP order used by task and governance writers.
     const quota = await this.quota?.(attribution.workspaceId)
@@ -257,20 +217,16 @@ export class HostedUsageStore {
       if (prior) throw new PaidResourceError('usage_in_progress') // Never replay a paid provider call.
       if (!await this.budget(workspaceId, attribution.workspaceId, estimate, tx)) throw new PaidResourceError('usage_budget_exhausted')
       const balance = await this.balance(workspaceId, tx)
-      // No card and nothing bought: only the first TRIAL_MESSAGES messages' turns, paid by the platform.
-      if (!this.allowTrial && !balance.verified && balance.purchased <= 0) throw new PaidResourceError('verification_required')
-      const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance, tx, trialWorkspaces) : null
-      if (trial !== null && trial < 0)
-        throw new PaidResourceError('verification_required')
+      // No trial: nothing is admitted without plan, purchased or previously granted free credit.
       const available = balance.free + balance.plan + balance.purchased
-      if (trial === null && available <= 0) throw new PaidResourceError('free_allowance_used')
+      if (available <= 0) throw new PaidResourceError('points_exhausted')
       const flight = await this.inFlight(tx, workspaceId)
       if (flight.calls >= (quota?.limit ?? HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE))
         throw new PaidResourceError('usage_concurrency_limit')
       // Concurrent calls must fit the balance together. A lone call is admitted
       // on any positive balance, as before, so the last cents stay usable.
-      if (trial === null && flight.held > 0 && available - flight.held < estimate)
-        throw new PaidResourceError('free_allowance_used')
+      if (flight.held > 0 && available - flight.held < estimate)
+        throw new PaidResourceError('points_exhausted')
       const limit = abuseLimits(env)
       const spent = Number(
         (
@@ -286,7 +242,7 @@ export class HostedUsageStore {
         `INSERT INTO hosted_usage (id,"workspaceId",model,state,"holdMicroUsd","usageWorkspaceId","billingOrganizationId","executionOwnerId","actorId","usageProjectId","usageThreadId","usageRunId","attributionComplete")
           VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [id, workspaceId, model, estimate, attribution.workspaceId, attribution.billingOrganizationId ?? null, attribution.ownerId ?? null,
-          attribution.actorId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
+          attribution.actorId ?? attribution.ownerId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
       )
       return { id, workspaceId }
     }) } finally { await quota?.close() }
@@ -423,7 +379,7 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
   ) {
     const balance = await this.balance(workspaceId)
-    if (!this.metered) return { state: 'ready', balance, trialLeft: null }
+    if (!this.metered) return { state: 'ready', balance }
     const flight = await this.inFlight(this.pool, workspaceId)
     const spent = Number(
       (
@@ -437,25 +393,21 @@ export class HostedUsageStore {
     // A billing page has no particular Project/Thread/Run. It summarizes the
     // known scopes; reserve() still requires complete execution attribution.
     const withinBudget = await this.budget(workspaceId, this.attribution(workspaceId).workspaceId, HOSTED_CALL_HOLD_MICRO_USD, this.pool, false)
-    const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance) : null
     // These pool reads retain no APP connection. Once the plan is pinned,
     // status computes the response without acquiring another APP connection.
     const quota = await this.quota?.(this.attribution(workspaceId).workspaceId)
     try {
-    const state = !withinBudget ? 'usage_budget_exhausted' : trial !== null
-      ? trial > 0 ? (spent >= abuseLimits(env).dailyMicroUsd ? 'platform_paused' : 'ready') : 'verification_required'
-      : !balance.verified
-      ? 'verification_required'
+    const state = !withinBudget ? 'usage_budget_exhausted'
       : available <= 0
-        ? 'free_allowance_used'
+        ? 'points_exhausted'
         : flight.calls >= (quota?.limit ?? HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE)
           ? 'usage_concurrency_limit'
           : flight.held > 0 && available - flight.held < HOSTED_CALL_HOLD_MICRO_USD
-            ? 'free_allowance_used'
+            ? 'points_exhausted'
             : spent >= abuseLimits(env).dailyMicroUsd && balance.plan + balance.purchased <= 0
               ? 'platform_paused'
               : 'ready'
-    return { state, balance, trialLeft: trial === null ? null : Math.max(0, trial) }
+    return { state, balance }
     } finally { await quota?.close() }
   }
   async recent(workspaceId: string, sourceWorkspaceId?: string) {

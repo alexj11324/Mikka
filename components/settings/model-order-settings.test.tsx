@@ -17,7 +17,7 @@ let savedAutoRouting = true
 const changes: OrderChange[] = []
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
 mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => {
   events.push(value ? 'order-cache' : 'order')
   if (value) data = value
@@ -29,7 +29,7 @@ mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderV
 } }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 const liveKeys: unknown[] = []
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
-mock.module('next/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
+mock.module('@/lib/client-runtime/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
 mock.module(new URL('../../app/actions/model-order.ts', import.meta.url).href, { namedExports: {
   changeModelOrder: async (change: typeof changes[number], workspace: string) => {
     assert.equal(workspace, workspaceId)
@@ -194,42 +194,9 @@ test('an unavailable provider read keeps checking even when the HTTP request suc
 })
 
 
-test('automatic model routing reflects the saved setting and saves each toggle for the current workspace', async () => {
+test('the retired difficulty-routing switch is not shown', async () => {
   await render()
-  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
-  assert.equal(toggle().getAttribute('aria-checked'), 'true')
-  await act(async () => toggle().click())
-  assert.deepEqual(changes, [{ kind: 'autoRouting', enabled: false }])
-  assert.equal(toggle().getAttribute('aria-checked'), 'false')
-  assert.equal(data.autoModelRouting, false)
-  await act(async () => toggle().click())
-  assert.deepEqual(changes[1], { kind: 'autoRouting', enabled: true })
-  assert.equal(toggle().getAttribute('aria-checked'), 'true')
-  assert.equal(container.querySelector('[role="alert"]'), null)
-})
-
-test('a refused routing change restores the saved setting and retry applies the intended value', async () => {
-  changeFails = 'response'
-  await render()
-  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
-  await act(async () => toggle().click())
-  assert.equal(toggle().getAttribute('aria-checked'), 'true')
-  assert.equal(savedAutoRouting, true)
-  assert.ok(container.querySelector('[role="alert"]'))
-  changeFails = null
-  await act(async () => button('retry')!.click())
-  assert.equal(toggle().getAttribute('aria-checked'), 'false')
-  assert.equal(container.querySelector('[role="alert"]'), null)
-})
-
-test('an offline routing save restores the last saved setting even when revalidation fails', async () => {
-  changeFails = 'network'; rereadFails = true
-  await render()
-  const toggle = container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
-  await act(async () => toggle.click())
-  assert.equal(data.autoModelRouting, true)
-  assert.equal(toggle.getAttribute('aria-checked'), 'true')
-  assert.ok(container.querySelector('[role="alert"]'))
+  assert.equal(container.querySelector('[role="switch"][aria-label="autoRouting"]'), null)
 })
 
 test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay out, a move sends only its rows, and the list re-reads on a live push', async () => {
@@ -257,25 +224,21 @@ test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay
   assert.doesNotMatch(container.textContent ?? '', /claude-opus/)
 })
 
-test('nothing for the 优先使用的 Agent but models for the other: the line says tasks go there, and one button switches', async () => {
+test('nothing for this Agent but models for the other: no fallback line or switch, only what gets this Agent models (decision 2026-11-17-1800)', async () => {
   const keyId = randomUUID()
   data = { ...data, candidates: [{ harness: 'codex', model: 'gpt-codex', name: 'gpt-codex', provider: 'openai', source: { kind: 'api_key', keyId } }] as OrderView['candidates'] }
   await render()
-  assert.ok(container.textContent?.includes('emptyUseOther'), 'not 「订阅和 API Key 还没有报告模型」')
-  assert.ok(!container.textContent?.includes('emptyNoModels'))
-  await act(async () => button('switchAgent')!.click())
-  assert.deepEqual(changes.at(-1), { kind: 'preferred', harness: 'codex' })
+  assert.ok(!container.textContent?.includes('emptyUseOther'), 'tasks never go to the other Agent')
+  assert.equal(button('switchAgent'), undefined)
+  assert.ok(container.textContent?.includes('emptyNoModels'))
 })
 
-test('the other Agent\'s list folds under this one as the fallback, an API key marked as billed by its provider', async () => {
+test('the other Agent\'s list is not shown under this one as a fallback', async () => {
   const claude = { ...row(null), model: 'claude-opus' }
   const codex = { ...row(null, { kind: 'api_key', keyId: randomUUID() }), model: 'gpt-codex', harness: 'codex' as const, provider: 'openai', agents: ['codex' as const] }
   data = { ...data, entries: [claude, codex] }
   await render()
-  const fold = button('backup')
-  assert.ok(fold, 'one line for the fallback list')
-  assert.doesNotMatch(container.textContent ?? '', /gpt-codex/, 'folded until tapped')
-  await act(async () => fold!.click())
-  assert.match(container.textContent ?? '', /gpt-codex/)
-  assert.match(container.textContent ?? '', /billedByProvider/)
+  assert.equal(button('backup'), undefined, 'no fallback list')
+  assert.doesNotMatch(container.textContent ?? '', /gpt-codex/)
+  assert.match(container.textContent ?? '', /claude-opus/)
 })

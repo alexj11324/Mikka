@@ -35,7 +35,7 @@ const actor: DriveActor = { ownerId: 'drive-owner', authorName: 'Drive Fixture' 
  */
 function migrationDDL(): string[] {
   const statements: string[] = []
-  for (const file of ['20261111000100_drive_volume.sql', '20261111000200_drive_cas_write.sql']) {
+  for (const file of ['20261111000100_drive_volume.sql', '20261111000200_drive_cas_write.sql', '20261114152243_archive_personal_drive_volumes.sql']) {
     const sql = readFileSync(new URL(`../../drizzle/${file}`, import.meta.url), 'utf8')
     for (const raw of sql.split(/;\s*\n/)) {
       // Drop comment lines first: a CREATE TABLE is usually preceded by a note

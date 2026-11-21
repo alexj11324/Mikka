@@ -15,7 +15,7 @@ import { handleFactoryQuestionList } from "./ask-user";
 import { builtinGateway } from "../../builtin-gateway/runtime";
 import { isolateCoordinatorWakes } from "../../../tests/support/coordinator-wake";
 import { bindFixtureWorkspaceDatabase } from "../../../tests/helpers/workspace-database";
-import { dropTestDatabase } from "../../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -28,7 +28,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
   await isolateCoordinatorWakes(t);
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_askq_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 6 });
@@ -42,7 +42,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const fixture: Record<string, { deviceId: string; agentId: string; repoId: string }> = {};
     for (const user of ["owner", "intruder"]) {
       const f = (fixture[user] = { deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID() });
-      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,$2,'Disposable',now(),'[{"harness":"codex","installed":true}]')`, [f.deviceId, user]);
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Disposable',now(),'[{"harness":"codex","installed":true}]',now())`, [f.deviceId, user]);
       await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'Fixture','codex',$3)`, [f.agentId, user, f.deviceId]);
       await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/repo')`, [f.repoId, f.deviceId, user]);
     }
@@ -184,6 +184,33 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       // b's run is outside the newest 50: found only because runId is filtered before LIMIT.
       assert.ok(!all.includes(b.questionId));
       assert.deepEqual(((await get("owner", `?runId=${b.runId}`)).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId), [b.questionId]);
+    });
+
+    await t.test("the task's pending feed and its durable history each apply their own 50-row limit", async () => {
+      const item = await asked("decision", "Still waiting?", ["Yes"]);
+      const oldCandidate = randomUUID();
+      await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId")
+        VALUES ($1,$2,repeat('a',40),'fixture/repo','preview','fixture',$3)`, [oldCandidate, item.taskId, item.runId]);
+      await pool.query(
+        `INSERT INTO factory_questions
+           (id,"originRunId","userId","issueId","taskId","attemptId",stage,"originSessionId",
+            "originRevision","waitingBinding",kind,question,request,status,reason,"sourceEventId","expiresAt","createdAt","candidateId")
+         SELECT gen_random_uuid(),gen_random_uuid(),q."userId",q."issueId",q."taskId",q."attemptId",q.stage,
+                q."originSessionId",q."originRevision",q."waitingBinding",q.kind,q.question,q.request,
+                CASE WHEN n%3=0 THEN 'resolved' ELSE 'waiting_user' END,q.reason,q."sourceEventId",
+                CASE WHEN n%3=1 THEN q."createdAt"-interval '1 day' END,q."createdAt"+n*interval '1 second',
+                CASE WHEN n%3=2 THEN $2::uuid END
+           FROM factory_questions q CROSS JOIN generate_series(1,50) n WHERE q.id=$1`,
+        [item.questionId, oldCandidate],
+      );
+      const history = await questions.list("owner", item.taskId);
+      assert.equal(history.length, 50);
+      assert.ok(history.every(q => ["resolved", "expired", "superseded"].includes(q.status)));
+      const feed = await get("owner", `?taskId=${item.taskId}`);
+      assert.equal(feed.status, 200);
+      assert.deepEqual((feed.body as { questions: { questionId: string }[] }).questions.map(q => q.questionId), [item.questionId]);
+      const all = await get("owner");
+      assert.ok((all.body as { questions: { questionId: string }[] }).questions.some(q => q.questionId === item.questionId));
     });
 
     await t.test("BE-16: GETs compute expiry from expiresAt and write nothing", async () => {
@@ -329,7 +356,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       // Move three more questions onto the same task, then give all four the same createdAt so only `id DESC` orders them.
       for (let i = 1; i < 4; i++) {
         const { questionId } = await asked("decision", `Tiebreak ${i}`, ["A"]);
-        await pool.query('UPDATE factory_questions f SET "taskId"=o."taskId","attemptId"=o."attemptId","candidateId"=o."candidateId" FROM factory_questions o WHERE f.id=$1 AND o.id=$2', [questionId, first.questionId]);
+        await pool.query('UPDATE factory_questions f SET "taskId"=o."taskId","issueId"=o."issueId","attemptId"=o."attemptId","candidateId"=o."candidateId","waitingBinding"=o."waitingBinding" FROM factory_questions o WHERE f.id=$1 AND o.id=$2', [questionId, first.questionId]);
         ids.push(questionId);
       }
       await pool.query(`UPDATE factory_questions SET "createdAt"='2020-06-01T00:00:00Z' WHERE "taskId"=$1`, [first.taskId]);

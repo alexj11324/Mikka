@@ -4,9 +4,9 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
-import { issueListChanged } from '@/lib/live/lists'
-import { issueMembersChanged, issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
-import { agents, bots, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
+import { persistIssueMetadata } from '@/lib/issue-metadata-store'
+import { issueMembersChanged } from '@/lib/live/issue-detail'
+import { agents, bots, issues, issueMembers, users } from '@/lib/db/schema'
 import { factoryAgentProfiles } from '@/lib/db/agent-profile-schema'
 import { builtinAgentProfileDefinition, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-definition'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
@@ -14,14 +14,15 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { projectViewsForTasks } from '@/lib/project-access'
 import { issuePropertyChoices } from '@/lib/issue-property-choices'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { requireIssueAccess, requireUser } from '@/lib/issue-access'
 import { listWorkspaceProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
-import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata } from '@/lib/issue-metadata'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
+import { issueAssignedEvent } from '@/lib/coordinator-events'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
-import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 
 const patchSchema = z.object({
   // R-60 keeps the UI human-only; the verified legacy MCP contract remains supported.
@@ -47,7 +48,7 @@ export async function getIssuePropertyOptions(id: string) {
     .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId!), eq(workspaceMembers.status, 'active')))
   const members = activeMembers.length ? await tx.select({ id: users.id, name: users.name, image: users.image }).from(users)
     .where(inArray(users.id, activeMembers.map(member => member.id))) : []
-  const choices = await issuePropertyChoices(user.id)
+  const choices = await issuePropertyChoices(user, locked.workspaceId!, tx)
   const projectRecords = await listWorkspaceProjects(locked.workspaceId!)
   return {
     members,
@@ -57,6 +58,20 @@ export async function getIssuePropertyOptions(id: string) {
     labels: choices.labels,
     isOwner: user.id === issue.userId,
   }
+  })
+}
+
+/** 新建任务's Assignee, Labels and Access choices for one workspace, before any task exists: its active members and
+ * the labels already on tasks the person can see. Bots come from the person's own Bot list (listBots). */
+export async function getNewTaskOptions(workspaceId: string) {
+  const user = await requireUser()
+  return withTaskWorkspace(user, workspaceId, async (workspace, membership) => {
+    const active = await membership.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.status, 'active')))
+    const members = active.length ? await db.select({ id: users.id, name: users.name, image: users.image }).from(users)
+      .where(inArray(users.id, active.map(member => member.id))) : []
+    const { labels } = await issuePropertyChoices(user, workspace.id, db)
+    return { viewerId: user.id, members: members.sort((a, b) => (a.id === user.id ? -1 : b.id === user.id ? 1 : a.name.localeCompare(b.name))), labels }
   })
 }
 
@@ -127,22 +142,24 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
             delegate = { id: profile.id, name: profile.definition.name, kind: 'profile', image: null }
           }
         }
-        const next = { ...metadata, ...patch, assignee, delegate }
+        const next = { ...metadata, ...patch, assignee, delegate, ...(requestedDelegate !== undefined ? { delegateSelection: 'manual' as const } : {}) }
         next.labels = [...new Map(next.labels.map(label => [label.name.toLowerCase(), label])).values()]
         next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
-        const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
+        const saved = await persistIssueMetadata(tx, latest, next, activityActor(user.id))
         if (!saved) return { error: 'issueOutdated' }
-        reviewTaskChanged(tx, latest, saved)
         // Invitation bookkeeping follows every validation and the revision
         // fence. An invalid delegate must not leave a partial invitation.
         if (parsed.data.inviteEmail && assignee?.kind === 'member' && assignee.id !== issue.userId) {
           const added = await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: assignee.id }).onConflictDoNothing().returning({ memberId: issueMembers.memberId })
           if (added.length) await issueMembersChanged(tx, issue.id)
         }
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
-        await issueListChanged(tx, saved.id)
-        await issueRelationsChanged(tx, [saved.id, ...relationIds(latest.content), ...relationIds(saved.content)])
-        return { issue: await issueView(saved, tx) }
+        const view = await issueView(saved, tx)
+        // Assigning a Bot wakes it in its own chat (Capy's issue_activity); it decides whether to start work.
+        if (delegate?.kind === 'bot' && (metadata.delegate?.kind !== 'bot' || metadata.delegate.id !== delegate.id)) {
+          await recordCoordinatorEvent(tx, issueAssignedEvent({ id: saved.id, ownerId: user.id, identifier: view.identifier ?? null, title: saved.title, revision: saved.revision },
+            delegate, { name: user.name || delegate.name }))
+        }
+        return { issue: view }
       })))
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       return result

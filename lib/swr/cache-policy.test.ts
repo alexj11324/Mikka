@@ -13,6 +13,7 @@ test('ordinary task documents and history summaries retain their exact hash-cove
   const issue = { id: 'task', content, readVersion: 'a'.repeat(32) }
   const history = { version: 'b'.repeat(32), positions: [{ id: 'v1', version: 'c'.repeat(32) }], items: [{ id: 'v1', content: { type: 'doc', attrs: content.attrs } }] }
   assert.deepEqual(persistentReadData(['issue', 'task'], issue), issue)
+  assert.deepEqual(persistentReadData(['issue', 'task'], { ...issue, taskWork: { factory: { report: 'session only' }, threads: ['in-memory'] } }), issue)
   assert.deepEqual(persistentReadData(['issue-activity-versions', 'task'], history), history)
 })
 

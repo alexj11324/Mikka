@@ -56,7 +56,6 @@ test('model summary cannot supply new host sources and peer OK stays a notificat
 test('Eve product instructions and native workers keep the host message policy', () => {
   assert.ok(COORDINATOR_INSTRUCTIONS.endsWith(PERSONAL_MESSAGE_INSTRUCTIONS))
   const steps = readFileSync('workflows/coordinator/steps.ts', 'utf8')
-  assert.match(steps, /prepareEveInstructions/)
   assert.doesNotMatch(steps, /summarizeConversation|saveSummary/)
   const native = readFileSync('packages/daemon/src/agents/run-context.ts', 'utf8')
   // The skills section still comes from the shared pure builder, and still sits

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { harnessName } from '@/components/labels/entity-labels'
 import useSWR, { useSWRConfig } from 'swr'
-import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
+import type { GatewayFeature } from '@/lib/model-gateway/features'
+import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyFeatures, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import { useActionError } from '@/lib/use-action-error'
@@ -46,14 +47,24 @@ export function useApiKeys(workspaceId: string) {
       await keys.mutate(result, { revalidate: false })
     } catch { setFailed({ message: actionError(), retry: () => void share(key, shared) }) } finally { setPending(false) }
   }
-  async function refetch(key: ApiKey) {
+  /** Turns a request feature off or back on for a custom provider (decision 2026-11-15-2000). */
+  async function setFeature(key: ApiKey, feature: GatewayFeature, on: boolean) {
+    setPending(true); setFailed(null)
+    try {
+      const result = await updateApiKeyFeatures(key.id, { ...key.features, [feature]: on }, workspaceId)
+      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void setFeature(key, feature, on) }); return }
+      await keys.mutate(result, { revalidate: false })
+    } catch { setFailed({ message: actionError(), retry: () => void setFeature(key, feature, on) }) } finally { setPending(false) }
+  }
+  async function refetch(key: ApiKey): Promise<boolean> {
     setPending(true); setFailed(null)
     try {
       const result = await refetchApiKeyModels(key.id, workspaceId)
-      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return }
+      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return false }
       await keys.mutate(result, { revalidate: false })
       void mutate(modelOrderKey(workspaceId))
-    } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }) } finally { setPending(false) }
+      return true
+    } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }); return false } finally { setPending(false) }
   }
   async function remove(key: ApiKey) {
     setPending(true); setFailed(null)
@@ -84,7 +95,7 @@ export function useApiKeys(workspaceId: string) {
     } catch { return actionError() }
   }
 
-  return { data, loadError, pending, failed, share, refetch, remove, add, setAfterQuota }
+  return { data, loadError, pending, failed, share, setFeature, refetch, reload: () => keys.mutate(), remove, add, setAfterQuota }
 }
 
 /**

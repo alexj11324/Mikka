@@ -13,8 +13,8 @@ import {
   useRichTextOutline,
 } from "./rich-text-outline"
 import type { RichTextSlashItem } from "./rich-text-slash-menu"
-import { TableOfContentsIcon } from "lucide-react"
-import { useTranslations } from "next-intl"
+import { TableOfContents } from "@/components/icons"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 const LINK_INDENT = ["", "ps-4", "ps-8"] as const
 
@@ -87,7 +87,7 @@ export const RICH_TEXT_OUTLINE_SLASH_ITEM: RichTextSlashItem = {
   hint: "Jump links to every heading",
   keywords: ["outline", "toc", "headings", "summary"],
   icon: (
-    <TableOfContentsIcon aria-hidden="true" />
+    <TableOfContents aria-hidden="true" />
   ),
   can: (editor) => !editor.isActive("table"),
   run: (editor, range) =>

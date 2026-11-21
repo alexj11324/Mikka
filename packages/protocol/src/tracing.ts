@@ -8,10 +8,14 @@ const EMAIL = /[^\s@"'<>(),;:]+@[^\s@"'<>(),;:]+\.[A-Za-z]{2,}/g
 const IPV4 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g
 const IPV6 = /\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b|\b(?:[0-9a-f]{1,4}:){1,6}:(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?\b/gi
 
-/** Removes `?query` and `#hash` from any URL or path inside the string, then masks emails and IPs. */
+/** An automation's webhook key (`mwh_…`) is its URL's only credential (lib/schedules/webhook.ts). */
+const WEBHOOK_KEY = /\bmwh_[A-Za-z0-9_-]+/g
+
+/** Removes `?query` and `#hash` from any URL or path inside the string, then masks webhook keys, emails and IPs. */
 export function scrubString(value: string): string {
   const scrubbed = value
     .replace(/(\b[a-z][a-z0-9+.-]*:\/\/[^\s?#]*|(?:^|(?<=\s))\/[^\s?#]*)[?#]\S*/gi, '$1')
+    .replace(WEBHOOK_KEY, 'mwh_[key]')
     .replace(EMAIL, '[email]')
     .replace(IPV4, '[ip]')
     .replace(IPV6, '[ip]')

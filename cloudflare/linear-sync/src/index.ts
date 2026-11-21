@@ -1,3 +1,4 @@
+import { causeFields } from '@mikka/protocol/coded-error'
 import { isLinearOAuthRevocation, parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
 import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
@@ -13,6 +14,8 @@ export interface Env {
   LINEAR_CLIENT_SECRET?: string
   LINEAR_TOKEN_ENCRYPTION_KEY?: string
   LINEAR_WEBHOOK_SECRET?: string
+  /** The app's `/api/webhooks/linear/automations` URL; unset, Linear deliveries start no automations. */
+  LINEAR_AUTOMATIONS_FORWARD_URL?: string
 }
 
 interface WorkerContext {
@@ -73,10 +76,34 @@ async function withRequestDatabase<T>(runtime: Awaited<SyncRuntime>, connectionS
   }
 }
 
+/**
+ * 自动化 Linear triggers run in the app, next to the automations: a verified Issue or Comment delivery is passed on with
+ * Linear's own headers and body, and the app checks the signature again. Whether sync is on does not matter. A failed
+ * hand-off answers 503 so Linear redelivers; the app takes each delivery ID once.
+ */
+async function forwardToAutomations(raw: Request, env: Env): Promise<Response | null> {
+  if (!env.LINEAR_AUTOMATIONS_FORWARD_URL) return null
+  const headers = new Headers({ 'content-type': 'application/json' })
+  for (const name of ['linear-delivery', 'linear-event', 'linear-signature']) headers.set(name, raw.headers.get(name) ?? '')
+  try {
+    const answer = await fetch(env.LINEAR_AUTOMATIONS_FORWARD_URL, { method: 'POST', headers, body: await raw.text() })
+    if (answer.status >= 500) return Response.json({ error: 'Automations are temporarily unavailable' }, { status: 503 })
+    if (!answer.ok) console.error('Linear automations hand-off was refused', answer.status)
+    return null
+  } catch {
+    return Response.json({ error: 'Automations are temporarily unavailable' }, { status: 503 })
+  }
+}
+
 async function webhook(request: Request, env: Env, ctx: WorkerContext) {
+  const raw = request.clone()
   const parsed = await parseLinearWebhookRequest(request, env.LINEAR_WEBHOOK_SECRET)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
+  if (parsed.eventType === 'Issue' || parsed.eventType === 'Comment') {
+    const failed = await forwardToAutomations(raw, env)
+    if (failed) return failed
+  }
   const state = await linearSyncState(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')
   if (state === 'disabled') {
     if (!isLinearOAuthRevocation(parsed.payload)) return Response.json({ disabled: true })
@@ -147,16 +174,15 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
 
 export default {
   fetch: handleRequest,
-  scheduled(_controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
-    ctx.waitUntil(runScheduled(env).catch(() => {
-      console.error('Linear sync scheduled batch failed')
-    }))
+  async scheduled(_controller: WorkerSchedule, env: Env) {
+    if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return
+    // The native trigger has no HTTP bearer. Its returned promise is the Cron invocation.
+    const runtime = await loadSyncRuntime(env)
+    try {
+      await withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())
+    } catch (error) {
+      // error-cause: Workers records unhandled rejections. Exclude raw query parameters and provider messages.
+      throw new Error('Linear sync scheduled batch failed', { cause: causeFields(error) })
+    }
   },
-}
-
-export async function runScheduled(env: Env) {
-  if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return
-  if (!env.CRON_SECRET || !syncConfigured(env)) return
-  const runtime = await loadSyncRuntime(env)
-  await withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())
 }

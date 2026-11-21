@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
@@ -148,6 +148,13 @@ test('actual root Nitro configuration loads the API/Workflow graph; an empty def
   try {
     nitro = await createNitro({ rootDir: root, preset: 'node-server', buildDir: join(temporary, 'build'), output: { dir: join(temporary, 'output') } }, { dotenv: false })
     assertApiBuildConfiguration(nitro, root)
+    // The real callers derive root from a directory URL, which keeps a
+    // trailing slash; the alias table holds the same path without one.
+    assertApiBuildConfiguration(nitro, `${root}${sep}`)
+    // Dropping the `@` alias must fail: `resolve('')` is the working
+    // directory, so a missing key would otherwise compare equal to `root`.
+    const withoutAlias = { ...nitro.options, alias: Object.fromEntries(Object.entries(nitro.options.alias ?? {}).filter(([key]) => key !== '@')) }
+    assert.throws(() => assertApiBuildConfiguration({ options: withoutAlias }, root), /API_CONFIG_NOT_LOADED/)
     assert.equal(nitro.options.workflow.runtime, 'nodejs24.x')
     assert.equal(nitro.options.vercel.functionRules['/mikka/api/agents/**'].supportsCancellation, true)
   } finally { await nitro?.close(); await rm(temporary, { recursive: true, force: true }) }

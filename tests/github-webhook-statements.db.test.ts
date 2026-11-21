@@ -19,7 +19,7 @@ const secret = 'statement-count-webhook-secret'
 const originalEdition = process.env.MIKKA_EDITION
 after(() => { if (originalEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = originalEdition })
 const callbacks: Array<() => unknown> = []
-mock.module('next/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
   decide: async () => null, invokeDecision: async () => null, callDecisionRequest: async () => { throw new Error('no model in this test') },
 } })
@@ -119,13 +119,17 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
     return sent
   }
 
+  // One more for each PR, issue, comment, review or check delivery that maps to an 自动化 event (decision
+  // 2026-11-15-1704): a single indexed read of the active automations with event triggers on that repository.
   await budget('push', 'push', { ref: 'refs/heads/main', repository: { full_name: 'o/r' } }, 0)
-  await budget('pull_request labeled', 'pull_request', pullRequest(delivered, number, 'labeled'), 0)
-  await budget('pull_request opened, a PR Mikka never delivered', 'pull_request', pullRequest(unrelated, number + 1, 'opened'), 1)
-  await budget('pull_request synchronize, new line counts', 'pull_request', pullRequest(delivered, number, 'synchronize'), 2)
-  await budget('pull_request synchronize, nothing stored changed', 'pull_request', pullRequest(delivered, number, 'synchronize'), 2)
+  await budget('pull_request labeled', 'pull_request', pullRequest(delivered, number, 'labeled'), 1)
+  await budget('pull_request opened, a PR Mikka never delivered', 'pull_request', pullRequest(unrelated, number + 1, 'opened'), 2)
+  await budget('pull_request synchronize, new line counts', 'pull_request', pullRequest(delivered, number, 'synchronize'), 3)
+  await budget('pull_request synchronize, nothing stored changed', 'pull_request', pullRequest(delivered, number, 'synchronize'), 3)
+  // One more than before (3 → 4): a merged delivery also moves its task to 已完成 in a single statement
+  // (decision 2026-11-13-1405, lib/task-status-advance.ts ADVANCE_MERGED_TASKS). Only a merge pays it.
   const merged = await budget('pull_request closed+merged', 'pull_request',
-    pullRequest(delivered, number, 'closed', { state: 'closed', merged: true, merged_at: '2026-11-05T01:00:00Z', merge_commit_sha: 'b'.repeat(40) }), 3)
+    pullRequest(delivered, number, 'closed', { state: 'closed', merged: true, merged_at: '2026-11-05T01:00:00Z', merge_commit_sha: 'b'.repeat(40) }), 5)
   assert.ok(merged.some(text => text.includes('factory_tasks')), 'the merge still looks for Factory tasks waiting on the PR')
   const { rows: [publication] } = await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
   assert.equal(publication.pullRequest.state, 'merged', 'the delivery shows the merge')
@@ -142,7 +146,7 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
     action: 'dismissed', repository: { full_name: 'o/r' }, pull_request: { number, html_url: unrelated },
   }, 0)
   await budget('issue_comment on an issue by someone without Mikka', 'issue_comment',
-    { action: 'created', repository: { full_name: 'o/r' }, sender: { id: 2, login: 'other' }, issue: { number, user: { id: 999_999_999 }, title: 'Bug' }, comment: { id: 1, body: 'hi', created_at: '2026-11-05T00:00:00Z' } }, 1)
+    { action: 'created', repository: { full_name: 'o/r' }, sender: { id: 2, login: 'other' }, issue: { number, user: { id: 999_999_999 }, title: 'Bug' }, comment: { id: 1, body: 'hi', created_at: '2026-11-05T00:00:00Z' } }, 2)
   // The person's recent matters, each with the evidence a few notices leave (~10 KB).
   const notices = Array.from({ length: 6 }, (_, n) => ({ title: `Notice ${n}`, excerpt: 'x'.repeat(1_500), occurredAt: '2026-11-04T00:00:00Z' }))
   for (let n = 0; n < 10; n++) await pool.query(`INSERT INTO attention_matters (id,"userId","matterKey",source,title,level,assessment,evidence,state)
@@ -151,7 +155,7 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   const { githubWebhookNotifications } = await import('../lib/suggestions/sources')
   const recipients = await githubWebhookNotifications('issue_comment', commentPayload)
   assert.deepEqual(recipients.map(notification => notification.userId), [owner], 'the budget measures a single recipient')
-  const comment = await budget('issue_comment on the person\'s issue (judge gives no answer)', 'issue_comment', commentPayload, 8)
+  const comment = await budget('issue_comment on the person\'s issue (judge gives no answer)', 'issue_comment', commentPayload, 9)
   // A full matter row (its evidence and assessment, tens of KB) is what made this route heavy; the judgment reads only its brief.
   assert.ok(comment.some(text => text.includes('"attention_matters"')), 'the judgment still reads the person\'s matters')
   assert.ok(comment.every(text => !text.includes('"assessment"')), 'no matter evidence or assessment is read')

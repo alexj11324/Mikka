@@ -48,8 +48,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   observePoolCommits(pool)
   // Native HTTP uses the production API request adapters, as the mobile DB fixture does.
   const requestContext = await import('../../apps/api/src/context')
-  t.mock.module('next/headers', { namedExports: await import('../../apps/api/compat/headers') })
-  t.mock.module('next-intl/server', { namedExports: await import('../../apps/api/compat/intl') })
+  t.mock.module('@/lib/server-runtime/headers', { namedExports: await import('../../lib/server-runtime/headers') })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: await import('../../lib/intl/i18n-server') })
   async function withMobileRequest<T>(request: Request, work: () => Promise<T>) {
     const scope = requestContext.createRequestScope(request)
     try { return await requestContext.runRequestScope(scope, work) }
@@ -1064,7 +1064,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(await session(saml.jar), null, 'the form revokes the local SAML session before the IdP round trip')
     assert.equal((await session(oidcCookies))?.user.id, userId, 'neither sign-out touches the independent OIDC session')
   })
-  await t.test('the 组织 page client adds a second Org admin, who can export audit until revoked, then is refused (#1669)', async () => {
+  await t.test('the 组织 page client adds a second Org admin, who can export audit until revoked, then is refused (#1669)', async adminTest => {
     const { organizationApi } = await import('../../hooks/settings/use-organization')
     const { GovernanceRequestError } = await import('../../hooks/settings/use-workspace-governance')
     const { auth: applicationAuth } = await import('../auth')
@@ -1092,12 +1092,40 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const added = await as(ownerSession.token, () => organizationApi.addMember(organizationId, secondAdmin, 'admin'))
       assert.equal(added.member.role, 'admin')
       await assert.rejects(as(adminSession.token, () => organizationApi.addMember(organizationId, randomUUID(), 'owner')), refused(403), 'an admin cannot mint an owner')
+      await adminTest.test('live organization audit pages keep microsecond ties and filter the selected organization without an export', async () => {
+        const ids = [randomUUID(), randomUUID(), randomUUID()].sort()
+        const instant = '2025-01-01T03:04:05.123456Z'
+        for (const id of ids) await pool.query(`insert into mikka_organization_audit_events
+          (id,"organizationId","actorId",action,result,"correlationId","targetId",metadata,"createdAt")
+          values ($1,$2,$3,'organization.member_changed','success',$1,$4,'{}'::jsonb,$5)`, [id, organizationId, adminId, secondAdmin, instant])
+        const filters = { from: instant, to: instant, family: 'organization', userId: secondAdmin, actor: adminId, q: 'MEMBER_CHANGED', limit: 2 }
+        const read = (extra: Parameters<typeof organizationApi.listAuditEvents>[1] = {}) =>
+          as(adminSession.token, () => organizationApi.listAuditEvents(organizationId, { ...filters, ...extra }))
+        const before = await pool.query('select count(*) from mikka_organization_audit_exports where "organizationId"=$1', [organizationId])
+        for (const order of ['asc', 'desc'] as const) {
+          const expected = order === 'asc' ? ids : [...ids].reverse()
+          const first = await read({ order })
+          assert.deepEqual(first.events.map(event => event.id), expected.slice(0, 2))
+          assert.ok(first.nextCursor)
+          const next = await read({ order, cursor: first.nextCursor })
+          assert.deepEqual(next.events.map(event => event.id), expected.slice(2))
+          assert.equal(next.nextCursor, null)
+        }
+        assert.deepEqual((await read({ q: '%' })).events, [])
+        assert.deepEqual((await read({ family: 'sso' })).events, [])
+        assert.deepEqual((await read({ userId: randomUUID() })).events, [])
+        await assert.rejects(as(adminSession.token, () => organizationApi.listAuditEvents(randomUUID())), refused(403))
+        await assert.rejects(read({ cursor: 'invalid' }), refused(400))
+        const after = await pool.query('select count(*) from mikka_organization_audit_exports where "organizationId"=$1', [organizationId])
+        assert.deepEqual(before.rows, after.rows)
+      })
       const exported = await as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {}))
       assert.equal(exported.manifest.organizationId, organizationId)
       assert.ok(exported.events.some(event => event.action === 'organization.member_changed' && event.targetId === secondAdmin), 'the grant is in the audit the new admin downloads')
       const page = await as(adminSession.token, () => organizationApi.readAuditExport(organizationId, exported.manifest.id, 0, 10))
       assert.equal(page.manifest.id, exported.manifest.id)
       assert.deepEqual(await as(ownerSession.token, () => organizationApi.removeMember(organizationId, secondAdmin)), { removed: true })
+      await assert.rejects(as(adminSession.token, () => organizationApi.listAuditEvents(organizationId)), refused(403), 'revoked administrator loses the live list')
       await assert.rejects(as(adminSession.token, () => organizationApi.readAuditExport(organizationId, exported.manifest.id, 0, 10)), refused(403), 'a revoked admin cannot keep reading a frozen export')
       await assert.rejects(as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {})), refused(403), 'or start a new one')
       await assert.rejects(as(ownerSession.token, () => organizationApi.createAuditExport(randomUUID(), {})), refused(403), 'an unknown Organization is refused, not created')

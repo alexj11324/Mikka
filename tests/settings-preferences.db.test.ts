@@ -30,8 +30,8 @@ async function load() {
 
 before(async () => {
   if (!databaseUrl) return
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   mock.module('@/lib/auth', { namedExports: {
     auth: { api: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } },
     authBaseURL: 'https://memory-rpc.example.invalid', googleEnabled: false, githubSignInEnabled: async () => false,
@@ -84,7 +84,8 @@ dbTest('preferences read both optional owner rows in one statement without losin
     } finally { observed.mock.restore() }
   }
   const stored = {
-    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false,
+    archiveIdleAfterDays: 30,
+    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false, organizationInvitationEmails: false,
     pushWhen: schema.PUSH_WHEN.find(value => value !== 'always')!,
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
     dailySuggestions: true,
@@ -126,6 +127,75 @@ dbTest('preferences read both optional owner rows in one statement without losin
   }
 })
 
+dbTest('a rejected preference save restores the proactive switch, waiting matter and quiet history', async () => {
+  const { db, schema, drizzle: { eq, sql } } = m
+  const { readPreferences, savePreferences } = await import('@/lib/preferences')
+  const owner = people.dana
+  const matterId = randomUUID()
+  const constraint = sql.identifier('test_pref_' + randomUUID().replaceAll('-', ''))
+  await db.insert(schema.attentionMatters).values({
+    id: matterId, userId: owner, matterKey: matterId, source: 'gmail', title: 'Waiting', level: 'high', assessment: {}, evidence: {}, state: 'waiting',
+  })
+  const readState = async () => {
+    const { proactive, personalInstructions } = await readPreferences(owner)
+    const [matter] = await db.select({ state: schema.attentionMatters.state }).from(schema.attentionMatters).where(eq(schema.attentionMatters.id, matterId))
+    const logs = await db.select({ action: schema.attentionLog.action }).from(schema.attentionLog).where(eq(schema.attentionLog.matterId, matterId))
+    return { proactive, personalInstructions, state: matter.state, log: logs.map(entry => entry.action) }
+  }
+  const initial = await readState()
+  assert.deepEqual(initial, { proactive: true, personalInstructions: '', state: 'waiting', log: [] })
+  const patch = { proactive: false, personalInstructions: 'Reject this test preference' }
+  await db.execute(sql`ALTER TABLE user_preferences ADD CONSTRAINT ${constraint} CHECK ("personalInstructions" <> 'Reject this test preference') NOT VALID`)
+  try {
+    await assert.rejects(savePreferences(owner, patch), (error: { cause?: { code?: string } }) => error.cause?.code === '23514')
+    assert.deepEqual(await readState(), initial, 'a failed save must leave all three tables unchanged')
+  } finally {
+    await db.execute(sql`ALTER TABLE user_preferences DROP CONSTRAINT ${constraint}`)
+  }
+  await savePreferences(owner, patch)
+  await savePreferences(owner, patch)
+  assert.deepEqual(await readState(), { proactive: false, personalInstructions: patch.personalInstructions, state: 'quiet', log: ['quiet'] })
+  assert.equal((await readPreferences(people.alex)).proactive, true)
+  await savePreferences(owner, { proactive: true, personalInstructions: '' })
+})
+
+dbTest('independent preference patches submitted together both survive', async () => {
+  const { readPreferences, savePreferences } = await import('@/lib/preferences')
+  const owner = people.dana
+  await savePreferences(owner, { pushReview: true, pushBriefing: true })
+  const { withDatabaseClient } = await import('@/lib/db')
+  const [gate, first, second] = await Promise.all([m.pool.connect(), m.pool.connect(), m.pool.connect()])
+  try {
+    // Hold the eventual upsert so both requests are in flight before either can commit.
+    const pids = await Promise.all([first, second].map(async client => (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid as number))
+    await gate.query('BEGIN')
+    await gate.query('SELECT 1 FROM user_preferences WHERE "userId" = $1 FOR UPDATE', [owner])
+    const writes = Promise.allSettled([
+      withDatabaseClient(first, () => savePreferences(owner, { pushReview: false })),
+      withDatabaseClient(second, () => savePreferences(owner, { pushBriefing: false })),
+    ])
+    try {
+      const deadline = Date.now() + 10000
+      while (true) {
+        const { rows } = await gate.query('SELECT DISTINCT pid FROM pg_locks WHERE pid = ANY ($1::int[]) AND NOT granted', [pids])
+        if (rows.length === 2) break
+        assert.ok(Date.now() < deadline, 'both writers acquired a connection and waited for a lock')
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+    } finally {
+      await gate.query('ROLLBACK')
+      await writes
+    }
+    for (const write of await writes) if (write.status === 'rejected') throw write.reason
+  } finally {
+    gate.release()
+    first.release()
+    second.release()
+  }
+  const saved = await readPreferences(owner)
+  assert.deepEqual([saved.pushReview, saved.pushBriefing], [false, false])
+})
+
 dbTest('preferences: send key, personal instructions and daily suggestions save with their rules', async () => {
   as(people.alex)
   const { preferences } = m
@@ -142,6 +212,13 @@ dbTest('preferences: send key, personal instructions and daily suggestions save 
   assert.equal((await preferences.getPreferences()).personalInstructions, '回答用中文', 'a refused patch changes nothing')
 
   // 每日建议 needs 记忆.
+  for (const days of [3, 7, 14, 30, 90, 0]) {
+    const written = await preferences.updatePreferences({ archiveIdleAfterDays: days })
+    assert.equal(written.error, undefined)
+    if (!written.error) assert.equal(written.archiveIdleAfterDays, days)
+  }
+  assert.equal((await preferences.updatePreferences({ archiveIdleAfterDays: 1 })).error, 'validationGeneric')
+  assert.equal((await preferences.getPreferences()).archiveIdleAfterDays, 0)
   const memoryOff = await preferences.updatePreferences({ memoryEnabled: false })
   assert.equal(!memoryOff.error && memoryOff.dailySuggestions, false, 'turning 记忆 off turns 每日建议 off')
   assert.equal((await preferences.updatePreferences({ dailySuggestions: true })).error, 'dailySuggestionsNeedMemory')
@@ -166,22 +243,22 @@ dbTest('personal instructions reach the next prompt for the Coordinator and Bots
   assert.equal(await personal.withPersonalInstructions(people.alex, 'BASE RULES'), 'BASE RULES')
 })
 
-dbTest('the Coordinator\'s and a Bot\'s turn prompt (prepareEveInstructions) carry the saved instructions and drop them once cleared', async () => {
+dbTest('the Coordinator\'s and a Bot\'s turn prompt (composeEveInstructions) carry the saved instructions and drop them once cleared', async () => {
   as(people.alex)
   const { preferences } = m
-  const { prepareEveInstructions } = await import('@/workflows/coordinator/steps')
+  const { composeEveInstructions } = await import('@/lib/coordinator/product-instructions')
   const botId = randomUUID()
   // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
   const coordinator = (await seedCoordinator(people.alex)).botId
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
   for (const bot of [coordinator, botId]) {
-    const instructions = await prepareEveInstructions(people.alex, bot)
+    const instructions = await composeEveInstructions(people.alex, bot)
     assert.match(instructions, /You are the Coordinator in Mikka/, 'the rules come first')
     assert.match(instructions, /<personal_instructions>\nSign every reply with 🐧\.\n<\/personal_instructions>/)
     assert.ok(instructions.indexOf('<personal_instructions>') > instructions.indexOf('You are the Coordinator in Mikka'))
   }
   await preferences.updatePreferences({ personalInstructions: '' })
-  for (const bot of [coordinator, botId]) assert.doesNotMatch(await prepareEveInstructions(people.alex, bot), /personal_instructions|Sign every reply/)
+  for (const bot of [coordinator, botId]) assert.doesNotMatch(await composeEveInstructions(people.alex, bot), /personal_instructions|Sign every reply/)
 })
 
 dbTest('time zone: a picked zone survives browser and IP reports until 自动', async () => {

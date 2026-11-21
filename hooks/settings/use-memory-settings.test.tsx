@@ -16,6 +16,7 @@ const original = {
 } satisfies MemoryData
 let persisted: MemoryData
 let allowed: boolean
+let refuseSwitch = false
 let mergeInto: string | null
 let reads = 0
 let readFailure: Error | null
@@ -23,7 +24,11 @@ const writes: string[] = []
 
 mock.module('@/app/actions/memory', { namedExports: {
   getMemory: async () => { reads++; if (readFailure) throw readFailure; return structuredClone(persisted) },
-  setMemory: async (enabled: boolean) => { persisted.enabled = enabled },
+  setMemory: async (enabled: boolean) => {
+    writes.push('switch')
+    if (refuseSwitch) throw new Error('Preference storage unavailable')
+    persisted.enabled = enabled
+  },
   updateFact: async (id: string, subject: string) => {
     writes.push('correct')
     if (!allowed) return false
@@ -38,6 +43,15 @@ mock.module('@/app/actions/memory', { namedExports: {
     writes.push('remove')
     if (!allowed) return false
     persisted.facts = persisted.facts.filter(fact => fact.id !== id)
+    return true
+  },
+  reviewFact: async (id: string, decision: 'approve' | 'reject') => {
+    writes.push(`review:${decision}`)
+    if (!allowed) return false
+    const fact = persisted.pending.find(item => item.id === id)
+    if (!fact) return false
+    persisted.pending = persisted.pending.filter(item => item.id !== id)
+    if (decision === 'approve') persisted.facts = [{ ...fact, reviewStatus: 'approved', userEdited: true }, ...persisted.facts]
     return true
   },
 } })
@@ -55,7 +69,7 @@ before(async () => {
   ;({ useMemorySettings } = await import('./use-memory-settings'))
 })
 beforeEach(() => {
-  persisted = structuredClone(original); allowed = false; mergeInto = null; reads = 0; readFailure = null; writes.length = 0
+  persisted = structuredClone(original); allowed = false; refuseSwitch = false; mergeInto = null; reads = 0; readFailure = null; writes.length = 0
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container); root = createRoot(container)
 })
@@ -95,6 +109,20 @@ for (const action of ['correct', 'remove'] as const) {
     assert.equal(container.textContent, 'Original memory')
   })
 
+  test(`Retry resubmits the original memory ${action} after rollback`, async () => {
+    await render()
+    await act(async () => {
+      if (action === 'correct') await memory.correct(factId, 'Keep this correction')
+      else await memory.remove(factId)
+    })
+    assert.equal(memory.failed, true)
+    allowed = true
+    await act(async () => { await memory.reload() })
+    assert.deepEqual(writes, [action, action])
+    assert.equal(memory.failed, false)
+    assert.equal(container.textContent, action === 'correct' ? 'Keep this correction' : '')
+  })
+
   test(`an accepted memory ${action} remains saved after a refresh`, async () => {
     await render(); allowed = true
     await act(async () => {
@@ -119,6 +147,45 @@ test('the memory switch still accepts its void action result', async () => {
   assert.equal(memory.data?.enabled, false)
 })
 
+const pendingId = '9d1f0d55-7f4e-4a63-8c1e-1a2b3c4d5e6f'
+const pendingFact = { ...original.facts[0], id: pendingId, subject: 'Learned but unconfirmed', reviewStatus: 'pending' as const, userEdited: false }
+
+test('a learned fact waits in pending and approving it makes it a visible fact', async () => {
+  persisted = structuredClone({ ...original, facts: [], total: 0, pending: [pendingFact] })
+  await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}><Probe /></SWRConfig>))
+  await settle()
+  assert.equal(container.textContent, '', 'a pending fact is not shown among approved facts')
+  assert.equal(memory.data?.pending.length, 1, 'but the person can see that one is waiting')
+  allowed = true
+  await act(async () => { await memory.review(pendingId, 'approve') })
+  assert.deepEqual(writes, ['review:approve'])
+  assert.equal(memory.data?.pending.length, 0)
+  assert.equal(container.textContent, 'Learned but unconfirmed', 'approving it makes it a fact Mikka uses')
+})
+
+test('rejecting a pending fact discards it without approving anything', async () => {
+  persisted = structuredClone({ ...original, facts: [], total: 0, pending: [pendingFact] })
+  await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}><Probe /></SWRConfig>))
+  await settle()
+  allowed = true
+  await act(async () => { await memory.review(pendingId, 'reject') })
+  assert.deepEqual(writes, ['review:reject'])
+  assert.equal(memory.data?.pending.length, 0)
+  assert.equal(container.textContent, '')
+})
+
+test('Retry saves the refused memory switch value', async () => {
+  await render(); refuseSwitch = true
+  await act(async () => { await memory.setEnabled(false) })
+  assert.equal(memory.data?.enabled, true)
+  assert.equal(memory.failed, true)
+  refuseSwitch = false
+  await act(async () => { await memory.reload() })
+  assert.deepEqual(writes, ['switch', 'switch'])
+  assert.equal(persisted.enabled, false)
+  assert.equal(memory.failed, false)
+})
+
 test('a correction merged into another saved fact renders the authoritative surviving row', async () => {
   const survivor = 'c12c497e-3511-40a9-a357-aa0e410794aa'
   persisted.facts.push({ ...persisted.facts[0], id: survivor, subject: 'Existing memory' })
@@ -141,6 +208,7 @@ test('a saved memory whose confirmation read fails exposes a read error without 
   assert.equal(persisted.facts[0].subject, 'Saved correction')
   readFailure = null
   await act(async () => { await memory.reload() })
+  assert.deepEqual(writes, ['correct'], 'retrying a confirmation read must not replay a saved write')
   assert.equal(memory.error, undefined)
   assert.equal(container.textContent, 'Saved correction')
 })

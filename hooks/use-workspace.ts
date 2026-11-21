@@ -1,13 +1,11 @@
 'use client'
 
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { withBasePath } from '@/lib/base-path'
+import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 
-async function fetchWorkspace([url]: readonly [string, string]): Promise<WorkspaceSettings> {
-  const response = await fetch(withBasePath(url))
-  if (!response.ok) throw new Error('无法读取工作区，请确认访问权限后重试。')
-  return response.json()
+function fetchWorkspace([url]: readonly [string, string]): Promise<WorkspaceSettings> {
+  return fetchSettingsData<WorkspaceSettings>(url)
 }
 
 export function useWorkspace(userKey: string, workspaceId?: string) {

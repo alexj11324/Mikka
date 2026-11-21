@@ -9,10 +9,21 @@ import { deploymentStage } from '../../lib/deployment-stage.mjs'
 import { installationBuild } from '../../scripts/build-installation.mjs'
 import { sharedStylePlugins } from './scripts/shared-styles.mjs'
 
+// One process describes one revision. Resolving this per call means an
+// intermittent `git` spawn failure lands in the `catch` below and silently turns
+// a later build of the same process into a different application: every module
+// that reads NEXT_PUBLIC_MIKKA_BUILD is emitted with a different constant, which
+// renames and rewrites every chunk that transitively imports one.
+let resolvedApplicationBuild
+
 function applicationBuild() {
+  if (resolvedApplicationBuild !== undefined) return resolvedApplicationBuild
   const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.MIKKA_BUILD_REVISION ?? process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA
-  if (configured !== undefined) return configured
-  try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return '' }
+  if (configured !== undefined) resolvedApplicationBuild = configured
+  else {
+    try { resolvedApplicationBuild = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { resolvedApplicationBuild = '' }
+  }
+  return resolvedApplicationBuild
 }
 
 export async function frontendConfig({ target = 'web', command = 'build', outdir, clean = true, serverPages = false, publicTestFixture = false } = {}) {

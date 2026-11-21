@@ -3,8 +3,10 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
-const REPOSITORY = 'alexj11324/Mikka'
+const officialRepository = repository => officialMikkaRepository(repository?.full_name, String(repository?.id),
+  repository?.owner?.id === undefined ? undefined : String(repository.owner.id))
 const WORKFLOW = '.github/workflows/e2b-official-runtime.yml'
 const FAILURE_STEPS = new Set([
   'Build private versioned candidates and require official file conservation',
@@ -27,6 +29,12 @@ export function releaseDecision({ workerHash, beforeWorkerHash, failedRunId, eve
     if (!reason?.trim()) throw Error('runtimeInputs:retryReasonRequired')
     return { changed: true, reason: 'manual retry' }
   }
+  if (eventName === 'workflow_run') {
+    if (!/^[a-f0-9]{40}$/.test(workerHash ?? '')) throw Error('runtimeInputs:workerHashRequired')
+    if (workerHash === beforeWorkerHash) return { changed: false, reason: 'the last published release has the same installed worker and template inputs' }
+    if (failedRunId) return { changed: false, reason: `skipped: same inputs as failed run ${failedRunId}` }
+    return { changed: true, reason: beforeWorkerHash ? 'installed worker or template inputs changed since the last published release' : 'no published release found' }
+  }
   if (eventName !== 'push') return { changed: false, reason: 'not a production push' }
   if (![workerHash, beforeWorkerHash].every(value => /^[a-f0-9]{40}$/.test(value ?? ''))) throw Error('runtimeInputs:workerHashRequired')
   if (workerHash === beforeWorkerHash) return { changed: false, reason: 'installed worker and template inputs unchanged' }
@@ -42,9 +50,28 @@ export function pushRuntimeInputs({ ref, event, cwd = process.cwd() }, hash = ru
   return { workerHash: hash({ ref, cwd }), beforeWorkerHash: hash({ ref: event.before, cwd }) }
 }
 
+const PUBLISH_STEP = 'Make only fully accepted candidates public'
+
+/** The source of the newest run that actually made templates public. A Cloudflare
+ * promotion compares against it, not against the previous push. */
+export async function lastPublishedSource({ token, fetchImpl = fetch, maxRuns = 200 }) {
+  const options = { token, fetchImpl }
+  let seen = 0
+  for await (const run of pages(`/actions/workflows/${WORKFLOW.split('/').pop()}/runs?branch=main&status=success`, 'workflow_runs', options)) {
+    if (++seen > maxRuns) return null
+    if (run.path !== WORKFLOW || run.head_branch !== 'main' || !officialRepository(run.repository)
+      || !['workflow_dispatch', 'workflow_run'].includes(run.event) || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '') || !id(run.run_attempt)) continue
+    for await (const job of pages(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs', options)) {
+      if (/^(?:release \/ )?subscriptions$/.test(job.name ?? '') && job.head_sha === run.head_sha
+        && job.steps?.some(step => step.name === PUBLISH_STEP && step.conclusion === 'success')) return run.head_sha
+    }
+  }
+  return null
+}
+
 async function githubRead(path, { token, fetchImpl }) {
   if (!token) throw Error('runtimeInputs:githubTokenRequired')
-  const response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
+  const response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}${path}`, {
     headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
     signal: AbortSignal.timeout(20_000), redirect: 'error', cache: 'no-store',
   })
@@ -78,8 +105,8 @@ export async function findFailedInputs({ digest, currentRunId, token, fetchImpl 
       || source.head_branch !== 'main' || !/^[a-f0-9]{40}$/.test(source.head_sha ?? '')) continue
     const run = await githubRead(`/actions/runs/${source.id}`, options)
     if (run.id !== source.id || run.path !== WORKFLOW || run.head_branch !== 'main' || run.head_sha !== source.head_sha
-      || run.repository?.full_name !== REPOSITORY || run.head_repository?.full_name !== REPOSITORY
-      || !['push', 'workflow_dispatch'].includes(run.event)
+      || !officialRepository(run.repository) || !officialRepository(run.head_repository)
+      || !['push', 'workflow_dispatch', 'workflow_run'].includes(run.event)
       || !(run.status === 'completed' && run.conclusion === 'failure' || run.status === 'in_progress' && run.conclusion === null)
       || !id(run.run_attempt) || !(Date.parse(artifact.created_at) >= Date.parse(run.run_started_at))) continue
     if (await failedRuntimeAttempt(run, options)) return run.id
@@ -108,11 +135,12 @@ export async function rememberFailure({ sourceCommit, runId, runAttempt, token, 
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const digest = runtimeInputsDigest({ ref: process.env.GITHUB_SHA })
+  const source = process.env.MIKKA_RUNTIME_SOURCE || process.env.GITHUB_SHA
+  const digest = runtimeInputsDigest({ ref: source })
   if (process.argv[2] === 'remember') {
-    const remember = await rememberFailure({ sourceCommit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID,
+    const remember = await rememberFailure({ sourceCommit: source, runId: process.env.GITHUB_RUN_ID,
       runAttempt: process.env.GITHUB_RUN_ATTEMPT, token: process.env.GITHUB_TOKEN })
-    if (remember) writeFileSync(process.argv[3], JSON.stringify({ digest, sourceCommit: process.env.GITHUB_SHA,
+    if (remember) writeFileSync(process.argv[3], JSON.stringify({ digest, sourceCommit: source,
       runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }) + '\n')
     appendFileSync(process.env.GITHUB_OUTPUT, `digest=${digest}\nremember=${remember}\n`)
     console.log(remember ? `Remember failed runtime inputs ${digest}` : 'No current-source build/gate failure to remember')
@@ -122,8 +150,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // never as commands, job outputs or operator-supplied Markdown.
     if (manual) releaseDecision({ eventName: 'workflow_dispatch', reason: process.env.RETRY_REASON })
     const recheck = process.argv[2] === 'recheck'
+    const promotion = process.env.GITHUB_EVENT_NAME === 'workflow_run'
     let inputs
-    if (!manual && !recheck) {
+    if (promotion && !recheck) {
+      const published = await lastPublishedSource({ token: process.env.GITHUB_TOKEN })
+      inputs = { workerHash: digest, beforeWorkerHash: published ? runtimeInputsDigest({ ref: published }) : null }
+    } else if (!manual && !recheck) {
       let event
       try { event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) } catch (cause) { throw Error('runtimeInputs:invalidPushEvent', { cause }) }
       inputs = pushRuntimeInputs({ ref: process.env.GITHUB_SHA, event })

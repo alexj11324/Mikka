@@ -174,6 +174,27 @@ test('terminal snapshots wake through the Durable Object, and byte streams use i
   expect((await (await runtime.getWorker('authority')).fetch('https://world.internal/world/run-terminal?runId='+run)).status).toBe(404)
 })
 
+test('both workloads read and append to streams persisted under their original names', async () => {
+  const binding = await runtime.getDurableObjectNamespace('EVE_STREAMS', 'authority')
+  const run = 'existing-run'
+  const name = 'events'
+  const stream = JSON.stringify(['stream', run, name])
+  const registry = JSON.stringify(['run-streams', run])
+  for (const [client, streamKey, registryKey, firstByte] of [
+    [world, stream, registry, 5],
+    [business, JSON.stringify(['business', stream]), JSON.stringify(['business', registry]), 8],
+  ]) {
+    const persisted = binding.get(binding.idFromName(streamKey))
+    await persisted.writeChunk(Uint8Array.of(firstByte))
+    await binding.get(binding.idFromName(registryKey)).registerStream(name)
+    expect(await client.streams.list(run)).toEqual([name])
+    await client.streams.write(run, name, Uint8Array.of(firstByte + 1))
+    const { chunks } = await persisted.getChunks({ startIndex: 0, limit: 2 })
+    expect(chunks.map(chunk => chunk[0])).toEqual([firstByte, firstByte + 1])
+    expect((await client.streams.getChunks(run, name)).data.map(chunk => chunk.data[0])).toEqual([firstByte, firstByte + 1])
+  }
+})
+
 test('business and Eve scopes isolate identically named streams and workflow catalogs even on shared physical storage', async () => {
   const eveRun = await start('eve-only')
   await expect(business.runs.get(eveRun)).rejects.toMatchObject({ name: 'WorkflowRunNotFoundError' })

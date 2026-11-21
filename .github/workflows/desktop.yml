@@ -89,7 +89,6 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3000
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      NEXT_TELEMETRY_DISABLED: '1'
       MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
     steps:
@@ -109,7 +108,7 @@ jobs:
         run: |
           sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
           pnpm exec playwright install --with-deps chromium
-      - run: sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
+      - run: sudo apt-get install -y xvfb xdotool x11-utils imagemagick tesseract-ocr dbus-x11 gnome-keyring libsecret-1-0
       - name: Install the pinned Electron runtime and its Linux sandbox helper
         working-directory: apps/desktop
         env:
@@ -156,7 +155,7 @@ jobs:
             xvfb-run -a node apps/desktop/test/environment.mjs -- bash -euc "
               node --test apps/desktop/test/native-viewport.test.mjs
               REQUIRE_DB=1 pnpm test:desktop-auth
-              node apps/desktop/test/run-acceptance.mjs bundled-smoke
+              MIKKA_TEST_X11_DIRECTORY_DIALOG=1 LANG=C.UTF-8 node apps/desktop/test/run-acceptance.mjs bundled-smoke
             "
           '
       - name: Audit runtime evidence before upload

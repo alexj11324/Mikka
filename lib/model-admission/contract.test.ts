@@ -1,68 +1,55 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { admitGatewayRoute, admitModelRoute, GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, parseModelAdmissionPolicy, subscriptionModelRoute, ZEROCAT_MODEL_ENDPOINT } from './contract'
+import { admitModelRoute, modelAdmissionRevision, ModelAdmissionError, parseModelAdmissionPolicy, subscriptionModelRoute } from './contract'
 
-const request = { ownerId: 'alice', model: 'deepseek/deepseek-v4.1-flash', endpoint: GATEWAY_MODEL_ENDPOINT }
-const rule = { provider: 'vercel-gateway', endpoint: GATEWAY_MODEL_ENDPOINT, model: request.model,
-  servingProviders: ['deepseek'], principalIds: ['alice'], dataRegions: ['unknown'] }
+const request = { ownerId: 'alice', provider: 'litellm', model: 'mikka-default', endpoint: 'https://models.example.test/v1' }
+const rule = { provider: request.provider, endpoint: request.endpoint, model: request.model,
+  servingProviders: ['litellm'], principalIds: ['alice'], dataRegions: ['unknown'] }
 const policy = () => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [rule] })
 const denied = (code: string) => (error: unknown) => error instanceof ModelAdmissionError && error.code === code
 
-test('managed Gateway admission pins the exact principal, model and server endpoint', () => {
-  const admitted = admitGatewayRoute(policy(), request)
-  assert.deepEqual(admitted.servingProviders, ['deepseek'])
+test('LiteLLM admission pins the exact principal, alias and administrator endpoint', () => {
+  const admitted = admitModelRoute(policy(), request)
+  assert.deepEqual(admitted.servingProviders, ['litellm'])
   assert.equal(admitted.dataRegion, 'unknown')
-  assert.deepEqual(managedGatewayOptions(admitted), { only: ['deepseek'], order: ['deepseek'], models: [] })
-  for (const changed of [{ model: 'deepseek/auto' }, { model: `${request.model}\n` }, { ownerId: 'bob' },
-    { endpoint: 'https://proxy.example/v4/ai' }, { endpoint: `${GATEWAY_MODEL_ENDPOINT}?redirect=https://proxy.example` }])
-    assert.throws(() => admitGatewayRoute(policy(), { ...request, ...changed }), denied('modelRouteDenied'))
+  for (const changed of [{ model: 'mikka-title' }, { model: `${request.model}\n` }, { ownerId: 'bob' },
+    { provider: 'vercel-gateway' }, { endpoint: 'https://other.example/v1' }, { endpoint: `${request.endpoint}?redirect=https://proxy.example` }])
+    assert.throws(() => admitModelRoute(policy(), { ...request, ...changed }), denied('modelRouteDenied'))
 })
 test('revocation, absent principal and unproved regions refuse rather than falling back', () => {
-  assert.throws(() => admitGatewayRoute({ ...policy(), revoked: true }, request), denied('modelPolicyRevoked'))
-  assert.throws(() => admitGatewayRoute(policy(), { ...request, ownerId: null }), denied('modelPrincipalUnavailable'))
+  assert.throws(() => admitModelRoute({ ...policy(), revoked: true }, request), denied('modelPolicyRevoked'))
+  assert.throws(() => admitModelRoute(policy(), { ...request, ownerId: null }), denied('modelPrincipalUnavailable'))
   const regional = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...rule, dataRegions: ['eu'] }] })
-  assert.throws(() => admitGatewayRoute(regional, request), denied('modelRegionUnverified'))
+  assert.throws(() => admitModelRoute(regional, request), denied('modelRegionUnverified'))
 })
-test('policy input cannot declare another transport, proxy URL or undocumented fields', () => {
-  for (const changed of [{ endpoint: 'https://proxy.example' }, { provider: 'arbitrary' }, { model: 'Auto' },
-    { servingProviders: [] }, { servingProviders: ['deepseek','another-provider'] }, { credentials: 'never accepted' }])
+test('policy input refuses retired transports, credential-bearing endpoints and undocumented fields', () => {
+  for (const changed of [{ endpoint: 'https://key@models.example/v1' }, { endpoint: 'https://models.example/v1?key=secret' },
+    { endpoint: 'ftp://models.example/v1' }, { endpoint: 'https://models.example/v1/' }, { model: '\nAuto' },
+    { servingProviders: [] }, { servingProviders: ['litellm', 'another-provider'] }, { credentials: 'never accepted' },
+    ...['vercel-gateway', 'zerocat', 'cloudflare-workers-ai', 'openai-compatible'].map(provider => ({ provider }))])
     assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...rule, ...changed }] }), denied('modelPolicyInvalid'))
-  assert.throws(() => parseModelAdmissionPolicy({schemaVersion:1,routes:[rule,rule]}),denied('modelPolicyInvalid'))
+  assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [rule, rule] }), denied('modelPolicyInvalid'))
+  assert.equal(admitModelRoute(parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...rule, model: 'vendor/model' }] }), { ...request, model: 'vendor/model' }).model, 'vendor/model')
 })
-test('existing subscription routes pin the worker endpoint, physical provider and exact model without claiming a region', () => {
+test('existing subscription routes retain their exact worker endpoint, physical provider and model', () => {
   for (const kind of ['codex_cpa', 'claude_cpa', 'codex_cli', 'claude_code_cli']) {
     const transport = subscriptionModelRoute(kind)
     const route = { ...transport, model: 'provider-model', servingProviders: [kind.startsWith('codex') ? 'openai' : 'anthropic'], principalIds: ['alice'], dataRegions: ['unknown'] }
     const rule = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
     const request = { ...transport, ownerId: 'alice', model: route.model }
     assert.equal(admitModelRoute(rule, request).dataRegion, 'unknown')
-    for (const changed of [{ model: 'other-model' }, { ownerId: 'bob' }, { provider: 'vercel-gateway' }, { endpoint: 'https://proxy.invalid' }])
+    for (const changed of [{ model: 'other-model' }, { ownerId: 'bob' }, { provider: 'litellm' }, { endpoint: 'https://proxy.invalid' }])
       assert.throws(() => admitModelRoute(rule, { ...request, ...changed }), denied('modelRouteDenied'))
     assert.throws(() => admitModelRoute(parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, dataRegions: ['us'] }] }), request), denied('modelRegionUnverified'))
     assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, endpoint: `${transport.endpoint}?proxy=true` }] }), denied('modelPolicyInvalid'))
   }
   assert.throws(() => subscriptionModelRoute('openai_siwc'), denied('modelRouteDenied'))
 })
-test('the default model\'s ZeroCat route pins its endpoint and is not a Gateway route', () => {
-  const route = { provider: 'zerocat', endpoint: ZEROCAT_MODEL_ENDPOINT, model: request.model, servingProviders: ['zerocat'], principalIds: ['alice'], dataRegions: ['unknown'] }
-  const rule = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
-  const zeroCat = { provider: 'zerocat', endpoint: ZEROCAT_MODEL_ENDPOINT, ownerId: 'alice', model: request.model }
-  assert.equal(admitModelRoute(rule, zeroCat).provider, 'zerocat')
-  for (const changed of [{ endpoint: 'https://proxy.invalid/v1' }, { provider: 'vercel-gateway' }, { ownerId: 'bob' }])
-    assert.throws(() => admitModelRoute(rule, { ...zeroCat, ...changed }), denied('modelRouteDenied'))
-  assert.throws(() => admitGatewayRoute(rule, request), denied('modelRouteDenied'))
-  for (const changed of [{ endpoint: 'https://proxy.invalid/v1' }, { servingProviders: ['deepseek'] }])
-    assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, ...changed }] }), denied('modelPolicyInvalid'))
-})
 
-
-test('self-hosted admission pins the administrator endpoint and actual provider model', () => {
-  const route = { provider: 'openai-compatible', endpoint: 'https://models.example.test/v1', model: 'local-model', servingProviders: ['openai-compatible'], principalIds: ['alice'], dataRegions: ['unknown'] }
-  const policy = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
-  const request = { provider: 'openai-compatible', endpoint: route.endpoint, model: route.model, ownerId: 'alice' }
-  assert.equal(admitModelRoute(policy, request).model, 'local-model')
-  for (const other of [{ ...request, endpoint: 'https://other.example.test/v1' }, { ...request, model: 'different-model' }, { ...request, ownerId: 'bob' }]) {
-    assert.throws(() => admitModelRoute(policy, other), { code: 'modelRouteDenied' })
-  }
-  assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, endpoint: 'https://key@models.example.test/v1' }] }))
+test('policy revisions survive PostgreSQL JSON object key ordering, including retired policies', () => {
+  const policy = { schemaVersion: 1, routes: [rule] }
+  const reordered = { routes: [{ dataRegions: rule.dataRegions, principalIds: rule.principalIds, servingProviders: rule.servingProviders,
+    model: rule.model, endpoint: rule.endpoint, provider: rule.provider }], schemaVersion: 1 }
+  assert.equal(modelAdmissionRevision(policy), modelAdmissionRevision(reordered))
+  assert.notEqual(modelAdmissionRevision(policy), modelAdmissionRevision({ ...reordered, routes: [] }))
 })

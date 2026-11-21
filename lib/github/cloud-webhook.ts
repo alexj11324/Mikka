@@ -14,7 +14,7 @@ export function createCloudGitHubReceiver(deps: {
   database: Pick<Pool, 'query'>
   registration(): Promise<{ serverSecret: string } | null>
   readBody(request: Request): Promise<string | null>
-  dispatch(event: string, rawBody: string): Promise<Response>
+  dispatch(event: string, rawBody: string, options?: { deliveryId?: string }): Promise<Response>
   now?: () => number
 }) {
   return async (request: Request): Promise<Response> => {
@@ -39,7 +39,7 @@ export function createCloudGitHubReceiver(deps: {
       return reply(row?.completed_at && row.body_hash === hash && row.event === event ? 204 : 409)
     }
     try {
-      const response = await deps.dispatch(event, body)
+      const response = await deps.dispatch(event, body, { deliveryId: delivery })
       if (response.status >= 400) {
         await deps.database.query('UPDATE cloud_github_webhook_receipts SET lease_until=$2 WHERE delivery_id=$1 AND completed_at IS NULL', [delivery, new Date(now)])
         return reply(response.status)

@@ -41,8 +41,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     for (const [w, u, status] of [[workspace, owner, 'active'], [workspace, member, 'active'], [workspace, removed, 'active'], [otherWorkspace, foreign, 'active'],[ownerPersonal,owner,'active'],[memberPersonal,member,'active']]) {
       await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',$4)', [w, u, `${u}@example.invalid`, status])
     }
-    for (const [id, w, u] of [[team, workspace, owner], [secondTeam, workspace, owner], [foreignTeam, otherWorkspace, foreign]]) {
-      await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Narrow\',$4)', [id, w, u, `N${id.slice(0, 3).toUpperCase()}`])
+    for (const [id, w, u, identifier] of [[team, workspace, owner, 'NTEAM'], [secondTeam, workspace, owner, 'NSECOND'], [foreignTeam, otherWorkspace, foreign, 'NFOREIGN']]) {
+      await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Narrow\',$4)', [id, w, u, identifier])
     }
     const issueRows: [string, string, string, string][] = [
       [issue.shared, owner, 'workspace',workspace], [issue.secondTeam, owner, 'workspace',workspace], [issue.personal, owner, 'personal',ownerPersonal],

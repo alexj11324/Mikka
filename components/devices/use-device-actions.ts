@@ -1,9 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
-import { removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
+import { removeDevice, renameDevice, sendDeviceCommand, setDeviceDescription, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import type { ActionResult } from '@/lib/action-result'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -39,6 +39,7 @@ export function useDeviceActions(device: Pick<DeviceView, 'id' | 'name' | 'onlin
   return {
     busy,
     rename: (name: string) => run(() => renameDevice(device.id, name.trim())),
+    setDescription: (description: string) => run(() => setDeviceDescription(device.id, description.trim())),
     setEnabled: (enabled: boolean) => run(() => setDeviceEnabled({ deviceId: device.id, enabled })),
     command: (kind: 'restart' | 'update' | 'redetect') => run(() => sendDeviceCommand({ deviceId: device.id, kind }), () => {
       toast.success(device.online ? t(`commands.sent.${kind}`, { name: device.name }) : t('commands.queued', { name: device.name }))

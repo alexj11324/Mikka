@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { withRequestLog } from '@/lib/request-log'
@@ -7,7 +7,6 @@ import { GITHUB_PLUGIN_PATH } from '@/lib/github/connect-callback'
 import { claimConnectIntent, isIntentToken, startLoopbackIntent } from '@/lib/github/connect-intent'
 import { pool } from '@/lib/db'
 
-export const runtime = 'nodejs'
 
 /**
  * Plugins → GitHub → Link GitHub: GitHub authorization for this signed-in user only.

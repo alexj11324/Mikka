@@ -78,24 +78,20 @@ if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=
 const dbTest = databaseUrl ? test : test.skip
 
 async function database() {
-  const [{ Pool }, { drizzle }, schema, { createRequestDatabaseScope }, { renewRunLeases }] = await Promise.all([
-    import('pg'), import('drizzle-orm/node-postgres'), import('./db/schema'), import('./db'), import('./run-leases'),
+  const [{ Pool }, { drizzle }, schema, { createRequestDatabaseScope }, { applyDeviceSessionReport }] = await Promise.all([
+    import('pg'), import('drizzle-orm/node-postgres'), import('./db/schema'), import('./db'), import('./device-session'),
   ])
   const pool = new Pool({ connectionString: databaseUrl, max: 2 })
   const scope = createRequestDatabaseScope(databaseUrl!)
   const db = drizzle(pool, { schema })
-  // Exercise the current server lease function, with its real request DB scope.
-  // The heartbeat route records device presence before renewing claimed runs.
-  const heartbeat = async (deviceId: string, runIds: readonly string[], now: Date) => {
-    const { eq } = await import('drizzle-orm')
-    await db.update(schema.devices).set({ harnesses: [], lastSeenAt: now, updatedAt: now }).where(eq(schema.devices.id, deviceId))
-    return scope.run(() => renewRunLeases(deviceId, runIds, now))
-  }
-  return { pool, db, schema, heartbeat, close: async () => { await scope.close(); await pool.end() } }
+  // The gateway's session reports, through the real server writer and its request DB scope.
+  const session = (deviceId: string, state: 'connected' | 'disconnected', at: Date) =>
+    scope.run(() => applyDeviceSessionReport(deviceId, { state, at: at.toISOString(), socketId: `socket-${deviceId.slice(0, 8)}` }))
+  return { pool, db, schema, session, close: async () => { await scope.close(); await pool.end() } }
 }
 
 dbTest('active agents on the database', async t => {
-  const { db, pool, schema, heartbeat, close } = await database()
+  const { db, pool, schema, session, close } = await database()
   const { listActiveAgents } = await import('./active-agents')
   const { agents, agentRuns, devices, coordinatorSessions } = schema
   const { eq, inArray } = await import('drizzle-orm')
@@ -107,8 +103,8 @@ dbTest('active agents on the database', async t => {
   const ahead = new Date(now.getTime() + 5 * 60_000)
   const onlineDevice = randomUUID(); const offlineDevice = randomUUID()
   await db.insert(devices).values([
-    { id: onlineDevice, ownerId: me, name: 'on', lastSeenAt: ago(5_000) },
-    { id: offlineDevice, ownerId: me, name: 'off', lastSeenAt: ago(10 * 60_000) },
+    { id: onlineDevice, ownerId: me, name: 'on', lastSeenAt: ago(10 * 60_000), sessionOpenedAt: ago(10 * 60_000) },
+    { id: offlineDevice, ownerId: me, name: 'off', lastSeenAt: ago(5_000), sessionOpenedAt: ago(60_000), sessionClosedAt: ago(5_000) },
   ])
   const agent = (name: string, userId = me) => ({ id: randomUUID(), userId, harness: 'codex' as const, name })
   const [a, b, c, d, e, f, mine] = [agent('A'), agent('B'), agent('C'), agent('D'), agent('E'), agent('F'), agent('Other', other)]
@@ -157,6 +153,12 @@ dbTest('active agents on the database', async t => {
   assert.deepEqual((await listActiveAgents(db, other, now)).map(x => x.name), ['Other'], 'other users only see their own')
   assert.deepEqual(await listActiveAgents(db, me, now), list, 'stable order across polls')
 
+  const alternateWorkspace = await seedFixtureWorkspace(pool, me, 'team')
+  assert.deepEqual(await listActiveAgents(db, me, now, alternateWorkspace), [],
+    'workspace-scoped token does not return active runs belonging to another workspace')
+  assert.deepEqual((await listActiveAgents(db, me, now, workspaceId)).map(row => row.name), ['B', 'A', 'C'],
+    'the matching workspace still displays its active runs')
+
   await t.test('ties order by id', async () => {
     const tie = ago(200_000)
     const [x, y] = [agent('X'), agent('Y')]
@@ -166,63 +168,30 @@ dbTest('active agents on the database', async t => {
     assert.deepEqual(ids, [x.id, y.id].sort())
   })
 
-  await t.test('heartbeats keep a claimed run active past the first 90s lease', async () => {
-    const { isDeviceOnline, RUN_LEASE_MS } = await import('@mikka/protocol/device')
-    const claimedAt = new Date(now.getTime() + 60 * 60_000) // future clock so other rows' leases do not matter
-    const device = randomUUID()
-    await db.insert(devices).values({ id: device, ownerId: me, name: 'beating', lastSeenAt: claimedAt })
+  await t.test('a claimed run stays active for its whole session, and the close ends it', async () => {
+    const { SESSION_LEASE_MS } = await import('@mikka/protocol/device')
+    const device = randomUUID(), otherDevice = randomUUID()
+    const openedAt = new Date()
+    await db.insert(devices).values([{ id: device, ownerId: me, name: 'session' }, { id: otherDevice, ownerId: me, name: 'elsewhere' }])
     const worker = agent('Leased')
     await db.insert(agents).values(worker)
-    const claimed = run(worker.id, 'preparing', { deviceId: device, startedAt: claimedAt, leaseExpiresAt: new Date(claimedAt.getTime() + RUN_LEASE_MS) })
-    const finished = run(worker.id, 'succeeded', { deviceId: device, leaseExpiresAt: claimedAt })
-    await db.insert(agentRuns).values([claimed, finished])
-    let leases: Record<string, string> = {}
-    for (let second = 15; second <= 120; second += 15) {
-      const beatAt = new Date(claimedAt.getTime() + second * 1000)
-      const result = await heartbeat(device, [claimed.id, finished.id], beatAt)
-      leases = result.leases
-      assert.deepEqual(result.revoked, [finished.id], 'terminal runs are revoked under main contract')
-      assert.equal(leases[claimed.id], new Date(beatAt.getTime() + RUN_LEASE_MS).toISOString(), `renewed at +${second}s`)
-      assert.ok((await listActiveAgents(db, me, beatAt)).some(x => x.runId === claimed.id), `still active at +${second}s`)
-    }
-    const at120 = new Date(claimedAt.getTime() + 120_000)
-    assert.deepEqual(leases, { [claimed.id]: new Date(at120.getTime() + RUN_LEASE_MS).toISOString() }, 'real leases, only in-progress runs')
-    const [row] = await db.select({ lastSeenAt: devices.lastSeenAt }).from(devices).where(eq(devices.id, device))
-    assert.ok(isDeviceOnline(row.lastSeenAt, at120.getTime()), 'device still online at +120s')
-    assert.ok((await listActiveAgents(db, me, at120)).some(x => x.runId === claimed.id), 'run still active at +120s')
-    assert.ok(!(await listActiveAgents(db, me, new Date(at120.getTime() + RUN_LEASE_MS + 61_000))).some(x => x.runId === claimed.id), 'expires once heartbeats stop')
-    await db.delete(agentRuns).where(eq(agentRuns.agentId, worker.id))
-    await db.delete(agents).where(eq(agents.id, worker.id))
-    await db.delete(devices).where(eq(devices.id, device))
-  })
-
-  await t.test('heartbeat renews only claimed runs; queued, foreign and invalid IDs are revoked', async () => {
-    const { RUN_LEASE_MS } = await import('@mikka/protocol/device')
-    const beatAt = new Date(now.getTime() + 2 * 60 * 60_000)
-    const [device, otherDevice] = [randomUUID(), randomUUID()]
-    await db.insert(devices).values([
-      { id: device, ownerId: me, name: 'reporting', lastSeenAt: beatAt },
-      { id: otherDevice, ownerId: me, name: 'elsewhere', lastSeenAt: beatAt },
-    ])
-    const worker = agent('Reported')
-    await db.insert(agents).values(worker)
-    const old = new Date(beatAt.getTime() - 1_000)
-    const queued = run(worker.id, 'queued', { deviceId: device, leaseExpiresAt: old })
-    const claimed = run(worker.id, 'preparing', { deviceId: device, leaseExpiresAt: old })
-    const elsewhere = run(worker.id, 'running', { deviceId: otherDevice, leaseExpiresAt: old })
-    const unreported = run(worker.id, 'running', { deviceId: device, leaseExpiresAt: old })
-    await db.insert(agentRuns).values([queued, claimed, elsewhere, unreported])
+    const soon = new Date(Date.now() + 60_000)
+    const claimed = run(worker.id, 'preparing', { deviceId: device, leaseExpiresAt: soon })
+    const queued = run(worker.id, 'queued', { deviceId: device, leaseExpiresAt: soon })
+    const stopping = run(worker.id, 'running', { deviceId: device, leaseExpiresAt: soon, stopRequestedAt: new Date() })
+    const ended = run(worker.id, 'running', { deviceId: device, leaseExpiresAt: ago(1_000) })
+    const elsewhere = run(worker.id, 'running', { deviceId: otherDevice, leaseExpiresAt: soon })
+    await db.insert(agentRuns).values([claimed, queued, stopping, ended, elsewhere])
     try {
-      const result = await heartbeat(device, [claimed.id, queued.id, elsewhere.id, 'not-a-uuid'], beatAt)
-      const renewedTo = new Date(beatAt.getTime() + RUN_LEASE_MS)
-      assert.deepEqual(result, { leases: { [claimed.id]: renewedTo.toISOString() }, revoked: [queued.id, elsewhere.id, 'not-a-uuid'] })
-      assert.deepEqual(await heartbeat(device, ['invalid-only'], beatAt), { leases: {}, revoked: ['invalid-only'] }, 'all-invalid reports avoid a UUID SQL error')
-      const rows = await db.select({ id: agentRuns.id, leaseExpiresAt: agentRuns.leaseExpiresAt }).from(agentRuns).where(eq(agentRuns.agentId, worker.id))
-      const lease = (id: string) => rows.find(row => row.id === id)!.leaseExpiresAt!.getTime()
-      assert.equal(lease(claimed.id), renewedTo.getTime())
-      assert.equal(lease(queued.id), old.getTime(), 'queued runs are not held and must not be revived')
-      assert.equal(lease(elsewhere.id), old.getTime(), 'a run on another device is not renewed even if reported')
-      assert.equal(lease(unreported.id), old.getTime(), 'a run the daemon did not report is left to expire')
+      assert.deepEqual(await session(device, 'connected', openedAt), { applied: true })
+      const lease = async (id: string) => (await db.select({ at: agentRuns.leaseExpiresAt }).from(agentRuns).where(eq(agentRuns.id, id)))[0].at!.getTime()
+      assert.ok(await lease(claimed.id) >= openedAt.getTime() + SESSION_LEASE_MS - 60_000, 'a live lease lasts as long as the session')
+      for (const id of [queued.id, stopping.id, ended.id, elsewhere.id]) assert.ok(await lease(id) < openedAt.getTime() + 120_000, 'queued, stopping, ended and foreign runs are not extended')
+      const hourLater = new Date(Date.now() + 60 * 60_000)
+      assert.ok((await listActiveAgents(db, me, hourLater)).some(x => x.runId === claimed.id), 'no heartbeat needed an hour later')
+      assert.deepEqual(await session(device, 'disconnected', new Date()), { applied: true })
+      assert.ok(await lease(claimed.id) <= Date.now(), 'the close ends the lease at once')
+      assert.ok(!(await listActiveAgents(db, me, new Date(Date.now() + 1))).some(x => x.runId === claimed.id))
     } finally {
       await db.delete(agentRuns).where(eq(agentRuns.agentId, worker.id))
       await db.delete(agents).where(eq(agents.id, worker.id))
@@ -234,8 +203,8 @@ dbTest('active agents on the database', async t => {
     const at = new Date(now.getTime() + 3 * 60 * 60_000)
     const [myDevice, theirDevice] = [randomUUID(), randomUUID()]
     await db.insert(devices).values([
-      { id: myDevice, ownerId: me, name: 'mine', lastSeenAt: at },
-      { id: theirDevice, ownerId: other, name: 'theirs', lastSeenAt: at },
+      { id: myDevice, ownerId: me, name: 'mine', sessionOpenedAt: now },
+      { id: theirDevice, ownerId: other, name: 'theirs', sessionOpenedAt: now },
     ])
     const myAgent = agent('Mine-ok'), theirAgent = agent('Theirs', other)
     const myAgentA = agent('Layer-agent'), myAgentB = agent('Layer-run'), myAgentC = agent('Layer-device')
@@ -255,10 +224,10 @@ dbTest('active agents on the database', async t => {
       assert.ok(!mine.some(x => x.runId === theirRunMyAgent.id), 'agent_runs.userId filter')
       assert.ok(!mine.some(x => x.runId === onTheirDevice.id), 'devices.ownerId filter')
       assert.ok(!(await listActiveAgents(db, other, at)).some(x => [control.id, viaTheirAgent.id, theirRunMyAgent.id, onTheirDevice.id].includes(x.runId!)), 'the other user sees none of these either')
-      // Heartbeat layer, run.deviceId: my device reporting a run that lives on their device renews nothing.
-      const old = new Date(at.getTime() - 1_000)
+      // Session layer, run.deviceId: my device's session extends nothing that lives on their device.
+      const old = new Date(Date.now() + 60_000)
       await db.update(agentRuns).set({ leaseExpiresAt: old }).where(eq(agentRuns.id, onTheirDevice.id))
-      assert.deepEqual(await heartbeat(myDevice, [onTheirDevice.id], at), { leases: {}, revoked: [onTheirDevice.id] }, 'a run on another user\'s device is revoked, not renewed')
+      await session(myDevice, 'connected', new Date())
       const [row] = await db.select({ leaseExpiresAt: agentRuns.leaseExpiresAt }).from(agentRuns).where(eq(agentRuns.id, onTheirDevice.id))
       assert.equal(row.leaseExpiresAt!.getTime(), old.getTime())
     } finally {
@@ -270,11 +239,11 @@ dbTest('active agents on the database', async t => {
 
   await t.test('coordinator listed while it holds an unexpired lease', async () => {
     // The Coordinator's chat is its bot row's (coordinator_bots); its entry carries that bot's id.
-    const coordinatorBot = randomUUID(), workspaceId = randomUUID()
+    const coordinatorBot = randomUUID(), coordinatorWorkspace = alternateWorkspace
     const { sql } = await import('drizzle-orm')
     await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${me},'Active agents fixture',${`${me}@example.invalid`},false,now(),now()) on conflict do nothing`)
-    await db.insert(schema.bots).values({ id: coordinatorBot, ownerId: me, workspaceId, name: 'Coordinator' })
-    await db.insert(schema.coordinatorBots).values({ ownerId: me, workspaceId, botId: coordinatorBot })
+    await db.insert(schema.bots).values({ id: coordinatorBot, ownerId: me, workspaceId: coordinatorWorkspace, name: 'Coordinator' })
+    await db.insert(schema.coordinatorBots).values({ ownerId: me, workspaceId: coordinatorWorkspace, botId: coordinatorBot })
     await db.insert(coordinatorSessions).values({ userId: me, botId: coordinatorBot, leaseHolder: null, leaseUntil: ahead, updatedAt: ago(1_000) })
     assert.ok(!(await listActiveAgents(db, me, now)).some(x => x.kind === 'coordinator'), 'no holder')
     await db.update(coordinatorSessions).set({ leaseHolder: 'turn-1', leaseUntil: ago(1) }).where(eq(coordinatorSessions.userId, me))
@@ -284,6 +253,10 @@ dbTest('active agents on the database', async t => {
     const coordinator = result.find(x => x.kind === 'coordinator')
     assert.deepEqual(coordinator, { id: coordinatorBot, kind: 'coordinator', name: 'Coordinator', avatarUrl: null, startedAt: ago(1_000).toISOString(), state: 'working', runId: null, issueId: null })
     assert.equal(result.at(-1)?.id, coordinatorBot, 'sorted by start like the rest')
+    assert.deepEqual((await listActiveAgents(db, me, now, coordinatorWorkspace)).map(row => row.id), [coordinatorBot],
+      'a team-scoped token sees only its active Coordinator, not personal workspace runs')
+    assert.ok(!(await listActiveAgents(db, me, now, workspaceId)).some(row => row.kind === 'coordinator'),
+      'a personal workspace token cannot see the active Coordinator of another workspace')
     assert.ok(!(await listActiveAgents(db, other, now)).some(x => x.kind === 'coordinator'), 'not shown to others')
   })
 })

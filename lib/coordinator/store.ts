@@ -12,7 +12,8 @@ import { taskReviewSummaries } from '../coding-workspace/task-review/summaries'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { botReadState } from '@/lib/conversation-reads-store'
 import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
@@ -28,7 +29,7 @@ import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from 
 import { projectMessageDisplays } from './display-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
-import { readCoordinatorPromptPreferences, readPreferences } from '@/lib/preferences'
+import { readPreferences } from '@/lib/preferences'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
@@ -177,20 +178,7 @@ export async function loadConversation(userId: string, botId: string): Promise<L
   return conversationWithMemory(conversation, (await readPreferences(userId)).memoryEnabled)
 }
 
-/** Product memory and settings only; eve owns conversation history and compaction. */
-export async function loadProductPromptContext(userId: string, botId: string): Promise<{ memory: string; personalInstructions: string; memoryEnabled: boolean }> {
-  const [session, preferences] = await Promise.allSettled([
-    db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1),
-    readCoordinatorPromptPreferences(userId),
-  ])
-  if (session.status === 'rejected') throw session.reason
-  if (preferences.status === 'rejected') throw preferences.reason
-  return {
-    memory: preferences.value.memoryEnabled ? session.value[0]?.memory ?? '' : '',
-    personalInstructions: preferences.value.personalInstructions,
-    memoryEnabled: preferences.value.memoryEnabled,
-  }
-}
+export { loadProductPromptContext } from './prompt-context'
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
 export async function saveSummary(userId: string, summary: string, through: number, botId: string): Promise<void> {
@@ -281,13 +269,14 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // The prompt and tool count belong to the same authorized owner runs. One
   // bounded projection avoids opening a third APP connection beside tasks.
   const [ownedRuns, tasks] = await Promise.all([
-    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
+    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt, title: agentRuns.title,
       steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
         and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
     }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : [],
     issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
   ])
   const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
+  const titles = new Map(ownedRuns.map(row => [row.id, row.title]))
   const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
@@ -310,15 +299,15 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
-    // The short title travels only when there is one, so a citation carries nothing new otherwise.
-    const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
     const review = task ? reviews.get(task.id) : undefined
-    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
+    const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, stopReason: row.stopReason ?? null, group, issue,
       pullRequests,
-      name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
+      // The full source and compact bot preview use the same authorized name, including a teammate's public harness.
+      title: titles.get(row.id) ?? null,
+      name: titles.get(row.id) || threadName(prompts.get(row.id) ?? '', issue && row.agentId ? '' : row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
   }
   return sources
@@ -346,7 +335,7 @@ export async function citationNames(reader: IssueReader, texts: readonly string[
   ])
   for (const task of tasks) names[task.id] = { kind: 'issue', title: task.title }
   // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
-  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
+  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? run.title || threadName(run.promptHead ?? '', run.hasIssue ? '' : run.agentName) : threadName('', run.harness) }
   return names
 }
 
@@ -537,9 +526,17 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
 }
 
 export interface BotChatSummary {
+  unreadCount?: number
   /** The latest reply or message, with cited threads and tasks written as their names; null before the first. */
   line: string | null
   at: string | null
+  /** The latest message's id: what 标为已读 acknowledges (POST /api/conversations/bot:<id>/read); absent before the first. */
+  messageId?: string
+  /** The person's own 置顶 / 通知 / 隐藏 for this chat (lib/chat-preferences.ts), when they changed one. */
+  pinned?: boolean
+  muted?: boolean
+  hidden?: boolean
+  pinOrder?: number | null
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
@@ -569,12 +566,15 @@ export async function botChatSnapshot(reader: IssueReader) {
     ...waiting.flatMap(event => event.tier !== 'background' && event.kind !== 'matter_handoff' && event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now ? [event.wakeLeaseUntil] : []),
   ]
   const result: Record<string, BotChatSummary> = {}
-  for (const event of waiting) {
-    if (event.botId && !result[event.botId]) result[event.botId] = { line: null, at: null, working: coordinatorChatState(undefined, waiting.filter(row => row.botId === event.botId), now).working }
-  }
+  const waitingByBot = Map.groupBy(waiting, event => event.botId)
   for (const session of sessions) {
     if (!session.botId) continue
-    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
+    const events = waitingByBot.get(session.botId) ?? []
+    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, events, now).working }
+    waitingByBot.delete(session.botId)
+  }
+  for (const [botId, events] of waitingByBot) {
+    if (botId) result[botId] = { line: null, at: null, working: coordinatorChatState(undefined, events, now).working }
   }
   for(const row of latest)if(row.botId&&row.nativePending)result[row.botId]={line:null,at:null,working:true}
   const projected = await projectMessageDisplays(db, userId, latest)
@@ -584,21 +584,19 @@ export async function botChatSnapshot(reader: IssueReader) {
     // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
     if (item?.welcome) return []
     // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
-    return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+    return [{ botId: row.botId, messageId: row.id, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
   const sources = await citationNames(reader, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
-    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
+    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at, messageId: line.messageId }
   }
+  // The unread counts and, in the same read, the person's own 置顶 / 通知 / 隐藏 (lib/chat-preferences.ts writes them and pushes this list).
+  const { counts, preferences } = await botReadState(pool, userId, botIds)
+  for (const [botId, count] of counts) {
+    if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
+  }
+  for (const [botId, preference] of preferences) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), ...preference }
   return { items: result, expiries, observedAt: now.getTime() }
-}
-
-/** The whole conversation for display, newest last. */
-export async function conversationForDisplay(userId: string, limit = 200, botId: string) {
-  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(messagesOf(userId, botId))
-    .orderBy(desc(coordinatorMessages.position)).limit(limit)
-  return (await projectMessageDisplays(db, userId, rows)).reverse().map(({ id: _id, ...row }) => row)
 }

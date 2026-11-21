@@ -3,26 +3,31 @@
 import { Component, useCallback, type KeyboardEvent, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { useTranslations } from 'next-intl'
+import { useListExpiry } from '@/hooks/use-list-expiry'
+import { issueRestoreDeadline } from '@/lib/issue-metadata'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { JSONContent } from '@tiptap/react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/components/icons'
 import type { IssueDetailNavigation } from './issue-detail-header'
+import { TaskPageLoading } from './workspace-loading'
 import type { IssueActionRequest } from './issue-detail-actions'
 import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
+import { pollTaskDetail, type IssueWorkSnapshot } from '@/app/actions/agents'
+import { descriptionKey } from '@/lib/issue-relations'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
-import { issueKeys } from '@/lib/swr/keys'
+import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
 import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
 import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-editor'
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
-import { useAgentActivity } from './issue-threads'
+import { useTaskWork } from './issue-threads'
 import { FramedTask } from './task-detail-frame'
 import { TaskThreadPane } from './task-thread-pane'
 import { navigate } from './workspace-navigation'
@@ -37,18 +42,44 @@ import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 import { TaskDetailFrame } from '@ui-slot/task-detail'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
+import { presentedFactoryEvents, readTaskEvidenceTarget, taskEvidenceThread } from '@/lib/task-factory-events'
+import { TaskArtifactsButton } from './thread-artifacts'
 
 type Issue = IssueView
-type IssueRead = IssueView & { readVersion?: string }
+type IssueRead = IssueView & { readVersion?: string; taskWork?: IssueWorkSnapshot & { history: ActivityRead } }
 type ActivityRead = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
 
+function savedChangesMatch(previous: Issue, submitted: Pick<Issue, 'title' | 'status' | 'priority' | 'content'>, latest: Issue) {
+  return latest.id === previous.id && latest.workspaceId === previous.workspaceId && latest.canSteer !== false && latest.revision > previous.revision &&
+    (submitted.title === previous.title || latest.title === submitted.title.trim()) &&
+    (submitted.status === previous.status || latest.status === submitted.status) &&
+    (submitted.priority === previous.priority || latest.priority === submitted.priority) &&
+    (descriptionKey(submitted.content) === descriptionKey(previous.content) || descriptionKey(latest.content) === descriptionKey(submitted.content))
+}
+
 // No access and deleted come back as an action error; SWR's error state renders UnavailableIssue.
-async function loadIssue(id: string, viewerId: string, previous?: IssueRead): Promise<IssueRead> {
-  const result = await pollIssue(id, previous?.readVersion)
+async function loadIssue(id: string, viewerId: string, previous?: IssueRead, includeWork = false): Promise<IssueRead> {
+  const held = previous?.taskWork?.viewerId === viewerId ? previous.taskWork.history : undefined
+  const positions = heldListPositions(held)
+  const version = positions && positions.length === held?.positions?.length ? held.version : undefined
+  let result: Awaited<ReturnType<typeof pollIssue>> & { taskWork?: IssueWorkSnapshot }
+  try {
+    result = includeWork ? await pollTaskDetail(id, previous?.readVersion, { version, positions }) : await pollIssue(id, previous?.readVersion)
+  } catch (error) {
+    // Earlier servers have no joined RPC. A refused task is still a refusal.
+    if (!includeWork || !error || typeof error !== 'object' || !('code' in error) || error.code !== 'desktop_rpc_action_unknown' || !('status' in error) || error.status !== 404) throw error
+    result = await pollIssue(id, previous?.readVersion)
+  }
   if (result.error) throw new CacheReadError(result.error)
   if (result.viewerId !== viewerId) throw new ListReadScopeError('owner')
-  if (result.unchanged) return { ...previous!, readVersion: result.version }
-  return { ...result.issue, readVersion: result.version }
+  const document = result.unchanged ? previous! : result.issue
+  const work = result.taskWork
+  if (!work) return { ...document, readVersion: result.version, taskWork: undefined }
+  if (work.viewerId !== viewerId) throw new ListReadScopeError('owner')
+  const next = work.activity
+  const history = { version: next.version, items: mergeList(held?.items ?? [], next), positions: 'positions' in next ? next.positions : held?.positions }
+  return { ...document, readVersion: result.version, taskWork: { ...work, history } }
 }
 type WorkspaceUser = { id: string; name: string; email: string }
 type DetailProps = { /** The thread open in the right column, from the address (R-82). */ thread: string | null; /** Where the task was opened from: the first crumb. */ origin: string; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
@@ -56,10 +87,46 @@ type DetailProps = { /** The thread open in the right column, from the address (
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
   const actionError = useActionError()
-  const { data } = useSWR(issueKeys.deleted(id), () => getDeletedIssue(id))
+  const { data, mutate } = useSWR(issueKeys.deleted(id), () => getDeletedIssue(id))
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  return <div className="flex flex-col items-start gap-4 p-8"><h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1><p role="status" className="text-sm text-muted-foreground">{data ? t('deletedDescription', { title: data.title }) : t('unavailableDescription')}</p>{error && <FieldError>{error}</FieldError>}<div className="flex gap-2">{data && <Button disabled={pending} onClick={async () => { setPending(true); try { const result = await setIssueDeleted({ id, restore: true }); if (result.error) setError(actionError(result.error)); else { toast.success(t('taskRestored')); onRetry() } } catch { setError(t('restoreFailed')) } finally { setPending(false) } }}>{t('restoreTask')}</Button>}<Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button><Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button></div></div>
+  const deadline = data ? issueRestoreDeadline(data.deletedAt) : null
+  useListExpiry(deadline === null ? [] : [deadline])
+  const canRestore = data && data.canRestore !== false && deadline !== null && Date.now() <= deadline
+
+  async function restore() {
+    if (!data || !canRestore) return
+    setPending(true)
+    setError('')
+    try {
+      const result = await setIssueDeleted({ id, restore: true })
+      if (result.error === 'issueRestoreWindow') {
+        await mutate({ ...data, canRestore: false }, { revalidate: false })
+      } else if (result.error) {
+        setError(actionError(result.error))
+      } else {
+        toast.success(t('taskRestored'))
+        onRetry()
+      }
+    } catch {
+      setError(t('restoreFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  let description = t('unavailableDescription')
+  if (data) description = canRestore ? t('deletedDescription', { title: data.title }) : actionError('issueRestoreWindow')
+  return <div className="flex flex-col items-start gap-4 p-8">
+    <h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1>
+    <p role="status" className="text-sm text-muted-foreground">{description}</p>
+    {error && <FieldError>{error}</FieldError>}
+    <div className="flex gap-2">
+      {canRestore && <Button size="sm" disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
+      <Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button>
+      <Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button>
+    </div>
+  </div>
 }
 
 const WIDE = '(min-width: 1024px)'
@@ -69,7 +136,7 @@ function subscribeWide(onChange: () => void) {
   return () => query.removeEventListener('change', onChange)
 }
 
-export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
+export function TaskDetail({ id, deferWork = false, ...props }: DetailProps & { id: string; deferWork?: boolean }) {
   const t = useTranslations('Workspace.detail')
   const { cache } = useSWRConfig()
   const [loadedId, setLoadedId] = useState<string | null>(null)
@@ -77,7 +144,9 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   const { data, error, mutate } = useSWR<IssueRead>(key, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(key))?.data as IssueRead | undefined
-    return loadIssue(id, props.user.id, previous?.id === id ? previous : undefined)
+    // The embedded task can display its document while TaskForm reads Work separately.
+    const current = previous?.id === id ? previous : undefined
+    return loadIssue(id, props.user.id, current, !deferWork || Boolean(current?.taskWork))
   }, { revalidateOnFocus: false, revalidateOnMount: false, onSuccess: () => setLoadedId(id) })
   useEffect(() => {
     let active = true
@@ -104,10 +173,10 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])
   if (error && !backgroundFailed) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
-  if (!data) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
+  if (!data) return <TaskPageLoading />
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.
-  return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId !== id ? 'cached' : data.canSteer === false ? 'reader' : 'editor'} initial={data} preview={loadedId !== id} {...props} /></SectionBoundary>
+  return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId !== id ? 'cached' : data.canSteer === false ? 'reader' : 'editor'} initial={data} refreshDetail={mutate} preview={loadedId !== id} {...props} /></SectionBoundary>
 }
 
 function SectionBoundary({ children, onClose }: { children: ReactNode; onClose: () => void }) {
@@ -131,16 +200,19 @@ const READ_ONLY_SNAPSHOT = { ready: false, pending: false, error: false, syncing
 const readOnlySnapshot = () => READ_ONLY_SNAPSHOT
 const noSubscribe = () => () => {}
 
-function TaskForm({ initial, preview = false, thread: openThread, origin, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue; preview?: boolean }) {
+function TaskForm({ initial, refreshDetail, preview = false, thread: openThread, origin, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: IssueRead; refreshDetail: () => Promise<IssueRead | undefined>; preview?: boolean }) {
   const t = useTranslations('Workspace.detail')
   const { cache, mutate: mutateCache } = useSWRConfig()
-  const publishSaved = useCallback((issue: Issue) => {
+  const publishSaved = useCallback((issue: Issue, previousStatus: Issue['status']) => {
     // A confirmed write also updates the preview that another placement opens immediately.
     // Discard the old conditional token. A slower mutation must never move the cache backwards.
     void mutateCache<IssueRead>(issueKeys.detail(issue.id), previous =>
-      previous && previous.revision > issue.revision ? previous : issue, { revalidate: false })
+      previous && previous.revision > issue.revision ? previous : { ...issue, taskWork: previous?.taskWork }, { revalidate: false })
+    if (previousStatus !== issue.status) {
+      void mutateCache(key => isTaskPresentationKey(key, user.id, issue.workspaceId, issue.id))
+    }
     onSaved(issue.id)
-  }, [mutateCache, onSaved])
+  }, [mutateCache, onSaved, user.id])
   const tDetail = useTranslations('IssueDetail')
   const actionError = useActionError()
   const saveMessages = useRef({ t, actionError })
@@ -159,7 +231,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
   // A committed acceptance changes the issue and its history without editing
   // the Yjs body. All three reads follow the same authorized document event.
-  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id))], liveWorkspaceId, { minIntervalMs: 1500 })
+  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id)), unstable_serialize(['issue-threads', saved.id])], liveWorkspaceId, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -170,13 +242,15 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const [title, setTitle] = useState(initial.title)
   const [content, setContent] = useState<JSONContent>(initial.content)
   const [status, setStatus] = useState(initial.status)
+  const [stateId, setStateId] = useState<string | null>(initial.stateId ?? null)
   const [priority, setPriority] = useState(initial.priority)
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState(false)
   const flight = useRef<Promise<boolean> | null>(null)
-  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, priority: initial.priority, generation: 0 })
+  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, stateId: (initial.stateId ?? null) as string | null, priority: initial.priority, generation: 0 })
   const savedRef = useRef(initial)
   const acknowledged = useRef(0)
+  const conflictingRead = useRef<Issue | null>(null)
   const composing = useRef(false)
   const [editSequence, setEditSequence] = useState(0)
   const [metadataSaving, setMetadataSaving] = useState(false)
@@ -185,7 +259,19 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const [openAcceptance, setOpenAcceptance] = useState<FactoryTask | null>(null)
   // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-82).
   const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); navigate({ thread: runId }) }, [])
-  const agentActivity = useAgentActivity(saved.id, openThread ?? null, showThread, !preview)
+  const agentActivity = useTaskWork(saved.id, showThread, !preview, user.id, !preview && initial.taskWork ? { data: initial.taskWork, refresh: async () => (await refreshDetail())?.taskWork } : undefined)
+  // An evidence link (`?issue=…&factoryTask=…&evidence=…`, from iOS and older pages) opens the thread that produced the
+  // receipt on its Artifact tab (Alex, 2026-11-15); the task page has no evidence list. A receipt the read no longer admits stays here.
+  const evidenceTarget = readTaskEvidenceTarget(useSearchParams() ?? new URLSearchParams())
+  const factoryWork = agentActivity.work?.factory
+  const evidenceRun = !preview && evidenceTarget && evidenceTarget.issueId === saved.id && factoryWork?.task.id === evidenceTarget.factoryTaskId
+    ? taskEvidenceThread(presentedFactoryEvents(factoryWork.events, evidenceTarget.factoryTaskId), evidenceTarget) : null
+  const evidenceOpened = useRef<string | null>(null)
+  useEffect(() => {
+    if (!evidenceRun || !evidenceTarget || evidenceOpened.current === evidenceTarget.receiptId) return
+    evidenceOpened.current = evidenceTarget.receiptId
+    if (!openThread) navigate({ thread: evidenceRun }, 'replace')
+  }, [evidenceRun, evidenceTarget, openThread])
   const showAcceptance = useCallback((task: FactoryTask) => {
     if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); navigate({ thread: task.candidateRunId }) }
     else { navigate({ thread: null }); setOpenAcceptance(task) }
@@ -205,7 +291,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const activityKey = issueKeys.activityVersions(saved.id)
-  const { data: activityRead, error: historyError, mutate: refreshVersions } = useSWR<ActivityRead>(preview ? null : activityKey, async () => {
+  const localActivity = useSWR<ActivityRead>(preview || agentActivity.history ? null : activityKey, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(activityKey))?.data as ActivityRead | undefined
     const held = heldListPositions(previous)
@@ -216,24 +302,28 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     const next = result.snapshot
     return { version: next.version, items: mergeList(previous?.items ?? [], next), positions: 'positions' in next ? next.positions : previous?.positions }
   })
-  const versions = activityRead?.items
+  const versions = agentActivity.history ? agentActivity.history.rows : localActivity.data?.items
+  const historyError = agentActivity.history ? agentActivity.history.error : localActivity.error
+  const refreshVersions = agentActivity.history?.refresh ?? localActivity.mutate
   const { data: historyVersions, error: historyBodyError, mutate: refreshHistoryVersions } = useSWR(history && !preview ? issueKeys.versions(saved.id) : null, () => listIssueVersions(saved.id))
-  useEffect(() => {
+  const applyRead = useCallback((fresh: Issue) => {
     const previous = savedRef.current
-    if (initial.id !== previous.id || initial.revision <= previous.revision) return
+    if (fresh.id !== previous.id || fresh.revision <= previous.revision) return
+    if (conflictingRead.current && fresh.revision > conflictingRead.current.revision) conflictingRead.current = fresh
     const current = draft.current
     const next = { ...current }
     // Only fields unchanged since the last server snapshot adopt its newer
     // value. Updating the draft too keeps a later text save from reopening Done.
-    if (current.title === previous.title && !composing.current) { next.title = initial.title; setTitle(initial.title) }
-    if (current.status === previous.status) { next.status = initial.status; setStatus(initial.status) }
-    if (current.priority === previous.priority) { next.priority = initial.priority; setPriority(initial.priority) }
-    if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = initial.content; setContent(initial.content) }
+    if (current.title === previous.title && !composing.current) { next.title = fresh.title; setTitle(fresh.title) }
+    if (current.status === previous.status && current.stateId === (previous.stateId ?? null)) { next.status = fresh.status; setStatus(fresh.status); next.stateId = fresh.stateId ?? null; setStateId(fresh.stateId ?? null) }
+    if (current.priority === previous.priority) { next.priority = fresh.priority; setPriority(fresh.priority) }
+    if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = fresh.content; setContent(fresh.content) }
     draft.current = next
-    savedRef.current = initial
-    setSaved(initial)
+    savedRef.current = fresh
+    setSaved(fresh)
     // This is a read, not an edit: keep generation, selection and the Y.Doc.
-  }, [initial])
+  }, [])
+  useEffect(() => { applyRead(initial) }, [initial, applyRead])
   const hasUnsavedChanges = dirty || syncState.pending
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
   useEffect(() => {
@@ -242,12 +332,13 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [hasUnsavedChanges])
-  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'priority'>>) {
+  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'stateId' | 'priority'>>) {
     if (locked) return
     draft.current = { ...draft.current, ...patch, generation: draft.current.generation + 1 }
     if (patch.title !== undefined) setTitle(patch.title)
     if (patch.content !== undefined) setContent(patch.content)
     if (patch.status !== undefined) setStatus(patch.status)
+    if (patch.stateId !== undefined) setStateId(patch.stateId)
     if (patch.priority !== undefined) setPriority(patch.priority)
     setDirty(true)
     setError('')
@@ -256,7 +347,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const save = useCallback((): Promise<boolean> => {
     if (locked) return Promise.resolve(false)
     if (flight.current) return flight.current
-    if (composing.current) return Promise.resolve(false)
+    if (composing.current || conflictingRead.current) return Promise.resolve(false)
     const operation = (async () => {
       const mustPersist = () => draft.current.generation !== acknowledged.current
       if (!mustPersist() && !sync?.getSnapshot().pending) return true
@@ -265,7 +356,8 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
       try {
         do {
           const snapshot = { ...draft.current }
-          const revision = savedRef.current.revision
+          const previous = savedRef.current
+          const revision = previous.revision
           if (!snapshot.title.trim()) { setError(saveMessages.current.t('titleRequired')); return false }
           const yjs = sync?.getSnapshot() ?? readOnlySnapshot()
           const bodyDirty = JSON.stringify(snapshot.content) !== JSON.stringify(savedRef.current.content)
@@ -275,16 +367,42 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
           // snapshot, never paired with fields captured at an older revision.
           if (savedRef.current.revision !== revision) continue
           if (snapshot.generation !== acknowledged.current) {
-            const result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
-            if (!('issue' in result) || !result.issue) { setError(saveMessages.current.actionError(result.error ?? 'issueSaveFailed')); return false }
-            if (result.issue.revision >= savedRef.current.revision) {
-              savedRef.current = result.issue
-              setSaved(result.issue)
+            let result: Awaited<ReturnType<typeof saveIssue>> | undefined
+            try {
+              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, stateId: snapshot.stateId && snapshot.stateId !== previous.stateId ? snapshot.stateId : undefined, priority: snapshot.priority })
+            } catch (error) {
+              if (error && typeof error === 'object') {
+                if ('code' in error && error.code === 'desktop_session_changed') throw error
+                if ('status' in error && typeof error.status === 'number' && error.status >= 400 && error.status < 500) throw error
+              }
+              // The server may have committed before the connection broke.
             }
+            if (result?.error && result.error !== 'issueStale') { setError(saveMessages.current.actionError(result.error)); return false }
+            let confirmed = result && 'issue' in result ? result.issue : undefined
+            if (!confirmed) {
+              const latest = await loadIssue(initial.id, user.id)
+              if (!savedChangesMatch(previous, snapshot, latest)) {
+                if (latest.id === previous.id && latest.workspaceId === previous.workspaceId && latest.canSteer !== false && latest.revision > revision) {
+                  conflictingRead.current = latest
+                }
+                setError(latest.revision > revision ? saveMessages.current.actionError('issueOutdated') : saveMessages.current.t('autosaveFailed'))
+                return false
+              }
+              // Preserve edits typed while the read was in flight and adopt the server's untouched fields.
+              applyRead(latest)
+              confirmed = latest
+            }
+            if (confirmed.revision >= savedRef.current.revision) {
+              savedRef.current = confirmed
+              setSaved(confirmed)
+              // A status saved without a state took its category's default: the draft follows the server's choice.
+              if (draft.current.stateId === snapshot.stateId && draft.current.status === confirmed.status) { draft.current = { ...draft.current, stateId: confirmed.stateId ?? null }; setStateId(confirmed.stateId ?? null) }
+            }
+            conflictingRead.current = null
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
-            publishSaved(result.issue)
+            publishSaved(confirmed, previous.status)
           }
         } while (draft.current.generation !== acknowledged.current)
         return true
@@ -294,7 +412,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     flight.current = operation
     void operation.finally(() => { flight.current = null })
     return operation
-  }, [initial.id, locked, sync, publishSaved, refreshVersions])
+  }, [initial.id, user.id, locked, sync, applyRead, publishSaved, refreshVersions])
   useEffect(() => {
     // A preview cannot acquire an editable draft, so leaving it needs no save.
     // Keep save() itself refused until the normal read verifies access.
@@ -307,13 +425,25 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     const timer = setTimeout(() => { void save() }, 700)
     return () => clearTimeout(timer)
   }, [editSequence, syncState.ready, syncState.pending, syncState.error, save])
+  function retryAutosave() {
+    // Only a person's explicit retry may base their edited fields on a competing write.
+    if (conflictingRead.current) {
+      applyRead(conflictingRead.current)
+      conflictingRead.current = null
+    }
+    void save()
+  }
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
-    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
-    draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
-    void refreshVersions().catch(() => {}); publishSaved(issue)
+    const previousStatus = savedRef.current.status
+    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setStateId(issue.stateId ?? null); setPriority(issue.priority)
+    draft.current = { ...draft.current, status: issue.status, stateId: issue.stateId ?? null, priority: issue.priority }
+    void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
+  async function openHistory() {
+    if (!preview && (reader || await save())) setHistory(true)
+  }
   async function restore(version: NonNullable<typeof historyVersions>[number]) {
     if (!await save()) return false
     return new Promise<boolean>(resolve => {
@@ -340,28 +470,31 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
 
   const saveLabel = readOnly || locked ? '' : error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')
   const acceptance = preview ? null : <FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} onOpenThread={showThread} />
+  const artifacts = preview ? null : <TaskArtifactsButton issueId={saved.id} threads={agentActivity.threads} work={agentActivity.work} failed={agentActivity.failed?.retry ?? null} />
   // The frame composes sub-tasks and activity around the shared document editor.
   const editorWith = (afterDescription: ReactNode, renderActivity: (discussions: IssueDiscussions) => ReactNode) => <>
-    {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    {documentTools && <div data-task-description-body><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert data-task-description-body><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div data-task-description-body className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
   </>
   const dialogs = <>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id, user.id)) }} /></DialogContent></Dialog>
-    <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={restore} />
+    <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={locked ? undefined : restore} />
   </>
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => closeOnEscape(event, rootRef.current, onClose)
   const titleChange = (value: string) => changed({ title: value })
   const titleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }
   return <FramedTask Frame={TaskDetailFrame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
-    task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
+    task={saved} title={title} status={status} stateId={stateId} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
     discussionSave={sync ? { afterAcknowledged: sync.afterAcknowledged, retry: () => { void save() } } : undefined}
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
-    saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: () => { void save() }, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
-    editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance}
+    saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
+    descriptionEditable={!readOnly && !locked && syncState.ready}
+    editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance} artifacts={artifacts}
+    teamSnapshot={!preview && initial.taskWork?.teamId !== undefined ? { teamId: initial.taskWork.teamId, refresh: refreshDetail } : undefined}
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
-    onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
-    onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
+    onStatus={(value, picked) => { changed(picked === undefined ? { status: value, stateId: null } : { status: value, stateId: picked }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
+    onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 
 }

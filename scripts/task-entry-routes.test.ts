@@ -35,7 +35,8 @@ test('workspace Task entry points forward their UUID to the shared TaskDetail se
   }
   assert.deepEqual(prop('TeamHome', 'onIssues'), ["()=>navigate('all')"])
   assert.deepEqual(prop('GlobalSearch', 'onIssue'), ['open'])
-  for (const page of ['TasksPage', 'InboxPage']) assert.deepEqual(prop(page, 'onOpenIssue'), ['id=>{open(id)}'], page)
+  assert.deepEqual(prop('InboxPage', 'onOpenIssue'), ['id=>{open(id)}'])
+  assert.deepEqual(prop('TasksPage', 'onOpenIssue'), [], 'tasks have one entry, the board')
   assert.deepEqual(prop('TaskDetail', 'id'), ['selected'])
   assert.deepEqual(prop('EmbeddedTaskDetail', 'issueId'), ['taskShown'])
   const embedded = elements('../components/coordinator/conversation-panels.tsx')

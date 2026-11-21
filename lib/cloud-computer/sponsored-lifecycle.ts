@@ -9,12 +9,16 @@ import { runChanged } from '../live/panels'
 import { openOwnedCloudflareTaskMachine, releaseOwnedCloudflareTaskMachine } from '../eve/cloudflare-task-bridge'
 import { finishThreadRegistration, prepareThreadRegistration } from './thread-registration'
 import { hostedSnapshot, type TaskMachineActor } from './sponsored-task'
+import { PaidResourceError } from '../abuse/policy'
+import { DEFAULT_MACHINE_SIZE, isMachineSize, MACHINE_CHUNK_MS, MACHINE_GRACE_MS, MACHINE_RENEW_BEFORE_MS, type MachineSize } from './machine-pricing'
 
 const unavailable = () => new ComputerError(409, 'Cloudflare task machine unavailable')
 const fixedWorker =
   'exec /usr/local/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --cloudflare-task'
 
 type Handoff = {
+  /** The size the machine is billed at (decision 2026-11-15-1900): the run's own, else Mikka's default. */
+  size: MachineSize
   deviceId: string
   operationId: string
   leaseId: string
@@ -128,6 +132,8 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
       throw unavailable()
     definition.repositoryAdmission = { ...a, deviceId }
   }
+  const frozenSize = run.agentDefinition.taskMachine.size
+  const size: MachineSize = isMachineSize(frozenSize) ? frozenSize : DEFAULT_MACHINE_SIZE
   const issued = await prepareThreadRegistration(tx, {
     runId,
     deviceId,
@@ -151,12 +157,13 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
   await tx.query(
     `UPDATE thread_machines SET state='starting',epoch=epoch+1,"sandboxId"=NULL,"operationId"=$2,"workerLeaseId"=$3,
     "workerLeaseUntil"=clock_timestamp()+interval '90 seconds',"lifecycleAt"=clock_timestamp()+interval '90 seconds',
-    lifecycle=lifecycle||jsonb_build_object('phase','create_requested','sponsoredUntil',clock_timestamp()+interval '15 minutes',
-      'sponsoredRepositoryKey',$4::text) || CASE WHEN $5::jsonb IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('sponsoredRestore',$5::jsonb) END WHERE "runId"=$1`,
-    [runId, operationId, leaseId, run.repoPath, requiredCheckpoint ? JSON.stringify(requiredCheckpoint) : null],
+    lifecycle=lifecycle||jsonb_build_object('phase','create_requested','sponsoredUntil',clock_timestamp()+make_interval(secs=>$6::double precision/1000),
+      'sponsoredRepositoryKey',$4::text,'sponsoredChunks',1,'sponsoredSize',$7::text) || CASE WHEN $5::jsonb IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('sponsoredRestore',$5::jsonb) END WHERE "runId"=$1`,
+    [runId, operationId, leaseId, run.repoPath, requiredCheckpoint ? JSON.stringify(requiredCheckpoint) : null, MACHINE_CHUNK_MS, size],
   )
   await tx.query(`UPDATE device_tokens SET "expiresAt"=clock_timestamp()+interval '15 minutes' WHERE id=$1`, [tokenId])
   return {
+    size,
     deviceId,
     operationId,
     leaseId,
@@ -209,6 +216,10 @@ export async function ensureSponsoredTaskMachine(pool: Pool, actor: TaskMachineA
     return { runId, state: 'running' }
   }
   try {
+    // Machine time is paid from Mikka 额度 before the machine opens (decision 2026-11-15-1900).
+    const { fundMachineChunk } = await import('./machine-billing')
+    if (!await fundMachineChunk({ ownerId: actor.userId, workspaceId: actor.workspaceId, runId, operationId: handoff.operationId, index: 0, size: handoff.size }))
+      throw new PaidResourceError('points_exhausted')
     const { connection, instanceId } = await openOwnedCloudflareTaskMachine(pool, actor, runId)
     const changed = await pool.query(
       `UPDATE thread_machines SET "sandboxId"=$2,"runningSince"=clock_timestamp(),
@@ -314,7 +325,10 @@ export async function reconcileSponsoredTaskMachine(
   const fence = { epoch: row.epoch, sandboxId: row.sandboxId }
   const terminal = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(row.status)
   const deadline = typeof row.lifecycle.sponsoredUntil === 'string' ? Date.parse(row.lifecycle.sponsoredUntil) : NaN
-  const expired = Number.isFinite(deadline) && deadline <= now
+  // A funded machine has a grace period past its paid time: a late renewal
+  // wake pays the missed chunks below instead of ending the thread.
+  const unfundedNow = row.lifecycle.sponsoredUnfunded === true
+  const expired = Number.isFinite(deadline) && deadline + (unfundedNow ? 0 : MACHINE_GRACE_MS) <= now
   if (row.stopRequestedAt || row.taskClosed || (expired && !terminal && row.state !== 'paused')) {
     const { threadMachineAction } = await import('./thread-machines')
     await threadMachineAction(pool, actor, runId, 'end', fence)
@@ -347,11 +361,60 @@ export async function reconcileSponsoredTaskMachine(
     }
     return false
   }
+  // Prepaid machine time: just before the paid chunk ends, pay the next one from
+  // Mikka 额度 and extend the lease, or stop the run when nothing can pay.
+  let until = deadline, unfunded = row.lifecycle.sponsoredUnfunded === true
+  // A late wake pays every missed chunk in order until the paid time is ahead of now again.
+  while (Number.isFinite(until) && row.operationId && !unfunded && now >= until - MACHINE_RENEW_BEFORE_MS) {
+    const renewed = await renewSponsoredMachine(pool, actor, runId, row, until)
+    if (renewed.until === until && !renewed.unfunded) break
+    ;({ until, unfunded } = renewed)
+    row = { ...row, lifecycle: { ...row.lifecycle, sponsoredUntil: new Date(until).toISOString(), sponsoredChunks: (typeof row.lifecycle.sponsoredChunks === 'number' ? row.lifecycle.sponsoredChunks : 1) + 1 } }
+  }
+  // Unfunded: wake at the paid deadline to end the machine. Otherwise wake to renew (never sooner than 5 s).
+  const wake = !Number.isFinite(until) ? NaN : unfunded ? until : Math.max(now + 5_000, until - MACHINE_RENEW_BEFORE_MS)
   // The DO owns its immutable hard alarm. The existing application timer also
   // wakes on terminal Run transitions, so live jobs need no additional polls.
   await pool.query(
     `UPDATE thread_machines SET "lifecycleAt"=$5 WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4`,
-    [runId, actor.userId, actor.workspaceId, row.epoch, Number.isFinite(deadline) ? new Date(deadline) : null],
+    [runId, actor.userId, actor.workspaceId, row.epoch, Number.isFinite(wake) ? new Date(wake) : null],
   )
-  return Number.isFinite(deadline) ? deadline : false
+  return Number.isFinite(wake) ? wake : false
+}
+
+/** Pays the next chunk and extends the lease; returns the (possibly new) paid deadline. */
+async function renewSponsoredMachine(pool: Pool, actor: TaskMachineActor, runId: string, row: Reconciliation, deadline: number): Promise<{ until: number; unfunded: boolean }> {
+  const size = isMachineSize(row.lifecycle.sponsoredSize) ? row.lifecycle.sponsoredSize : DEFAULT_MACHINE_SIZE
+  const index = typeof row.lifecycle.sponsoredChunks === 'number' ? row.lifecycle.sponsoredChunks : 1
+  const { fundMachineChunk } = await import('./machine-billing')
+  const funded = await fundMachineChunk({ ownerId: actor.userId, workspaceId: actor.workspaceId, runId, operationId: row.operationId!, index, size })
+  if (!funded) {
+    // Out of Mikka 额度: the run stops at the end of what is paid, with its reason in the thread.
+    await pool.query(
+      `UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",now()),"stopReason"=COALESCE("stopReason",'cloud_machine_unfunded'),
+        error=COALESCE(error,'cloud_machine_unfunded'),"updatedAt"=now()
+      WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled')`,
+      [runId, actor.userId],
+    )
+    await pool.query(
+      `UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('sponsoredUnfunded',true)
+      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND "operationId"=$5`,
+      [runId, actor.userId, actor.workspaceId, row.epoch, row.operationId],
+    )
+    await runChanged(pool, runId)
+    return { until: deadline, unfunded: true }
+  }
+  const extended = await pool.query<{ until: string }>(
+    `UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object(
+        'sponsoredUntil',((lifecycle->>'sponsoredUntil')::timestamptz+make_interval(secs=>$6::double precision/1000)),
+        'sponsoredChunks',$7::int+1)
+      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND "operationId"=$5
+        AND COALESCE((lifecycle->>'sponsoredChunks')::int,1)=$7::int
+      RETURNING lifecycle->>'sponsoredUntil' AS until`,
+    [runId, actor.userId, actor.workspaceId, row.epoch, row.operationId, MACHINE_CHUNK_MS, index],
+  )
+  const next = extended.rows[0] ? Date.parse(extended.rows[0].until) : deadline
+  // The DO lease follows the paid deadline (same grant, later expiry).
+  if (extended.rows[0]) await (await import('../eve/cloudflare-task-bridge')).extendOwnedTaskMachine(pool, actor, runId)
+  return { until: next, unfunded: false }
 }

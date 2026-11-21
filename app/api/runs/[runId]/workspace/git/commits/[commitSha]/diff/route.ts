@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { reviewHttp } from '@/lib/coding-workspace/diff/http'
 import { diffPage } from '@/lib/coding-workspace/diff/service'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const sha = z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/)
 const query = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(), baseSha: sha, headSha: sha,

@@ -4,6 +4,7 @@ import { Row } from '@/components/settings'
 import { Symbol } from '@/components/Symbol'
 import { Group } from '@/components/ui'
 import { askForPush, pushUndeliverable, retryPush, usePushState } from '@/lib/push-state'
+import { mobileMessages as messages } from '@/lib/messages'
 import { colors } from '@/lib/theme'
 
 /**
@@ -14,12 +15,13 @@ import { colors } from '@/lib/theme'
  */
 export function PushRow({ proactive, ask = false }: { proactive: boolean; ask?: boolean }) {
   const push = usePushState()
+  const copy = messages.MobileCore.notifications
   if (!proactive) return null
   if (pushUndeliverable(push)) {
     const denied = push === 'denied'
     return (
       <Group>
-        <Row icon={<Symbol name="bell.slash" size={19} color={colors.danger} web={<BellOff size={21} color={colors.danger} strokeWidth={1.8} />} />} label="推送无法送达" value={denied ? '打开设置' : '重试'}
+        <Row icon={<Symbol name="bell.slash" size={19} color={colors.danger} web={<BellOff size={21} color={colors.danger} strokeWidth={1.8} />} />} label={copy.unavailable} value={denied ? copy.openSettings : messages.Common.retry}
           onPress={() => void (denied ? Linking.openSettings() : retryPush())} />
       </Group>
     )
@@ -27,7 +29,7 @@ export function PushRow({ proactive, ask = false }: { proactive: boolean; ask?: 
   if (ask && push === 'undetermined') {
     return (
       <Group>
-        <Row icon={<Symbol name="bell.badge" size={19} web={<BellRing size={21} color={colors.ink} strokeWidth={1.8} />} />} label="允许推送" onPress={() => void askForPush()} />
+        <Row icon={<Symbol name="bell.badge" size={19} web={<BellRing size={21} color={colors.ink} strokeWidth={1.8} />} />} label={copy.allow} onPress={() => void askForPush()} />
       </Group>
     )
   }

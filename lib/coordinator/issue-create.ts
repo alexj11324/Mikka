@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { systemActor } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
-import { bots, coordinatorEvents, issues } from '@/lib/db/schema'
+import { bots, coordinatorEvents } from '@/lib/db/schema'
 import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
@@ -11,13 +11,14 @@ import { dispatchTaskIntent } from '@/lib/task-create-command'
 import { attachInitialProject, insertExplicitTask, reconcileInitialProject } from '../task-create-scope'
 import { withTaskCreationReceipt } from '@/lib/task-creation-receipt'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
-import { compactTaskTitle } from '@/lib/short-title'
+import { backlogTaskDraft } from '@/lib/task-create-form'
+import { requestIssueInput } from './issue-input'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 
-const inputSchema = z.object({ sourceEventId: z.uuid(), title: z.string().trim().min(1).max(200), confirmAccess: z.boolean().optional() }).strict()
+const inputSchema = requestIssueInput.extend({ confirmAccess: z.boolean().optional() })
 
 /** The authenticated request is also the idempotency record for issue creation. */
-export async function createIssueFromRequest(userId: string, input: { sourceEventId: string; title: string; confirmAccess?: boolean }) {
+export async function createIssueFromRequest(userId: string, input: z.input<typeof inputSchema>) {
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) throw new FactoryError('factoryInvalid')
   // A host-stored Bot is the event's tenant authority. Legacy events without
@@ -49,7 +50,8 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
     // A title the person typed in the task form wins over the model's: it is stored on the user's own event.
     const typed = taskTitleInputSchema.safeParse(event.payload.taskTitle)
     const title = typed.success ? typed.data : parsed.data.title
-    const fields = { title, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: command?.description ?? event.payload.text as string }] }] }, status: 'todo' as const, priority: 'normal' as const }
+    // The event retains the execution request verbatim. Only the person's explicit form description or the model's brief belongs on the task.
+    const fields = backlogTaskDraft(title, command?.description ?? parsed.data.summary ?? '')
     const requestId = command ? z.uuid().parse(event.payload.taskCreationRequestId) : undefined
     const create = async () => {
       let created
@@ -61,7 +63,6 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
         if (!issue?.identifier) throw new FactoryError('factoryInvalid')
         created = { taskId: issue.id, identifier: issue.identifier }
       }
-      if (typed.success || command) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title }), shortTitleFrom: title }).where(eq(issues.id, created.taskId))
       return created
     }
     const receipt = command ? await withTaskCreationReceipt(tx, userId, source.workspaceId!,

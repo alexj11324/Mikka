@@ -1,3 +1,4 @@
+import { privateMikkaRepository } from './cloudflare-source.mjs'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -13,7 +14,7 @@ const ACCOUNT = /^[a-f0-9]{32}$/
 const WORKER_PATHS = { apiIngress: 'ingress.mjs', eveRuntime: 'workers/eve-runtime.mjs',
   taskSandbox: 'workers/task-sandbox.mjs', web: 'workers/web.mjs',
   credentialIdentity: 'workers/credential-identity.mjs', credentialBroker: 'workers/credential-broker.mjs',
-  appGateway: 'workers/app-gateway.mjs' }
+  appGateway: 'workers/app-gateway.mjs', liteLlm: 'workers/litellm.mjs' }
 const fail = code => { throw new Error(code) }
 const hash = value => createHash('sha256').update(value).digest('hex')
 const git = (cwd, ...args) => stdout('git', args, { cwd, stage: 'SOURCE_CHECKOUT', timeout: 30000 })
@@ -25,7 +26,7 @@ export function releaseId(publicSha, runId, runAttempt) {
 
 export function releaseSelection(env, receipt) {
   const context = sourceContext(env, env.GITHUB_SHA, env.OVERLAY_SHA)
-  validateReceipt(receipt, context)
+  validateReceipt(receipt, context, privateMikkaRepository('mikka-hosted-ui', env))
   return { context, publicSha: context.publicSha, privateSha: context.privateSha,
     id: releaseId(context.publicSha, context.runId, context.runAttempt) }
 }
@@ -161,9 +162,11 @@ async function prepareArtifacts(work, selected, env, webRenderer) {
   await mkdir(join(artifacts, 'workers'))
   const workerBundles = { apiIngress: { path: WORKER_PATHS.apiIngress, sha256: hash(worker), bytes: worker.length } }
   command('npm', ['ci', '--prefix', 'cloudflare/task-sandbox', '--ignore-scripts'], { cwd: work, env, stage: 'TASK_WORKER_INSTALL' })
+  command('npm', ['ci', '--prefix', 'cloudflare/litellm', '--ignore-scripts'], { cwd: work, env, stage: 'LITELLM_WORKER_INSTALL' })
   const configurations = {
     eveRuntime: { directory: 'cloudflare/eve-runtime', stage: 'EVE_WORKER_BUNDLE' },
     taskSandbox: { directory: 'cloudflare/task-sandbox', stage: 'TASK_WORKER_BUNDLE' },
+    liteLlm: { directory: 'cloudflare/litellm', stage: 'LITELLM_WORKER_BUNDLE' },
     web: { config: prepared, stage: 'WEB_WORKER_BUNDLE' },
     appGateway: { config: gatewayConfig({ current: selected.id, retained: [selected.id] }), stage: 'APP_GATEWAY_BUNDLE' },
     credentialIdentity: { config: { main: join(work, 'cloudflare/credential-identity/worker.mjs'),
@@ -202,7 +205,7 @@ async function prepareArtifacts(work, selected, env, webRenderer) {
 export async function readSelection(env) {
   const receipt = JSON.parse(await readFile(join(root, '.cloudflare-ci/receipt.json'), 'utf8'))
   const selected = releaseSelection(env, receipt)
-  validateReceipt(receipt, selected.context)
+  validateReceipt(receipt, selected.context, privateMikkaRepository('mikka-hosted-ui', env))
   if (git(root, 'rev-parse', 'HEAD') !== selected.publicSha
       || git(join(root, '.hosted-ui'), 'rev-parse', 'HEAD') !== selected.privateSha) fail('CF_OCI_CHECKOUT_DRIFT')
   return { receipt, selected }
@@ -212,7 +215,7 @@ export function verifyOverlayMain(work, privateSha, env = process.env) {
   if (!SHA.test(privateSha ?? '')) fail('CF_OCI_OVERLAY_SOURCE_REQUIRED')
   const shallow = stdout('git', ['rev-parse', '--is-shallow-repository'], {cwd:work,env,stage:'OVERLAY_HISTORY'})
   command('git', ['fetch','--quiet','--no-tags','--filter=blob:none',...(shallow === 'true' ? ['--unshallow'] : []),
-    'git@github.com:alexj11324/mikka-hosted-ui.git','refs/heads/main'], {cwd:work,env,stage:'OVERLAY_MAIN_FETCH'})
+    'git@github.com:' + privateMikkaRepository('mikka-hosted-ui', env) + '.git','refs/heads/main'], {cwd:work,env,stage:'OVERLAY_MAIN_FETCH'})
   command('git', ['merge-base','--is-ancestor',privateSha,'FETCH_HEAD'], {cwd:work,env,stage:'OVERLAY_MAIN_ANCESTRY'})
 }
 
@@ -315,7 +318,7 @@ async function publish() {
     const broker = digestFromRepoDigests(brokerRefs, process.env.CLOUDFLARE_ACCOUNT_ID, selected.id, 'mikka-credential-broker')
     await readSelection(process.env)
     const receipt = { version: 1, ...selected.context, ...verified,
-      overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: selected.privateSha, actualSha: selected.privateSha },
+      overlayCheckout: { repository: privateMikkaRepository('mikka-hosted-ui'), requestedSha: selected.privateSha, actualSha: selected.privateSha },
       localImageId: record.localImageId, webRenderer: record.webRenderer,
       brokerImage: broker.image, brokerDigest: broker.digest, brokerLocalImageId: record.brokerLocalImageId,
       brokerOfflineVerification: record.brokerOfflineVerification,

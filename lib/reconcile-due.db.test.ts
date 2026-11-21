@@ -4,7 +4,9 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 import { reconcileDue } from './reconcile-due'
+import { nextScheduleDue } from './schedules/store'
 import { cleanupWorkspaceEphemera } from './coding-workspace/retention'
+import { COORDINATOR_WAKE_SCOPES_SQL, MAX_WAKE_ATTEMPTS } from './coordinator/wake-recovery'
 
 // #1371: the one safety-net check. It is true for a job only when that job has
 // work already due that its own wake or timer did not pick up, and false on an
@@ -13,7 +15,7 @@ const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests require matching isolated loopback _e2e URLs')
 
-const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'inbox_snoozes', 'agent_runs', 'devices', 'cloud_machines',
+const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'inbox_snoozes', 'inbox_conversation_snoozes', 'agent_runs', 'devices', 'cloud_machines',
   'thread_machines', 'coding_review_sessions', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
   'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'account_deletion_guards', 'chat_attachments', 'chat_attachment_retirements',
   'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts', 'coding_workspace_requests', 'coding_workspace_mentions']
@@ -50,6 +52,22 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await clear()
   })
 
+  await t.test('the wake sweep visits only chats with a due wake, never an inbox whose wakes ran out', async () => {
+    // An exhausted runtime event stays undelivered and untriaged for good. Before, the sweep re-checked
+    // every such chat on each run once any other wake was due (32 chats, 500+ statements in production).
+    const scopes = async () => (await pool.query<{ botId: string }>(COORDINATOR_WAKE_SCOPES_SQL)).rows.map(row => row.botId).sort()
+    const [exhausted, dueBot] = [randomUUID(), randomUUID()]
+    const runtimeEvent = (botId: string, attempts: number) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeAttempts")
+      VALUES ($1,'owner',$2,'run_question',$3,'{}',now()-interval '1 day',$4)`, [randomUUID(), botId, randomUUID(), attempts])
+    await runtimeEvent(exhausted, MAX_WAKE_ATTEMPTS)
+    assert.deepEqual(await due(), none)
+    assert.deepEqual(await scopes(), [])
+    await runtimeEvent(dueBot, 0)
+    assert.deepEqual(await due(), { ...none, wakes: true })
+    assert.deepEqual(await scopes(), [dueBot])
+    await clear()
+  })
+
   await t.test('a turn holding a chat lease is checked for an interrupted run', async () => {
     await pool.query(`INSERT INTO coordinator_sessions ("userId","botId","leaseHolder","leaseUntil") VALUES ('owner',$1,'wrun_fixture',now()+interval '5 minutes')`, [randomUUID()])
     assert.deepEqual(await due(), { ...none, wakes: true })
@@ -63,6 +81,18 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await insert(`now()-interval '1 second'`)
     assert.deepEqual(await due(), { ...none, schedules: true })
     await clear()
+  })
+
+  await t.test('a conversation snooze alone sets the timer deadline and becomes due for recovery', async () => {
+    const id = randomUUID()
+    const inserted = await pool.query<{ until: Date }>(`INSERT INTO inbox_conversation_snoozes ("workspaceId","userId","itemType","itemId","snoozedUntil")
+      VALUES ($1,'owner','conversation',$2,date_trunc('milliseconds',now()) + interval '10 minutes') RETURNING "snoozedUntil" AS until`, [randomUUID(), id])
+    const future = await nextScheduleDue(pool)
+    const before = await due()
+    await pool.query(`UPDATE inbox_conversation_snoozes SET "snoozedUntil" = now() - interval '1 second' WHERE "itemId"=$1`, [id])
+    const expired = await due()
+    await clear()
+    assert.deepEqual([future, before.schedules, expired.schedules], [inserted.rows[0].until.getTime(), false, true])
   })
 
   await t.test('an Inbox snooze alone wakes schedules reconciliation only once it is due', async () => {

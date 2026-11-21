@@ -17,8 +17,14 @@ export async function getAgentHistory(userId: string, requestedId?: string, fres
     db.select({
       id: agentSessions.id, title: agentSessions.title, updatedAt: agentSessions.updatedAt,
       // The last turn feeds the second line of the conversation list (MIK-35).
-      lastPrompt: sql<string | null>`(select t."prompt" from "agent_turns" t where t."sessionId" = "agent_sessions"."id" and t."userId" = ${userId} order by t."createdAt" desc limit 1)`,
-      lastCompletion: sql<string | null>`(select left(t."completion", 2000) from "agent_turns" t where t."sessionId" = "agent_sessions"."id" and t."userId" = ${userId} order by t."createdAt" desc limit 1)`,
+      // A single correlated read keeps the prompt and completion from the same
+      // last turn, including when two archived turns share a creation timestamp.
+      latestTurn: sql<{ prompt: string; completion: string } | null>`(
+        select jsonb_build_object('prompt', t."prompt", 'completion', left(t."completion", 2000))
+        from "agent_turns" t
+        where t."sessionId" = "agent_sessions"."id" and t."userId" = ${userId}
+        order by t."createdAt" desc, t."id" desc limit 1
+      )`,
     }).from(agentSessions).where(eq(agentSessions.userId, userId))
       .orderBy(desc(agentSessions.updatedAt), desc(agentSessions.id)).limit(100),
     fresh ? Promise.resolve([]) : db.select({
@@ -29,5 +35,5 @@ export async function getAgentHistory(userId: string, requestedId?: string, fres
   ])
   const sessionId = rows[0]?.sessionId ?? null
   if (requestedId && !fresh && !sessionId) throw new AgentStoreError(agentCopy.conversationNotFound, 404)
-  return { sessions: sessions.map(({ lastPrompt, lastCompletion, ...session }) => ({ ...session, updatedAt: session.updatedAt.toISOString(), preview: sessionPreview(lastCompletion, lastPrompt) })), sessionId, selectedSession: sessionId ? { id: sessionId, title: rows[0].selectedTitle } : null, turns: rows.flatMap(row => row.turn ? [row.turn] : []) }
+  return { sessions: sessions.map(({ latestTurn, ...session }) => ({ ...session, updatedAt: session.updatedAt.toISOString(), preview: sessionPreview(latestTurn?.completion, latestTurn?.prompt) })), sessionId, selectedSession: sessionId ? { id: sessionId, title: rows[0].selectedTitle } : null, turns: rows.flatMap(row => row.turn ? [row.turn] : []) }
 }

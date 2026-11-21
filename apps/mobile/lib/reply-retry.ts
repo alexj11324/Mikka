@@ -1,9 +1,10 @@
+import { mobileMessages } from './messages'
+
 export type ReplyRetryOutcome = 'queued' | 'working' | 'nothingToRetry' | 'unavailable' | 'unconfirmed'
 type RetryReply = { queued: true } | { queued: false; reason?: 'working' | 'nothingToRetry' | 'unavailable' } | { error: string }
 
-const LINES: Record<ReplyRetryOutcome, string> = {
-  queued: '回复已排队', working: '回复正在处理', nothingToRetry: '没有待重试的回复', unavailable: '回复暂不可重试', unconfirmed: '重试未确认',
-}
+/** The web's own words for the same outcomes (Coordinator.replyRetry), not a second set. */
+const LINES: Record<ReplyRetryOutcome, string> = mobileMessages.Coordinator.replyRetry
 export const replyRetryLine = (outcome: ReplyRetryOutcome) => LINES[outcome]
 
 /** A lost transport response can follow a successful enqueue. Only the

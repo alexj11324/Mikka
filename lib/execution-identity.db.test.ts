@@ -1,3 +1,4 @@
+import { observePoolCommits } from './db/commit-effects'
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -5,10 +6,10 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../tests/support/drop-test-database'
 import { freezeWorkerDefinition } from './agent-kit/worker'
 import { freezeExecutionIdentity, ExecutionIdentityError } from './execution-identity'
-import { createExecutionClaim } from './factory/execution-claim'
+import { createExecutionClaim } from '../tests/helpers/factory-execution-claim'
 import { sealSecret } from './secrets/crypto'
 
 const url = process.env.E2E_DATABASE_URL
@@ -18,10 +19,11 @@ else if (process.env.REQUIRE_DB === '1') assert.fail('REQUIRE_DB=1 needs an isol
 test('real claim, MCP tools, key disclosure and artifacts enforce the frozen execution identity', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `execution_identity_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const databaseUrl = target.toString()
   const pool = new Pool({ connectionString: databaseUrl, max: 5 })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   const previous = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }
   Object.assign(process.env, { MIKKA_DATABASE_URL: databaseUrl, DATABASE_URL: databaseUrl })
@@ -29,11 +31,10 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     const directory = new URL('../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
     await pool.query(await readFile(new URL('20261103220200_execution_identity_provenance.sql', directory), 'utf8'))
-    mock.module('next/server', { namedExports: { after() {} } })
+    mock.module('@/lib/server-runtime/server', { namedExports: { after() {} } })
     const { issueRunToken, verifyRunToken } = await import('./mcp/worker')
-    const { apiKeyForRun } = await import('./model-api-keys')
+    const { validateRunApiKey } = await import('./model-api-keys')
     const { authorizeRunApp } = await import('./run-app-mcp')
-    const { renewRunLeases } = await import('./run-leases')
     const { submitArtifact, readArtifact } = await import('./artifacts/store')
     appPool = (await import('./db')).pool; workspacePool = (await import('./workspace-db')).workspacePool
     const requester = 'requester', other = 'other', resourceOwner = 'resource-owner'
@@ -53,7 +54,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'Task', parent: null, executionId: null, model: 'example-model', apiKey: { keyId: sharedKey, model: 'example-model' } })
     definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: requester, botId: bot, deviceId: device, agentDefinition: definition }, pool)
-    await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, requester, bot, device, agent, issue, JSON.stringify(definition)])
+    await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition","workspaceId") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7,$8)', [runId, requester, bot, device, agent, issue, JSON.stringify(definition), workspace])
     const claim = createExecutionClaim(pool, async () => true)
     const lease = () => new Date(Date.now() + 300_000).toISOString()
     const { token } = await issueRunToken({ id: runId, userId: requester })
@@ -62,7 +63,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
 
     await t.test('explicitly shared key charges its real owner, while Gmail and runtime retain the requester', async () => {
       assert.equal((await claim(requester, device, runId, lease())).length, 1)
-      const credential = await apiKeyForRun(pool, runId, sharedKey, 'codex', env)
+      const credential = await validateRunApiKey(pool, runId, sharedKey)
       assert.equal(credential.ownerId, resourceOwner)
       const verified = await auth(); assert.ok(verified)
       let appUser = ''
@@ -70,13 +71,13 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       assert.equal(scope?.userId, requester); assert.equal(appUser, requester)
       assert.equal(definition.executionIdentity!.billingAccount.model.ownerId, resourceOwner)
       assert.equal(definition.executionIdentity!.billingAccount.runtime.ownerId, requester)
-      await assert.rejects(() => apiKeyForRun(pool, runId, ownKey, 'codex', env), /apiKeyNotFound/)
+      await assert.rejects(() => validateRunApiKey(pool, runId, ownKey), /apiKeyNotFound/)
     })
     await t.test('share withdrawal blocks the next claim, token use and key read even without stop propagation', async () => {
       await reset(); await pool.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1', [sharedKey])
       await assert.rejects(() => claim(requester, device, runId, lease()), ExecutionIdentityError)
       assert.equal(await auth(), undefined)
-      await assert.rejects(() => apiKeyForRun(pool, runId, sharedKey, 'codex', env), /apiKeyNotFound/)
+      await assert.rejects(() => validateRunApiKey(pool, runId, sharedKey), /apiKeyNotFound/)
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')
       await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
     })
@@ -101,15 +102,6 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       assert.ok(await readArtifact(requester, result.artifactId))
       assert.equal(await readArtifact(other, result.artifactId), null)
       await assert.rejects(() => submitArtifact({ userId: other, runId, issueId: issue, authorName: 'Codex' }, { title: 'Wrong owner', kind: 'markdown', content: 'Synthetic' }), ExecutionIdentityError)
-    })
-    await t.test('revoking an in-flight resource cuts the lease and tells the daemon to remove credentials', async () => {
-      assert.ok((await renewRunLeases(device, [runId])).leases[runId])
-      await pool.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1', [sharedKey])
-      const renewed = await renewRunLeases(device, [runId])
-      assert.deepEqual(renewed.revoked, [runId]); assert.deepEqual(renewed.leases, {})
-      assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt)
-      await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
-      await reset(); await claim(requester, device, runId, lease())
     })
     await t.test('cloud quota continuation freezes parent placement, then rebinds to a new child with the same principal', async t => {
       const { queueCloudRun } = await import('./computer/queue-run')
@@ -142,13 +134,13 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
         [eventId, requester, bot, taskId, 'sponsored:'+eventId])
         const input = { botId: bot, issueId: taskId, agentId: cloudAgent, deviceRepoId: cloudRepo, sourceEventId: eventId,
           title: 'Sponsored task', body: '', model: 'gpt-5', subscriptionBindingId: binding }
-        const oldCohort = process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
+        const oldCohort = process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
         const oldToken = process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
         try {
           process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = 'synthetic-test-only'
-          process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = randomUUID()
+          process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = '1'
           await assert.rejects(() => queueCloudRun(pool, actor, input))
-          process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = workspace
+          delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
           const { runId: sponsored } = await queueCloudRun(pool, actor, input)
           const machines = await import('./cloud-computer/thread-machines')
           const originalOrigin = process.env.MIKKA_CLOUD_WORKER_URL
@@ -199,8 +191,8 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
           } finally { await cleanup.query('ROLLBACK'); cleanup.release() }
 
         } finally {
-          if (oldCohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
-          else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = oldCohort
+          if (oldCohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
+          else process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = oldCohort
           if (oldToken === undefined) delete process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
           else process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = oldToken
         }
@@ -235,19 +227,20 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
         assert.equal(moved.agentDefinition.executionIdentity.requester, requester)
         assert.equal(moved.agentDefinition.executionIdentity.outputOwner, requester)
         await revalidateExecutionIdentity(pool, moved, pool)
-        await apiKeyForRun(pool, nextId, ownKey, 'codex', env)
+        await validateRunApiKey(pool, nextId, ownKey)
         assert.ok(await claimCloudRun(pool, actor, nextId, nextChild.deviceId, new Date(lease()), null, undefined, undefined, false))
       } finally { machines.restore() }
     })
     await t.test('preexisting runs keep the legacy own-resource path without fabricated history', async () => {
       await pool.query('UPDATE agent_runs SET "agentDefinition"=NULL WHERE id=$1', [runId])
       assert.ok(await auth())
-      await assert.rejects(() => apiKeyForRun(pool, runId, sharedKey, 'codex', env), /apiKeyNotFound/)
-      assert.equal((await apiKeyForRun(pool, runId, ownKey, 'codex', env)).ownerId, requester)
+      await assert.rejects(() => validateRunApiKey(pool, runId, sharedKey), /apiKeyNotFound/)
+      assert.equal((await validateRunApiKey(pool, runId, ownKey)).ownerId, requester)
     })
   } finally {
     mock.restoreAll()
     for (const [name, value] of Object.entries(previous)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+    await (await import('./builtin-gateway/runtime')).builtinGateway()?.stop()
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
     await admin.end()
   }

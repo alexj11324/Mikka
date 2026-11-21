@@ -3,7 +3,6 @@ import { diffSelection } from '@mikka/protocol/coding-workspace-review'
 import { reviewHttp, reviewPageQuery } from '@/lib/coding-workspace/diff/http'
 import { diffPage } from '@/lib/coding-workspace/diff/service'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const query = reviewPageQuery.extend({ source: z.string().optional(), baseSha: z.string().optional(), headSha: z.string().optional() })
 export const GET = reviewHttp(async ({ deps, actor, runId, repoId, input, request }) => {

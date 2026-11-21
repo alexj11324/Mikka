@@ -1,4 +1,8 @@
-import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
+import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
+import { builtinGateway } from '../builtin-gateway/runtime';
+import { claimFixtureFactoryCheck, createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
@@ -17,10 +21,8 @@ import { createFactoryCheckRecovery } from "./check-recovery";
 import { createFactoryReconciler } from "./reconcile";
 import { DECISION_MODEL, decisionRequestInput } from "../coordinator/decision";
 import {
-  createFactoryCheckClaim,
   factoryCheckAssignment,
   factoryCheckGates,
-  isFactoryCheckRun,
 } from "./checks";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
@@ -52,7 +54,10 @@ const rejects = (fn: () => Promise<unknown>, code: string) =>
 test(
   "PG17 check integration: atomic dispatch, frozen commands, independent provenance, repair/new SHA, restart and closed downstream gates (fixture run reports)",
   { skip: !dbURL, timeout: 120000 },
-  async () => {
+  async (t) => {
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `factory_193_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -62,6 +67,7 @@ test(
       max: 12,
       options: `-c search_path=${schema}`,
     });
+    const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     try {
       const dir = new URL("../../drizzle/", import.meta.url);
       for (const file of orderMigrations(
@@ -77,7 +83,7 @@ test(
         [issueId, await seedFixtureWorkspace(pool, 'owner')],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Isolated PG fixture',now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,
+        `INSERT INTO devices (id,"ownerId",name,"lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,'owner','Isolated PG fixture',now(),now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,
         [deviceId],
       );
       await pool.query(
@@ -259,6 +265,8 @@ test(
             JSON.stringify(report),
           ],
         );
+        if (run.kind !== "acceptance" && !options.failed && !options.timeout)
+          await addFactoryVisualEvidence(pool, runId);
         return { report, sessionId };
       };
       const sha1 = "1".repeat(40),
@@ -283,8 +291,7 @@ test(
       );
       assert.equal(assignment.baseBranch, sha1);
       assert.equal(assignment.policy.readOnly, true);
-      const claim = createFactoryCheckClaim(pool, authorize);
-      assert.equal(await isFactoryCheckRun(pool, "owner", review.runId), true);
+      const claim = claimFixtureFactoryCheck(pool, store);
       const claims = await Promise.allSettled(
         Array.from({ length: 10 }, () =>
           claim(
@@ -360,6 +367,7 @@ test(
       state = await store.read("owner", state.task.id);
       assert.equal(state.task.stage, "review");
       assert.notEqual(state.task.candidateId, review.task.candidateId);
+      await addFactoryPublicationEvidence(pool, state.task.id);
       for (const stage of ["review", "verify"]) {
         assert.equal(state.task.stage, stage);
         const check = await dispatch(state.task);
@@ -642,6 +650,8 @@ test(
         );
       }
     } finally {
+      await builtinGateway()?.stop();
+      await closeWorkspace();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

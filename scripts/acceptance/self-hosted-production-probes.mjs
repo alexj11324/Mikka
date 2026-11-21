@@ -140,7 +140,7 @@ export function coreLiveSocket(value, { ownerId, workspaceId, now = Date.now, ..
 }
 
 export function coreDeviceSocket(value, { deviceId, now = Date.now, ...options }) {
-  check(/^[0-9a-f-]{36}$/i.test(deviceId)
-    && ['runControl', 'computerReviews', 'coordinatorResults'].every(name => value?.[name] === 'push'), 'core_ticket', 'shape')
+  // The ticket is only the session socket's address (decision 2026-11-17-2215): everything is pushed.
+  check(/^[0-9a-f-]{36}$/i.test(deviceId), 'core_ticket', 'shape')
   return socketProof(ticket(value, '/v1/devices/' + deviceId + '/socket', now), options)
 }

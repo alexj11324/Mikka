@@ -4,6 +4,27 @@ import { test } from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedIssue, seedProject, seedProjectTasks, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
+test('an Environment keeps its default machine size; a run that names it gets it and keeps it as chosen', { skip: !dbUrl }, async t => {
+  const fixture = new Pool({ connectionString: dbUrl })
+  const store = await import('../lib/project-resources/store')
+  // The suite's last test closes the shared application pools.
+  t.after(() => fixture.end())
+  const owner = await seedUser(fixture, 'environment-size-owner')
+  const workspace = await seedWorkspace(fixture, owner, [{ userId: owner, role: 'admin' }])
+  const issueId = await seedIssue(fixture, owner, workspace.id)
+  const configuration = { setup: { copyFiles: [], command: 'echo size', approved: true } }
+  const size = async (id: string) => (await store.listProjectResources(owner, workspace.id)).environments.find(row => row.id === id)?.defaultMachineSize
+  const saved = await store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Large', configuration, defaultMachineSize: 'standard-4-16' })
+  assert.equal(await size(saved.id), 'standard-4-16')
+  const renamed = await store.saveEnvironment(owner, { workspaceId: workspace.id, id: saved.id, revision: saved.revision, name: 'Large runs', configuration })
+  assert.equal(await size(saved.id), 'standard-4-16', 'a save without the size keeps it')
+  await assert.rejects(store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Bad', configuration, defaultMachineSize: 'huge' as never }))
+  const snapshot = await store.withProjectExecution({ userId: owner, workspaceId: workspace.id, issueId, repositoryKey: null, baseBranch: null, runtime: 'cloud', harness: 'codex', environmentId: saved.id }, async value => value)
+  assert.deepEqual([snapshot.environment?.id, snapshot.environment?.chosen, snapshot.environment?.defaultMachineSize], [saved.id, true, 'standard-4-16'])
+  await store.saveEnvironment(owner, { workspaceId: workspace.id, id: saved.id, revision: renamed.revision, name: 'Large runs', configuration, defaultMachineSize: null })
+  assert.equal(await size(saved.id), null, 'null goes back to Mikka’s default')
+})
+
 test('project default editor preserves repository overrides and canonical task selection', { skip: !dbUrl }, async t => {
   const fixture = new Pool({ connectionString: dbUrl })
   const { pool } = await import('../lib/db')
@@ -27,6 +48,35 @@ test('project default editor preserves repository overrides and canonical task s
     store.setProjectDefaultEnvironment(user, { workspaceId: tenant, projectId, revision, environmentId })
   await assert.rejects(choose(second.id, 2, member), { code: 'workspaceAccessDenied' })
   await assert.rejects(choose(second.id, 2, owner, other.id), { code: 'projectNotFound' })
+  await t.test('Project binding reads and writes follow an explicitly granted Project capability', async () => {
+    const { changeResourceAccess } = await import('../lib/resource-access/store')
+    const selected = await seedProject(fixture, owner, [{ teamId: team.id, workspaceId: workspace.id }])
+    const reference = { kind: 'project' as const, workspaceId: workspace.id, id: selected }
+    const save = (revision: number) => store.saveProjectResources(member, { workspaceId: workspace.id, projectId: selected,
+      revision, repositories: [{ repositoryKey, baseBranch: 'feature' }], environmentIds: [first.id], defaultEnvironmentId: first.id })
+    const select = (revision: number) => store.setProjectDefaultEnvironment(member, { workspaceId: workspace.id,
+      projectId: selected, revision, environmentId: second.id })
+    const access = (expectedRevision: number, capabilities: ('canReadContent' | 'canSteer')[]) =>
+      changeResourceAccess(owner, reference, { expectedRevision, visibility: 'private',
+        grants: capabilities.length ? [{ subjectId: member, capabilities }] : [], confirmExpansion: true })
+    await fixture.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, member])
+    try {
+      const readOnly = await access(1, ['canReadContent'])
+      assert.deepEqual((await store.listProjectResources(member, workspace.id, selected)).repositories, [])
+      await assert.rejects(save(1), { code: 'projectNotFound' })
+      await assert.rejects(select(1), { code: 'projectNotFound' })
+      const editable = await access(readOnly.revision, ['canReadContent', 'canSteer'])
+      assert.deepEqual(await save(1), { revision: 2 })
+      assert.deepEqual(await select(2), { revision: 3 })
+      await access(editable.revision, [])
+      await assert.rejects(store.listProjectResources(member, workspace.id, selected), { code: 'projectNotFound' })
+      const config = await store.listProjectResources(owner, workspace.id, selected)
+      assert.deepEqual(config.repositories.map(row => row.baseBranch), ['feature'])
+      assert.deepEqual(config.environmentBindings.filter(row => row.isDefault).map(row => row.environmentId), [second.id])
+    } finally {
+      await fixture.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, member])
+    }
+  })
   await assert.rejects(choose(randomUUID(), 2), { code: 'projectEnvironmentUnavailable' })
   assert.deepEqual(await choose(second.id, 2), { revision: 3 })
   const configuration = await store.listProjectResources(owner, workspace.id, projectId)

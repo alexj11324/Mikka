@@ -39,7 +39,7 @@ function selection(rows: unknown[]) {
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 let actions: typeof import('../app/actions/agents')
 before(async () => {
-  mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => requestHeaders } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => ({ user: { id: viewer }, session: { id: 'fixture-human-session' } }) } } })
   stub('../lib/db/index.ts', { pool, db: { select: (fields: Record<string, unknown>) => {
     if ('prompt' in fields) return selection([fixtureRun()])
@@ -72,12 +72,13 @@ before(async () => {
   } }) }, workspacePool: pool })
   stub('../lib/workspace-access.ts', { loadWorkspaceContext: () => assert.fail('workspace selection outside task-bound wake fixture') })
   stub('../lib/deployment-switches.ts', { deploymentSwitch: () => factoryEnabled })
-  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
+  stub('../lib/issue-access.ts', { requireIssueAccessWithoutBody: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
   stub('../lib/device-link.ts', { issueDeviceToken: () => assert.fail('no device token') })
   stub('../lib/device-presence.ts', { deviceOnlineStates: () => assert.fail('no device selection') })
   stub('../lib/device-removal.ts', {
     removeOwnedDevice: () => assert.fail('no device removal'),
     renameOwnedDevice: () => assert.fail('no rename'),
+    setOwnedDeviceDescription: () => assert.fail('no device description change'),
     setOwnedDeviceEnabled: () => assert.fail('no device scheduling change'),
   })
   stub('../lib/device-management.ts', { enqueueDeviceCommand: () => assert.fail('no device command') })

@@ -15,8 +15,9 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Pool } from "pg";
+import type { ApiSession } from '../api-auth';
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database';
 
 type UploadedFile = { path: string; data: string };
 function uploadedFiles(path: string | UploadedFile[], body?: unknown): UploadedFile[] {
@@ -37,7 +38,7 @@ if (url) {
 test("a task's sandbox serves only that task's runs, parks between them and ends with the task", { skip: !url, timeout: 180000 }, async (t) => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `thr_task_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL, template: process.env.E2B_CODEX_TEMPLATE };
@@ -234,7 +235,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               if(command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')){
                 assert.ok(bootstrap);assert.equal(bootstrap.deviceId,f.prior.device);
                 await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`,[bootstrap.deviceId,createHash('sha256').update(bootstrap.credential).digest('hex')]);
-                await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`,[bootstrap.deviceId]);
+                await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`,[bootstrap.deviceId]);
               }
               return {stdout:command.includes(REGISTRATION_COMPLETE)?REGISTRATION_COMPLETE+'\n':'',stderr:'',exitCode:0};
             }}} as never;
@@ -411,7 +412,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
             } else if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap); assert.equal(bootstrap.deviceId, f.prior.device);
               await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
-              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
+              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`, [bootstrap.deviceId]);
               steps.push('registered');
               stdout = REGISTRATION_COMPLETE + '\n';
             } else if (command.includes('mikka-runtime-process-verified')) {
@@ -460,7 +461,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const definition = retryWorkerDefinition(originDefinition, 'Fixture\nOwner answer')!;
       await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.prior.runId, originDefinition]);
       await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.next, definition]);
-      await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true}]',"lastSeenAt"=clock_timestamp() WHERE id=$1`, [f.prior.device]);
+      await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true}]',"lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`, [f.prior.device]);
       return { ...f, eventId, definition, candidateId, originAttemptId, answerId, taskBot };
     };
 
@@ -1243,7 +1244,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
-              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
+              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`, [bootstrap.deviceId]);
               authenticated++;
               // Make the historical late floor observably later than this real authentication.
               await pool.query('SELECT pg_sleep(0.02)');
@@ -1286,7 +1287,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
           const used = await pool.query('UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id',
             [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
           assert.equal(used.rowCount, 1, 'the credential transaction is committed before provider publication');
-          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1', [bootstrap.deviceId]);
+          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1', [bootstrap.deviceId]);
           if (mode === 'revoked_before_finish') await pool.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp() WHERE "boundDeviceId"=$1', [bootstrap.deviceId]);
           return { stdout: REGISTRATION_COMPLETE + '\n', stderr: '', exitCode: 0 };
         };
@@ -1581,6 +1582,110 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.equal((await machine(before.runId)).state, 'running');
     });
 
+    const { resolveTaskReviewAuthority } = await import('../coding-workspace/review-authority');
+    const { beginReviewSession, closeReviewSession, revokeReviewSession, readReviewSession, reviewSessionTransport } = await import('../coding-workspace/review-sessions');
+    const reviewFixture = async (kind: 'terminal' | 'preview', state: 'running' | 'paused' = 'running') => {
+      const issueId = await task(), before = await parked(issueId), credentialId = randomUUID(), deviceTokenId = randomUUID();
+      const placement = (await pool.query('SELECT "repoId" FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+      const definition = { executionIdentity: { workspaceId }, repositoryAdmission: { workspaceId, userId: owner,
+        issueId, deviceId: before.device, agentId, remoteKey: 'v2/github.com/acme/app' } };
+      await pool.query('INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,$2,$1,now()+interval \'1 hour\',now(),now())', [credentialId, owner]);
+      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1::uuid,$2,$1::text,$3,$4,now()+interval \'1 hour\')', [deviceTokenId, owner, before.device, workspaceId]);
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"deviceTokenId"=$4,"agentDefinition"=$5,
+        "machineAuthority"=true,"worktreePath"=$6,"sessionId"='native-review-fixture',"startedAt"=now()-interval '1 minute',
+        "finishedAt"=now(),"leaseExpiresAt"=NULL,report=$7 WHERE id=$1`, [before.runId, before.device, placement.repoId, deviceTokenId,
+        JSON.stringify(definition), `/home/user/.mikka/worktrees/${before.runId}`,
+        JSON.stringify({ safePoint: { session: 'exited', observedAt: new Date().toISOString() } })]);
+      await pool.query(`UPDATE thread_machines SET state=$2,"runningSince"=CASE WHEN $2='running' THEN clock_timestamp() ELSE NULL END,
+        lifecycle=jsonb_build_object('phase',CASE WHEN $2='running' THEN 'review_resumed' ELSE 'paused' END) WHERE "runId"=$1`, [before.runId, state]);
+      const session: ApiSession = { user: { id: owner, name: 'Fixture', email: 'thr-task@example.invalid', image: null }, session: { id: credentialId } };
+      // Admission, credential checks and the grant use the real SQL path and
+      // locks. Only the provider close/pause boundaries below are controlled.
+      const current = await resolveTaskReviewAuthority(pool, pool, session, issueId, {}, async (authority, client) => ({ authority,
+        lease: await beginReviewSession(authority, { kind }, client) }));
+      assert.equal(current.authority.nativeExitedProof, true);
+      assert.equal(current.authority.sandboxId, before.sandboxId);
+      return { issueId, before, deviceTokenId, kind, ...current };
+    };
+
+    await t.test('actual parking honors an authorized human review lease until its absolute deadline', async () => {
+      for (const kind of ['terminal', 'preview'] as const) {
+        const f = await reviewFixture(kind), pauses: string[] = [], tails: string[] = [];
+        const before = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [f.before.runId])).rows[0];
+        const park = () => parkThreadMachine(pool, actor, f.before.runId,
+          async id => { pauses.push(id); }, async id => { tails.push(id); return null; });
+        assert.deepEqual(await park(), { reviewHeldUntil: Date.parse(f.lease.expiresAt) });
+        assert.deepEqual(await park(), { reviewHeldUntil: Date.parse(f.lease.expiresAt) }, 'repeated lifecycle work never slides the deadline');
+        assert.deepEqual(pauses, []); assert.deepEqual(tails, []);
+        assert.deepEqual((await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [f.before.runId])).rows[0], before);
+        assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [f.deviceTokenId])).rows[0].revokedAt, null);
+        assert.deepEqual(await readReviewSession(f.authority, { kind, id: f.lease.id }, pool), f.lease);
+        await pool.query('UPDATE coding_review_sessions SET "createdAt"=now()-interval \'6 minutes\',"expiresAt"=now()-interval \'1 minute\' WHERE id=$1', [f.lease.id]);
+        await park();
+        assert.deepEqual(pauses, [f.before.sandboxId]);
+        assert.deepEqual(tails, [f.before.sandboxId]);
+        assert.equal((await machine(f.before.runId)).state, 'paused');
+        assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [f.deviceTokenId])).rows[0].revokedAt);
+        // No data-plane ticket was issued by this database fixture.
+        await closeReviewSession(f.authority, { kind, id: f.lease.id }, pool);
+      }
+    });
+
+    await t.test('actual adoption waits for the old review close ACK before reusing that task VM', async () => {
+      for (const state of ['running', 'paused'] as const) {
+        const kind = state === 'running' ? 'terminal' : 'preview';
+        const f = await reviewFixture(kind, state), next = await run(f.issueId), provider = fake();
+        const identity = () => pool.query('SELECT state,"sandboxId","deviceId","repoId",epoch,"operationId" FROM thread_machines WHERE "runId"=$1', [f.before.runId]);
+        const before = (await identity()).rows[0];
+        const refused = async () => {
+          await assert.rejects(ensureThreadMachine(pool, actor, next, provider.provider), error => error instanceof RetainedTaskMachineUnavailable);
+          assert.deepEqual(provider.calls, [], 'no create, resume or kill while the old capability could still be live');
+          assert.equal(await machine(next), undefined);
+          assert.deepEqual((await identity()).rows[0], before);
+        };
+        const lease = async () => (await pool.query('SELECT * FROM coding_review_sessions WHERE id=$1', [f.lease.id])).rows[0];
+        assert.ok((await lease()).revokedAt, 'new Run admission durably fences the old capability');
+        assert.equal(await readReviewSession(f.authority, { kind, id: f.lease.id }, pool), null);
+        await refused();
+        let acknowledge = false;
+        const close = mock.method(reviewSessionTransport, 'close', async (...[target, ids, expiresAt, closingKind]: Parameters<typeof reviewSessionTransport.close>) => {
+          assert.deepEqual(target, { runId: f.before.runId, ownerId: owner, workspaceId, sandboxId: f.before.sandboxId });
+          assert.deepEqual(ids, [f.lease.id]); assert.equal(expiresAt, f.lease.expiresAt); assert.equal(closingKind, kind);
+          assert.ok((await lease()).revokedAt, 'the durable fence exists before provider IO');
+          // Taking this lock from another transaction proves that the remote
+          // close does not hold the machine transaction open.
+          const contender = await pool.connect();
+          try {
+            await contender.query('BEGIN');
+            await contender.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [f.before.runId]);
+            await contender.query('ROLLBACK');
+          } finally { contender.release(); }
+          if (!acknowledge) throw new Error('synthetic close acknowledgement unavailable');
+          await refused(); // Even a successful in-flight close is not its ACK.
+        });
+        try {
+          assert.deepEqual(await revokeReviewSession(f.authority, { kind, id: f.lease.id }, pool), { closed: 0, pending: 1 });
+          assert.ok((await lease()).retryAt.getTime() > Date.now());
+          await refused();
+          acknowledge = true;
+          assert.deepEqual(await revokeReviewSession(f.authority, { kind, id: f.lease.id }, pool), { closed: 1, pending: 0 });
+          assert.equal(await lease(), undefined);
+        } finally { close.mock.restore(); }
+        // The existing lifecycle parks a finished review VM before handoff;
+        // its filesystem is retained and the next Run adopts only that VM.
+        const pauses: string[] = [];
+        await parkThreadMachine(pool, actor, f.before.runId, async id => { pauses.push(id); }, async () => null);
+        assert.deepEqual(pauses, state === 'running' ? [f.before.sandboxId] : []);
+        assert.equal((await machine(f.before.runId)).state, 'paused');
+        await assert.rejects(ensureThreadMachine(pool, actor, next, provider.provider));
+        assert.deepEqual(provider.calls, [`connect:${f.before.sandboxId}`], 'the synthetic SDK stops bootstrap after the real SQL adoption');
+        assert.equal((await machine(next)).sandboxId, f.before.sandboxId);
+        assert.equal((await machine(next)).deviceId, f.before.device);
+        assert.equal((await machine(f.before.runId)).sandboxId, null);
+        assert.ok((await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [next])).rows[0].epoch > before.epoch);
+      }
+    });
+
     await t.test('an immediate owner continuation transfers its safely exited running VM before the timer parks it', async () => {
       const issueId = await task(), before = await parked(issueId), next = await run(issueId), tokenId = randomUUID();
       await pool.query('UPDATE agent_runs SET report=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL WHERE id=$1', [before.runId,
@@ -1620,6 +1725,17 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.deepEqual((await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0], original, blocked);
         assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt, null, blocked);
       }
+    });
+
+    await t.test('a manual pause reports a conflict if the machine binding changed before parking', async () => {
+      const before = await parked(await task());
+      const { epoch } = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+      await pool.query(`UPDATE thread_machines SET state='running',epoch=epoch+1 WHERE "runId"=$1`, [before.runId]);
+      await assert.rejects(
+        threadMachineAction(pool, actor, before.runId, 'pause', { epoch, sandboxId: before.sandboxId }),
+        { status: 409 },
+      );
+      assert.equal((await machine(before.runId)).state, 'running');
     });
 
     await t.test('an admitted adjacent stage keeps the same live VM and fences old lifecycle callbacks', async () => {

@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -31,8 +31,8 @@ test('Project v2: split database migration, canonical relationships and live ten
   const suffix = randomUUID().replaceAll('-', '')
   const appName = `project_app_${suffix}_e2e`, tenantName = `project_ws_${suffix}_e2e`
   const admin = new Pool({ connectionString: url, max: 1 })
-  await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-  await admin.query(`CREATE DATABASE "${tenantName}" TEMPLATE template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, tenantName, 'template0')
   const appUrl = new URL(url!), tenantUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; tenantUrl.pathname = `/${tenantName}`
   const application = new Pool({ connectionString: appUrl.toString(), max: 5 })
@@ -51,13 +51,13 @@ test('Project v2: split database migration, canonical relationships and live ten
   globals.mikkaPool = application; globals.workspacePool = workspace
   let workspaceModule: Pool | undefined
   let selectedWorkspace: string | undefined
-  const framework = await import('next/headers')
-  const headersMock = mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  const headersMock = mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }),
     headers: async () => new Headers(),
   } })
-  const localization = await import('next-intl/server')
-  const localeMock = mock.module('next-intl/server', { namedExports: { ...localization, getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
+  const localization = await import('@/lib/intl/i18n-server')
+  const localeMock = mock.module('@/lib/intl/i18n-server', { namedExports: { ...localization, getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))
@@ -199,6 +199,24 @@ test('Project v2: split database migration, canonical relationships and live ten
     const created = await actAs(member, () => actions.saveProject({ ...draft, leadUserId: owner, memberIds: [owner, member] }))
     assert.ok('project' in created, JSON.stringify(created))
     const createdId = created.project.id
+
+    await t.test('Task label suggestions stay in the Task workspace for a reader who belongs to both', async () => {
+      const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')
+      const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+      for (const [id, name] of [[initialTasks[0], 'Alpha only'], [foreignTask, 'Beta only']]) {
+        const document = { type: 'doc' }
+        const metadata = readIssueMetadata(document)
+        metadata.labels = [{ name, color: 'blue' }]
+        await application.query('UPDATE issues SET content=$2 WHERE id=$1', [id, withIssueMetadata(document, metadata)])
+      }
+      try {
+        for (const [workspaceId, id, name] of [[alpha, initialTasks[0], 'Alpha only'], [beta, foreignTask, 'Beta only']]) {
+          selectedWorkspace = workspaceId
+          const options = await actAs(owner, () => getIssuePropertyOptions(id))
+          assert.deepEqual(options.labels, [{ name, color: 'blue' }])
+        }
+      } finally { selectedWorkspace = alpha }
+    })
 
     await t.test('task Project options retain every visible project UUID and the selected tenant', async () => {
       const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')
@@ -349,7 +367,7 @@ test('Project v2: split database migration, canonical relationships and live ten
       const assigned = await actAs(member, () => actions.setProjectIssues({ id: source.id, revision: source.revision, issueIds: [task], workspaceId: alpha }))
       assert.ok('project' in assigned, JSON.stringify(assigned))
       const staleMove = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: null, workspaceId: alpha }))
-      assert.match(staleMove.error ?? '', /issueOutdated/, 'a Task detail opened before a Project edit cannot overwrite the new link')
+      assert.equal(staleMove.error, 'issueOutdated', 'a Task detail opened before a Project edit cannot overwrite the new link')
       assert.equal((await workspace.query('SELECT "projectId" FROM workspace_project_tasks WHERE "issueId"=$1', [task])).rows[0].projectId, source.id)
       const { changeResourceAccess } = await import('../lib/resource-access/store')
       const policy = (await application.query(`SELECT revision FROM resource_access_policies WHERE kind='project' AND id=$1`, [destination.id])).rows[0]

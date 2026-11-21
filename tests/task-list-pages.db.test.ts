@@ -11,7 +11,7 @@ if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Task page tests
 
 test('authorized Task collection traverses every threadless issue, including microsecond ties and the last page', { skip: !enabled }, async () => {
   const { pool } = await import('../lib/db')
-  const { listWorkspaceIssues, listWorkspaceTaskPage } = await import('../app/actions/issues')
+  const { countAssignedWorkspaceTasks, listWorkspaceIssues, listWorkspaceTaskPage } = await import('../app/actions/issues')
   const user = 'task-page-' + randomUUID(), other = 'task-page-' + randomUUID()
   async function createUser(id: string) {
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [id, id+'@example.invalid'])
@@ -24,6 +24,13 @@ test('authorized Task collection traverses every threadless issue, including mic
       '2022-09-12T00:00Z'::timestamptz + (n % 3) * interval '1 microsecond' from generate_series(1,$3::int) n`, [owner,id,count])
     await insert(workspaceId, user, 205); await insert(foreign, other, 1)
     const run = <T,>(fn: () => Promise<T>) => withActivitySession(user, fn, workspaceId)
+    // Only explicit human assignments count, including Tasks beyond the first page.
+    await pool.query(`update issues set content=jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',
+      jsonb_build_object('assignee', jsonb_build_object('kind','member','id',$1::text,'name','Assignee','image',null))))
+      where "workspaceId"=$2`, [user,workspaceId])
+    assert.deepEqual(await run(() => countAssignedWorkspaceTasks(workspaceId)), { count: 205 })
+    assert.deepEqual(await withActivitySession(other, () => countAssignedWorkspaceTasks(foreign), foreign), { count: 0 })
+    await assert.rejects(run(() => countAssignedWorkspaceTasks(foreign)), /workspaceAccessDenied/)
     const first = await run(() => listWorkspaceIssues(workspaceId))
     assert.equal(first.length, 100)
     const cursor = nextTaskListCursor(first)!
@@ -38,6 +45,20 @@ test('authorized Task collection traverses every threadless issue, including mic
     await assert.rejects(run(() => listWorkspaceTaskPage({ workspaceId: foreign, after: cursor })), /workspaceAccessDenied/)
     const anchor = (await pool.query('select id from issues where "userId"=$1', [other])).rows[0].id
     assert.deepEqual(await run(() => listWorkspaceTaskPage({ workspaceId, after: { ...cursor, id: anchor } })), { workspaceId, items: [], next: null, reset: true })
+    const parentId = expected.rows[0].id, otherParent = expected.rows[1].id
+    const children = expected.rows.slice(2, 107).map(row => row.id)
+    await pool.query(`update issues set content=jsonb_build_object('attrs',jsonb_build_object(
+      'mikka',jsonb_build_object('parentId',$1::text)))
+      where id=any($2::uuid[])`, [parentId, children])
+    const byParent = (id: string, after: Parameters<typeof listWorkspaceTaskPage>[0]['after'] = null) =>
+      run(() => listWorkspaceTaskPage({ workspaceId, parentId: id, after }))
+    const firstChildren = await byParent(parentId)
+    assert.equal(firstChildren.items.length, 100)
+    const moreChildren = await byParent(parentId, firstChildren.next)
+    assert.deepEqual([...firstChildren.items, ...moreChildren.items].map(row => row.id), children)
+    assert.equal(moreChildren.next, null)
+    assert.equal((await byParent(otherParent, firstChildren.next)).reset, true)
+    await assert.rejects(byParent(anchor), /issueNotFound/)
     const { seedAgent, seedBot, seedRun } = await import('./support/workspace-admin-db')
     const agent = await seedAgent(pool, user)
     const firstBot = await seedBot(pool, workspaceId, user, 'First dispatcher'), laterBot = await seedBot(pool, workspaceId, user, 'Later dispatcher')
@@ -73,6 +94,36 @@ test('authorized Task collection traverses every threadless issue, including mic
     assert.equal((await run(() => listWorkspaceTaskPage({ workspaceId, after: cursor }))).reset, true)
   } finally {
     for (const id of [user, other]) {
+      await pool.query('delete from issues where "userId"=$1', [id])
+      await pool.query('delete from "user" where id=$1', [id])
+    }
+  }
+})
+
+test('Views counts all seven statuses and each reader’s preferences across pages of the selected visible collection', { skip: !enabled }, async () => {
+  const { pool } = await import('../lib/db')
+  const { countWorkspaceTaskViews } = await import('../app/actions/issues')
+  const owner = 'task-view-' + randomUUID(), peer = 'task-view-' + randomUUID()
+  try {
+    for (const id of [owner, peer]) {
+      await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [id, id+'@example.invalid'])
+    }
+    const { workspaceId } = await seedCoordinator(owner)
+    const { workspaceId: personal } = await seedCoordinator(peer)
+    await pool.query(`insert into issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority)
+      select gen_random_uuid(),$1,$2,'bound','personal','Status '||n,jsonb_build_object('type','doc','attrs',
+        jsonb_build_object('mikka',
+          jsonb_build_object('favoriteUserIds',jsonb_build_array($1::text),'subscriberUserIds',jsonb_build_array($3::text))
+          || case when n = 109 then '{"deletedAt":"2026-10-01T00:00:00.000Z"}'::jsonb else '{}'::jsonb end)),
+        case when n > 7 then 'todo' else (array['backlog','todo','doing','review','done','canceled','duplicate'])[n] end,
+        'normal' from generate_series(1,109) n`, [owner, workspaceId, peer])
+    const counts = await withActivitySession(owner, () => countWorkspaceTaskViews(workspaceId), workspaceId)
+    assert.deepEqual(counts, { backlog: 1, todo: 102, doing: 1, review: 1, done: 1, canceled: 1, duplicate: 1, favorites: 108, following: 0 })
+    const empty = await withActivitySession(peer, () => countWorkspaceTaskViews(personal), personal)
+    assert.ok(Object.values(empty).every(value => value === 0))
+    await assert.rejects(withActivitySession(peer, () => countWorkspaceTaskViews(workspaceId), personal), /workspaceAccessDenied/)
+  } finally {
+    for (const id of [owner, peer]) {
       await pool.query('delete from issues where "userId"=$1', [id])
       await pool.query('delete from "user" where id=$1', [id])
     }

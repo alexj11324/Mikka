@@ -14,7 +14,8 @@ import type { ServerRequest } from 'srvx'
 import { browserRpcOrigin } from '../../../lib/browser-rpc/handler'
 import { createApiHandler } from '../src/application'
 import { requireRequestScope } from '../src/context'
-import { after } from '../compat/server'
+// oxlint-disable-next-line no-restricted-imports -- this spec exercises the request lifetime itself
+import { after } from '@/lib/server-runtime/server'
 import { vercelRequestAuthority } from '../request-authority-module.mjs'
 import { withNodeRequestAuthority, withVercelRequestAuthority } from './request-authority'
 import authorityPlugin from '../plugins/request-authority'
@@ -38,7 +39,7 @@ async function officialAdapter() {
   assert.match(sourceText, /toNodeHandler\(/)
   const result = await build({
     stdin: { contents: `export { default } from ${JSON.stringify(source)}; export { setApplication } from 'nitro/app'`, resolveDir: nitro },
-    bundle: true, write: false, platform: 'node', format: 'esm', target: 'node24',
+    bundle: true, write: false, platform: 'node', format: 'esm', target: 'node22',
     define: { 'import.meta._websocket': 'false' }, logLevel: 'silent',
     plugins: [{ name: 'local-application-slot', setup(builder) {
       builder.onResolve({ filter: /^(?:nitro\/app|#nitro\/virtual\/polyfills|#nitro\/runtime\/app)$/ }, args => ({ path: args.path, namespace: 'application-slot' }))

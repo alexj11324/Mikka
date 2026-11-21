@@ -45,7 +45,7 @@ test('only newly created links are sent; provider failures do not abort other re
     await Promise.resolve()
     active--
     if (message.to === 'member3@example.invalid') throw new Error('synthetic provider token should never leak')
-  })
+  }, async () => new Set())
   assert.deepEqual(result, { acceptedByProvider: 4, failed: 1 })
   assert.deepEqual(seen.sort(), ['member1@example.invalid', 'member2@example.invalid', 'member3@example.invalid',
     'member4@example.invalid', 'member5@example.invalid'])

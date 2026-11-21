@@ -25,7 +25,12 @@ export function createModelFixture() {
     const marker = [...JSON.stringify(input.messages).matchAll(/selfhost_turn_(\d{2})/g)].at(-1)?.[1]
     if (marker) turns.add(marker)
     calls++
-    const content = marker ? `SELF_HOSTED_REPLY_${marker}` : 'Synthetic self-hosted protocol response.'
+    // Only the short-title request advertises this structured response. Keep
+    // the existing chat and streaming replies independent of title naming.
+    const shortTitle = input.messages.some(message => message.role === 'system'
+      && typeof message.content === 'string' && message.content.includes('{"title": "<short title>"}'))
+    const content = shortTitle ? JSON.stringify({ title: 'Desktop inbox review' })
+      : marker ? `SELF_HOSTED_REPLY_${marker}` : 'Synthetic self-hosted protocol response.'
     const common = { id: `chatcmpl-fixture-${calls}`, created: Math.floor(Date.now() / 1000), model: 'selfhost-ci' }
     const usage = { prompt_tokens: 8, completion_tokens: 8, total_tokens: 16 }
     if (!input.stream) return json(200, { ...common, object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage })

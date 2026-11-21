@@ -24,7 +24,7 @@ mock.module(new URL('../lib/app-build.ts', import.meta.url).href, { namedExports
 let finishWake: (value: null) => void
 let failWake: (error: Error) => void
 const failures: string[] = []
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: (message: string) => failures.push(message) } } })
 mock.module(new URL('../hooks/use-computer.ts', import.meta.url).href, { namedExports: {
   useComputer: () => ({ data: state, mutate: async () => { stateReads++; return state } }),
@@ -35,6 +35,9 @@ mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedE
 } } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ size: _size, variant: _variant, ...props }: ComponentProps<'button'> & { size?: string; variant?: string }) => <button {...props} /> } })
 mock.module(new URL('../components/ui/progress.tsx', import.meta.url).href, { namedExports: { Progress: (props: { 'aria-label': string }) => <div role="progressbar" aria-label={props['aria-label']} /> } })
+mock.module(new URL('../components/settings/e2b-key-dialog.tsx', import.meta.url).href, { namedExports: {
+  E2BKeyDialog: ({ onClose }: { onClose: (changed: boolean) => void }) => <div role="dialog"><button onClick={() => onClose(true)}>save key</button><button onClick={() => onClose(false)}>cancel</button></div>,
+} })
 
 const browser = new Window()
 let root: Root
@@ -80,6 +83,26 @@ test('a real wake failure is visible and releases the button for an explicit ret
   assert.equal(requests, 2)
   state = { machine: 'waking', control: 'idle' }
   await act(async () => finishWake(null))
+})
+
+test('a missing key opens the existing setup dialog and saving retries wake', async () => {
+  await render()
+  await act(async () => container.querySelector('button')!.click())
+  await act(async () => failWake(new ComputerRequestError(503, { error: 'e2b_key_missing' })))
+  assert.ok(container.querySelector('[role="dialog"]'))
+  assert.deepEqual(failures, [])
+  await act(async () => container.querySelector<HTMLButtonElement>('[role="dialog"] button')!.click())
+  assert.equal(requests, 2)
+  await act(async () => finishWake(null))
+})
+
+test('closing key setup without a save does not retry provisioning', async () => {
+  await render()
+  await act(async () => container.querySelector('button')!.click())
+  await act(async () => failWake(new ComputerRequestError(503, { error: 'e2b_key_missing' })))
+  await act(async () => container.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')[1].click())
+  assert.equal(requests, 1)
+  assert.deepEqual(failures, [])
 })
 
 

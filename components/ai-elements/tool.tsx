@@ -19,14 +19,14 @@ import {
 import { cn } from "@/lib/utils";
 import type { ToolUIPart } from "ai";
 import {
-  ChevronDownIcon,
-  CircleIcon,
-  LoaderCircleIcon,
-  WrenchIcon,
-  XCircleIcon,
-} from "lucide-react";
+  ChevronDown,
+  Circle,
+  LoaderCircle,
+  Wrench,
+  CircleX,
+} from "@/components/icons";
 import type { ComponentProps, ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { isValidElement } from "react";
 import { CodeBlock } from "./code-block";
 
@@ -60,13 +60,13 @@ const getStatus = (status: ToolUIPart["state"], t: ReturnType<typeof useTranslat
   };
 
   const icons: Record<ToolUIPart["state"], ReactNode> = {
-    "input-streaming": <CircleIcon className="size-3.5" />,
-    "input-available": <LoaderCircleIcon className="size-3.5 animate-spin motion-reduce:animate-none" />,
-    "approval-requested": <CircleIcon className="size-3.5 text-warning-foreground" />,
-    "approval-responded": <WrenchIcon className="size-3.5" />,
-    "output-available": <WrenchIcon className="size-3.5" />,
-    "output-error": <XCircleIcon className="size-3.5 text-destructive-foreground" />,
-    "output-denied": <XCircleIcon className="size-3.5 text-warning-foreground" />,
+    "input-streaming": <Circle className="size-3.5" />,
+    "input-available": <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />,
+    "approval-requested": <Circle className="size-3.5 text-warning-foreground" />,
+    "approval-responded": <Wrench className="size-3.5" />,
+    "output-available": <Wrench className="size-3.5" />,
+    "output-error": <CircleX className="size-3.5 text-destructive-foreground" />,
+    "output-denied": <CircleX className="size-3.5 text-warning-foreground" />,
   };
 
   const shown = status === "output-error" || status === "output-denied" || status === "approval-requested";
@@ -97,7 +97,7 @@ export const ToolHeader = ({
     <span className={status.shown ? (state === "output-error" ? "text-destructive-foreground" : "text-warning-foreground") : "sr-only"}>
       {status.label}
     </span>
-    <ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 transition-transform in-data-[panel-open]:rotate-180" />
+    <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 transition-transform in-data-[panel-open]:rotate-180" />
   </CollapsibleTrigger>
   );
 };

@@ -166,6 +166,20 @@ test('retrying terminal bytes after the first EOF preserves the committed stream
   expect(Array.from(new Uint8Array(await (await request('/read', run, 'events')).arrayBuffer()))).toEqual([41])
 })
 
+test('a sealed stream replays durable bytes across pages without a live subscription', async () => {
+  const run = 'sealed-without-subscriber'
+  const origin = (await runtime.ready).origin
+  const get = createNodeStreamReader((url, init) => fetch(new URL(url.pathname + url.search, origin), init))
+  const bytes = Uint8Array.from({ length: 35 }, (_, i) => i + 1)
+  for (const byte of bytes) await write(run, Uint8Array.of(byte))
+  await request('/close', run, 'events', { method: 'POST' })
+  await request('/disable-subscriptions', run, 'events', { method: 'POST' })
+  for (const [start, expected] of [[0, bytes], [-2, bytes.slice(-2)], [bytes.length, new Uint8Array()]]) {
+    expect(await new Response(await get(run, 'events', start)).bytes()).toEqual(expected)
+  }
+  expect((await info('/stats', run)).waiting).toBe(0)
+})
+
 test('a fresh workerd replays persisted bytes at the requested offset and resumes paginated reads', async () => {
   const run = 'run-restart'
   await write(run, new Uint8Array([19]))

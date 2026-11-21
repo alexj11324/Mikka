@@ -1,4 +1,4 @@
-import { createContext, type ReactNode } from 'react'
+import { createContext, type ReactNode, type RefObject } from 'react'
 import type { DecisionReceipt } from '@/hooks/use-decision-submission'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
@@ -22,8 +22,11 @@ export type ThreadToolRow = {
   error?: string
   /** A short note after the label (its target, a count). */
   note?: string
-  /** Its output or the thought, in full, for a tooltip. */
+  /** Recorded input, output or reasoning for the expanded row. */
+  input?: string
   detail?: string
+  command?: string
+  exitCode?: number
 }
 
 /** One part of a Bot's message, top to bottom as it happened. */
@@ -45,6 +48,8 @@ export type ThreadEntry =
     /** When it was written, ms. */
     at: number
     text: string
+    /** The same words with explicit task, thread and PR references linked. */
+    body?: ReactNode
     /** What went with it: a quote from an artifact or a reply, browser notes, a 建议 card. */
     attachments?: { id: string; name: string; meta?: string }[]
     /** queued: written offline · sending · failed: shows 重试 (onRetry). */
@@ -62,7 +67,7 @@ export type ThreadEntry =
     streaming?: boolean
     stopped?: boolean
     /** Who wrote it, where the conversation has more than one Agent (a task's attempts): shown where it changes. */
-    author?: { id: string; name: string; mark: ReactNode }
+    author?: { id: string; name: string; mark: ReactNode; /** An Agent's reply, as Capy's: its words with no author line (Alex, 2026-11-15). */ quiet?: boolean; /** Its name opens where the message came from: a child thread's first message, its parent thread. */ onOpen?: () => void }
     /** A line about the chat (an event, a quota switch), not the Bot's words: it has no author line, and the reply after it shows its own. */
     event?: true
     /** Copy, the pages it cites, reactions. */
@@ -92,9 +97,11 @@ export type ThreadScreenProps = {
   mark: ReactNode
   /** null while the first read is on its way. */
   entries: ThreadEntry[] | null
-  /** Shown in place of an empty conversation: the welcome being written, or starters. */
+  /** Shown in place of an empty conversation: the welcome being written. No starter cards (R-12). */
   empty?: ReactNode
-  older?: { loading: boolean; onLoad: () => void }
+  /** Older rows were added above the visible transcript. */
+  historyPrepend?: number
+  older?: { loading: boolean; auto?: boolean; onLoad: () => void }
   /** The Bot is answering: Stop ends it. */
   working: boolean
   onStop?: () => void
@@ -102,7 +109,10 @@ export type ThreadScreenProps = {
   lastSeen?: number
   onMarkRead?: () => void
   /** The composer, as the chat-composer slot gets it: `useChatComposer` (hooks/use-chat-composer.ts) does what it does. */
-  composer: Omit<ChatComposerProps, 'model' | 'quote'>
+  composer: Omit<ChatComposerProps, 'quote'>
+  /** A reader without a reply target does not get a composer. */
+  readOnly?: boolean
+  scrollRef?: RefObject<HTMLDivElement | null>
   /** Chips that go out with the next message (a quote, a browser note), each with Remove. */
   pending: { id: string; name: string; meta?: string; onRemove: () => void }[]
   /** Notices that wait above the composer (quota, sign in again, actions to approve). */
@@ -141,4 +151,4 @@ export type ThreadScreenProps = {
 /** The hosted shell waits for a task tab's existing save before removing it. */
 export const WorkTabCloseContext = createContext<((tabId: string) => Promise<boolean>) | null>(null)
 
-export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; content: ReactNode }
+export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; label?: string; content: ReactNode }

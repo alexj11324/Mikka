@@ -6,6 +6,7 @@ import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { observePoolCommits, withoutCommitEffectsForRestore } from '@/lib/db/commit-effects'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
+import { DRIVE_STORAGE_PREFIX, driveStorageKey } from '@/lib/drive/blobs'
 import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeProjectRetention, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
@@ -173,9 +174,11 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
       let report: AccountCleanupReport
       try {
+        // The plan frozen in prepare() names the workspaces that go, so their paid plans are
+        // cancelled here, before any row this job removes can make the charge unreachable.
         const result = await withDatabaseClient(lease, () => options.externalCleanup
           ? options.externalCleanup(job.subjectUserId, main)
-          : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }))
+          : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }, job.plan?.solo ?? []))
         report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
       } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
       assertHeld()
@@ -264,7 +267,12 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       const remove = options.deleteObject ?? (async (key: string) => { if (artifactStorage() === 'r2') await deleteArtifactObject(key) })
       for (const key of job.pendingObjects) {
         assertHeld()
-        try { await remove(key) }
+        // Older jobs could have captured another owner's Drive object. Its
+        // canonical storage key still identifies the owner after the APP sweep.
+        const digest = key.slice(-64)
+        const owned = !key.startsWith(DRIVE_STORAGE_PREFIX)
+          || (/^[a-f0-9]{64}$/.test(digest) && key === driveStorageKey(job.subjectUserId, digest))
+        try { if (owned) await remove(key) }
         catch {
           await lease.query('UPDATE account_deletion_jobs SET stage=\'storage_pending\',"blockedReasons"=\'["object_cleanup_failed"]\',"updatedAt"=now() WHERE id=$1', [id])
           return await load(lease, id)

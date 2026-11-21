@@ -51,6 +51,7 @@ test('credit billing history and remaining balance are workspace scoped', { skip
   assert.equal((await workspaceCreditBillingView(owner, workspace.id)).transactions.at(-1)?.points, 100, 'spent gift retains its original transaction')
   await pool.query('INSERT INTO hosted_legacy_workspaces ("workspaceId") VALUES ($1)', [legacy.id])
   const grandfathered = await workspaceCreditBillingView(owner, legacy.id)
-  assert.equal(grandfathered.balancePoints, 100)
-  assert.deepEqual(grandfathered.transactions.map(row => row.type), ['verification'])
+  // No trial (decision 2026-11-15-1900): grandfathering verifies the workspace but grants no new allowance.
+  assert.equal(grandfathered.balancePoints, 0)
+  assert.deepEqual(grandfathered.transactions.map(row => row.type), [])
 })

@@ -19,7 +19,7 @@ import { agents, agentRuns, bots, coordinatorEvents, deviceRepos, devices, issue
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceSessionOpen } from '@/lib/device-presence'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
@@ -78,7 +78,7 @@ export interface RunDetail {
   decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date; submissionId?: string | null }[]
+  messages: { id: string; text: string; createdAt: Date; sourceRunId?: string | null; editable?: boolean; submissionId?: string | null }[]
 }
 
 export const runViewColumns = {
@@ -290,7 +290,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   if (!model) throw new ActionFailureError('runModelMissing')
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
   // A subscription's identity is its provider model, including at the CLI boundary.
-  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, workspaceId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
+  const { subscription, apiKey, credits } = await localRunCredential(internal?.client ?? pool, userId, botId, workspaceId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
   const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
@@ -300,7 +300,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
     mailboxScope = { botId, workspaceId }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, credits, model, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   if (agentDefinition && input.modelDispatch && !botId) {
     // Bot-less preferences belong to the actual execution workspace. Persist
@@ -337,7 +337,7 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
     { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } }, { transaction })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
   return { model: target.model, agentProfile,
-    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+    modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
     ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
     ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}),
     ...(chosen.policyCeiling ? { policyCeiling: chosen.policyCeiling } : {}) }
@@ -369,12 +369,14 @@ export async function runVisibilityPredicate(reader: IssueReader) {
  * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
  * as `workspaceRunView` does. No report, error or provenance.
  */
-export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; hasIssue: boolean; agentName: string; harness: string; promptHead: string | null; title: string | null }[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
   const visible = await runVisibilityPredicate(reader)
-  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
-    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
+  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, hasIssue: sql<boolean>`agent_runs."issueId" is not null`, agentName: runBotName, harness: runViewColumns.harness,
+    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end`,
+    // The conversation's own stored title, for its owner only, as its prompt is.
+    title: sql<string | null>`case when agent_runs."userId" = ${userId} then agent_runs.title end` }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(visible, inArray(agentRuns.id, runIds))).limit(Math.max(1, Math.min(runIds.length, 100)))
   return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
@@ -413,38 +415,39 @@ export async function visibleRuns(reader: IssueReader, input: RunListFilter & { 
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns),
-    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, deviceOnline: sql<boolean>`coalesce(${deviceSessionOpen}, false)`, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       visible,
       runListFilter(input),
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
-  const presence = await deviceOnlineStates(rows.flatMap(row => row.ownerId === userId && row.status === 'queued' && row.waitDeviceId
-    ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
-  return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
-    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled, deviceOnline: waitDeviceId ? presence.get(waitDeviceId) : undefined })
+  return rows.map(({ ownerId, waitDeviceId, deviceOnline, deviceEnabled, ...run }) => {
+    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, deviceEnabled, deviceOnline })
     return ownerId === userId ? { ...run, failureDetails: input.brief ? readCompactRunFailure(run.failureDetails) : readRunFailure(run.failureDetails), ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
   })
 }
 
 /** The caller has authorized these run IDs. Only the reader's own sends include a retry identity. */
 export function readRunMessages(userId: string, runIds: string[]) {
-  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt,
+  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt, sourceRunId:runMessages.runId,
+    editable:sql<boolean>`${runMessages.userId}=${userId} AND ${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
     submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'` })
     .from(runMessages).leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id),
       eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message')))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
 }
 
-export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
+export async function readRun(userId: string, runId: string, history: 'full' | 'latest-events' = 'full'): Promise<RunDetail | null> {
   const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
   if (!run) return null
   // Empty agentId is the deliberately restricted teammate projection.
   if (!run.agentId) return { run, chunks: [], messages: [] }
-  const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
-    .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await readRunMessages(userId, [run.id])
+  const chunksForRun = db.select({ chunk: runChunks.chunk }).from(runChunks).where(eq(runChunks.runId, run.id))
+  const chunks = history === 'full'
+    ? await chunksForRun.orderBy(asc(runChunks.seq))
+    : (await chunksForRun.orderBy(desc(runChunks.seq)).limit(5)).reverse()
+  const messages = history === 'full' ? await readRunMessages(userId, [run.id]) : []
   const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
   return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }
@@ -556,7 +559,7 @@ export async function requestRunStop(userId: string, runId: string): Promise<{ s
   const stoppedRunIds: string[] = []
   for (const runId of target.runIds) {
     try {
-      if (await stopOwnedRun(db, userId, runId)) await afterRunEnded(userId, runId)
+      if (await stopOwnedRun(db, userId, runId, true)) await afterRunEnded(userId, runId)
       else {
         // A refused startup may have no lifecycle/daemon to acknowledge this
         // stop. Reuse the scoped host acknowledgement after the stop commits.

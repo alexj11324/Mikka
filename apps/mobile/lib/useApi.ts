@@ -6,13 +6,20 @@ import { needsForegroundRead, withholdsCachedRead } from './api-read-state'
 import { live, useLive, type LiveSpec } from './live'
 import { presenceScope } from './presence-scope'
 
+/** Subscribe to the native foreground transition. Callers decide whether
+ * an already-loaded result needs a receipt or a stale result needs a read. */
+export function onAppForeground(entered: () => void) {
+  const subscription = AppState.addEventListener('change', state => { if (state === 'active') entered() })
+  return () => subscription.remove()
+}
+
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
 /** Data younger than this is fresh: coming back to the app leaves it alone (decision 2026-11-01-0400-no-refetch-on-focus). */
 export const FRESH_FOR_MS = 60_000
 onWorkspaceChange(() => cache.clear())
 
-/** Loads `path` ahead of its screen, once, so opening it draws at once (对话 warms the top chats). */
+/** Loads `path` ahead of its screen, once, so opening it draws at once (线程 warms the top chats). */
 export async function prefetch(path: string) {
   await cache.prefetch(path, api)
 }
@@ -51,13 +58,13 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   const revision = path ? cache.revision(path) : 0
   const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
     cache.commit(context, () => {
-      if (path && cache.revision(path) !== revision) return
+      if (path && (cache.revision(path) !== revision || cache.denial(path))) return
       // A saved mutation is newer than a read already in flight.
       request.current++; pending.current = null; setLoading(false); setError(null); failed.current = false
       setStored(current => {
         let value = current
         cache.commit(context, () => {
-          if (path && cache.revision(path) !== revision) return
+          if (path && (cache.revision(path) !== revision || cache.denial(path))) return
           value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
           if (path && value !== null) cache.set(path, value, context)
         })
@@ -84,7 +91,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     const promise = (async () => {
       try {
         const next = await read(path)
-        accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
+        accept(() => { cache.storeRead(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
       } catch (failure) {
         accept(() => {
           if (failure instanceof ApiError && withholdsCachedRead(failure.status)) {
@@ -144,19 +151,16 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
 
   useEffect(() => {
     if (!path) return
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') {
-        // Stale-while-revalidate: one silent read only when the data is older than
-        // FRESH_FOR_MS; the screen keeps what it shows meanwhile. A pushed screen's
-        // catch-up read is the live channel's; here only a failed read recovers.
-        if (pushed ? failed.current || loadedAt.current === 0 : needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
-      }
+    return onAppForeground(() => {
+      // Pushed screens catch up on their live channel. Only a failed or stale
+      // read needs an additional request on returning to the foreground.
+      if (pushed ? failed.current || loadedAt.current === 0 : needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
     })
-    return () => sub.remove()
   }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
-  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
+  const denial = path ? cache.denial(path) : null
+  return { data: denial ? null : sameSource ? data : path ? cache.get<T>(path) : null, error: denial ?? (sameSource ? error : null), loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */

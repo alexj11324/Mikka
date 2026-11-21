@@ -1,15 +1,14 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
-import { maskFor } from '@/lib/secrets/runtime'
+import { maskFor, maskForRun } from '@/lib/secrets/runtime'
 import { runChanged } from '@/lib/live/panels'
 import { runListChanged } from '@/lib/live/lists'
 
-export const dynamic = 'force-dynamic'
 
 /** States the daemon may report mid-run; the end comes through `/complete`. */
 const LIVE_STATES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
@@ -32,6 +31,21 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
   if (!await ownedRun(runId, caller.userId)) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
   const parsed = runPatchSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid patch.' }, { status: 400 })
+  if (parsed.data.observedModel !== undefined && parsed.data.sessionId) {
+    // A retried observation never sets session, state or worktree. The claim and
+    // the established session must still belong to the reporting device.
+    const model = (await maskForRun(runId, parsed.data.observedModel)).slice(0, 500)
+    const changed = await db.update(agentRuns).set({ observedModel: model })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId),
+        eq(agentRuns.deviceTokenId, caller.tokenId), eq(agentRuns.sessionId, parsed.data.sessionId),
+        caller.scopeDeviceId ? eq(agentRuns.deviceId, caller.scopeDeviceId) : undefined,
+        caller.scopeWorkspaceId ? eq(agentRuns.workspaceId, caller.scopeWorkspaceId) : undefined,
+        inArray(agentRuns.status, ['running', 'waiting_input', 'finishing']),
+        sql`${agentRuns.observedModel} IS DISTINCT FROM ${model}`))
+      .returning({ id: agentRuns.id })
+    if (changed.length) await runChanged(db, runId)
+    return new Response(null, { status: 204 })
+  }
   // 4e2 item 4: the error text is agent/harness output; mask it like run events.
   const patch = parsed.data.error !== undefined ? { ...parsed.data, error: await maskFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId }, parsed.data.error) } : parsed.data
   if (!(LIVE_STATES as readonly string[]).includes(patch.state)) {
@@ -51,7 +65,10 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
     .set({
       status: sql`CASE WHEN ${agentRuns.status}='paused' THEN 'paused' ELSE ${patch.state} END`,
       resumeStatus: sql`CASE WHEN ${agentRuns.status}='paused' THEN ${patch.state} ELSE NULL END`,
-      ...(patch.sessionId !== undefined ? { sessionId: patch.sessionId } : {}),
+      ...(patch.sessionId !== undefined ? {
+        sessionId: patch.sessionId,
+        observedModel: sql`CASE WHEN ${agentRuns.sessionId} IS DISTINCT FROM ${patch.sessionId} THEN NULL ELSE ${agentRuns.observedModel} END`,
+      } : {}),
       ...(patch.worktree !== undefined ? { worktreePath: patch.worktree } : {}),
       ...(patch.error !== undefined ? { error: patch.error } : {}),
       updatedAt: new Date(),

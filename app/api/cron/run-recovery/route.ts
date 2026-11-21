@@ -5,7 +5,6 @@ import { recoverRuns } from '@/lib/run-recovery'
 import { armDueTimer } from '@/lib/due-timer'
 import { runRecoveryNextDue } from '@/lib/run-recovery-due'
 
-export const runtime = 'nodejs'
 // The group-turn sweep keeps generating after the answer, as a message request does.
 export const maxDuration = 300
 const headers = { 'cache-control': 'no-store' }

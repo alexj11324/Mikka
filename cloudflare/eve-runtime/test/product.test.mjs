@@ -119,3 +119,25 @@ test('only the native Slack credential endpoint forwards a present grant proof',
   const tool = { eveProduct(forwarded) { assert.equal(forwarded.headers.has('x-mikka-slack-grant'), false); return new Response() } }
   await productRequest(request(endpoint, 'POST', { 'x-mikka-slack-grant': 'scoped-proof' }), tool, origin, 'private-local')
 })
+
+test('a refused redirect releases its response body independently of the 502', async () => {
+  const started = Promise.withResolvers()
+  const releaseBody = Promise.withResolvers()
+  const work = []
+  const api = { eveProduct: () => new Response(new ReadableStream({
+    cancel() { started.resolve(); return releaseBody.promise },
+  }), { status: 307, headers: { location: 'https://example.test/unused' } }) }
+  const pending = productRequest(request(), api, origin, 'private-local', { waitUntil(task) { work.push(task) } })
+  try {
+    await started.promise
+    const result = await Promise.race([pending, new Promise(resolve => setImmediate(resolve))])
+    assert.equal(result?.status, 502)
+    assert.equal(result.headers.has('location'), false)
+    assert.equal(result.body, null)
+    assert.equal(work.length, 1)
+  } finally {
+    releaseBody.resolve()
+    await pending
+    await Promise.all(work)
+  }
+})

@@ -5,11 +5,8 @@ on:
     paths:
       - '.github/workflows/task-attachment-production.yml'
       - 'scripts/acceptance/task-attachment-*.mjs'
-      - 'scripts/acceptance/deployed-target.mjs'
-  workflow_run:
-    workflows: ['Web deploy']
-    types: [completed]
-    branches: [main]
+  # Per-service releases publish no Web run to follow: dispatch on main after a release.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -31,9 +28,7 @@ jobs:
   roundtrip:
     if: >-
       github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
-      github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_sha == github.sha && github.event.workflow_run.head_repository.full_name == github.repository
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -53,7 +48,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Verify the open issue and the published main release
+      - name: Verify the open issue and current main served live
         id: release
         run: node scripts/acceptance/task-attachment-release.mjs
         env:

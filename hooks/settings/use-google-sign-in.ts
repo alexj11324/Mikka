@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
@@ -23,12 +23,11 @@ export function useGoogleSignIn(googleEnabled: boolean) {
     if (error) throw new Error('Accounts unavailable')
     return data?.some(account => account.providerId === 'google') ?? false
   }, { revalidateOnFocus: false })
-  const [linkedHere, setLinkedHere] = useState(false)
   /** null while it is not known yet */
-  const linked = !googleEnabled ? false : linkedHere || (accounts.data ?? null)
+  const linked = !googleEnabled ? false : accounts.error ? null : accounts.data ?? null
   const [pending, setPending] = useState(false)
   const [actionError, setActionError] = useState('')
-  const error = actionError || (accounts.error && accounts.data === undefined ? t('googleStatusFailed') : '')
+  const error = actionError || (accounts.error ? t('googleStatusFailed') : '')
   const [success, setSuccess] = useState('')
   // Linking from the desktop finishes in the system browser: read once on the way back.
   const { mutate } = accounts
@@ -39,14 +38,14 @@ export function useGoogleSignIn(googleEnabled: boolean) {
     const googleResult = url.searchParams.get('google')
     if (!googleResult) return
     if (googleResult === 'linked') {
-      setLinkedHere(true)
+      void mutate()
       setActionError('')
       setSuccess(t('googleLinkSuccess'))
     }
     if (googleResult === 'failed') setActionError(t('googleLinkFailed'))
     url.searchParams.delete('google')
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-  }, [t])
+  }, [mutate, t])
 
   async function link() {
     if (!googleEnabled || linked !== false || pending) return

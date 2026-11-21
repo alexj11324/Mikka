@@ -1,3 +1,4 @@
+import { mobileMessages as messages } from '@/lib/messages'
 import { ReadNotice } from '@/components/ReadNotice'
 import { useSettings } from '@/lib/settings'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -40,7 +41,7 @@ export function SettingsPage({ title, children, footer }: { title: string; child
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
       <NavBar back={() => router.canGoBack() ? router.back() : router.replace('/settings')} title={title} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>
-        <ReadNotice error={error} hasData={Boolean(data)} label="设置" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={messages.Settings.title} onRetry={reload} />
         {!data && loading ? <View style={{ padding: 24, alignItems: 'center' }}><Spinner /></View> : null}
         {data ? children : null}
       </ScrollView>
@@ -49,8 +50,8 @@ export function SettingsPage({ title, children, footer }: { title: string; child
   )
 }
 
-export function Row({ icon, label, detail, value, onPress, onLongPress, trailing, destructive, disabled = false }: {
-  icon?: ReactNode; label: string; detail?: string; value?: string; onPress?: () => void; onLongPress?: () => void; trailing?: ReactNode; destructive?: boolean; disabled?: boolean
+export function Row({ icon, label, detail, value, onPress, onLongPress, trailing, destructive, expanded, disabled = false }: {
+  icon?: ReactNode; label: string; detail?: string; value?: string; onPress?: () => void; onLongPress?: () => void; trailing?: ReactNode; destructive?: boolean; expanded?: boolean; disabled?: boolean
 }) {
   const content = (
     <>
@@ -66,7 +67,7 @@ export function Row({ icon, label, detail, value, onPress, onLongPress, trailing
   // A row without its own action stays a View, so a button in `trailing` is not nested in another button.
   if (!onPress) return <View style={styles.row}>{content}</View>
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} aria-disabled={Platform.OS === 'web' ? disabled : undefined} disabled={disabled} onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }, disabled && { opacity: 0.5 }]}>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled, expanded }} aria-disabled={Platform.OS === 'web' ? disabled : undefined} disabled={disabled} onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }, disabled && { opacity: 0.5 }]}>
       {content}
     </Pressable>
   )

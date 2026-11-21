@@ -8,8 +8,8 @@ export type StoreItemState = 'connected' | 'add' | 'ready' | 'unavailable'
 
 /**
  * - An app that needs no connection is `ready`: nothing to add or manage.
- *   One Composio cannot connect for people (OAuth without managed auth) is
- *   `unavailable`.
+ *   OAuth-only providers without an app configuration are explicitly
+ *   `unavailable`; unknown auth schemes remain unsupported.
  * - A Composio app is connected when the person has any account on it (an
  *   expired one too: they manage it from the menu). Without one it is `+`,
  *   unless connecting is not configured on this deployment.
@@ -23,9 +23,10 @@ export function storeItemState(input:
 ): StoreItemState | null {
   if (input.kind === 'composio') {
     if (input.connect === 'none') return 'ready'
-    if (input.connect === 'unsupported') return 'unavailable'
     if (input.loading) return null
+    // Previously connected accounts still need to be manageable even if this toolkit's current auth is unsupported.
     if (input.accounts > 0) return 'connected'
+    if (input.connect === 'unsupported' || input.connect === 'oauthSetupRequired') return 'unavailable'
     return input.canLink ? 'add' : 'unavailable'
   }
   if (input.state === undefined) return null

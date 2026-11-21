@@ -1,4 +1,5 @@
 import { FatalError } from 'workflow'
+import { ActionFailureError } from '@/lib/action-error'
 import { freezeBotModel } from '@/lib/bot-model-selection'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
@@ -16,6 +17,8 @@ import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 async function refusalIsFinal<T>(work: Promise<T>): Promise<T> {
   try { return await work } catch (error) {
     if (error instanceof SubscriptionRefusal) throw new FatalError(error.code)
+    // No model chosen is the person's to fix (pick one), not a transient failure (decision 2026-11-15-1900).
+    if (error instanceof ActionFailureError && error.code === 'executionModelUnknown') throw new FatalError(error.code)
     throw error
   }
 }

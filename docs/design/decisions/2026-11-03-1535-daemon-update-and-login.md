@@ -4,6 +4,7 @@
 - Source: Alex, Neon egress investigation: 「错了，是必须进行更新，并且重新登录之后才可以」, after authorizing disconnecting the daemon whose remote update failed.
 - Rule: —
 - Replaces: —
+- Superseded in part by: [2026-11-17-2215](2026-11-17-2215-device-session-no-heartbeat.md) (no update channel stays open to an old daemon: the heartbeat and command poll that delivered update commands are gone, and every device route answers 426 until the daemon is updated)
 
 A quarantined daemon's previous credential remains revoked. Updating alone does
 not revive it, and a new login cannot admit a released binary older than the

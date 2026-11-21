@@ -10,7 +10,7 @@ const serviceName = /^[a-z][a-z0-9-]{0,62}$/
 const nameForRelease = id => `mikka-app-release-${id}`
 const common = { compatibility_date: '2026-10-19', workers_dev: false, preview_urls: false }
 
-export async function releaseConfig({ id, assets, api, cloud, sourceSha, overlaySha }) {
+export async function prepareRelease({ id, assets, api, cloud, sourceSha, overlaySha }, outputDirectory) {
   if (!isValidDeploymentId(id) || id !== id.toLowerCase() || !serviceName.test(nameForRelease(id))) throw new Error('WEB_RELEASE_ID_INVALID')
   if (![api, cloud].every(name => typeof name === 'string' && serviceName.test(name)) || api === cloud) {
     throw new Error('WEB_RELEASE_SERVICE_INVALID')
@@ -32,20 +32,15 @@ export async function releaseConfig({ id, assets, api, cloud, sourceSha, overlay
   if (!assetsInShell.some(url => url.pathname.startsWith('/mikka/assets/')) || assetsInShell.some(url => url.searchParams.get('dpl') !== id)) {
     throw new Error('WEB_RELEASE_ASSET_PIN_MISMATCH')
   }
-  return {
+  const config = {
     ...common, name: nameForRelease(id), main: resolve(here, 'release.mjs'),
     compatibility_flags: ['nodejs_compat'],
     vars: { RELEASE_SHA: sourceSha, OVERLAY_SHA: overlaySha },
     assets: { directory, binding: 'ASSETS', run_worker_first: true, html_handling: 'none', not_found_handling: 'none' },
     services: [{ binding: 'API', service: api }, { binding: 'CLOUD', service: cloud }],
   }
-}
-
-/** Keep the signed build's verification inventory available to the private publisher.
- * Cloudflare receives only the files the official web client can request. */
-export async function prepareRelease(input, outputDirectory) {
-  const config = await releaseConfig(input)
-  const source = config.assets.directory
+  // Only the renderer's public contract is copied from the verified inventory.
+  const source = directory
   const parent = resolve(outputDirectory)
   if (parent === source || parent.startsWith(source + sep)) throw new Error('WEB_RELEASE_OUTPUT_INSIDE_BUILD')
   const published = await mkdtemp(join(parent, 'mikka-web-assets-'))
@@ -55,7 +50,6 @@ export async function prepareRelease(input, outputDirectory) {
       return !file.split(sep).some(segment => segment.startsWith('.'))
         && !['renderer-manifest.json', '_headers', '_redirects'].includes(file)
     } })
-    const inventory = JSON.parse(await readFile(join(source, 'renderer-manifest.json'), 'utf8'))
     await writeFile(join(published, 'renderer-actions.json'), JSON.stringify(rendererActionContract(inventory)) + '\n')
     config.assets.directory = published
     return config

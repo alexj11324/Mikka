@@ -1,12 +1,13 @@
 'use client'
 
 import { useViewState } from '@/lib/hooks/view-state'
-import { useTranslations } from 'next-intl'
-import { ChevronRight } from 'lucide-react'
-import { threadStepCounts, type ThreadStep } from '@/lib/issue-run-conversation'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ChevronRight } from '@/components/icons'
+import { threadStepCounts, threadStepOutput, type ThreadStep } from '@/lib/issue-run-conversation'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
+import { ThreadToolDetails } from './thread-tool-details'
 
 /**
  * 「已运行 2 条命令 · 调用了 1 个工具 ›」: the run's tool calls folded into one line that says what happened, as iOS does (#1770);
@@ -26,10 +27,21 @@ export function ThreadSteps({ steps, stateKey = 'steps' }: { steps: readonly Thr
     </CollapsibleTrigger>
     <CollapsibleContent className="w-full">
       <ol className="ml-1.5 flex flex-col gap-1 border-l border-rule py-0.5 pl-3 text-xs">
-        {steps.map(step => <li key={step.id} className="flex min-w-0 items-baseline gap-2">
-          <span className={cn('shrink-0 font-mono', step.failed ? 'text-destructive-foreground' : 'text-foreground')}>{step.name}</span>
-          {step.detail && <span className="min-w-0 truncate font-mono text-muted-foreground" title={step.detail}>{step.detail}</span>}
-        </li>)}
+        {steps.map(step => {
+          const label = <>
+            <span className={cn('shrink-0 font-mono', step.failed ? 'text-destructive-foreground' : 'text-foreground')}>{step.name}</span>
+            {step.detail && <span className="min-w-0 truncate font-mono text-muted-foreground" title={step.detail}>{step.detail}</span>}
+          </>
+          return <li key={step.id} className="min-w-0">
+            {step.command || threadStepOutput(step) || step.exitCode != null ? <Collapsible>
+              <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="group/step max-w-full justify-start" />}>
+                {label}
+                <ChevronRight aria-hidden="true" className="shrink-0 group-data-[panel-open]/step:rotate-90 rtl:rotate-180 rtl:group-data-[panel-open]/step:rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent><ThreadToolDetails command={step.command} output={threadStepOutput(step)} exitCode={step.exitCode ?? undefined} /></CollapsibleContent>
+            </Collapsible> : <div className="flex min-w-0 items-baseline gap-2">{label}</div>}
+          </li>
+        })}
       </ol>
     </CollapsibleContent>
   </Collapsible>

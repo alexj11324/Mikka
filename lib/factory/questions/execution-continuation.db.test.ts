@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
+import { addFactoryVisualEvidence } from '../../../tests/helpers/factory-visual-evidence';
 import { bindFixtureWorkspaceDatabase } from '../../../tests/helpers/workspace-database';
 // Isolated PostgreSQL fixtures model immutable host receipts, not live model acceptance.
 import assert from 'node:assert/strict'
@@ -7,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { createFactoryStore } from '../store'
 import { createFactoryDispatch, factoryBinding } from '../dispatch'
 import { factoryEventId } from '../event-id'
@@ -29,7 +30,7 @@ if (url) {
 test('real PG: question receipts preserve one execution without opening a repair-cap bypass', { skip: !url, timeout: 120_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `question_cap_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   let closeWorkspaceDatabase: (() => Promise<void>) | undefined
@@ -136,7 +137,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       })
 
     for (const kind of ['question_resume', 'question_recover'] as const) await t.test(`${kind}: the real cloud claim retains the original started Profile after edit without changing its digest`, async () => {
-      const [{ AgentProfileStore, parseAgentProfile, agentProfileInstructions, assertProfileSelection }, { resolveAgentProfileSkills },
+      const [{ AgentProfileStore, parseAgentProfile, agentProfileInstructions, assertProfileSelection, contentOnlyAgentProfile }, { resolveAgentProfileSkills },
         { freezeWorkerDefinition }, { freezeExecutionIdentity }, { workspacePool }, { claimCloudRun }, { assertRunProfileClaim }] = await Promise.all([
         import('../agent-profile'), import('../agent-profile-skills'), import('../../agent-kit/worker'), import('../../execution-identity'),
         import('../../workspace-db'), import('../../computer/claim'), import('../profile-admission'),
@@ -156,9 +157,11 @@ test('real PG: question receipts preserve one execution without opening a repair
         model: { mode: 'fixed', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: f.connectionId } } })
       const profile = await profiles.create(scope,definition), skills = resolveAgentProfileSkills(definition.skills)
       const entry = { id: `question-profile:${profile.id}`, harness: 'codex' as const, model: 'gpt-6-luna', source: { kind: 'subscription' as const, connectionId: f.connectionId } }
+      // A Profile holds content only (decision 2026-11-15-1630): the selection carries the stored body, as an explicit dispatch builds it.
+      const stored = contentOnlyAgentProfile(definition)
       const selection: import('../agent-profile').AgentProfileSelection = { profileId: profile.id, version: profile.version, digest: profile.digest,
-        name: profile.name, source: 'explicit', reason: 'Owner-selected native question fixture', scope, definition, skills,
-        instructions: agentProfileInstructions(definition,skills), effort: definition.effort, targetEntry: entry }
+        name: profile.name, source: 'explicit', reason: 'Owner-selected native question fixture', scope, definition: stored, skills,
+        instructions: agentProfileInstructions(stored,skills), targetEntry: entry, contentOnly: true }
       await assertProfileSelection(pool,scope,selection)
       const worker = freezeWorkerDefinition({ harness: 'codex', model: 'gpt-6-luna', instructions: selection.instructions, prompt: 'Synthetic task',
         parent: null, executionId: null, subscription: { id: f.bindingId, route: 'codex_cli', modelId: 'gpt-6-luna' },
@@ -480,6 +483,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       await pool.query('UPDATE factory_events SET "createdAt"=$3 WHERE "taskId"=$1 AND "eventId"=$2', [child.task.id, child.eventId, at(240)])
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"worktreePath"=$3,"startedAt"=$4,"finishedAt"=$5,report=$6 WHERE id=$1`,
         [child.runId, f.sessionId, worktree, at(300), at(540), JSON.stringify({ sourceCommit: base, deliverableCommit: head, summary: 'Synthetic complete report', verify: { status: 'not_run' } })])
+      await addFactoryVisualEvidence(pool,child.runId)
       for (const id of [f.originRunId, child.runId]) await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)', [id, f.bindingId])
       const inputId = randomUUID(), outputId = randomUUID()
       await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,$3,$4),($5,$2,3,$6,$7)`,
@@ -752,7 +756,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       // The continuation message uses this same receipt-bound reader and the
       // citation sources frozen by real check dispatch, not the old empty prompt.
       const checkDevice = randomUUID(), checkAgent = randomUUID(), checkRepo = randomUUID()
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Independent check','cloud',now(),$2)`,
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Independent check','cloud',now(),$2,now())`,
         [checkDevice, JSON.stringify([{ harness, installed: true }])])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,'owner',$2,$3,$4)`, [checkAgent, checkDevice, harness, `Independent checker ${checkAgent}`])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/tmp/fixture')`, [checkRepo, checkDevice])

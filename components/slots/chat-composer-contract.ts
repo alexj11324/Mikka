@@ -31,4 +31,6 @@ export type ChatComposerProps = {
   /** A thread's composer, not a bot chat's: choosing a chat focuses only the latter, and Esc never stops the run (decision 2026-11-02-0301). */
   thread?: boolean
   attachmentScope?: ChatFileScope
+  /** Keep a saved draft editable while blocking new files. */
+  attachmentDisabled?: boolean
 }

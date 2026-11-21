@@ -21,7 +21,7 @@ import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigati
 import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
 import { meetsMinimumVersion } from '@mikka/protocol/version'
-import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
+import { windowAppearance } from './window-appearance'
 import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
 import { BundledAuth } from './bundled-auth'
@@ -34,6 +34,7 @@ import { ServerDirectory } from './server-directory'
 import { BundledServers } from './bundled-servers'
 import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
+import { agentLogins } from './agent-logins'
 import { openBundledWebPage } from './bundled-web'
 import { newWindowMenuItem } from './window-menu'
 import { markStartup } from '../startup'
@@ -300,8 +301,7 @@ function reloadApp(): void {
 
 function createMainWindow(): void {
   markStartup('main.window.start')
-  // Read once at launch; a changed Reduce transparency setting applies from the next launch.
-  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors, reduceTransparency: nativeTheme.prefersReducedTransparency })
+  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors })
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -309,7 +309,7 @@ function createMainWindow(): void {
     minHeight: 600,
     show: false,
     // The page paints its own top bar, so the native one must not show as a separate band.
-    ...appearance.options,
+    ...appearance,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -324,7 +324,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, '--mikka-window-kind=main', ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, '--mikka-window-kind=main'],
     },
   })
   markStartup('main.window.created')
@@ -395,7 +395,7 @@ let gate: UpdateGate | null = null
  * Closing the window while it holds the door quits the app; there is no way
  * in on the old version.
  */
-function runUpdateGate(open: () => void): void {
+function runUpdateGate(open: (retryCheck: boolean) => void): void {
   if (gate) return
   const copy = gateCopy(app.getLocale())
   const win = new BrowserWindow({
@@ -434,11 +434,11 @@ function runUpdateGate(open: () => void): void {
   })
   gate = new UpdateGate(autoUpdater, {
     onState: render,
-    onProceed: () => {
+    onProceed: retryCheck => {
       opened = true
       gate = null
       if (!win.isDestroyed()) win.close()
-      open()
+      open(retryCheck)
     },
   })
   void win.loadFile(join(__dirname, 'update.html'))
@@ -636,6 +636,7 @@ async function start(): Promise<void> {
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
     pickRepo,
+    agentLogins,
     localAccount: () => readLocalDeviceAccount((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     localOwner: () => readLocalDeviceOwner((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment?view=owner', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,
@@ -649,13 +650,13 @@ async function start(): Promise<void> {
     requireUpdate: enforceMinimumVersion,
   })
   installMenu()
-  const open = () => {
+  const open = (retryCheck = false) => {
     createMainWindow()
     if (!app.isPackaged || FLAVOR === 'dev') return
     // This app may just have updated: the daemon on this computer updates too, when idle (daemon-update.ts).
     void updateLocalDaemon(FLAVOR, { connect: connectForUpdate({ name: 'mikka-desktop', version: APP_VERSION }) })
-    // Background checks start once the app is open, so they never race the launch gate.
-    setTimeout(() => { void checkForUpdates(false) }, 15_000)
+    // An inconclusive launch check gets an early retry after the window opens.
+    if (retryCheck) setTimeout(() => { void checkForUpdates(false) }, 15_000)
     setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
   }
   // A cold start of the installed app installs any newer version first (launch-update.ts).

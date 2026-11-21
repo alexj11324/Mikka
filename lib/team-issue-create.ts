@@ -61,7 +61,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
         // A caller's outer application transaction may have rolled back
         // after the workspace receipt committed. Reuse its reserved identity.
         const id = receipt?.issueId ?? crypto.randomUUID()
-        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { workspaceId: team.workspaceId, id, linearSyncBlocked: true, deriveShortTitle: !command })
+        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { workspaceId: team.workspaceId, id, linearSyncBlocked: true })
         if (!issue) throw new TeamCreateError('teamIssueRequestConflict')
         await tx.insert(teamIssueCreateRequests).values({ requestId, issueId: id, ownerId: userId, teamId, fingerprint })
         return id

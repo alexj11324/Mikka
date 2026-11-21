@@ -3,7 +3,7 @@ import test from 'node:test'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createServer, IncomingMessage } from 'node:http'
-import { registerHooks } from 'node:module'
+import { createRequire, registerHooks } from 'node:module'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -20,7 +20,7 @@ import { WORKSPACE_REVIEW_ERROR_CODES, diffFilePage, diffFilePatch, reviewAnchor
   type ReviewMutation, type TaskReviewRef, type TaskReviewSubmission } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 
 const databaseURL = process.env.E2E_DATABASE_URL
 if (databaseURL) assert.ok(disposableDatabase(process.env, databaseURL), E2E_DB_RULE)
@@ -48,7 +48,7 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'HTTP/daemon acceptance requires PostgreSQL 17')
   const database = `workspace_http_${kind}_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(databaseURL!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8, connectionTimeoutMillis: 5000 })
   const root = await mkdtemp(join(tmpdir(), 'mikka-files-http-'))
@@ -97,7 +97,8 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
     const route = (template: string, methods: string[], load: ApiRoute['load']): ApiRoute => ({ path: `/mikka${template}`, template, source: `app${template}/route.ts`, methods, load })
     const routes: ApiRoute[] = [
       route('/v1/devices/register', ['POST'], () => import('../../app/v1/devices/register/route')),
-      route('/v1/devices/[deviceId]/heartbeat', ['POST'], () => import('../../app/v1/devices/[deviceId]/heartbeat/route')),
+      route('/v1/devices/[deviceId]/report', ['POST'], () => import('../../app/v1/devices/[deviceId]/report/route')),
+      route('/v1/internal/device-sessions/[deviceId]', ['POST'], () => import('../../app/v1/internal/device-sessions/[deviceId]/route')),
       route('/v1/devices/[deviceId]/repos', ['GET'], () => import('../../app/v1/devices/[deviceId]/repos/route')),
       route('/v1/devices/[deviceId]/runs', ['GET'], () => import('../../app/v1/devices/[deviceId]/runs/route')),
       route('/v1/devices/[deviceId]/gateway', ['GET'], () => import('../../app/v1/devices/[deviceId]/gateway/route')),
@@ -116,8 +117,16 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       route('/api/tasks/[taskId]/review/send', ['POST'], () => import('../../app/api/tasks/[taskId]/review/send/route')),
     ]
     const application = createApiHandler(routes)
+    // The daemon works only while it holds its device session socket (decision
+    // 2026-11-17-2215). The node-server build mounts the built-in gateway on
+    // these paths (apps/api/builtin-services-module.mjs); mount the real one.
+    const { H3 } = await import('h3')
+    const { createGatewayHandler } = await import('../../apps/api/routes/builtin-gateway')
+    const gateway = new H3().all('/**', createGatewayHandler())
+    const gatewayPath = /^\/mikka\/v1\/(?:live\/|devices\/[^/]+\/(?:socket|push|status)$)/
     const runtime = serve({ manual: true, gracefulShutdown: false, silent: true, trustProxy: false, hostname: '127.0.0.1', port: 0,
       async fetch(request) {
+        if (gatewayPath.test(new URL(request.url).pathname)) return gateway.fetch(request)
         assert.ok(request.runtime?.node?.req instanceof IncomingMessage, 'requests enter through a TCP socket and srvx NodeRequest')
         const path = new URL(request.url).pathname
         // Observe the actual private TCP receipt without changing the request
@@ -144,6 +153,17 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       },
     })
     const server = createServer(runtime.node!.handler)
+    // Upgrades reach the built-in gateway through the Nitro WebSocket adapter production uses.
+    const nitroRequire = createRequire(createRequire(import.meta.url).resolve('nitro/package.json'))
+    const { default: websocketAdapter } = await import(pathToFileURL(nitroRequire.resolve('crossws/adapters/node')).href)
+    const { NodeRequest } = await import(pathToFileURL(nitroRequire.resolve('srvx/node')).href)
+    const websocket = websocketAdapter({ resolve: async (request: Request & { [key: symbol]: unknown }) => {
+      const response = await gateway.fetch(request) as Response & { crossws?: unknown }
+      return response.crossws ?? request[Symbol.for('crossws.hooks')] ?? {}
+    } })
+    server.on('upgrade', (request, socket, head) => {
+      websocket.handleUpgrade(request, socket, head, new NodeRequest({ req: request, upgrade: { socket, head } }))
+    })
     await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
     const address = server.address()
     assert.ok(address && typeof address !== 'string')
@@ -249,7 +269,7 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
     const link: unknown = Reflect.construct(linkModule.HttpServerLink as Function, [`${origin}/mikka`])
     assert.ok(link && typeof link === 'object' && 'fetchCommands' in link && typeof link.fetchCommands === 'function')
     daemon = fixtureDaemon(await Reflect.apply(mainModule.startDaemon as Function, undefined, [{ dataDir, flavor: 'dev', link, credential,
-      harnesses: [], modelProbe: false, agentSandbox: null, quotaSource: null, retainResources: true, heartbeatMs: 60_000, commandsWaitSeconds: 25 }]))
+      harnesses: [], modelProbe: false, agentSandbox: null, quotaSource: null, retainResources: true }]))
     await daemon.syncWithServer()
     const status = daemonStatusSchema.parse(daemon.status())
     assert.equal(status.server, 'online', JSON.stringify(traffic))
@@ -315,6 +335,41 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       assert.equal(sessionResponse.status, 200)
       assert.equal((await sessionResponse.json()).content, source)
       assert.equal((await getFile(ownerToken.token, '.env')).status, 404)
+    })
+
+    await t.test('a retained Run directory crosses real Files HTTP, daemon delivery and acknowledgement', async () => {
+      const url = new URL(endpoint + '/files')
+      url.search = new URLSearchParams({ workspaceId, repoId: clientIdentity.repoId, kind: 'tree', path: 'src' }).toString()
+      const getTree = (token?: string) => fetch(url, {
+        headers: token ? { authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(20_000),
+      })
+      const before = deliveries.length
+      assert.equal((await getTree()).status, 401)
+      assert.equal((await getTree(memberToken.token)).status, 404)
+      assert.equal((await getTree(otherToken.token)).status, 404)
+      assert.equal(deliveries.length, before)
+
+      const response = await getTree(ownerToken.token)
+      assert.equal(response.status, 200, await statusDiagnostic(response))
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+      const result = await response.json()
+      assert.equal(result.kind, 'tree')
+      assert.equal(result.path, 'src')
+      assert.deepEqual(result.identity, clientIdentity)
+      assert.equal(result.revision.source, 'working')
+      assert.equal(result.revision.headSha, headSha)
+      assert.deepEqual(result.entries, [
+        { path: 'src/example.ts', name: 'example.ts', kind: 'file', size: Buffer.byteLength(source) },
+        { path: 'src/lazy.ts', name: 'lazy.ts', kind: 'file', size: Buffer.byteLength('export const lazy = "base"\n') },
+      ])
+      const sent = deliveries.slice(before).find(command => command.kind === 'tree' && command.runId === runId && command.repoId === repoId)
+      assert.ok(sent)
+      const acknowledged = receiptEvents.get(sent.id)
+      assert.ok(acknowledged)
+      await acknowledged.promise
+      assert.ok(receipts.some(receipt => receipt.requestId === sent.id && receipt.status === 204
+        && receipt.body.result.ok && receipt.body.result.kind === 'tree'))
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_requests WHERE "runId"=$1', [runId])).rows[0].n, 0)
     })
 
     await t.test('mention create and resolve cross the same daemon transport and reject changed source', async () => {
@@ -825,7 +880,7 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       const restartLink: unknown = Reflect.construct(linkModule.HttpServerLink as Function, [`${origin}/mikka`])
       daemon = fixtureDaemon(await Reflect.apply(mainModule.startDaemon as Function, undefined, [{ dataDir, flavor: 'dev',
         link: restartLink, credential, harnesses: [], modelProbe: false, agentSandbox: null, quotaSource: null,
-        retainResources: true, heartbeatMs: 60_000, commandsWaitSeconds: 25 }]))
+        retainResources: true }]))
       await daemon.syncWithServer()
       for (const attempt of attempts) {
         const request = await fetch(`${origin}/mikka/api/runs/${attempt.id}/workspace/files?${new URLSearchParams({ workspaceId, repoId, kind: 'file', path: 'src/example.ts' })}`, {

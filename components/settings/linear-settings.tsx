@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
-import { ArrowRight, RefreshCw, Unplug } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
+import { useLiveScope } from '@/hooks/use-live-key'
+import { ArrowRight, RefreshCw, Unplug } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -22,10 +24,15 @@ type TeamOption = Awaited<ReturnType<typeof listLinearTeamOptions>>[number]
  */
 export function useLinearPlugin() {
   const t = useTranslations('Settings.linear')
-  const [state, setState] = useState<IntegrationState | null>(null)
+  const routeWorkspace = useSearchParams().get('workspace')
+  const liveScope = useLiveScope()
+  const target = routeWorkspace ?? liveScope?.workspaceId
+  const confirmed = useRef<string | undefined>(undefined)
+  const [snapshot, setState] = useState<IntegrationState | null>(null)
+  const state = !target || target === snapshot?.workspaceId ? snapshot : null
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [teams, setTeams] = useState<TeamOption[]>([])
-  const [selectedTeam, setSelectedTeam] = useState('')
+  const [choice, setChoice] = useState<{ workspaceId: string; teamId: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // Connecting from the desktop finishes in the system browser: read once on the way back.
@@ -49,12 +56,13 @@ export function useLinearPlugin() {
         const availability = response.ok ? await response.json() as { enabled?: boolean } : null
         if (!active) return
         if (availability?.enabled !== true) { setEnabled(false); return }
-        const next = await getLinearIntegrationState()
+        const workspace = target ?? confirmed.current
+        const next = workspace ? await getLinearIntegrationState(workspace) : await getLinearIntegrationState()
         if (!active) return
         setEnabled(next.enabled)
         if (!next.enabled) return
+        confirmed.current = next.workspaceId ?? undefined
         setState(next)
-        setSelectedTeam(current => current || next.syncs.find(sync => sync.active)?.linearTeamId || '')
         poll = next.connected && next.syncs.some(sync => sync.active)
         if (next.connected && !loadedTeams) {
           const options = await listLinearTeamOptions()
@@ -62,7 +70,7 @@ export function useLinearPlugin() {
         }
       } catch {
         poll = false
-        if (active) { setEnabled(false); setError(t('loadError')) }
+        if (active) { setState(null); setEnabled(false); setError(t('loadError')) }
       } finally {
         inFlight = false
         if (active && poll) timer = window.setTimeout(tick, 10_000)
@@ -73,9 +81,17 @@ export function useLinearPlugin() {
     const tick = () => { if (document.hidden) timer = window.setTimeout(tick, 10_000); else void loadState() }
     void loadState()
     return () => { active = false; window.clearTimeout(timer) }
-  }, [t, state?.connected, state?.syncs.some(sync => sync.active), reads])
+  }, [t, target, state?.connected, state?.syncs.some(sync => sync.active), reads])
 
   const activeTeam = state?.syncs.find(sync => sync.active)
+  const selectedTeam = (state?.workspaceId && choice?.workspaceId === state.workspaceId ? choice.teamId : null) ?? activeTeam?.linearTeamId ?? ''
+  function setSelectedTeam(teamId: string) {
+    if (state?.workspaceId) setChoice({ workspaceId: state.workspaceId, teamId })
+  }
+  async function refreshShownState() {
+    const workspace = state?.workspaceId ?? target ?? confirmed.current
+    setState(workspace ? await getLinearIntegrationState(workspace) : await getLinearIntegrationState())
+  }
   async function connect() {
     setBusy(true); setError('')
     try {
@@ -88,23 +104,24 @@ export function useLinearPlugin() {
   }
 
   async function enableTeam() {
-    if (!selectedTeam) return
+    if (!selectedTeam || !state?.workspaceId) return
     setBusy(true); setError('')
     try {
-      const result = await enableLinearTeam({ teamId: selectedTeam })
+      const result = await enableLinearTeam({ teamId: selectedTeam, workspaceId: state.workspaceId })
       if ('error' in result) throw new Error(result.error)
-      setState(await getLinearIntegrationState())
+      await refreshShownState()
     } catch (caught) {
       setError(caught instanceof Error && caught.message === 'linearTeamAlreadyLinked' ? t('teamAlreadyLinked') : t('operationError'))
     } finally { setBusy(false) }
   }
 
   async function disableTeam() {
-    if (!activeTeam) return
+    if (!activeTeam || !state?.workspaceId) return
     setBusy(true); setError('')
     try {
-      await disableLinearTeam(activeTeam.id)
-      setState(await getLinearIntegrationState())
+      const result = await disableLinearTeam(activeTeam.id, state.workspaceId)
+      if ('error' in result) throw new Error(result.error)
+      await refreshShownState()
     } catch { setError(t('operationError')) }
     finally { setBusy(false) }
   }
@@ -113,8 +130,8 @@ export function useLinearPlugin() {
     setBusy(true); setError('')
     try {
       await disconnectLinearAccount()
-      setState(await getLinearIntegrationState())
-      setTeams([]); setSelectedTeam('')
+      await refreshShownState()
+      setTeams([]); setChoice(null)
     } catch { setError(t('operationError')) }
     finally { setBusy(false) }
   }
@@ -124,7 +141,7 @@ export function useLinearPlugin() {
     try {
       const result = await retryLinearIssue(issueId)
       if ('error' in result) throw new Error(result.error)
-      setState(await getLinearIntegrationState())
+      await refreshShownState()
     } catch { setError(t('operationError')) }
     finally { setBusy(false) }
   }
@@ -134,7 +151,7 @@ export function useLinearPlugin() {
     try {
       const result = await retryLinearDelivery(deliveryId)
       if ('error' in result) throw new Error(result.error)
-      setState(await getLinearIntegrationState())
+      await refreshShownState()
     } catch { setError(t('operationError')) }
     finally { setBusy(false) }
   }
@@ -149,7 +166,7 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
     <SettingsSection
       id="linear-heading"
       description={enabled !== false && state?.connected ? t('connectedTo', { organization: state.organizationName ?? '' }) : undefined}
-      action={<div className="flex flex-wrap items-center gap-2">{enabled === false && <Badge variant="secondary">{t('syncDisabled')}</Badge>}{state?.connected ? <><Badge variant="secondary">{t('connected')}</Badge><Button {...settingsSectionAction} disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button></> : <Button size="sm" disabled={busy || enabled !== true || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}</div>}
+      action={<div className="flex flex-wrap items-center gap-2">{enabled === false && <Badge variant="secondary">{t('syncDisabled')}</Badge>}{state?.connected ? <><Badge variant="secondary">{t('connected')}</Badge><Button {...settingsSectionAction} size="sm" disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button></> : <Button size="sm" disabled={busy || enabled !== true || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}</div>}
     >
       {state?.connected && <SettingRow title={t('teamLabel')}>
         <div className="flex flex-col items-start gap-2">

@@ -48,7 +48,6 @@ export function selfHostedEnvironment(env, root) {
   env.DATABASE_URL ||= env.MIKKA_DATABASE_URL
   if (!env.MIKKA_DATABASE_URL || !env.DATABASE_URL) throw new Error('SELF_HOSTED_DATABASE_REQUIRED')
   env.WORKFLOW_TARGET_WORLD ||= 'local'
-  if (env.WORKFLOW_TARGET_WORLD !== 'local') throw new Error('SELF_HOSTED_LOCAL_WORKFLOW_REQUIRED')
   env.MIKKA_DATA_DIR ||= join(root, 'data')
   env.WORKFLOW_LOCAL_DATA_DIR ||= join(env.MIKKA_DATA_DIR, 'workflow')
   // Nitro mounts the SDK consumers at the origin root, outside /mikka.
@@ -87,7 +86,7 @@ async function migrate(root, env) {
 }
 
 export async function startSelfHosted(root = process.cwd(), env = process.env) {
-  if (!process.version.startsWith('v24.')) throw new Error('SELF_HOSTED_NODE24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('SELF_HOSTED_NODE22_REQUIRED')
   selfHostedEnvironment(env, root)
   await installationSecrets(env.MIKKA_DATA_DIR, env)
   await mkdir(env.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })

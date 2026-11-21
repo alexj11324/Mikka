@@ -1,17 +1,25 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
 import { failureLine, failureSettingsPath } from '../lib/chat-failure.ts'
 import { subscriptionRecovery, type SubscriptionRefusalNotice } from '../../../lib/subscription-refusal.ts'
 import { CLOUD_ERROR_CODES, type CloudErrorCode } from '../../../lib/cloud-services/errors.ts'
+import { mobileMessages } from '../lib/messages.ts'
 
-const copy = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8')).Coordinator.subscriptionRefusal
+// The phone reads the same catalog as the web (R-42). These assertions read the words back
+// instead of repeating them, so they hold under any device locale.
+const copy = mobileMessages.MobileCore.failure
+const subscription = {
+  unavailable: copy.subUnavailable, reconnect: copy.subReconnect, quotaUsed: copy.subQuotaUsed, retry: copy.subRetry,
+  selectionChanged: copy.subSelectionChanged, rateLimited: copy.subRateLimited, accessDenied: copy.subAccessDenied,
+  modelRejected: copy.modelRejected, quotaChecking: copy.quotaChecking, runtimeUnavailable: copy.runtimeUnavailable,
+  modelNotReported: copy.modelNotReported,
+}
 const notices: SubscriptionRefusalNotice[] = ['unavailable', 'reconnect', 'quotaUsed', 'retry', 'quotaChecking', 'rateLimited', 'accessDenied', 'modelRejected', 'runtimeUnavailable', 'selectionChanged']
 
 test('every server subscription notice has the same words and recovery on the phone', () => {
   for (const notice of notices) {
     const line = failureLine({ kind: 'subscription', notice })
-    assert.equal(line.text, copy[notice], notice)
+    assert.equal(line.text, subscription[notice], notice)
     const recovery = subscriptionRecovery(notice)
     assert.equal(line.retry, recovery === 'retry', notice)
     assert.equal(line.recovery, recovery === 'retry' ? null : recovery === 'settings' ? 'models' : 'model', notice)
@@ -20,7 +28,7 @@ test('every server subscription notice has the same words and recovery on the ph
 
 test('an unknown notice from a newer server stays readable and does not expose its value', () => {
   const line = failureLine({ kind: 'subscription', notice: 'fixture_private_provider_value' as SubscriptionRefusalNotice })
-  assert.equal(line.text, copy.retry)
+  assert.equal(line.text, copy.subRetry)
   assert.equal(line.retry, true)
   assert.equal(line.recovery, null)
 })
@@ -33,11 +41,8 @@ test('hosted billing and model refusals open their corresponding recovery', () =
 })
 
 test('API balance uses the shared fixed copy and model action, while ordinary failures retain retry', () => {
-  const messages = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8'))
-  assert.deepEqual(failureLine({ kind: 'failed', reason: 'balance' }), {
-    text: messages.Coordinator.apiBalance, retry: false, recovery: 'model',
-  })
-  assert.deepEqual(failureLine({ kind: 'failed' }), { text: messages.Coordinator.failedTitle, retry: true, recovery: null })
+  assert.deepEqual(failureLine({ kind: 'failed', reason: 'balance' }), { text: copy.apiBalance, retry: false, recovery: 'model' })
+  assert.deepEqual(failureLine({ kind: 'failed' }), { text: copy.replyFailed, retry: true, recovery: null })
 })
 
 test('billing recovery retains the selected workspace rather than a browser default', () => {
@@ -50,10 +55,9 @@ test('billing recovery retains the selected workspace rather than a browser defa
 })
 
 test('cloud failures reuse fixed web copy, preserve native model recovery and open cloud billing only for quota', () => {
-  const messages = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8'))
   for (const code of CLOUD_ERROR_CODES) {
     const line = failureLine({ kind: 'failed', cloudCode: code })
-    assert.equal(line.text, messages.RunErrors[code].default, code)
+    assert.equal(line.text, mobileMessages.RunErrors[code].default, code)
     const retry = code === 'cloud_rate_limited' || code === 'cloud_unavailable'
     assert.equal(line.retry, retry, code)
     assert.equal(line.recovery, code === 'cloud_quota_exhausted' ? 'cloudBilling' : retry ? null : 'model', code)

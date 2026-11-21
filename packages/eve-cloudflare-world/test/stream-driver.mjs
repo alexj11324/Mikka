@@ -2,6 +2,12 @@ import { EveWorldStream, createStreamStorage, serveStreamRequest } from '../src/
 
 export class MeasuredStream extends EveWorldStream {
   reads = 0
+  rejectSubscriptions = false
+  disableSubscriptions() { this.rejectSubscriptions = true }
+  fetch(request) {
+    if (this.rejectSubscriptions) return new Response(null, { status: 503 })
+    return super.fetch(request)
+  }
   async getChunks(query) {
     this.reads++
     return super.getChunks(query)
@@ -27,6 +33,7 @@ export default {
           cursor: url.searchParams.get('cursor') ?? undefined })
         return Response.json({ ...page, data: page.data.map(({ data, index }) => ({ index, bytes: Array.from(data) })) })
       }
+      case '/disable-subscriptions': await env.STREAM.getByName(JSON.stringify(['stream', run, name])).disableSubscriptions(); break
       case '/stats': return Response.json(await env.STREAM.getByName(JSON.stringify(['stream', run, name])).stats())
       default: return new Response(null, { status: 404 })
     }

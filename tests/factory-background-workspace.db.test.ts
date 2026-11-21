@@ -7,7 +7,7 @@ import { setTimeout as pause } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { orderMigrations } from '../scripts/migration-order.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 
 const target = process.env.E2E_DATABASE_URL
 const allowed = !!target && disposableDatabase(process.env, target)
@@ -18,7 +18,7 @@ const code = (error: unknown): string | undefined => error && typeof error === '
 test('background Factory transactions use persisted tenants before the APP pool and preserve native device authority', { skip: !allowed, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: target, max: 1 })
   const database = 'factory_background_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const isolated = new URL(target!); isolated.pathname = '/' + database
   const url = isolated.toString()
   // Independent control transactions orchestrate two real blocking writers and
@@ -298,7 +298,7 @@ test('background Factory transactions use persisted tenants before the APP pool 
   })
 
   const deviceId = randomUUID()
-  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt") VALUES($1,$2,\'Background local fixture\',\'local\',true,3,now())', [deviceId, owner])
+  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Background local fixture\',\'local\',true,3,now(),now())', [deviceId, owner])
   const run = async (workspaceId: string | null) => {
     const id = randomUUID()
     await controls.query('INSERT INTO agent_runs(id,"userId","workspaceId","agentId","deviceId",status,prompt) VALUES($1,$2,$3,$4,$5,\'queued\',\'Synthetic claim; no executor\')', [id, owner, workspaceId, agentId, deviceId])

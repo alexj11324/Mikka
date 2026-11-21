@@ -163,7 +163,7 @@ async function execute(manifest, manifestPath, manifestHash, output, approvalRef
     }
     return identities
   }
-  const baseEnv = { PATH:process.env.PATH, HOME:'/workspace', LANG:'C.UTF-8', TSX_DISABLE_CACHE:'1', NODE_DISABLE_COMPILE_CACHE:'1', NODE_ENV:'development', ISSUE184_LOCAL_TEST:'1', REQUIRE_DB:'1', MIGRATE:'0', VERCEL_ENV:'', NEXT_TELEMETRY_DISABLED:'1', BETTER_AUTH_URL:'http://127.0.0.1:3100', SCOPE_ACCEPTANCE_MANIFEST:manifestPath, SCOPE_ACCEPTANCE_MANIFEST_SHA256:manifestHash }
+  const baseEnv = { PATH:process.env.PATH, HOME:'/workspace', LANG:'C.UTF-8', TSX_DISABLE_CACHE:'1', NODE_DISABLE_COMPILE_CACHE:'1', NODE_ENV:'development', ISSUE184_LOCAL_TEST:'1', REQUIRE_DB:'1', MIGRATE:'0', VERCEL_ENV:'', BETTER_AUTH_URL:'http://127.0.0.1:3100', SCOPE_ACCEPTANCE_MANIFEST:manifestPath, SCOPE_ACCEPTANCE_MANIFEST_SHA256:manifestHash }
   async function child(phase,mode,databases) {
     policy.active()
     const stdout = [], stderr = []

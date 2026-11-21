@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { MousePointer2, Power } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { MousePointer2, Power } from '@/components/icons'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -13,6 +13,8 @@ import { ComputerRequestError, computerApi } from '@/lib/computer/client'
 import { MOCK_SCREEN_URL } from '@/lib/computer/mock'
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type ScreenRect, type ViewerMode } from '@/lib/computer/types'
 import { cn } from '@/lib/utils'
+import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
+import { usePresence } from '@/lib/use-presence'
 
 type RFBInstance = EventTarget & { viewOnly: boolean; scaleViewport: boolean; resizeSession: boolean; background: string; disconnect: () => void; focus: () => void }
 
@@ -88,13 +90,13 @@ function useScreenBox(rect: ScreenRect | null, pad = 0) {
 /** The ring around what the agent is about to touch: blue while it works, orange while it waits for you. */
 function TargetRing({ rect, tone }: { rect: ScreenRect; tone: 'agent' | 'approval' }) {
   const ref = useScreenBox(rect, 3)
-  return <span ref={ref} aria-hidden="true" className={cn('pointer-events-none absolute top-(--box-y) left-(--box-x) h-(--box-h) w-(--box-w) rounded-md ring-2 transition-[top,left,width,height] duration-150 ease-out motion-reduce:transition-none',
+  return <span ref={ref} aria-hidden="true" className={cn('pointer-events-none absolute top-(--box-y) left-(--box-x) h-(--box-h) w-(--box-w) rounded-md ring-2 transition-[top,left,width,height] duration-(--motion-fast) ease-out motion-reduce:transition-none',
     tone === 'agent' ? 'ring-sidebar-primary' : 'ring-attention')} />
 }
 
 function Cursor({ x, y }: { x: number; y: number }) {
   const ref = useScreenBox({ x, y, w: 0, h: 0 })
-  return <span ref={ref} aria-hidden="true" className="pointer-events-none absolute top-(--box-y) left-(--box-x) text-foreground transition-[top,left,width,height] duration-150 ease-out motion-reduce:transition-none">
+  return <span ref={ref} aria-hidden="true" className="pointer-events-none absolute top-(--box-y) left-(--box-x) text-foreground transition-[top,left,width,height] duration-(--motion-fast) ease-out motion-reduce:transition-none">
     <MousePointer2 className="size-[max(0.75rem,2cqw)] fill-screen stroke-screen-foreground" />
   </span>
 }
@@ -118,6 +120,8 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   const { data: state, error, mutate } = useComputer(botId)
   const wakeInFlight = useRef(false)
   const [wakePending, setWakePending] = useState(false)
+  const [addingKey, setAddingKey] = useState(false)
+  const keyDialog = usePresence(addingKey)
   const waking = wakePending || state?.machine === 'waking'
   const running = state?.machine === 'running'
   const { data: grant, error: grantError, mutate: renewGrant } = useViewerGrant(botId, mode, running && live)
@@ -131,11 +135,15 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
     if (wakeInFlight.current) return
     wakeInFlight.current = true
     setWakePending(true)
-    try { await computerApi.wake(botId); await mutate() } catch { toast.error(t('wakeFailed')) }
+    try { await computerApi.wake(botId); await mutate() } catch (error) {
+      if (error instanceof ComputerRequestError && (error.body as { error?: string } | null)?.error === 'e2b_key_missing') setAddingKey(true)
+      else toast.error(t('wakeFailed'))
+    }
     finally { wakeInFlight.current = false; setWakePending(false) }
   }
   const label = t('screenOf', { name })
   return <div className={cn('@container/screen relative aspect-[16/10] w-full overflow-hidden bg-screen text-screen-foreground', frame === 'rounded' ? 'rounded-lg' : 'rounded-xl')}>
+    {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) void wake() }} />}
     {running && !unauthorized && (grant?.url === MOCK_SCREEN_URL
       ? <img src={withBasePath('/computer/mock-desktop.svg')} alt={label} draggable={false} className="absolute inset-0 size-full select-none" />
       : <NoVncView key={botId} url={grant?.url} mode={mode} label={label} disconnected={() => { void mutate() }} />)}

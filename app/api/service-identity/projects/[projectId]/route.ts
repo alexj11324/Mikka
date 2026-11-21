@@ -1,7 +1,6 @@
 import { governanceResponse } from '@/lib/governance/http'
 import { readServiceCredentialProjects } from '@/lib/governance/service-credentials'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ projectId: string }> }
 
 export const GET = (request: Request, { params }: Context) => governanceResponse(async () => {

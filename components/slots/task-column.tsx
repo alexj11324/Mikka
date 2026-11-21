@@ -2,8 +2,8 @@
 
 // The default task-column slot (docs/ui-overlay.md): a task beside the centre, its title and its threads.
 // The default layer never opens one (its lists open threads); a layer that lists tasks does.
-import { useTranslations } from 'next-intl'
-import { ArrowLeft, X } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowLeft, X } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { RightColumn } from '@/components/workspace/thread-column'
 import { issueIdentifier } from '@/components/workspace/issue-properties'

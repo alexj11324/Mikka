@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { MESSAGE_MAX } from '@/lib/message-limits'
@@ -16,12 +16,13 @@ import type { ChatComposerProps } from '@/components/slots/chat-composer-contrac
  * drop and paste, the length limit. The default slot and the hosted layer both
  * call it, so the two composers cannot behave differently.
  */
-export function useChatComposer({ ref, value, onChange, onSubmit, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, sendKey = 'enter', thread = false, attachmentScope }: ChatComposerProps) {
+export function useChatComposer({ ref, value, onChange, onSubmit, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, sendKey = 'enter', thread = false, attachmentScope, attachmentDisabled = false }: ChatComposerProps) {
   const tShell = useTranslations('Shell')
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileId = useId()
-  const files = useChatFiles(value, onChange, attachmentScope, sending || disabled)
+  const attachDisabled = sending || disabled || attachmentDisabled
+  const files = useChatFiles(value, onChange, attachmentScope, attachDisabled, tShell)
   const stoppable = !!onStop && (sending || (running && !value.trim()))
   const canSend = !sending && !submitDisabled && !disabled && !files.locked && !!value.trim()
 
@@ -59,6 +60,7 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
 
   /** Files from the picker, a drop or a paste: uploaded as chat files where the chat takes them, otherwise read in as text. */
   function addFiles(items: File[]) {
+    if (attachDisabled) return
     if (attachmentScope) files.add(items)
     else void attachText(items)
   }
@@ -84,7 +86,7 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
     submit,
     /** The textarea cannot be edited (a reply is on its way and cannot be stopped). Not disabled, so focus stays. */
     readOnly: sending && !onStop && !editableWhileSending,
-    attachDisabled: sending || disabled,
+    attachDisabled,
     /** The hidden file input the attach button opens. */
     fileInput: { ref: fileRef, id: fileId, accept: attachmentScope ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT, onFiles: (list: FileList | null) => addFiles(Array.from(list ?? [])) },
     openFilePicker: () => fileRef.current?.click(),
@@ -101,7 +103,7 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
     onDragOver(event: DragEvent) {
       if (!Array.from(event.dataTransfer.types).includes('Files')) return
       event.preventDefault()
-      event.dataTransfer.dropEffect = sending || disabled ? 'none' : 'copy'
+      event.dataTransfer.dropEffect = attachDisabled ? 'none' : 'copy'
     },
     onDrop(event: DragEvent) {
       const dropped = Array.from(event.dataTransfer.files)

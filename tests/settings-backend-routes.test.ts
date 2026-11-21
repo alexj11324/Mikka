@@ -37,7 +37,7 @@ before(async () => {
     if (sessionFailure) throw sessionFailure
     return user ? { user, session: { id: currentSession.getStore() ?? syntheticSessionId, userId: user.id } } : null
   } } } } })
-  mock.module('next-intl/server', { namedExports: { getTranslations: async () => (key: string) => key } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => (key: string) => key } })
   mock.module('@/lib/workspace-switcher', { namedExports: { loadWorkspaceSwitcher: async (...args: unknown[]) => {
     switcherCalls.push(args)
     if (switcherFailure) throw switcherFailure
@@ -85,6 +85,8 @@ before(async () => {
     '@/app/actions/model-order': ['getModelOrder'],
     '@/app/actions/model-api-keys': ['getApiKeys'],
     '@/app/actions/environments': ['listEnvironments'],
+    '@/app/actions/thread-title-settings': ['getThreadTitleSettings'],
+    '@/app/actions/issue-states': ['getIssueStates'],
   })) mock.module(module, { namedExports: Object.fromEntries(names.map(name => [name, () => { throw new Error('unexpected settings read') }])) })
   mock.module('@/app/actions/bots', { namedExports: {
     listBots: () => { throw new Error('owner-only Bot list cannot replace workspace activity') },

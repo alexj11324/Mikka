@@ -14,6 +14,19 @@ export const taskRunKeys = {
   list: (ownerId: string) => ['task-runs', ownerId] as const,
 }
 
+export const taskPresentationKeys = {
+  collection: (viewer: string, workspace: string, ids: readonly string[]) => ['task-presentations', viewer, workspace, ids] as const,
+  cards: (viewer: string, workspace: string, ids: readonly string[]) => ['task-cards', viewer, workspace, ids] as const,
+  selected: (viewer: string, workspace: string, id: string) => ['selected-task-presentation', viewer, workspace, id] as const,
+}
+
+/** Revalidate mounted authorized readers of the changed Task, including a deep link outside the list. */
+export function isTaskPresentationKey(key: unknown, viewer: string, workspace: string | null, id: string) {
+  if (!workspace || !Array.isArray(key) || key[1] !== viewer || key[2] !== workspace) return false
+  if (key[0] === 'selected-task-presentation') return key[3] === id
+  return (key[0] === 'task-presentations' || key[0] === 'task-cards') && Array.isArray(key[3]) && key[3].includes(id)
+}
+
 export const issueKeys = {
   list: (ownerId: string, workspaceId: string) => ['issues', ownerId, workspaceId] as const,
   detail: (id: string) => ['issue', id] as const,
@@ -30,8 +43,19 @@ export const botKeys = {
   groups: (ownerId: string, workspaceId: string) => ['bot-list-groups', ownerId, workspaceId] as const,
 }
 
+/**
+ * 设置 › 应用与运行权限's own reads. Its page, the page's preload and the section's prefetch all name the
+ * same keys, so a read one of them starts is the read the others find.
+ */
+export const botPermissionsKeys = {
+  /** The workspace's Bots; a page with no workspace named reads the person's own list. */
+  bots: (workspaceId?: string) => workspaceId ? ['bots', 'workspace', workspaceId] as const : botKeys.all(),
+  agents: () => 'agents' as const,
+}
+
 export const settingsKeys = {
   issuePrefix: () => 'settings:issue-prefix' as const,
+  threadTitles: (workspaceId: string | null) => ['settings:thread-titles', workspaceId ?? ''] as const,
   preferences: () => 'preferences' as const,
   password: () => 'account:password' as const,
   sessions: () => 'account:sessions' as const,
@@ -43,6 +67,7 @@ export const settingsKeys = {
   sharePolicy: (id: string) => ['settings:share-policy', id] as const,
   appPolicy: (id: string) => ['settings:app-policy', id] as const,
   environments: (id: string) => ['settings:environments', id] as const,
+  issueStates: (id: string) => ['settings:issue-states', id] as const,
   secrets: (id: string) => ['settings:secrets', id] as const,
   e2bKey: (id: string) => ['settings:e2b-key', id] as const,
   usage: (id: string, month: string) => ['settings:usage', id, month] as const,
@@ -53,7 +78,6 @@ export const settingsKeys = {
   apiKeys: (id: string) => ['settings:api-keys', id] as const,
   subscriptions: (id: string) => ['settings:subscriptions', id] as const,
   subscriptionUsage: (id: string) => ['settings:subscription-usage', id] as const,
-  subscriptionShare: (id: string) => ['settings:subscription-share', id] as const,
   paymentDesignation: (id: string) => ['settings:payment-designation', id] as const,
   creditShare: (id: string) => ['settings:credit-share', id] as const,
   tokens: (id?: string) => ['settings:tokens', id ?? ''] as const,

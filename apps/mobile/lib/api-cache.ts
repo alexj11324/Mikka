@@ -5,9 +5,10 @@ export class ApiCache {
   private sessionId: string | null = null
   private ownerId: string | null = null
   private values = new Map<string, unknown>()
-  private revisions = new Map<string, number>()
+  private revisions = new Map<string, { version: number; denial: Error | null }>()
   private revocations = new Map<string, Set<(reason: Error) => void>>()
-  revision(path: string) { return this.revisions.get(path) ?? 0 }
+  revision(path: string) { return this.revisions.get(path)?.version ?? 0 }
+  denial(path: string) { return this.revisions.get(path)?.denial ?? null }
   onRevoked(path: string, listener: (reason: Error) => void) {
     const subscribers = this.revocations.get(path) ?? new Set<(reason: Error) => void>()
     subscribers.add(listener)
@@ -20,7 +21,7 @@ export class ApiCache {
   revoke(path: string, context: number, reason: Error) {
     this.commit(context, () => {
       this.values.delete(path)
-      this.revisions.set(path, this.revision(path) + 1)
+      this.revisions.set(path, { version: this.revision(path) + 1, denial: reason })
       for (const listener of this.revocations.get(path) ?? []) listener(reason)
     })
   }
@@ -42,12 +43,20 @@ export class ApiCache {
     return true
   }
   set(path: string, value: unknown, context: number) { return this.commit(context, () => { this.values.set(path, value) }) }
+  /** Only a newer successful read can supersede a server denial, including across screen mounts. */
+  storeRead(path: string, value: unknown, context: number) {
+    return this.commit(context, () => {
+      this.values.set(path, value)
+      const revision = this.revisions.get(path)
+      if (revision) revision.denial = null
+    })
+  }
   async prefetch(path: string, read: (path: string) => Promise<unknown>) {
     if (this.values.has(path)) return
     const context = this.context(), revision = this.revision(path)
     try {
       const value = await read(path)
-      if (revision === this.revision(path)) this.set(path, value, context)
+      if (revision === this.revision(path)) this.storeRead(path, value, context)
     } catch { /* the screen loads it itself */ }
   }
 }

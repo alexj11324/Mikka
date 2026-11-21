@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { MCP_REPLY_CHANNEL, listenOn, notifyChannel, subscribeShared } from '../db/listen'
 import { coordinatorSessionScope } from '../live/coordinator-session'
 import { observeReplySignals } from './reply-signals'
@@ -57,7 +57,7 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
   const workspaceSql = await readFile(new URL('../../drizzle/20261107120002_mcp_membership_notifications.sql', import.meta.url), 'utf8')
   try {
     for (const name of names) {
-      await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+      await createTestDatabase(admin, name, 'template0')
       created.push(name)
       const url = new URL(target!); url.pathname = '/' + name
       const pool = new Pool({ connectionString: url.toString(), max: 3 })
@@ -189,5 +189,37 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
   } finally {
     for (const [index, name] of created.entries()) await dropTestDatabase(admin, name, pools[index])
     await admin.end()
+  }
+})
+
+test('immediate MCP history authorizes once at the actual read', { skip: !valid }, async t => {
+  const { measured, readMetrics } = await import('../../tests/helpers/read-metrics')
+  const { seedUser } = await import('../../tests/support/workspace-admin-db')
+  const { seedCoordinator } = await import('../../tests/support/coordinator-bot')
+  const { pool } = await import('../db')
+  const { workspacePool } = await import('../workspace-db')
+  t.after(async () => { await Promise.all([pool.end(), workspacePool.end()]) })
+  const { actAs } = await import('../acting-user')
+  const { tokenWorkspace } = await import('../tokens/principal')
+  const scopeCheck = t.mock.fn(coordinatorSessionScope)
+  const sessionModule = await import('../live/coordinator-session')
+  t.mock.module('../live/coordinator-session', { namedExports: { ...sessionModule, coordinatorSessionScope: scopeCheck } })
+  const { readCoordinatorMessages } = await import('./tools')
+  const owner = await seedUser(pool, 'mcp-snapshot')
+  const { workspaceId } = await seedCoordinator(owner)
+  const history = () => actAs({ id: owner, [tokenWorkspace]: workspaceId }, () => readCoordinatorMessages(owner, {}))
+  try {
+    await history()
+    scopeCheck.mock.resetCalls()
+    const result = await measured(history)
+    t.diagnostic('Immediate MCP history ' + JSON.stringify(readMetrics(result)))
+    assert.deepEqual(result.value.messages, [])
+    assert.equal(scopeCheck.mock.callCount(), 1, 'only the actual read checks current Bot and Workspace access')
+    await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner, 'suspended'])
+    await assert.rejects(history(), /workspaceAccessDenied/)
+  } finally {
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
   }
 })

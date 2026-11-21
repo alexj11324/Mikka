@@ -33,7 +33,7 @@ mock.module(new URL('../../lib/demo-device-cleanup.ts',import.meta.url).href,{na
   calls.push({sql:apply?'devices_apply':'devices_plan'})
   return {devices:0,activeRuns:0,stoppedRuns:0,removedDevices:0}
 }}})
-mock.module(new URL('../../lib/device-presence.ts',import.meta.url).href,{namedExports:{deviceOnlineStates:async()=>new Map()}})
+mock.module(new URL('../../lib/device-presence.ts',import.meta.url).href,{namedExports:{deviceOnlineStates:()=>new Map()}})
 mock.module(new URL('../../lib/subscription-acquire-expiry.ts',import.meta.url).href,{namedExports:{expireSubscriptionAcquisitions:async (connection,ownerId)=>{
   assert.equal(connection,client)
   assert.equal(ownerId,'active-owner','never run a global sweep or touch a deleting owner')

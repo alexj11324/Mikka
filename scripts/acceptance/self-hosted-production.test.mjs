@@ -17,15 +17,10 @@ const { WebSocketServer } = createRequire(nitroRequire.resolve('crossws/adapters
 const SHA = 'a'.repeat(40), API = 'https://api.github.com/repos/alexj11324/Mikka'
 const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }
 const env = { MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY: repository.full_name,
-  GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_run',
+  GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch',
   GITHUB_SHA: SHA, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1',
   GITHUB_WORKFLOW_REF: repository.full_name + '/' + CORE_WORKFLOW + '@refs/heads/main', GH_TOKEN: 'fixture-token' }
-const release = { id: 51, run_attempt: 2, repository, head_repository: repository,
-  url: API + '/actions/runs/51', name: 'Web deploy', path: '.github/workflows/web-deploy.yml',
-  event: 'push', head_branch: 'main', head_sha: SHA, status: 'completed', conclusion: 'success' }
-const event = { action: 'completed', repository, workflow_run: release }
-const steps = ['Verify the official runtime stays on the cloud edition', 'Build (runs migrations last, as the Vercel build did)',
-  'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
+const event = { repository }
 const now = () => Date.parse('2026-11-07T12:00:00Z')
 
 function metadata(options = {}) {
@@ -43,7 +38,7 @@ function metadata(options = {}) {
     assert.equal(url.origin, 'https://api.github.com')
     const path = url.href.slice(API.length)
     if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: 1, repository, head_repository: repository,
-      url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SHA,
+      url: url.href, path: CORE_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: SHA,
       status: 'in_progress', conclusion: null, ...options.driver })
     if (path.startsWith('/issues/')) {
       const number = Number(path.slice(8)); assert.ok(CORE_ISSUES.includes(number))
@@ -51,38 +46,30 @@ function metadata(options = {}) {
         state: options.openIssues ? (options.openIssues.includes(number) ? 'open' : 'closed') : options.closed ? 'closed' : 'open', ...options.issue })
     }
     if (path === '/git/ref/heads/main') return Response.json({ ref: 'refs/heads/main', object: { type: 'commit', sha: options.main ?? SHA } })
-    if (path === '/actions/runs/51') return Response.json({ ...release, ...options.release })
-    if (path === '/actions/runs/51/attempts/2/jobs?per_page=100') return Response.json({ total_count: 1,
-      jobs: [{ id: 61, name: 'deploy', run_id: 51, head_sha: SHA, status: 'completed', conclusion: 'success',
-        steps: steps.map(name => ({ name, status: 'completed', conclusion: options.skippedStep === name ? 'skipped' : 'success' })) }] })
     assert.fail('Unexpected metadata request')
   }
   return { calls, fetchImpl, prove: (extra = {}) => attestCoreProduction({ env, event, fetchImpl, now, ...extra }) }
 }
 
-test('core production accepts only the actual same-repository main Web workflow_run, not a relabelled dispatch', () => {
+test('core production accepts only a same-repository main dispatch, not another event or workflow', () => {
   assert.equal(coreProductionGuard(env, event).applicationSha, SHA)
-  for (const patch of [{ GITHUB_EVENT_NAME: 'workflow_dispatch' }, { GITHUB_REF: 'refs/pull/1/merge' },
-    { GITHUB_SHA: 'b'.repeat(40) }, { GITHUB_WORKFLOW_REF: repository.full_name + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main' },
+  for (const patch of [{ GITHUB_EVENT_NAME: 'workflow_run' }, { GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/pull/1/merge' },
+    { GITHUB_SHA: 'main' }, { GITHUB_WORKFLOW_REF: repository.full_name + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main' },
     { GITHUB_REPOSITORY: 'someone/fork' }, { GITHUB_RUN_ATTEMPT: '0' }])
     assert.throws(() => coreProductionGuard({ ...env, ...patch }, event), /core_configuration/)
-  for (const patch of [{ event: 'workflow_dispatch' }, { status: 'in_progress' }, { conclusion: 'failure' },
-    { path: '.github/workflows/other.yml' }, { head_repository: { full_name: 'someone/fork' } }, { head_branch: 'topic' }])
-    assert.throws(() => coreProductionGuard(env, { ...event, workflow_run: { ...release, ...patch } }), /core_configuration/)
 })
 
-test('target proof never accesses owner credentials and requires actual publication, current main and runtime cloud guard', async () => {
+test('target proof never accesses owner credentials and requires current main served live', async () => {
   const f = metadata(), guardedEnv = { ...env }
   for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'VERCEL_TEAM_TOKEN'])
     Object.defineProperty(guardedEnv, key, { get() { return assert.fail('Target proof must not read ' + key) } })
   const proof = await f.prove({ env: guardedEnv })
   assert.equal(proof.status, 'ready'); assert.deepEqual(proof.openIssues, [...CORE_ISSUES])
-  assert.equal(proof.webAttempt, 2); assert.equal(proof.webDeployJobId, 61)
-  assert.equal(f.calls.filter(url => url.endsWith('/mikka/api/version')).length, 2)
+  assert.equal(f.calls.filter(url => url.endsWith('/mikka/api/version')).length, 1)
+  assert.equal(f.calls.some(url => url.includes('/actions/runs/') && !url.endsWith('/actions/runs/17')), false, 'no Web deploy run is read')
   for (const options of [{ main: 'b'.repeat(40) }, { version: 'b'.repeat(40) },
-    { driver: { event: 'workflow_dispatch' } }, { issue: { pull_request: {} } },
-    { release: { conclusion: 'failure' } }, ...steps.map(skippedStep => ({ skippedStep }))])
-    await assert.rejects(metadata(options).prove(), /core_(target_changed|driver|issue|release)/)
+    { driver: { event: 'workflow_run' } }, { issue: { pull_request: {} } }])
+    await assert.rejects(metadata(options).prove(), /core_(target_changed|driver|issue)/)
 })
 
 test('all related issues closed is an explicit skip before credentials or application requests', async () => {
@@ -95,7 +82,7 @@ test('the cleanup regression issue alone keeps exact-revision Core acceptance en
   const f = metadata({ openIssues: [1826] }), proof = await f.prove()
   assert.equal(proof.status, 'ready')
   assert.deepEqual(proof.openIssues, [1826])
-  assert.equal(f.calls.filter(url => url.endsWith('/mikka/api/version')).length, 2)
+  assert.equal(f.calls.filter(url => url.endsWith('/mikka/api/version')).length, 1)
   await assert.rejects(metadata({ openIssues: [1826], version: 'b'.repeat(40) }).prove(), /core_target_changed/)
 })
 
@@ -115,8 +102,7 @@ const gateway = 'wss://mikka-gateway.aspectlylabs.com'
 const protocol = 'mikka-ticket-' + Math.floor((now() + 299_000) / 1000) + '-' + 'a'.repeat(64)
 const channel = createHash('sha256').update(JSON.stringify([ownerId, workspaceId])).digest('hex')
 const liveTicket = () => ({ url: gateway + '/v1/live/' + channel + '/socket', protocol, expiresAt: now() + 299_000 })
-const deviceTicket = () => ({ url: gateway + '/v1/devices/' + deviceId + '/socket', protocol,
-  runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' })
+const deviceTicket = () => ({ url: gateway + '/v1/devices/' + deviceId + '/socket', protocol })
 
 test('tickets cannot leave the existing gateway, swap scope or carry arbitrary URL/query credentials', () => {
   const options = { ownerId, workspaceId, now, socketFactory: () => assert.fail('Invalid ticket reached WebSocket') }
@@ -203,6 +189,6 @@ test('the dedicated workflow has only the existing narrow OIDC delivery and API/
   assert.equal((text.match(/identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac/g) ?? []).length, 2)
   assert.deepEqual([...text.matchAll(/secret-name: (.+)/g)].map(match => match[1]), ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD'])
   assert.ok(text.indexOf('self-hosted-production.mjs --attest') < text.indexOf('uses: Infisical/secrets-action'))
-  assert.doesNotMatch(text, /workflow_dispatch:|playwright|chromium|contents: write|secret-path: \/(?:platform|vercel|neon)/)
-  assert.match(text, /workflow_run:[\s\S]*workflows: \['Web deploy'\]/)
+  assert.doesNotMatch(text, /workflow_run:|Web deploy|playwright|chromium|contents: write|secret-path: \/(?:platform|vercel|neon)/)
+  assert.match(text, /workflow_dispatch:/)
 })

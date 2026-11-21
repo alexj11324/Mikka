@@ -166,7 +166,7 @@ export async function applyDriveWrite(
     // move between the comparison and the write that depends on it.
     const { rows: [volume] } = await client.query<{
       id: string; ownerId: string; driveScope: DriveScope; headVersionId: string; headDigest: string; entryCount: number; totalBytes: string
-    }>('SELECT id,"ownerId","driveScope","headVersionId","headDigest","entryCount","totalBytes" FROM drive_volumes WHERE id=$1 FOR UPDATE', [scope.volumeId])
+    }>('SELECT id,"ownerId","driveScope","headVersionId","headDigest","entryCount","totalBytes" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL FOR UPDATE', [scope.volumeId])
     if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
     if (scope.driveScope && volume.driveScope !== scope.driveScope) throw new DriveError('drive_not_found', 404)
 
@@ -200,7 +200,7 @@ export async function applyDriveWrite(
     const manifestProblem = driveManifestProblem(applied.manifest)
     if (manifestProblem) throw new DriveError(manifestProblem === 'too_many_entries' ? 'drive_limit_exceeded' : 'drive_manifest_invalid', manifestProblem === 'too_many_entries' ? 413 : 422)
 
-    return commitVersion(client, volume, applied.manifest, actor, 'autosave', null, write.mutationId, requestDigest, write.expectedDigest)
+    return commitVersion(client, volume, current, applied.manifest, actor, 'autosave', null, write.mutationId, requestDigest, write.expectedDigest)
   })
 }
 
@@ -215,6 +215,7 @@ export async function applyDriveWrite(
 async function commitVersion(
   client: PoolClient,
   volume: { id: string; ownerId: string },
+  current: readonly DriveManifestEntry[],
   manifest: readonly DriveManifestEntry[],
   actor: DriveActor,
   kind: 'autosave' | 'checkpoint' | 'restore',
@@ -231,12 +232,9 @@ async function commitVersion(
   // The entry rows and the version are written in the caller's transaction, so a
   // failure anywhere leaves the volume exactly as it was: this is what "a
   // refused write has no effect" means in practice.
-  const { rows: held } = await client.query<{ path: string; mode: number; sizeBytes: number; sha256: string }>(
-    'SELECT path,mode,"sizeBytes",sha256 FROM drive_volume_entries WHERE "volumeId"=$1 ORDER BY path', [volume.id])
-  const currentPaths = new Set(held.map(row => row.path))
-  const kept = new Map(held.map(row => [row.path, row]))
+  const kept = new Map(current.map(entry => [entry.path, entry]))
   const nextPaths = new Set(manifest.map(entry => entry.path))
-  const removed = [...currentPaths].filter(path => !nextPaths.has(path))
+  const removed = [...kept.keys()].filter(path => !nextPaths.has(path))
   if (removed.length) await client.query('DELETE FROM drive_volume_entries WHERE "volumeId"=$1 AND path = ANY($2::text[])', [volume.id, removed])
   const changed = manifest.filter(entry => {
     const before = kept.get(entry.path)
@@ -284,7 +282,7 @@ const versionIdFor = () => `vver_${nextVersionId()}`
 export async function readDriveHead(database: { query: Pool['query'] }, scope: { ownerId: string; volumeId: string }):
   Promise<{ headVersionId: string; headDigest: string; entries: DriveManifestEntry[] }> {
   const { rows: [volume] } = await database.query<{ ownerId: string; headVersionId: string; headDigest: string }>(
-    'SELECT "ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1', [scope.volumeId])
+    'SELECT "ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [scope.volumeId])
   if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
   const { rows } = await database.query<{ path: string; mode: number; sizeBytes: number; sha256: string }>(
     'SELECT path,mode,"sizeBytes",sha256 FROM drive_volume_entries WHERE "volumeId"=$1 ORDER BY path', [scope.volumeId])
@@ -303,20 +301,50 @@ export async function readDriveHistory(
   database: Pick<Pool, 'query'>,
   actor: { ownerId: string },
   volumeId: string,
-  options: { limit?: number; beforeId?: string } = {},
+  options: { limit?: number | null; beforeId?: string } = {},
 ): Promise<DriveVersionSummary[]> {
-  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
-  const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1', [volumeId])
+  const limit = options.limit === null ? null : Math.min(Math.max(options.limit ?? 50, 1), 200)
+  const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [volumeId])
   if (!volume || volume.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
-  // A cursor is the last id already seen; ULIDs sort by time, so it doubles as
-  // a stable page boundary without an offset that shifts under new writes.
+  // The volume lock serializes sequence numbers. Independent writers can generate
+  // ULIDs in a different order within the same millisecond.
   const { rows } = await database.query<{
     id: string; seq: number; kind: DriveVersionSummary['kind']; fileCount: number; totalBytes: string; digest: string
     threadId: string | null; threadTitle: string | null; authorName: string; restoredFromVersionId: string | null; createdAt: Date
   }>(`SELECT id,seq,kind,"fileCount","totalBytes",digest,"threadId","threadTitle","authorName","restoredFromVersionId","createdAt"
       FROM drive_volume_versions
-      WHERE "volumeId"=$1 AND ($2::text IS NULL OR id < $2)
-      ORDER BY id DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit])
+      WHERE "volumeId"=$1 AND EXISTS (
+        SELECT 1 FROM drive_volumes WHERE id=$1 AND "ownerId"=$4 AND "archivedAt" IS NULL
+      ) AND ($2::text IS NULL OR seq < (
+        SELECT seq FROM drive_volume_versions WHERE "volumeId"=$1 AND id=$2
+      ))
+      ORDER BY seq DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit, actor.ownerId])
+  return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
+}
+
+/** Compare the selected entry with the immediately preceding immutable snapshot.
+ * A deletion is a change with a null file. Writes to other paths leave no row.
+ */
+export async function readDriveFileHistory(
+  database: Pick<Pool, 'query'>,
+  actor: { ownerId: string },
+  volumeId: string,
+  path: string,
+  options: { limit: number | null; beforeId?: string },
+): Promise<(DriveVersionSummary & { file: DriveManifestEntry | null })[]> {
+  const { rows } = await database.query<DriveVersionSummary & { file: DriveManifestEntry | null }>(`
+    SELECT v.id, v.seq, v.kind, v."fileCount", v."totalBytes", v.digest, v."threadId", v."threadTitle",
+           v."authorName", v."restoredFromVersionId", v."createdAt", entries.file
+      FROM drive_volume_versions v
+      JOIN drive_volumes d ON d.id = v."volumeId" AND d."archivedAt" IS NULL
+      LEFT JOIN drive_volume_versions prev ON prev."volumeId" = v."volumeId" AND prev.seq = v.seq - 1
+      CROSS JOIN LATERAL (
+        SELECT jsonb_path_query_first(v.manifest, '$[*] ? (@.path == $path)', jsonb_build_object('path', $3::text)) AS file,
+               jsonb_path_query_first(prev.manifest, '$[*] ? (@.path == $path)', jsonb_build_object('path', $3::text)) AS prior
+      ) entries
+     WHERE v."volumeId" = $1 AND v."ownerId" = $2 AND entries.file IS DISTINCT FROM entries.prior
+       AND ($4::text IS NULL OR v.seq < (SELECT seq FROM drive_volume_versions WHERE id = $4 AND "volumeId" = $1))
+     ORDER BY v.seq DESC LIMIT $5`, [volumeId, actor.ownerId, path, options.beforeId ?? null, options.limit])
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
@@ -326,20 +354,21 @@ export async function readDriveVersion(
   actor: { ownerId: string },
   volumeId: string,
   versionId: string,
-): Promise<DriveVersionSummary & { manifest: DriveManifestEntry[] }> {
+): Promise<DriveVersionSummary & { manifest: DriveManifestEntry[]; parentDigest: string | null }> {
   const { rows: [version] } = await database.query<{
     id: string; volumeId: string; seq: number; kind: DriveVersionSummary['kind']; fileCount: number; totalBytes: string; digest: string
-    manifest: DriveManifestEntry[]; threadId: string | null; threadTitle: string | null; authorName: string
+    manifest: DriveManifestEntry[]; parentDigest: string | null; threadId: string | null; threadTitle: string | null; authorName: string
     restoredFromVersionId: string | null; createdAt: Date; ownerId: string
   }>(`SELECT v.id,v."volumeId",v.seq,v.kind,v."fileCount",v."totalBytes",v.digest,v.manifest,v."threadId",v."threadTitle",
-        v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId"
+        v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId",prev.digest AS "parentDigest"
       FROM drive_volume_versions v JOIN drive_volumes d ON d.id=v."volumeId"
-      WHERE v.id=$1 AND v."volumeId"=$2`, [versionId, volumeId])
+      LEFT JOIN drive_volume_versions prev ON prev."volumeId"=v."volumeId" AND prev.seq=v.seq-1
+      WHERE v.id=$1 AND v."volumeId"=$2 AND d."ownerId"=$3 AND d."archivedAt" IS NULL`, [versionId, volumeId, actor.ownerId])
   if (!version || version.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   return { id: version.id, seq: version.seq, kind: version.kind, fileCount: version.fileCount,
     totalBytes: Number(version.totalBytes), digest: version.digest, threadId: version.threadId,
     threadTitle: version.threadTitle, authorName: version.authorName,
-    restoredFromVersionId: version.restoredFromVersionId, createdAt: version.createdAt, manifest: version.manifest }
+    restoredFromVersionId: version.restoredFromVersionId, createdAt: version.createdAt, parentDigest: version.parentDigest, manifest: version.manifest }
 }
 
 /**
@@ -355,24 +384,35 @@ export async function restoreDriveVersion(
   database: { connect: Pool['connect'] },
   scope: { ownerId: string; volumeId: string },
   actor: DriveActor,
-  input: { versionId: string; expectedDigest: string; mutationId: string },
+  input: { versionId: string; expectedDigest: string; mutationId?: string },
 ): Promise<DriveWriteResult> {
   const requestDigest = sha256Hex(JSON.stringify(['restore', scope.volumeId, input.versionId, input.expectedDigest]))
   return withTransaction(database, async client => {
     const { rows: [volume] } = await client.query<{
       id: string; ownerId: string; headVersionId: string; headDigest: string
-    }>('SELECT id,"ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 FOR UPDATE', [scope.volumeId])
+    }>('SELECT id,"ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL FOR UPDATE', [scope.volumeId])
     if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
 
-    // A restore is idempotent for the same reason a write is.
-    const { rows: [receipt] } = await client.query<{ requestDigest: string; versionId: string; resultDigest: string }>(
-      'SELECT "requestDigest","versionId","resultDigest" FROM drive_mutations WHERE "volumeId"=$1 AND "mutationId"=$2', [volume.id, input.mutationId])
-    if (receipt) {
-      if (receipt.requestDigest !== requestDigest) throw new DriveError('drive_replay_mismatch', 409)
-      const { rows: [version] } = await client.query<{ seq: number; fileCount: number; totalBytes: string }>(
-        'SELECT seq,"fileCount","totalBytes" FROM drive_volume_versions WHERE id=$1', [receipt.versionId])
-      return { headVersionId: receipt.versionId, headDigest: receipt.resultDigest, seq: version?.seq ?? 0,
-        entryCount: version?.fileCount ?? 0, totalBytes: Number(version?.totalBytes ?? 0), replayed: true }
+    if (input.mutationId) {
+      const { rows: [receipt] } = await client.query<{ requestDigest: string; versionId: string; resultDigest: string }>(
+        'SELECT "requestDigest","versionId","resultDigest" FROM drive_mutations WHERE "volumeId"=$1 AND "mutationId"=$2', [volume.id, input.mutationId])
+      if (receipt) {
+        if (receipt.requestDigest !== requestDigest) throw new DriveError('drive_replay_mismatch', 409)
+        const { rows: [version] } = await client.query<{ seq: number; fileCount: number; totalBytes: string }>(
+          'SELECT seq,"fileCount","totalBytes" FROM drive_volume_versions WHERE id=$1', [receipt.versionId])
+        return { headVersionId: receipt.versionId, headDigest: receipt.resultDigest, seq: version?.seq ?? 0,
+          entryCount: version?.fileCount ?? 0, totalBytes: Number(version?.totalBytes ?? 0), replayed: true }
+      }
+    } else {
+      // The Organization contract supplies a source version and an observed digest.
+      // Only the current head can acknowledge this exact restore after a lost response.
+      const { rows: [applied] } = await client.query<{ seq: number; fileCount: number; totalBytes: string }>(`
+        SELECT v.seq,v."fileCount",v."totalBytes" FROM drive_volume_versions v
+        JOIN drive_volume_versions prev ON prev."volumeId"=v."volumeId" AND prev.seq=v.seq-1
+        WHERE v.id=$1 AND v."volumeId"=$2 AND v.kind='restore' AND v."restoredFromVersionId"=$3 AND prev.digest=$4`,
+      [volume.headVersionId, volume.id, input.versionId, input.expectedDigest])
+      if (applied) return { headVersionId: volume.headVersionId, headDigest: volume.headDigest, seq: applied.seq,
+        entryCount: applied.fileCount, totalBytes: Number(applied.totalBytes), replayed: true }
     }
 
     const { rows: [source] } = await client.query<{ manifest: DriveManifestEntry[]; digest: string }>(
@@ -380,18 +420,22 @@ export async function restoreDriveVersion(
     if (!source) throw new DriveError('drive_not_found', 404)
 
     // The same CAS as a write: the caller's view must still be current.
+    const current = await readEntries(client, volume.id)
     if (input.expectedDigest !== volume.headDigest) {
-      const current = await readEntries(client, volume.id)
       const wanted = new Map(source.manifest.map(entry => [entry.path, entry]))
-      const paths = [...new Set([...current.map(entry => entry.path), ...wanted.keys()])].filter(path => {
-        const held = current.find(entry => entry.path === path), target = wanted.get(path)
-        return target ? !held || held.sha256 !== target.sha256 || held.mode !== target.mode : Boolean(held)
-      }).sort()
+      const paths: string[] = []
+      for (const entry of current) {
+        const target = wanted.get(entry.path)
+        if (!target || entry.sha256 !== target.sha256 || entry.mode !== target.mode) paths.push(entry.path)
+        wanted.delete(entry.path)
+      }
+      for (const path of wanted.keys()) paths.push(path)
+      paths.sort()
       throw new DriveError('drive_version_conflict', 409, { headDigest: volume.headDigest, headVersionId: volume.headVersionId, paths })
     }
     // The restored version is written forward as a new one that names its source.
-    return commitVersion(client, volume, source.manifest, actor, 'restore', input.versionId,
-      input.mutationId, requestDigest, input.expectedDigest)
+    return commitVersion(client, volume, current, source.manifest, actor, 'restore', input.versionId,
+      input.mutationId ?? null, requestDigest, input.expectedDigest)
   })
 }
 

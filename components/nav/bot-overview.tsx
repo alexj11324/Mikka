@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
@@ -12,13 +12,14 @@ import { ComputerViewer } from '@/components/computer/computer-viewer'
 import { deleteLibraryFile, fetchBotLibrary } from '@/lib/bot-library'
 import { BOT_COLORS, BOT_NAME_MAX, BOT_SHAPES } from '@/lib/bot-shapes'
 import { isMockedComputer } from '@/lib/computer/client'
-import { PR_GROUPS, pullRequestsOf } from '@/lib/thread-groups'
+import { PR_GROUPS, botGlance, pullRequestsOf } from '@/lib/thread-groups'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence } from '@/lib/use-presence'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
 import { BotLookPicker } from './bot-look-picker'
 import { useBotPublicRole } from './bot-public-role-editor'
 import { useSaveBot } from './use-save-bot'
+import { useBotSettings } from './use-bot-settings'
 import { BotOverview } from '@ui-slot/bot-overview'
 import type { BotOverviewItem, BotOverviewProps, BotOverviewTab } from '@/components/slots/bot-overview-contract'
 
@@ -53,10 +54,10 @@ export function useBotLibrary(botId: string | null, enabled = true) {
 }
 
 /** An ordinary bot's authorized name and appearance commands. */
-function useBotEdits(botId: string, color?: string, shape?: string): NonNullable<BotOverviewProps['edit']> {
+function useBotEdits(botId: string, workspaceId?: string, color?: string, shape?: string): NonNullable<BotOverviewProps['edit']> {
   const t = useTranslations('Shell.panel')
   const actionError = useActionError()
-  const saveBot = useSaveBot()
+  const saveBot = useSaveBot(workspaceId)
   const failed = (failure: unknown) => actionError(failure instanceof Error ? failure.message : null)
   const tone = known(color, BOT_COLORS, DEFAULT_BOT_COLOR)
   const form = known(shape, BOT_SHAPES, DEFAULT_BOT_SHAPE)
@@ -103,8 +104,12 @@ function RoleOf({ botId, workspaceId, visible, children }: { botId: string; work
   return children(useBotPublicRole(botId, workspaceId, visible))
 }
 
-function EditsOf({ botId, color, shape, children }: { botId: string; color?: string; shape?: string; children: (edit: BotOverviewProps['edit']) => ReactNode }) {
-  return children(useBotEdits(botId, color, shape))
+function SettingsOf({ botId, workspaceId, visible, children }: { botId: string; workspaceId?: string; visible: boolean; children: (settings: BotOverviewProps['settings']) => ReactNode }) {
+  return children(useBotSettings(botId, workspaceId, visible))
+}
+
+function EditsOf({ botId, workspaceId, color, shape, children }: { botId: string; workspaceId?: string; color?: string; shape?: string; children: (edit: BotOverviewProps['edit']) => ReactNode }) {
+  return children(useBotEdits(botId, workspaceId, color, shape))
 }
 
 /**
@@ -147,9 +152,11 @@ export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery
       }) }
     }).filter(group => group.rows.length),
   }
-  const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
-    edit={edit} details={{ role, routines: [], library }} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
+  const glance = botGlance(threads, issues)
+  const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit'], settings: BotOverviewProps['settings'] = null) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
+    edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} settings={settings} dialogs={dialogs} />
   if (!botId) return draw(null, null)
   return <RoleOf key={botId} botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{role =>
-    <EditsOf botId={botId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>
+    <SettingsOf botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{settings =>
+      <EditsOf botId={botId} workspaceId={workspaceId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit, settings)}</EditsOf>}</SettingsOf>}</RoleOf>
 }

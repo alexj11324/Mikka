@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createServer } from 'node:net'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
@@ -15,6 +15,7 @@ import { loadEnvironment } from '../../../scripts/test-accounts/environment.mjs'
 import { createParityFixtures } from './parity-fixtures.mjs'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { verifyPickedRepository } from './native-repository-picker.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
@@ -425,15 +426,7 @@ try {
   check('native notification click event follows the real preload bridge to the requested task/thread')
 
   mark('native-repository-picker')
-  const repo = join(directory, 'picked-repository')
-  await mkdir(repo)
-  execFileSync('git', ['init', '--quiet', repo])
-  execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.invalid/review.git'])
-  await run.app.evaluate(({ dialog }, selected) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] }) }, repo)
-  const picked = await run.page.evaluate(() => window.mikka.device.pickRepo())
-  assert.deepEqual(picked, { status: 'picked', repo: { path: await realpath(repo), name: basename(repo), remoteUrl: 'https://example.invalid/review.git' } })
-  await run.app.evaluate(({ dialog }) => { dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] }) })
-  assert.deepEqual(await run.page.evaluate(() => window.mikka.device.pickRepo()), { status: 'cancelled' })
+  await verifyPickedRepository(run.app, run.page, directory)
   check('native dialog result traverses real IPC and main validates the selected Git repository and cancellation')
   await close(run.app); application = null
 

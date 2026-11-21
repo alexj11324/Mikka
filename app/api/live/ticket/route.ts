@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/api-auth'
 import { activeTaskWorkspaces } from '@/lib/task-workspace'
 import { withRequestLog } from '@/lib/request-log'
@@ -8,7 +8,6 @@ import { workspaceLiveTicket } from '@/lib/enterprise/live-authority'
 import { desktopBearerHeaders } from '@/lib/desktop-rpc/handler'
 import { homeScopeProof } from '@/lib/live/home-scope-proof'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'cache-control': 'private, no-store' }
 
 async function ticket(request: Request) {

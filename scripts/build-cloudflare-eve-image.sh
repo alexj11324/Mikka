@@ -13,9 +13,10 @@ fi
 docker run --rm --network none --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
   --env CI=true --env XDG_CACHE_HOME=/tmp/mikka-build-cache \
-  --env NITRO_PRESET=node-server --env MIKKA_EVE_WORKFLOW_WORLD=cloudflare \
+  --env NITRO_PRESET=node-server --env WORKFLOW_TARGET_WORLD=@workflow/world-postgres \
   --env NODE_OPTIONS=--max-old-space-size=6144 \
   --env MIKKA_BUILD_REVISION --env MIKKA_UI_OVERLAY_SHA --env MIKKA_DEPLOYMENT_ID \
+  --env MIKKA_RUNTIME_RELEASE \
   --env MIKKA_EDITION --env MIKKA_BUILD_BYOS_WORKER --env MIKKA_DEPLOYMENT_ENVIRONMENT \
   --env NEXT_PUBLIC_MIKKA_BUILD --env NEXT_PUBLIC_POSTHOG_KEY --env NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY \
   --env MIKKA_DEPLOYMENT_STAGE --env NEXT_PUBLIC_TURNSTILE_SITE_KEY \

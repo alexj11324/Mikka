@@ -1,6 +1,6 @@
 import { defaultAgentCopy } from '@/lib/agent-copy'
 import { isBareRepositoryName, relatedRepositories } from '@/lib/github/repository-match'
-import { timedPhase } from '@/lib/dispatch-timing'
+import { recordRepositoryRefusal, timedPhase } from '@/lib/dispatch-timing'
 
 type Repository = { fullName: string; private?: boolean; description?: string | null; homepage?: string | null }
 /** Lists one user's own authorized repositories. The host passes the user id; a model never does. */
@@ -129,7 +129,11 @@ export async function sameRepository(userId: string, named: string, remoteUrl: s
 
 /** Dispatches only with a resolved repository; otherwise nothing is queued and the result carries the card. */
 export async function withResolvedRepository<T>(userId: string, issueId: string, repo: string, dispatch: (repo: string) => Promise<T>, list: RepositoryLister = ownRepositories, context: RepositoryContextSource = taskContext) {
-  const resolved = await timedPhase('resolveRepository', () => resolveRepository(userId, repo, list, () => context(userId, issueId)))
+  const resolved = await timedPhase('resolveRepository', async () => {
+    const resolved = await resolveRepository(userId, repo, list, () => context(userId, issueId))
+    if ('error' in resolved) recordRepositoryRefusal(resolved.error)
+    return resolved
+  })
   return 'repo' in resolved ? dispatch(resolved.repo) : { ...resolved, issueId }
 }
 

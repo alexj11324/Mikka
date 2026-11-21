@@ -20,6 +20,8 @@ export const metadataSchema = z.object({
   number: z.number().int().positive().optional(),
   assignee: assigneeSchema.nullable().default(null),
   delegate: delegateSchema.nullable().default(null),
+  // Manual includes an explicit clear. An absent value predates dispatch assignment.
+  delegateSelection: z.enum(['dispatch','manual']).optional(),
   project: z.string().trim().max(100).nullable().default(null),
   labels: z.array(labelSchema).max(12).default([]),
   pullRequests: z.array(pullRequestSchema).max(10).default([]),
@@ -39,6 +41,39 @@ export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 export type IssueDelegate = z.infer<typeof delegateSchema>
 
+/** A named member owns the task when assigned; otherwise its admitted delegate provides the human-facing work owner. */
+export function taskWorkOwner(metadata: Pick<IssueMetadata, 'assignee' | 'delegate'>) {
+  return metadata.assignee ?? metadata.delegate
+}
+
+export const labelKey = (label: IssueLabel) => label.name.toLowerCase()
+export const githubPullRequestKey = (url: string) => url.toLowerCase().replace(/\/$/, '')
+export const pullRequestKey = (pr: IssuePullRequest) => pr.url.replace(/\/$/, '')
+
+/** Keep independent edits. A concurrent change to the same entry is shown as saved for review. */
+export function reconcileMetadataDraft<T extends IssueLabel | IssuePullRequest>(
+  original: T[], draft: T[], latest: T[], key: (entry: T) => string, inputKey: string,
+) {
+  const entries = (items: T[]) => new Map(items.map(item => [key(item), item]))
+  const before = entries(original)
+  const edited = entries(draft)
+  const current = entries(latest)
+  function changedRemotely(id: string) {
+    const previous = before.get(id)
+    const saved = current.get(id)
+    if (!previous || !saved) return previous !== saved
+    return Object.keys({ ...previous, ...saved }).some(field => previous[field as keyof T] !== saved[field as keyof T])
+  }
+  const result = new Map(current)
+  for (const id of new Set([...before.keys(), ...edited.keys()])) {
+    if (changedRemotely(id)) continue
+    const item = edited.get(id)
+    if (item) result.set(id, item)
+    else result.delete(id)
+  }
+  return { items: [...result.values()], inputChanged: changedRemotely(inputKey) }
+}
+
 /** Preserve old assignments without continuing to present an Agent as a person.
  * A deliberate modern delegate (including null) takes precedence over history. */
 function canonicalMetadata(value: unknown): unknown {
@@ -47,6 +82,10 @@ function canonicalMetadata(value: unknown): unknown {
   const assignee = assigneeSchema.safeParse(metadata.assignee)
   if (!assignee.success || assignee.data.kind !== 'agent') return value
   return { ...metadata, assignee: null, delegate: Object.hasOwn(metadata, 'delegate') ? metadata.delegate : assignee.data }
+}
+
+export function issueRestoreDeadline(deletedAt: string): number {
+  return Date.parse(deletedAt) + 30 * 86_400_000
 }
 
 export function readIssueMetadata(content: JSONContent): IssueMetadata {

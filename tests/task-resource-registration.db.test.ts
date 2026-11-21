@@ -8,7 +8,7 @@ import { sql } from 'drizzle-orm'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 // Framework/session/background only; Task writers and ACL decisions stay real.
 import './fixtures/activity-runtime.mjs'
@@ -23,8 +23,8 @@ test('Task registration works with legacy and private SQL defaults; kind authori
   const appName = `task_acl_app_${suffix}_e2e`, wsName = `task_acl_ws_${suffix}_e2e`
   const appUrl = new URL(url!), wsUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; wsUrl.pathname = `/${wsName}`
-  await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-  await admin.query(`CREATE DATABASE "${wsName}" TEMPLATE template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, wsName, 'template0')
   const app = new Pool({ connectionString: appUrl.toString(), max: 4 })
   const ws = new Pool({ connectionString: wsUrl.toString(), max: 4 })
   const prior = { app: process.env.MIKKA_DATABASE_URL, ws: process.env.DATABASE_URL }

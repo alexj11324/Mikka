@@ -9,6 +9,8 @@
     "nav-bot-list": {},
     "group-chat": {},
     "subscription-settings": {},
-    "pull-request-badge": {}
+    "pull-request-badge": {},
+    "automations": {},
+    "automation-editor": {}
   }
 }

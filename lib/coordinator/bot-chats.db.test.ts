@@ -1,3 +1,5 @@
+import { DECISION_MODEL } from './decision'
+import type { DecisionExecution } from './decide'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -319,7 +321,7 @@ dbTest('durable attempts advance past one inbox batch and persist only a matchin
     assert.equal(next.length,50)
     assert.equal(next.some(item=>item.id===event.id),false,'in-flight/cooling attempt cannot monopolize the next wake')
     assert.ok(next.some(item=>!first.some(prior=>prior.id===item.id)),'selection advances beyond the original fifty rows')
-    const execution={executionId:randomUUID(),modelId:'openai/gpt-6-luna-decisions' as const,
+    const execution:DecisionExecution={executionId:randomUUID(),modelId:DECISION_MODEL,
       providerGenerationId:'synthetic-db-contract',startedAt:'2026-10-28T22:00:00Z',completedAt:'2026-10-28T22:00:00Z',
       requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input' as const}
     const judgment={tier:'result' as const,execution}
@@ -674,7 +676,7 @@ dbTest('own task completion returns to the original Bot with an exhausted team t
     await db.insert(schema.coordinatorEvents).values(Array.from({ length: 21 }, (_, n) => ({
       id: randomUUID(), userId: owner, botId, kind: 'user_message' as const, dedupeKey: `${owner}:${n}`, payload: { text: 'Earlier fixture input' }, tier: 'attention' as const, deliveredAt: new Date(),
     })))
-    await assert.rejects(new HostedUsageStore(pool).canUseMikkaPaid(workspaceId), { code: 'verification_required' }, 'the original Gateway classification is refused before a model call')
+    await assert.rejects(new HostedUsageStore(pool).canUseMikkaPaid(workspaceId), { code: 'points_exhausted' }, 'the original Gateway classification is refused before a model call')
     const agentId = randomUUID(), runId = randomUUID(), issueId = randomUUID(), eventId = randomUUID()
     await db.insert(schema.agents).values({ id: agentId, userId: owner, harness: 'claude_code', name: 'Completion fixture' })
     await db.insert(schema.issues).values({ id: issueId, userId: owner, workspaceId, title: 'Read-only completion', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })

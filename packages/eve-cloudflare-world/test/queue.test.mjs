@@ -82,6 +82,21 @@ test('a delayed previous-revision message reaches only its signed Node executor 
   ])
 })
 
+test('unkeyed publication returns the native ID even if the accepted response body is lost', async () => {
+  const id = randomUUID()
+  const handled = once(events, id)
+  const client = createNodeQueue({ deploymentId: revisions[1], signingKey, async fetchBound(url, init) {
+    const result = await outbound.fetch(url, init)
+    if (!result.ok) return result
+    await result.body?.cancel()
+    return new Response(new ReadableStream({ start(controller) {
+      controller.error(new Error('receipt body reset after native acceptance'))
+    } }), { status: result.status })
+  } })
+  const [receipt, [item]] = await Promise.all([client.queue(topic, { id }), handled])
+  expect(receipt).toEqual({ messageId: item.meta.messageId })
+})
+
 test.each(['reset', 'pending'])('response cleanup (%s) cannot change or delay the pinned executor acknowledgement', async cleanupMode => {
   const revision = revisions[1]
   for (const [status, returnedRevision, accepted] of [

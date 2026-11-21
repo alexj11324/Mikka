@@ -10,7 +10,7 @@ import { remainingRequestBudget, requestBudgetSignal, type RequestBudget } from 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const opaque = () => randomBytes(32).toString('base64url')
 const aad = (kind: string, id: string) => ['cloud_service_client', kind, id].join('\0')
-type RegistrationRow = { server_id: string; origin: string; base_path: string; service_url: string; secret: Sealed }
+type RegistrationRow = { server_id: string; origin: string; base_path: string; service_url: string; secret: Sealed; push_content: CloudConnectionView['pushContent'] }
 type BindingRow = { owner: string; server_id: string; secret: Sealed; scopes: CloudScope[]; revoked: boolean }
 type BindingSecret = { token?: CloudToken; serverKey?: string }
 type Database = Pick<PoolClient, 'query'>
@@ -39,12 +39,12 @@ export class CloudClientStore {
     finally { client.release() }
   }
 
-  async registration(database: Database = this.pool): Promise<CloudRegistration | null> {
-    const { rows: [row] } = await database.query<RegistrationRow>('SELECT server_id,origin,base_path,service_url,secret FROM cloud_service_registration WHERE id=true')
+  async registration(database: Database = this.pool): Promise<(CloudRegistration & Pick<CloudConnectionView, 'pushContent'>) | null> {
+    const { rows: [row] } = await database.query<RegistrationRow>('SELECT server_id,origin,base_path,service_url,secret,push_content FROM cloud_service_registration WHERE id=true')
     if (!row) return null
     const expected = selfHostedAddress(this.env)
     if (row.service_url !== cloudServiceUrl(this.env) || row.origin !== expected.origin || row.base_path !== expected.basePath) throw new CloudServiceError('cloud_invalid_request', 'configuration')
-    return { serverId: row.server_id, origin: row.origin, basePath: row.base_path, serviceUrl: row.service_url,
+    return { serverId: row.server_id, origin: row.origin, basePath: row.base_path, serviceUrl: row.service_url, pushContent: row.push_content,
       serverSecret: this.open<{ serverSecret: string }>(row.secret, 'registration', row.server_id).serverSecret }
   }
 
@@ -209,7 +209,7 @@ export class CloudClientStore {
     const registration = await this.registration()
     const { rows } = await this.pool.query<BindingRow>('SELECT owner,scopes,revoked FROM cloud_service_bindings WHERE owner=ANY($1::text[])', [[`user:${userId}`, 'server']])
     const personal = rows.find(row => row.owner === `user:${userId}`), team = rows.find(row => row.owner === 'server')
-    return { registered: Boolean(registration), serverId: administrator ? registration?.serverId ?? null : null, serviceUrl: cloudServiceUrl(this.env), administrator, pushContent: await this.pushContent(),
+    return { registered: Boolean(registration), serverId: administrator ? registration?.serverId ?? null : null, serviceUrl: cloudServiceUrl(this.env), administrator, pushContent: registration?.pushContent ?? 'full',
       team: { connected: Boolean(team && !team.revoked), scopes: team?.scopes ?? [] },
       personal: { connected: Boolean(personal && !personal.revoked), revoked: Boolean(personal?.revoked), scopes: personal?.scopes ?? [] } }
   }

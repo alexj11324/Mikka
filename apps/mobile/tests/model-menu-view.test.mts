@@ -1,7 +1,7 @@
 import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { groupTag, groupTitle, HOSTED_CHOICE, modelDisplayName, modelMenuLabel, modelSourceLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
+import { groupTag, groupTitle, modelDisplayName, modelMenuLabel, modelSourceLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
 
 const current: ModelMenu['current'] = { id: 'fixture', modelId: 'fixture-model', provider: 'claude', kind: 'subscription', chosen: true, available: false, availability: 'checking', credentialLabel: 'owner@example.test' }
 
@@ -43,11 +43,12 @@ test('a used-up subscription without a fallback never claims it switched to a pa
   assert.equal(modelStatusLine(exhausted)?.change, true)
 })
 
-test('cloud hosted choices identify Mikka Cloud credits while self-hosted and older servers retain their own billing labels', () => {
-  const hosted: ModelMenu['current'] = { id: HOSTED_CHOICE, modelId: '', provider: 'mikka', kind: 'hosted', available: true, chosen: true, hostedSource: 'cloud' }
+test('cloud Mikka 额度 choices name their model and identify Mikka Cloud credits; self-hosted keeps its own provider label', () => {
+  // 「Mikka 默认」 is gone (decision 2026-11-15-1900): a Mikka 额度 choice is a catalogue model like any other.
+  const hosted: ModelMenu['current'] = { id: 'credits:deepseek/deepseek-v4-pro', modelId: 'deepseek/deepseek-v4-pro', name: 'DeepSeek V4 Pro', provider: 'deepseek', kind: 'hosted', available: true, chosen: true, hostedSource: 'cloud' }
   assert.equal(groupTag({ kind: 'hosted', hostedSource: 'cloud', options: [hosted] }), mobileMessages.Coordinator.modelPicker.cloudCredits)
   assert.equal(groupTag({ kind: 'hosted', hostedSource: 'self-hosted', options: [] }), mobileMessages.Coordinator.modelPicker.ownProvider)
-  assert.equal(groupTag({ kind: 'hosted', options: [] }), '点数')
-  assert.equal(modelMenuLabel(hosted), mobileMessages.Coordinator.modelPicker.hosted, 'the composer chip stays compact')
-  assert.equal(modelSourceLabel(hosted), `${mobileMessages.Coordinator.modelPicker.hosted} · ${mobileMessages.Coordinator.modelPicker.cloudCredits}`)
+  assert.equal(groupTag({ kind: 'hosted', options: [] }), null)
+  assert.equal(modelMenuLabel(hosted), 'DeepSeek V4 Pro', 'the composer chip stays compact')
+  assert.equal(modelSourceLabel(hosted), `DeepSeek V4 Pro · ${mobileMessages.Coordinator.modelPicker.cloudCredits}`)
 })

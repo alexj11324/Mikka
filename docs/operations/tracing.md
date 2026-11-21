@@ -44,22 +44,13 @@ Every span has `service.name=mikka-web` and `deployment.environment`
 | `mikka.rpc.action` | A key confirmed present in the shared browser/desktop RPC registry. No arguments or unknown action strings are exported |
 | `error.type`, `mikka.error.code`, `mikka.error.detail` | On a failed request or job: the error's class name, and the code and detail of the first coded error in its cause chain (`@mikka/protocol/tracing`). Never the message |
 
-Each call to the default model (Mikka 默认, `lib/abuse/zerocat.ts`) also writes
-one `model.route` span, and the same values as a `default_model_route` log line:
+Mikka-managed model calls use the AI request span described below, with
+`mikka.ai.route = litellm` and the requested alias in the model field. The
+LiteLLM call ID and response cost connect that request to the proxy's spend
+receipt and Mikka usage ledger. Provider routing is owned by LiteLLM.
+Historical `model.route` spans with ZeroCat/fallback fields describe earlier
+revisions; they are not emitted by the LiteLLM-only model path.
 
-| Attribute | Meaning |
-| --- | --- |
-| `mikka.model.id` | `deepseek/deepseek-v4.1-flash` |
-| `mikka.model.route` | `zerocat` (the main route) or `gateway` (the fallback) |
-| `mikka.model.fallback_reason` | On `gateway` only: `unconfigured`, `endpoint_unexpected`, `route_denied`, `paused` (ZeroCat failed in this instance in the last 60 s and was skipped), `timeout`, `rate_limited`, `quota`, `server_error`, `redirect` (ZeroCat answered with a redirect, which the transport refuses), `network`, `request_rejected` or `stream_error` |
-| `mikka.model.zerocat_error`, `mikka.model.zerocat_error_code` | On a ZeroCat failure: the error names along its cause chain (`AI_APICallError>TypeError>Error`) and the first system code in it (`ECONNRESET`, `UND_ERR_CONNECT_TIMEOUT` …). Never a message |
-| `mikka.model.zerocat_ms` | How long the ZeroCat attempt took, success or failure |
-| `mikka.model.zerocat_status` | ZeroCat's HTTP status, when the failure had one |
-| `mikka.model.gateway_credential` | On `gateway`: `system` (Vercel bills) or `byok` (our own provider key), from Gateway's routing receipt |
-
-Count fallbacks by `attributes['mikka.model.fallback_reason']` on
-`posthog.trace_spans` where `name = 'model.route'` and
-`attributes['mikka.model.route'] = 'gateway'`.
 
 Database spans also have:
 
@@ -284,14 +275,17 @@ compaction, title/profile and daemon agent calls use the same convention.
   numeric fields. Missing provider usage stays absent, not a fabricated zero.
   `$ai_cache_reporting_exclusive=false` records that input totals include
   cached tokens.
-- Tier, effort, their score/confidence and the ZeroCat/Gateway/fallback route
+- Tier, effort, their score/confidence and the LiteLLM route
   are attributes. Prompt content, output content and tool arguments are never
   included.
-- Real Gateway/ZeroCat/provider cost receipts set `$ai_total_cost_usd` and
-  `$ai_cost_passthrough=true`. A subscription without an actual per-call cost
-  omits that receipt. PostHog may display a model-catalog estimate from usage;
-  label that as an estimate, not the subscription bill or cash charged by a
-  provider. Unknown cost is not zero.
+- The application sets `$ai_total_cost_usd` and `$ai_cost_passthrough=true`
+  when it supplies a per-call amount. Managed model amounts come from the
+  LiteLLM cost receipt, converted to integer microdollars before conversion
+  to USD. Passthrough alone does not establish an actual charge.
+  A subscription without a per-call amount omits these fields. PostHog may
+  display its own model-catalog estimate from usage; label estimates as such,
+  not as the subscription bill or cash charged by a provider. Unknown cost is
+  not zero.
 
 See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
 and [AI traces](https://posthog.com/docs/ai-observability/traces).
@@ -399,9 +393,61 @@ type/code fields. Bodies are the fixed strings `mikka.stage.completed` or
 `mikka.stage.failed`; free-form messages and cause messages are excluded.
 Ordinary successful SQL spans are APM-only.
 
+Coordinator tools that convert a coded exception into an ordinary result keep
+an owned `coordinator.tool` child span around the operation. That child retains
+the safe exception type/code and `ERROR` status when the Workflow SDK records
+the returned result and completes its parent step as `OK`. The closed
+repository-resolution refusal branches likewise mark their owned
+`dispatch.resolveRepository` and enclosing `dispatch_run` spans with
+`error.type=DispatchRefusal` and the existing refusal code. Their
+`dispatch_timing.failed` is true. These explicit boundaries preserve the
+business return values; telemetry does not inspect arbitrary result contents.
+
 Batching, bounded queues, exporter timeouts and an outage circuit breaker keep
 telemetry off the business response path. No log export adds a database query
 or an application polling loop. See the official [Node.js Logs guide](https://posthog.com/docs/logs/installation/nodejs).
+
+#### Codex priority evidence
+
+Inspect the application runtime JSON records for hosted Codex subscription
+calls. Correlate them with `model_call_timing` and
+`subscription_transport_timing` by `workflowRunId`, `stepId`, and `attempt`;
+worker receipts also carry `workerOrdinal` and `outcome`.
+
+The Eve session model requests priority for non-scheduled hosted Coordinator and
+named Bot chat turns. Scheduled reads, delegated child sessions, evaluations
+and dispatched Agent executions keep their ordinary tier.
+
+The records distinguish three evidence boundaries:
+
+| Record and fields | Meaning |
+| --- | --- |
+| `subscription_service_tier_policy`: `intent`, `capability`, `requested` | Internal hosted-chat policy, the current-epoch catalogue's supported/unsupported/unknown result, and the field selected for the same request. |
+| `subscription_service_tier`: `inputRequested`, `requested` | Worker input intent and the value after CPA conversion and request filtering, immediately before the single HTTP attempt. Values are `priority` or `omitted`. |
+| `subscription_service_tier`: `created`, `completed`, `incomplete` | The native `response.service_tier` in the corresponding response events, observed before CPA conversion. Each value is `priority`, `default`, `auto`, `flex`, `missing`, or `unrecognized`. |
+
+A receipt's `state` is `reported`, `unavailable`, or `invalid`.
+An older worker, a missing terminal frame, or cancellation can leave no receipt;
+absent native response fields remain `missing`. A requested tier or HTTP
+success does not establish the provider's actual tier. Retain differing event
+values and unknown states when assessing a run. The receipt contains only
+versioned fixed enums, with no prompt, tool arguments, credential, or raw
+provider field.
+
+The catalogue and request gates are described in the
+[subscription worker guide](../../packages/subscription-worker/README.md#model-catalogue-and-codex-priority).
+Only authenticated `getBotModelMenu` requests the optional upgrade of an
+otherwise current catalogue for priority metadata. Default `ensureCatalogues`,
+`getModelOrder`, and dispatch do not request that upgrade. Missing catalogues
+and epoch mismatches retain the existing refresh; manual refresh also collects
+capability within the same owner boundary (subscriptions are owner-only).
+
+Unknown or unsupported capability omits priority on the original request
+without retry. Fast can increase subscription allowance or credit use; consult
+the official [pricing guide](https://learn.chatgpt.com/docs/pricing).
+Neither a capability nor a tier receipt establishes a first-text latency
+improvement; compare the existing timing and client evidence for the tested
+revision.
 
 ### Browser context and masked Replay
 
@@ -417,6 +463,23 @@ headers/bodies/performance capture off. The URL sanitizer removes query strings,
 fragments and identifier segments. Live-channel `status` / `message` handling
 records only event kind, allowed key names and receive/skip state, never payload
 content. See [Replay privacy](https://posthog.com/docs/session-replay/privacy).
+
+Ordinary browser sessions keep the SDK's bot filter. The production acceptance
+runner explicitly opts in only its fresh automated browser context: before page
+scripts run, it installs a non-enumerable, in-memory deadline marker in the
+official Mikka main document. A valid marker enables the SDK's public
+`opt_out_useragent_filter` option for that instance. It does not alter the user
+agent, WebDriver signals, consent, project settings or recording privacy. The
+official `$browser_type` value survives the privacy filter only when it is exactly
+`bot` or `browser`, for both ordinary events and snapshots. The marker deadline
+limits eligibility at initialization; it is not an automatic timer that resets
+an already initialized SDK. The runner closes its owned context during cleanup.
+
+This opt-in never fabricates a snapshot or bypasses readiness: the same session
+must still produce a natural `$snapshot` before the single UI submission. Browser
+readiness alone does not prove ingestion or playback. See the
+[SDK configuration contract](https://posthog.com/docs/references/posthog-js/types/PostHogConfig)
+and the [acceptance driver contract](../../scripts/acceptance/run-observability.md).
 
 Project-level capture configuration and its deployment history belong to the
 [private operations entry](README.md). The SDK applies the local privacy policy
@@ -452,7 +515,10 @@ Company deployment queries, configuration and evidence are maintained through th
   entry loads. Set `1` locally to see every request.
 - Batch span processor (5 s, 512 spans per export, queue of 2048, then
   dropped). On Vercel a flush is handed to `waitUntil` when a request's root
-  span ends, after the response.
+  span ends, after the response. Its lifetime covers both the queued batches
+  and the exporter transport already started by the batch timer; native Logs
+  flush concurrently. Exporter rejection or a synchronous failure stays inside
+  the existing telemetry failure boundary.
 - Exporting never blocks or fails a request. A failed export drops its spans
   and pauses exporting for a minute; there are no retries beyond the
   exporter's own bounded 5 s attempt.
@@ -547,3 +613,17 @@ in `lib/tracing/tracing.test.ts` with the real `pg` driver and instrumentation.
 
 Adding an attribute means adding its key to the allowlist in `sanitize.ts`
 and a case to the privacy test.
+
+### Native reads and telemetry evidence
+
+The chat model readers share the workspace subscription-policy observation within an active batch and database executor. Keys, share and authority checks remain independent. Deferred work reads its own policy.
+
+Device run/repository polls read credential liveness, current device ownership
+and the requested list in one existing authority-bearing SQL snapshot. A
+revocation, expiry, removal or ownership change committed before that read is
+refused. Nonempty repository results keep their original settings reads. Grant
+consumption and credential issuance share one atomic SQL statement. A pending
+command read without completion/failure receipts reads the device state and
+queue together; acknowledgement and revocation transactions retain their
+existing behavior. These reductions do not alter the full Native measurement
+window or remove background traffic from its budget.

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import { WORKSPACE_NAME } from './workspace-defaults'
 
 export const DEFAULT_PROJECT_PROPERTIES = { color: 'green' as const, members: [] as string[], labels: [] as string[], dependencyIds: [] as string[], milestones: [] as { id: string; name: string; targetDate: string; completed: boolean }[] }
 const date = z.union([z.literal(''), z.iso.date()])
@@ -26,7 +26,23 @@ export const projectFields = z.object({
   team: z.string().trim().max(100).default(WORKSPACE_NAME), startDate: date, targetDate: date,
   properties: projectProperties.default(DEFAULT_PROJECT_PROPERTIES),
 })
-export const projectInput = projectFields.extend({ id: z.uuid().optional(), workspaceId: z.uuid().optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
+export const projectVisibilityDefault = z.strictObject({
+  organizationId: z.uuid().nullable(), visibility: z.enum(['private', 'shared']),
+})
+export type ProjectVisibilityDefault = z.infer<typeof projectVisibilityDefault>
+
+export const personalProjectSelection = z.object({
+  organizationId: z.uuid().nullable(),
+  projectId: z.uuid().nullable(),
+  revision: z.number().int().nonnegative(),
+  projects: z.array(z.object({ id: z.uuid(), name: z.string() })),
+})
+export const changePersonalProject = z.strictObject({
+  readerId: z.string().min(1).max(255), organizationId: z.uuid(), projectId: z.uuid().nullable(),
+  expectedRevision: z.number().int().nonnegative(),
+})
+
+export const projectInput = projectFields.extend({ id: z.uuid().optional(), workspaceId: z.uuid().optional(), expectedVisibility: projectVisibilityDefault.optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
 export const projectPatch = z.object({ id: z.uuid(), revision: z.number().int().positive(), changes: projectFields.partial().extend({ team: z.string().trim().max(100).optional(), properties: projectProperties.optional() }).refine(value => Object.keys(value).length > 0, 'validationProjectChangesRequired') })
 export type ProjectDraft = z.output<typeof projectFields>
 export type ProjectChanges = z.input<typeof projectPatch>['changes']

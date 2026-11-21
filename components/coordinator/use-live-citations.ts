@@ -20,12 +20,12 @@ export function useLiveCitations(texts: readonly string[], citations: AgentCitat
     const cited = citedIds([joined])
     return [...new Set([...cited.issueIds, ...cited.runIds])].filter(id => !known[id]).sort()
   }, [joined, known])
-  const { data } = useSWR<Lookup>(ids.length ? ['live-citations', ...ids] : null, async ([, ...asked]: string[]) => ({ ids: asked, sources: await coordinatorCitationSources(asked) }), {
+  const { data, error } = useSWR<Lookup>(ids.length ? ['live-citations', ...ids] : null, async ([, ...asked]: string[]) => ({ ids: asked, sources: await coordinatorCitationSources(asked) }), {
     keepPreviousData: true, revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false,
   })
   const lookedUp = data?.sources
   const answered = data?.ids
-  const waiting = ids.some(id => !answered?.includes(id))
+  const waiting = !error && ids.some(id => !answered?.includes(id))
   return useMemo(() => {
     const sources = lookedUp ? { ...lookedUp, ...known } : known
     return { settled: { ...citations, sources, pending: waiting }, streaming: { ...citations, sources, pending: true } }

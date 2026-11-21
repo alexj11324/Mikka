@@ -1,12 +1,11 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { authenticateDevice } from '@/lib/device-link'
 import { skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 
-export const dynamic='force-dynamic'
 async function handleGET(request:Request,{params}:{params:Promise<{runId:string}>}) {
   const caller=await authenticateDevice(request)
   if (!caller) return NextResponse.json({error:'authRequired'},{status:401})

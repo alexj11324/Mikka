@@ -1,3 +1,4 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import 'server-only'
 import { withRunWorkspace } from '@/lib/run-completion'
 import { assertLockedRunProfileClaim, assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
@@ -7,6 +8,7 @@ import { computerPermission, type ComputerPermission } from './permission'
 import { runMayUseCredentialSql } from '@/lib/personal-policy'
 import { runListChanged } from '@/lib/live/lists'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
+import { advanceTaskAfterRunStart } from '@/lib/task-status-run-start'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
@@ -18,7 +20,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
       WHERE r.id=$1 AND r."deviceId"=$2`, [runId, deviceId])
   if (!stored?.workspaceId) return 'unavailable'
   return await withRunWorkspace<'claimed' | 'unavailable' | 'cloud-required'>(stored.userId, stored.workspaceId, async () => {
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     await executionIdentityForRun(client, runId)
@@ -28,7 +30,8 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     await assertRunProfileClaim(client, runId)
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
-    // The lease is due to be reclaimed at its expiry if no heartbeat renews it (#1212).
+    advanceTaskAfterRunStart(client, runId)
+    // The lease lasts as long as the device session; run recovery reclaims it once it ends (#1212).
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
@@ -47,7 +50,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
 /** The scoped cloud device may claim only a run bound to its owner's Bot
  * and to that run's own thread machine. Binding and claim use the same run row lock.
  * A run frozen on an API key has no subscription binding (null): its key
- * was checked and recorded for it by `apiKeyForRun` before the claim. */
+ * was checked and recorded for it by `validateRunApiKey` before the claim. */
 export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
   const { rows: [stored] } = await pool.query<{ workspaceId: string | null }>(
     'SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3',
@@ -55,7 +58,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
   if (!stored?.workspaceId || stored.workspaceId !== actor.workspaceId) return null
   return withRunWorkspace(actor.userId, stored.workspaceId, async () => {
   await refreshCloudRunProfileClaim(pool, actor, runId, deviceId, subscriptionBindingId)
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     // Bot binding takes policy -> run locks. Acquire that same policy lock
@@ -85,7 +88,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
       await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])
     } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
-    // The lease is due to be reclaimed at its expiry if no heartbeat renews it (#1212).
+    advanceTaskAfterRunStart(client, runId)
+    // The lease lasts as long as the device session; run recovery reclaims it once it ends (#1212).
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)

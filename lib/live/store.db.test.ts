@@ -4,8 +4,10 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
+import type { LiveInvalidation } from './events'
+import type { LiveScope } from './scope'
 import { observePoolCommits } from '../db/commit-effects'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 
@@ -15,17 +17,18 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 test('the real Factory store schedules one invalidation only after its outer transaction commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
+  const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
   let onSchedule = () => {}
   const notification = mock.module('./notify', { namedExports: {
     scheduleLive: (work: () => Promise<void>) => { pending.push(work); onSchedule() },
-    sendLiveInvalidations: async () => {},
+    sendLiveInvalidations: async (scope: LiveScope, events: LiveInvalidation[]) => { sent.push({ scope, events }) },
   } })
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
   process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-live-test-secret'
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `factory_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 4 })
   observePoolCommits(pool)
@@ -70,7 +73,10 @@ test('the real Factory store schedules one invalidation only after its outer tra
     await t.test('a non-merge PR webhook refreshes the current Factory delivery after its update commits', async () => {
       const request = await input()
       const { task } = await store.route('owner', request)
-      const [agentId, runId, candidateId] = Array.from({ length: 3 }, () => randomUUID())
+      const [agentId, runId, candidateId, projectId] = Array.from({ length: 4 }, () => randomUUID())
+      await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+        VALUES($1,'owner',$2,'Fixture','','','planned','none','','','','','[]',1)`, [projectId, workspaceId])
+      await pool.query('INSERT INTO workspace_project_tasks("issueId","projectId","workspaceId") VALUES ($1,$2,$3)', [task.issueId, projectId, workspaceId])
       await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES ($1,'owner','Fixture','codex')`, [agentId])
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES ($1,'owner',$2,$3,'succeeded','Fixture')`, [runId, task.issueId, agentId])
       const url = 'https://github.com/fixture/repo/pull/7'
@@ -81,28 +87,48 @@ test('the real Factory store schedules one invalidation only after its outer tra
       const { refreshPublishedPullRequest } = await import('../github/publication-webhook')
       const { factoryTaskDetail } = await import('../factory/task-detail')
       const reader = await pool.connect()
-      let visible: Promise<unknown> = Promise.resolve()
-      const before = pending.length
+      let visibility: Promise<void> | undefined
+      const requestScope = await import('../db/request-scope')
+      const workspace = await import('../workspace-db')
+      const databases = [
+        mock.module(new URL('../db/request-scope.ts', import.meta.url).href, { namedExports: { ...requestScope, pool } }),
+        mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { ...workspace, workspacePool: pool } }),
+      ]
+      pending.length = 0 // Ignore preceding route notifications, which have their own assertions above.
       try {
-        for (const [index, state] of ['closed', 'draft', 'open'].entries()) {
+        for (const state of ['closed', 'draft', 'open']) {
           const title = `Updated ${state}`
           onSchedule = () => {
-            visible = factoryTaskDetail(reader, { ...task, candidateId }).then(detail => {
+            visibility ??= factoryTaskDetail(reader, { ...task, candidateId }).then(detail => {
               assert.deepEqual(detail.delivery.pullRequest, { url, state, title })
             })
           }
           await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'fixture/repo' }, pull_request: {
             number: 7, html_url: url, title, state: state === 'closed' ? 'closed' : 'open', draft: state === 'draft', merged_at: null,
           } }, pool)
-          // Its Factory task, project map, and the PR badge on the delivered task.
-          assert.equal(pending.length, before + 3 * (index + 1), 'each committed PR edit invalidates its current Factory task, project map and PR badge')
-          await visible
+          assert.equal(pending.length, 4)
+          await visibility
+          visibility = undefined
+          for (const work of pending.splice(0)) await work()
+          const changes = sent.splice(0).flatMap(({ scope, events }) => {
+            assert.deepEqual(scope, { ownerId: 'owner', workspaceId })
+            return events.map(event => [event.kind, event.id])
+          })
+          assert.deepEqual(changes.sort(), [
+            ['factory_task', task.id], ['factory_issue', task.issueId], ['project_map', projectId],
+            ['pull_request_status', task.issueId], ['thread_list', workspaceId],
+          ].sort(), 'only the current Factory, linked project, PR badge and owner conversation list refresh')
         }
         await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'other/repo' }, pull_request: {
           number: 7, html_url: url, title: 'Mismatched repository', state: 'closed', draft: false, merged_at: null,
         } }, pool)
-        assert.equal(pending.length, before + 9, 'an invalid webhook target sends nothing')
-      } finally { onSchedule = () => {}; reader.release() }
+        assert.equal(pending.length, 0, 'an invalid webhook target sends nothing')
+      } finally {
+        onSchedule = () => {}
+        await visibility?.catch(() => {})
+        for (const database of databases.reverse()) database.restore()
+        reader.release()
+      }
     })
   } finally {
     notification.restore()

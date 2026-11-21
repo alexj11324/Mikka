@@ -8,16 +8,21 @@ import type { UsableApiKey } from '../model-api-keys'
 const botId = '10000000-0000-4000-8000-000000000001', workspaceId = '10000000-0000-4000-8000-000000000002'
 let selected: string | null | undefined, rows: BotSubscriptionChoice[] = [], keys: UsableApiKey[] = []
 let key: { keyId: string; model: string } | undefined
+let credits: string | undefined
 let fallback: { key: UsableApiKey; model: string } | null = null
 const scopes: Array<{ ownerId: string; workspaceId: string }> = []
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (sql: string, args: unknown[]) => {
   assert.match(sql, /^SELECT /, 'readiness never writes a default or clones a binding')
+  // No Mikka Cloud connection: this community server has no model of its own to fall back to.
+  if (sql.includes('FROM cloud_service_bindings')) return { rows: [] }
   if (sql.includes("to_jsonb(u)->>'hostedModelEnabled'")) {
     assert.deepEqual(args, ['alice'])
     return { rows: [{ enabled: true }] }
   }
   assert.deepEqual(args, ['alice', workspaceId, botId])
-  return { rows: selected === undefined ? [] : [{ bindingId: selected }] }
+  if (key) return { rows: [{ bindingId: null, apiKeyId: key.keyId, apiKeyModel: key.model }] }
+  if (credits) return { rows: [{ bindingId: null, apiKeyId: null, apiKeyModel: null, creditsModel: credits }] }
+  return { rows: selected === undefined ? [] : [{ bindingId: selected, apiKeyId: null, apiKeyModel: null }] }
 } } } })
 mock.module(new URL('../execution-settings.ts', import.meta.url).href, { namedExports: {
   executionWorkspace: async (owner: string, bot: string | null) => {
@@ -31,7 +36,7 @@ mock.module(new URL('../execution-settings.ts', import.meta.url).href, { namedEx
   },
 } })
 mock.module(new URL('../model-api-keys.ts', import.meta.url).href, { namedExports: {
-  botApiKeyChoice: async () => key, usableApiKeys: async () => keys,
+  usableApiKeys: async () => keys,
 } })
 mock.module(new URL('../quota-fallback.ts', import.meta.url).href, { namedExports: { quotaFallbackKey: async () => fallback } })
 // The existing core hosted ledger admits an unmetered community default;
@@ -41,7 +46,7 @@ mock.module(new URL('../points-fallback.ts', import.meta.url).href, { namedExpor
 } })
 let botModelReady: typeof import('./model-ready')['botModelReady']
 before(async () => { process.env.MIKKA_EDITION = 'community'; ({ botModelReady } = await import('./model-ready')) })
-beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; fallback = null; scopes.length = 0 })
+beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; credits = undefined; fallback = null; scopes.length = 0 })
 function subscription(provider = 'claude', used = 0.2, age = 0): BotSubscriptionChoice {
   return { bindingId: 'fixture-binding', connectionId: 'fixture-connection', ownerId: 'alice', provider,
     modelId: 'fixture-model', quota: { vendor: provider === 'codex' ? 'codex' : 'claude_code', source: 'official', status: 'ok', plan: null,
@@ -60,11 +65,12 @@ test('Claude and ChatGPT choices enable only their authorized bot without a serv
   assert.equal(await botModelReady('alice', 'other-bot'), false)
 })
 
-test('an explicit default stays unavailable even with a connected subscription', async () => {
+test('a former 「Mikka 默认」 row is no choice and follows the connected subscription; a withdrawn one with nothing left is not ready', async () => {
+  // 「Mikka 默认」 is gone (decision 2026-11-15-1900): its saved rows read as no choice, and no choice uses the person's own connection.
   rows = [subscription()]; selected = HOSTED_CHOICE
-  assert.equal(await botModelReady('alice', botId), false)
+  assert.equal(await botModelReady('alice', botId), true)
   selected = null
-  assert.equal(await botModelReady('alice', botId), false)
+  assert.equal(await botModelReady('alice', botId), true)
   selected = 'withdrawn-binding'; rows = []
   assert.equal(await botModelReady('alice', botId), false)
 })
@@ -85,4 +91,12 @@ test('a selected usable API key works; an inaccessible or unsupported key does n
   assert.equal(await botModelReady('alice', botId), false)
   keys = [{ ...savedKey, models: ['another-model'] }]
   assert.equal(await botModelReady('alice', botId), false)
+})
+
+test('a chat on a Mikka 额度 model wakes like one on a subscription or key', async () => {
+  // Alex, 2026-11-16: background wakes treat every model source alike.
+  credits = 'deepseek/deepseek-v4-pro'
+  assert.equal(await botModelReady('alice', botId), true)
+  credits = undefined
+  assert.equal(await botModelReady('alice', botId), false, 'still no model when nothing is chosen and nothing is connected')
 })

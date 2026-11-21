@@ -13,20 +13,16 @@ async function serveBoundWorld(request, env, workload) {
   if ((env.WORLD_WORKLOAD ?? 'eve') !== workload) return new Response(null, { status: 404 })
   const { pathname, hostname } = new URL(request.url)
   if (hostname !== 'world.internal') return new Response(null, { status: 404 })
-  const streams = workload === 'eve' ? env.EVE_STREAMS : {
-    idFromName: name => env.EVE_STREAMS.idFromName(JSON.stringify([workload, name])),
-    get: id => env.EVE_STREAMS.get(id),
-  }
   if (pathname.startsWith('/world/queue/')) return serveQueueRequest(request, env)
-  if (pathname === '/world/stream') return serveStreamRequest(request, streams)
+  if (pathname === '/world/stream') return serveStreamRequest(request, env.EVE_STREAMS, workload)
   const namespace = env.EVE_WORLD_NAMESPACE
   if (typeof namespace !== 'string' || !namespace) return new Response(null, { status: 503 })
-  const authority = env.EVE_WORLD.getByName(workload === 'eve' ? namespace : JSON.stringify([workload, namespace]))
-  if (pathname === '/world/run-terminal' && request.method === 'GET') return waitForTerminal(authority, request)
+  const authority = () => env.EVE_WORLD.getByName(workload === 'eve' ? namespace : JSON.stringify([workload, namespace]))
+  if (pathname === '/world/run-terminal' && request.method === 'GET') return waitForTerminal(authority(), request)
   if (pathname !== '/world/rpc' || request.method !== 'POST') return new Response(null, { status: 404 })
   const [method, ...args] = decodeRecord(await request.arrayBuffer())
-  if (storageMethods.has(method)) return cbor(await authority[method](...args))
-  if (streamMethods.has(method)) return cbor(await createStreamStorage(streams)[method](...args))
+  if (storageMethods.has(method)) return cbor(await authority()[method](...args))
+  if (streamMethods.has(method)) return cbor(await createStreamStorage(env.EVE_STREAMS, { workload })[method](...args))
   return new Response(null, { status: 404 })
 }
 

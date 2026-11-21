@@ -205,7 +205,7 @@ test('screens listen to the keys the web uses, on the right channel', () => {
   assert.deepEqual(online.refs, offline.refs, 'presence metadata does not replace the home subscription')
   assert.equal(online.presence, null, 'an online machine keeps the channel\'s existing minute fallback until covered')
   assert.deepEqual(botPageLive(null, bot, home, team).refs, [
-    { kind: 'thread_list', id: home, scope: home }, { kind: 'bot_chat', id: bot, scope: home }, { kind: 'bot_list', id: team, scope: team },
+    { kind: 'thread_list', id: team, scope: team }, { kind: 'bot_chat', id: bot, scope: home }, { kind: 'bot_list', id: team, scope: team },
   ])
   const thread = threadLive({ live: { runs: [{ id: bot, workspaceId: team }] } } as never, bot)
   assert.deepEqual(thread.refs, [{ kind: 'thread', id: bot, scope: team }, { kind: 'run', id: bot, scope: team }])

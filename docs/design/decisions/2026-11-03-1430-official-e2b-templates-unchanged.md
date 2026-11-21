@@ -973,6 +973,29 @@ main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配We
 
 独立整合复核已闭合（manifest43401fffb3f3cee5eb25be202846cdeba9d0e67a2721283031b8926c8b18f612；固定27f验证9638eb77e5c7f735d30a0584dc5606e49f68a59259b1ba366933e9a3e977a018）：470个原始输入对象中469个逐字相同，唯一变动是package.json的test:mobile脚本；正式worker投影排除此脚本，因此指纹9da相同。这里不把原始blob相同与投影相同混为一谈，也不把静态整合证明称为新CI或运行时通过。
 
+## 2026-11-09：官方 Codex 根证书的精确权限变化
+
+官方空白对照 [42670291715/1](https://github.com/alexj11324/Mikka/actions/runs/42670291715)
+在 `/usr/local/share/ca-certificates/e2b-ca.crt` 观察到 `file`、uid/gid 为 `0` 的
+根证书从 `0644` 变为 `0777`。`before` 与 `pre_finalization` 的内容摘要为
+`713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a`；
+`ready` 的摘要不变，`fresh` 的摘要变为
+`545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a`。
+三个原始 JSON 成员及 ZIP/member 摘要见
+[原件导出](../../operations/evidence/1505-official-path-control-20261109.json) 与
+[范围说明](../../operations/evidence/1505-official-path-control-20261109.md)。
+该证据和 Codex 定点策略来自 [PR #1835](https://github.com/alexj11324/Mikka/pull/1835)
+固定提交 `cb2f771eeac0c8793e9f94b485dd87c7d5866b4c`，归档提交为
+`45e0fccdb447dd0ae1943dafedfdb55adb4bf72b`。
+
+仅 Codex 的这个精确路径新增 `_kind: file` 约束及 `0644 → 0777` 转换，
+保留既有的 per-boot 内容摘要规则。原安装阶段仍严格拒绝改变，其他路径、
+权限转换、所有者和文件类型不获例外；Claude 与 Desktop 的已有规则不变。
+Node 发布回执校验补上与 Python 已有 `_kind` 约束一致的检查，防止把目录、
+链接或缺失类型伪装成这条 regular-file 权限回执。Desktop APT 备份在对照四个
+阶段均未变化，未新增任何 APT 例外。这个定点对照不代表本 PR 的候选验收、
+真实订阅或生产发布通过。
+
 ### 2026-11-09：Codex 根证书权限的官方定点对照
 
 在同一个 #1505 修复 PR 中继续保留“只许加、不许删或覆盖官方文件”的决定。

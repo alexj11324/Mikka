@@ -6,7 +6,6 @@ import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { deliverRunCompletion } from './run-completion-delivery'
 import { runTriageBatch } from './triage-batch'
-import { createWakeRecovery, deliverWake } from './wake-recovery'
 
 const target = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !disposableDatabase())
@@ -59,8 +58,7 @@ test('owned run completion delivery against real PostgreSQL', { skip: !disposabl
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM mikka_workspace_members WHERE "workspaceId"=$1 AND status=\'active\'', [f.workspaceId])).rows[0].n, 8)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM hosted_verifications WHERE "workspaceId"=$1', [f.workspaceId])).rows[0].n, 0)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM workspace_credit_shares WHERE "workspaceId"=$1', [f.workspaceId])).rows[0].n, 0)
-      let now = new Date('2026-11-03T01:01:00Z')
-      const recovery = createWakeRecovery(pool, () => now)
+      const now = new Date('2026-11-03T01:01:00Z')
       let claims = 0, classifications = 0, starts = 0, consumed = 0
       const deps = {
         claim: async (event: CompletionEvent) => {
@@ -84,28 +82,20 @@ test('owned run completion delivery against real PostgreSQL', { skip: !disposabl
           WHERE id=$1 AND tier='result' AND "deliveredAt" IS NULL RETURNING id`, [f.event.id, now])
         consumed += result.rowCount ?? 0
       }
-      const first = await recovery.claim(f.scope)
-      assert.ok(first)
-      const before = await deliverWake(first, {
-        triage: async () => { assert.deepEqual((await runTriageBatch([f.event], deps, new AbortController().signal)).pending, [f.event.id]) },
-        hasWaking, start, failed: recovery.failed,
-      })
-      assert.equal(before, 'deferred')
+      const before = await runTriageBatch([f.event], deps, new AbortController().signal)
+      assert.deepEqual(before.pending, [f.event.id])
+      assert.equal(await hasWaking(), false)
       assert.deepEqual([claims, classifications, starts, consumed], [1, 2, 0, 0])
-      assert.equal((await state(f.event.id)).wakeLastError, 'triage_pending')
-      now = (await pool.query('SELECT "nextWakeAt" FROM coordinator_events WHERE id=$1', [f.event.id])).rows[0].nextWakeAt
-      const next = await recovery.claim(f.scope)
-      assert.ok(next)
-      const after = await deliverWake(next, {
-        triage: async () => {
-          const result = await runTriageBatch([f.event], { ...deps, deliverCompletion: event => deliverRunCompletion(pool, event, f.scope, pool) }, new AbortController().signal)
-          assert.deepEqual(result, { classified: [f.event.id], pending: [], stale: [], unattempted: [] })
-        }, hasWaking, start, failed: recovery.failed,
-      })
-      assert.equal(after, 'started')
-      assert.deepEqual([claims, classifications, starts, consumed], [1, 2, 1, 1], 'completion bypasses the paid classifier, not its refusal or billing policy')
+
+      const result = await runTriageBatch([f.event], {
+        ...deps, deliverCompletion: event => deliverRunCompletion(pool, event, f.scope, pool),
+      }, new AbortController().signal)
+      assert.deepEqual(result, { classified: [f.event.id], pending: [], stale: [], unattempted: [] })
+      assert.equal(await hasWaking(), true)
+      await start()
+      assert.deepEqual([claims, classifications, starts, consumed], [1, 2, 1, 1])
       assert.ok((await state(f.event.id)).deliveredAt)
-      assert.equal(await recovery.claim(f.scope), null)
+      assert.equal(await hasWaking(), false)
       assert.equal(await deliverRunCompletion(pool, f.event, f.scope, pool), false)
       assert.deepEqual([starts, consumed], [1, 1])
     })

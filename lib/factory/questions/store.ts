@@ -3,6 +3,7 @@ import { remoteKey } from "@mikka/protocol/repository";
 import { factoryChanged } from "../../live/factory";
 import { runChanged } from "../../live/panels";
 import { runListChanged } from '../../live/lists';
+import { advanceTaskAfterRunStart } from '../../task-status-run-start';
 import { wakeCoordinatorAfterCommit } from '../../coordinator/wake-after-commit';
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { appendFactoryCheckContinuationContext, factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
@@ -24,6 +25,7 @@ import type {
 import type { FactoryDispatchInput } from "../dispatch";
 import { tiptapToText } from "../../tiptap-text";
 import {
+  PENDING_QUESTION_STATUSES,
   contextQuestionAnswerSchema,
   humanQuestionAnswerSchema,
   questionEscalationSchema,
@@ -38,6 +40,10 @@ import {
   type QuestionStatus,
   type QuestionReference,
 } from "./contract";
+
+// Both pending collections apply the persisted eligibility before their newest-50 cap.
+const pendingQuestionFilter = `q.status = ANY($4::text[])
+  AND NOT (q.status IN ('open','waiting_user') AND q."expiresAt" IS NOT NULL AND q."expiresAt"<=clock_timestamp())`;
 
 export interface FactoryQuestion {
   id: string;
@@ -197,6 +203,16 @@ export function createFactoryQuestions(
     if (!q || q.taskId !== task.id || q.issueId !== task.issueId) fail("factoryNotFound");
     return { task, q };
   }
+  async function ownedContinuation(tx: PoolClient, userId: string, runId: string) {
+    const { rows: [identity] } = await tx.query<{ id: string; taskId: string }>(
+      'SELECT id, "taskId" FROM factory_questions WHERE "continuationRunId"=$1 AND "userId"=$2',
+      [runId, userId],
+    );
+    if (!identity) return null;
+    const current = await ownedForTask(tx, userId, identity.id, identity.taskId, true);
+    return current.q.continuationRunId === runId ? current : null;
+  }
+
   function fence(
     task: FactoryTask,
     q: FactoryQuestion,
@@ -284,12 +300,12 @@ export function createFactoryQuestions(
         `SELECT q.id, q."taskId" FROM factory_questions q
           JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
           JOIN issues i ON i.id=t."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=t."workspaceId"
-          WHERE q."userId"=$1 AND q.status IN ('open','waiting_user','resuming','blocked')
-            AND NOT (q.status IN ('open','waiting_user') AND q."expiresAt" IS NOT NULL AND q."expiresAt"<=clock_timestamp())
+          WHERE q."userId"=$1 AND ${pendingQuestionFilter}
+            AND t.status NOT IN ('cancelled','revoked') AND q."candidateId" IS NOT DISTINCT FROM t."candidateId"
             AND ($2::uuid IS NULL OR q."originRunId"=$2::uuid OR q."continuationRunId"=$2::uuid)
             AND ($3::uuid IS NULL OR t."workspaceId"=$3::uuid)
           ORDER BY q."createdAt" DESC, q.id DESC LIMIT 50`,
-        [userId, runId ?? null, workspaceId ?? null],
+        [userId, runId ?? null, workspaceId ?? null, PENDING_QUESTION_STATUSES],
       );
       const result = [];
       for (const row of rows) {
@@ -316,12 +332,15 @@ export function createFactoryQuestions(
         return currentView(tx, task, q, false);
       });
     },
-    async list(userId: string, taskId: string, readScope: "bot" | "user" = "bot") {
+    async list(userId: string, taskId: string, readScope: "bot" | "user" = "bot", view: "history" | "pending" = "history") {
       return transaction(async (tx) => {
         const task = await ownedTask(tx, userId, taskId, false, readScope);
+        if (view === "pending" && stopped(task)) return [];
         const { rows } = await tx.query<FactoryQuestion>(
-          'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC, id DESC LIMIT 50',
-          [taskId, userId],
+          `SELECT q.* FROM factory_questions q WHERE q."taskId"=$1 AND q."userId"=$2 AND q."issueId"=$3
+             AND ($5::boolean OR (${pendingQuestionFilter} AND q."candidateId" IS NOT DISTINCT FROM $6::uuid))
+           ORDER BY q."createdAt" DESC, q.id DESC LIMIT 50`,
+          [taskId, userId, task.issueId, PENDING_QUESTION_STATUSES, view === "history", task.candidateId],
         );
         const result = [];
         for (const q of rows) result.push(await currentView(tx, task, q, false));
@@ -854,14 +873,9 @@ export function createFactoryQuestions(
     ) {
       const existing = typeof existingOrClaim === "function" ? undefined : existingOrClaim;
       return transaction(async (tx) => {
-        const {
-          rows: [identity],
-        } = await tx.query(
-          'SELECT id FROM factory_questions WHERE "continuationRunId"=$1 AND "userId"=$2',
-          [runId, userId],
-        );
-        if (!identity) fail("factoryQuestionContinuationUnavailable");
-        const { task, q } = await owned(tx, userId, identity.id);
+        const current = await ownedContinuation(tx, userId, runId);
+        if (!current) fail("factoryQuestionContinuationUnavailable");
+        const { task, q } = current;
         if (stopped(task)) fail("factoryStopped");
         if (
           q.status !== "resuming" ||
@@ -873,7 +887,7 @@ export function createFactoryQuestions(
         const {
           rows: [run],
         } = await tx.query(
-          `SELECT r.*,a."runId" AS "boundRunId",origin."deviceId" AS "originDeviceId",origin."sessionId" AS "originSessionId",origin."agentId" AS "originAgentId",origin."deviceRepoId" AS "originRepoId",d.enabled,d."lastSeenAt",d.harnesses,d.kind AS "deviceKind",ag.harness,ag."deviceId" AS "agentDeviceId" FROM agent_runs r JOIN factory_attempts a ON a.id=$3 AND a."taskId"=$4 JOIN agent_runs origin ON origin.id=$5 AND origin."userId"=$2 AND origin."issueId"=$6 JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=$2 JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=d.id WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$6 FOR UPDATE OF r FOR SHARE OF d,ag,repo`,
+          `SELECT r.*,a."runId" AS "boundRunId",origin."deviceId" AS "originDeviceId",origin."sessionId" AS "originSessionId",origin."agentId" AS "originAgentId",origin."deviceRepoId" AS "originRepoId",d.enabled,d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,d.kind AS "deviceKind",ag.harness,ag."deviceId" AS "agentDeviceId" FROM agent_runs r JOIN factory_attempts a ON a.id=$3 AND a."taskId"=$4 JOIN agent_runs origin ON origin.id=$5 AND origin."userId"=$2 AND origin."issueId"=$6 JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=$2 JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=d.id WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$6 FOR UPDATE OF r FOR SHARE OF d,ag,repo`,
           [runId, userId, task.attemptId, task.id, q.originRunId, q.issueId],
         );
         // Match the execution run before acquiring placement locks, as runtime
@@ -899,7 +913,7 @@ export function createFactoryQuestions(
           run.originRepoId !== run.deviceRepoId ||
           run.originSessionId !== q.originSessionId ||
           !run.enabled ||
-          !await deviceIsOnline({ id: run.deviceId, lastSeenAt: run.lastSeenAt }) ||
+          !deviceIsOnline(run) ||
           !run.harnesses?.some(
             (h: { harness: string; installed: boolean }) =>
               h.harness === run.harness && h.installed,
@@ -948,6 +962,7 @@ export function createFactoryQuestions(
             : {};
         if (!existing) {
           await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1',[runId,leaseExpiresAt]);
+          advanceTaskAfterRunStart(tx,runId);
           await runListChanged(tx,runId);
           await runChanged(tx,runId);
           if (typeof existingOrClaim === "function") await existingOrClaim(tx);
@@ -964,14 +979,9 @@ export function createFactoryQuestions(
     },
     async settle(userId: string, runId: string, existing?: PoolClient) {
       return transaction(async (tx) => {
-        const {
-          rows: [identity],
-        } = await tx.query(
-          'SELECT id FROM factory_questions WHERE "continuationRunId"=$1 AND "userId"=$2',
-          [runId, userId],
-        );
-        if (!identity) return null;
-        const { task, q } = await owned(tx, userId, identity.id);
+        const current = await ownedContinuation(tx, userId, runId);
+        if (!current) return null;
+        const { task, q } = current;
         if (questionClosed(q.status)) return currentView(tx,task,q,false);
         const {
           rows: [run],

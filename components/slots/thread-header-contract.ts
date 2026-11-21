@@ -5,12 +5,18 @@
 import type { ReactNode, RefObject } from 'react'
 import type { ThreadOutcome } from '@/lib/thread-groups'
 
+export type ThreadViewAction = { id: 'changes' | 'acceptance'; label: string; onSelect: () => void }
+
 export type ThreadHeaderProps = {
   /** The task it works on; null for a thread with no task. */
   issueId: string | null
   runId: string
   /** The name the thread's row shows (its task, else what it was asked). */
   title: string
+  /** The current secondary view, for the heading. Title still identifies the thread. */
+  viewTitle?: string
+  /** Revalidate the scoped reader supplying this title once its write succeeds. */
+  onTitleChanged?: () => void
   /** The heading Esc and focus return to. */
   headingRef: RefObject<HTMLHeadingElement | null>
   /** ← and Esc: back to where it was opened from. */
@@ -27,12 +33,9 @@ export type ThreadHeaderProps = {
   acceptanceBadge: ReactNode
   /** The execution identity (ThreadExecutionIdentity), for its owner; null otherwise. */
   identity: ReactNode
-  /** The Artifact button (ThreadArtifactButton); null when the read was rejected. */
-  artifact: ReactNode
-  /** 对话 / 验收 tabs when they share the header row; null otherwise. */
-  tabs: ReactNode
-  /** The header wraps on a phone (a Factory candidate's tabs). */
-  wraps: boolean
+  /** A named, member-owned chat offers conversation controls without a run identity. */
+  standalone?: boolean
+  views?: readonly ThreadViewAction[]
   /**
    * ⤢: widen the right column the thread sits in, or put back the width it had (useRightColumnWiden);
    * absent outside the right column. Optional: the default header has no widen button.
@@ -40,13 +43,10 @@ export type ThreadHeaderProps = {
   widen?: { wide: boolean; onToggle: () => void }
   /** The run its live work goes to (a continuation's), for a layer that opens the execution identity itself. */
   liveRunId?: string
-  /** The thread's status, for a layer that lists its Artifacts itself (useArtifactReview). */
-  status?: string
-  /** The acceptance task this thread produced, when the panel knows it. */
-  acceptanceTaskId?: string | null
 }
 
 export type ThreadStatusLineProps = {
+  pauseReason?: import('@/lib/task-state').TaskStateRun['pauseReason']
   status: string
   outcome: ThreadOutcome | string | null | undefined
   /** A stop was asked for and has not landed. */

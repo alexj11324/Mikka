@@ -1,4 +1,4 @@
-// Hosted-model (Mikka 默认) usage, card verification and the points balance,
+// Mikka 额度 usage and the points balance (card verification is history only, decision 2026-11-15-1900),
 // as the backend reports them (#531, #558, #559), and the UI's helpers for them.
 
 /** Every state `getHostedUsage` reports; a refused model call carries the same code. */
@@ -22,10 +22,10 @@ export interface HostedUsage {
   balance: HostedBalance
   /** A personal workspace: card verification (the person's, C19) lands here. */
   personal?: boolean
+  /** The person may choose a plan or add credits here: a personal workspace, or a team admin. */
+  admin?: boolean
   /** The person has a Claude / ChatGPT subscription connected; it serves them in any workspace (#838). */
   subscribed?: boolean
-  /** No card and nothing bought: the free messages left (TRIAL_MESSAGES); null otherwise. */
-  trialLeft?: number | null
   /** The workspace this was read for, so a dialog opened from the chat acts there. */
   workspaceId?: string
 }
@@ -72,26 +72,26 @@ export function hostedRefusal(message: string | null | undefined): HostedRefusal
 }
 
 /**
- * What the refusal line above the composer offers, from the person's real
- * state (`usage`, null until read). With a subscription connected it serves
- * them in every workspace (#838), so a refusal is a moment's outage: 暂时不可用
- * and 重试. 连接订阅 only with none connected; 验证银行卡 in a personal workspace
- * with no verified card (C19); 打开计费 in a team with no points. Nothing until
- * the state is read.
+ * What the refusal card offers, from the person's real state (`usage`, null
+ * until read). Out of Mikka 额度 (decision 2026-11-15-1900): 充值 and 选择套餐
+ * in a personal workspace; 打开计费 in a team, where admins pay and members
+ * ask them. 改用我的订阅 when one is connected. No card verification: there is
+ * no trial any more.
  */
 export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
   const busy = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable'
   // A team with no points of its own: retrying never helps, even with a subscription connected. Its 计费 page buys points or turns on a member's shared credits.
   const restricted = code === 'usage_budget_exhausted' || code === 'billing_authorization_revoked'
   const billing = restricted || (!busy && usage?.personal === false && (code === 'verification_required' || code === 'free_allowance_used' || code === 'points_exhausted'))
-  const transient = busy || (Boolean(usage?.subscribed) && !billing)
+  // Out of Mikka 额度 is never a moment's outage, even with a subscription connected: 改用我的订阅 is offered beside 充值.
+  const transient = busy
   return {
     transient,
     billing,
-    card: !transient && Boolean(usage?.personal) && (code === 'verification_required' || (usage?.balance.verified === false && (code === 'free_allowance_used' || code === 'points_exhausted'))),
+    card: false,
     connect: !transient && !restricted && usage?.subscribed === false,
     // A personal workspace with a verified card that ran out: 充值 right there (decision 2026-11-02-1450).
-    topUp: !transient && Boolean(usage?.personal) && usage?.balance.verified === true && (code === 'free_allowance_used' || code === 'points_exhausted'),
+    topUp: !transient && Boolean(usage?.personal) && (code === 'verification_required' || code === 'free_allowance_used' || code === 'points_exhausted'),
   }
 }
 

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { GroupMessagesRequestError, leaveGroupConversation, type GroupSummary } from '@/lib/group-messages'
@@ -10,14 +10,18 @@ import { botKeys } from '@/lib/swr/keys'
 import type { GroupChatRequest } from './group-chat-view'
 import { forgetGroupReads } from './group-membership-cache'
 
-export function GroupLeaveAction({ group, userId, onLeft }: {
-  group: GroupChatRequest; userId: string; onLeft: () => void
+/** 退出群聊 and its confirmation. With `open`/`onOpenChange` another control (the sidebar row's menu) opens it, and it draws no button. */
+export function GroupLeaveAction({ group, userId, onLeft, open: openAsked, onOpenChange }: {
+  group: GroupChatRequest; userId: string; onLeft: () => void; open?: boolean; onOpenChange?: (open: boolean) => void
 }) {
   const t = useTranslations('GroupChat')
   const common = useTranslations('Common')
   const { mutate } = useSWRConfig()
   const sending = useRef(false)
-  const [open, setOpen] = useState(false)
+  const [openHere, setOpenHere] = useState(false)
+  const controlled = openAsked !== undefined
+  const open = controlled ? openAsked : openHere
+  const setOpen = (next: boolean) => { if (controlled) onOpenChange?.(next); else setOpenHere(next) }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -48,7 +52,7 @@ export function GroupLeaveAction({ group, userId, onLeft }: {
   }
 
   return <AlertDialog open={open} onOpenChange={next => { if (!sending.current) { setOpen(next); setError('') } }}>
-    <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>{t('leave')}</AlertDialogTrigger>
+    {!controlled && <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>{t('leave')}</AlertDialogTrigger>}
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{t('leaveConfirm', { name: group.title || t('untitled') })}</AlertDialogTitle>
