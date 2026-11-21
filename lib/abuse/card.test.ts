@@ -5,7 +5,7 @@ const bindings = new Map<string, { id: string; workspaceId: string; customerId: 
 const verified: unknown[][] = []
 const requests: string[] = []
 let statusRow: Record<string, unknown> | undefined
-const saved = { secret: process.env.STRIPE_SECRET_KEY, webhook: process.env.STRIPE_WEBHOOK_SECRET }
+const saved = { edition: process.env.MIKKA_EDITION, secret: process.env.STRIPE_SECRET_KEY, webhook: process.env.STRIPE_WEBHOOK_SECRET }
 mock.module(new URL('../db/index.ts', import.meta.url).href, {
   namedExports: { pool: { query: async (sql: string, values: string[]) => {
     if (sql.includes('FROM hosted_verifications')) return { rows: statusRow ? [statusRow] : [] }
@@ -25,12 +25,15 @@ mock.module(new URL('./runtime.ts', import.meta.url).href, { namedExports: { ens
 let card: typeof import('./card')
 before(async () => { card = await import('./card') })
 after(() => {
+  if (saved.edition === undefined) delete process.env.MIKKA_EDITION
+  else process.env.MIKKA_EDITION = saved.edition
   if (saved.secret === undefined) delete process.env.STRIPE_SECRET_KEY
   else process.env.STRIPE_SECRET_KEY = saved.secret
   if (saved.webhook === undefined) delete process.env.STRIPE_WEBHOOK_SECRET
   else process.env.STRIPE_WEBHOOK_SECRET = saved.webhook
 })
 beforeEach(() => {
+  process.env.MIKKA_EDITION = 'cloud'
   process.env.STRIPE_SECRET_KEY = 'sk_test_fixture'
   process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fixture'
   bindings.clear(); requests.length = 0; verified.length = 0; statusRow = undefined; admin = true
