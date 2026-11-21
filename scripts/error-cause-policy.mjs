@@ -163,7 +163,6 @@ export const droppedCauseAllowlist = {
   'lib/thread-continue.ts': 1,
   'lib/tokens/store.ts': 1,
   'lib/workspace-admin/action.ts': 1,
-  'packages/daemon/src/adapters/codex-mailbox.ts': 2,
   'packages/daemon/src/agents/chat-files.ts': 2,
   'packages/daemon/src/agents/github-runtime.ts': 1,
   'packages/daemon/src/lock.ts': 1,

@@ -51,7 +51,7 @@ function receiptFile(stateDir: string, runId: string): string {
 function readJson(file: string, limit: number, firstLine = false, reason = 'history_file'): unknown {
   let fd: number
   try { fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) }
-  catch (error) { throw unavailable(reason, error) }
+  catch { throw unavailable(reason) } // error-cause: fs error text embeds the private mailbox path
   try {
     const stat = fstatSync(fd)
     if (!stat.isFile() || stat.nlink !== 1 || (!firstLine && stat.size > limit)) throw unavailable(reason)
@@ -60,7 +60,7 @@ function readJson(file: string, limit: number, firstLine = false, reason = 'hist
     const end = firstLine ? buffer.subarray(0, length).indexOf(10) : length
     if (end < 0 || end > limit) throw unavailable(reason)
     try { return JSON.parse(buffer.subarray(0, end).toString('utf8')) }
-    catch (error) { throw unavailable(reason, error) }
+    catch { throw unavailable(reason) } // error-cause: parser errors quote history bytes
   } finally { closeSync(fd) }
 }
 

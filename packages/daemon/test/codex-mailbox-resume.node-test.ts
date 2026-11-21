@@ -192,7 +192,17 @@ test('Codex mailbox resume rejects missing or changed capability evidence before
       const target = join(f.stateDir, 'synthetic-outside-history.jsonl')
       writeFileSync(target, readFileSync(history)); rmSync(history); symlinkSync(target, history)
     }
-    await assert.rejects(f.adapter().start({ ...f.options(nextId, current.mailbox), continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } }), /Run mailbox/)
+    // The gate name is what diagnoses the next production rejection (#1468);
+    // without it every check collapses to one opaque line again. The cause
+    // must stay empty: fs and parser errors carry paths and history bytes.
+    await assert.rejects(
+      f.adapter().start({ ...f.options(nextId, current.mailbox), continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } }),
+      (error: unknown) => error instanceof Error && error.message.startsWith('Run mailbox requires') &&
+        (error as { detail?: unknown }).detail === (change === 'missing-receipt' ? 'receipt' :
+          change === 'receipt-path' ? 'history_path' :
+          change === 'catalogue' || change.startsWith('receipt-') ? 'receipt_mismatch' : 'history_meta') &&
+        !(error as { cause?: unknown }).cause,
+    )
     assert.equal(current.calls.length, 0)
     assert.equal(f.trace(nextId).filter(item => item.method === 'turn/start' || item.method === 'thread/start').length, 0)
     await current.mailbox.close()
