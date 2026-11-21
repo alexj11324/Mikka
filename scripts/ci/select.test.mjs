@@ -51,6 +51,57 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
 })
+test('enrolled billing fixture edits retain their real DB consumers without unrelated lanes', async () => {
+  // The seven-file local-fixtures candidate previously selected all 87 DB
+  // suites solely because the four root tests had no path-area classification.
+  const result = await select(plan, [
+    'lib/abuse/card.db.test.ts', 'lib/abuse/card.test.ts', 'lib/abuse/model-postpay.db.test.ts',
+    'tests/billing-history.db.test.ts', 'tests/credit-shares.db.test.ts',
+    'tests/model-order.db.test.ts', 'tests/personal-workspace.db.test.ts',
+  ].map(file => change(file)))
+  assert.equal(result.full, false)
+  // Keep both explicit package owners and the existing source-contract callers.
+  assert.deepEqual(result.db_suites, [
+    'test:abuse-db', 'test:approved-writes-db', 'test:bot-threads-db',
+    'test:coordinator-task-binding-db', 'test:migration-steps-db',
+    'test:onboarding-db', 'test:scope-detachment-db', 'test:workspace-admin-db',
+  ])
+  assert(result.source)
+  for (const flag of ['daemon', 'desktop', 'mobile', 'analytics']) assert.equal(result[flag], false, flag)
+  for (const script of ['test:release-security', 'test:credentials', 'test:test-accounts', 'test:abuse']) {
+    assert(result.unit_tasks.some(task => task.command.includes(`pnpm ${script}`)), script)
+  }
+})
+test('a DB-looking path needs both enrollment and an existing direct suite edge', async () => {
+  const file = 'tests/billing-history.db.test.ts'
+  const withoutEnrollment = { ...plan, db: { ...plan.db, files: plan.db.files.filter(value => value !== file) } }
+  const dependencies = Object.fromEntries(Object.entries(plan.graph.dependencies).map(([id, edges]) => [
+    id, id.startsWith('db-') ? edges.filter(edge => edge.target !== sourceId(file)) : edges,
+  ]))
+  const withoutSuiteEdge = { ...plan, graph: { ...plan.graph, dependencies } }
+  for (const incomplete of [withoutEnrollment, withoutSuiteEdge]) {
+    const result = await select(incomplete, [change(file)])
+    assert(result.full)
+    assert(result.reasons.includes('unmapped file'))
+    assert.deepEqual(result.db_suites, plan.db.scripts)
+  }
+  assert((await pick('tests/not-enrolled.db.test.ts')).full)
+})
+test('enrolled root DB tests still respect full-validation reasons', async () => {
+  const file = 'tests/billing-history.db.test.ts'
+  for (const extra of [{ status: 'D' }, { status: 'R100' }, { mode: '100755' }, { mode: '120000' }, { oldMode: '100755' }]) {
+    assert((await pick(file, extra)).full)
+  }
+  const unresolved = await select({ ...plan, unresolved: [...plan.unresolved, { file, spec: '<computed import>' }] }, [change(file)])
+  assert(unresolved.full)
+  assert(unresolved.reasons.includes('changed source has unresolved/generated imports'))
+  const forced = await select(plan, [change(file)], { force: true })
+  assert(forced.full)
+  assert.deepEqual(forced.db_suites, plan.db.scripts)
+  const mixedUnknown = await select(plan, [change(file), change('unmapped.bin')])
+  assert(mixedUnknown.full)
+  assert(mixedUnknown.reasons.includes('unmapped file'))
+})
 test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
   const unit = await pick('lib/eve/streaming-model.ts')
   assert(unit.units.includes('ci-core-41'))
