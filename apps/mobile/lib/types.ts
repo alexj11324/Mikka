@@ -92,11 +92,10 @@ export interface Chat {
 
 /** lib/chat-failure.ts on the server. */
 export type ChatFailure = (
-  | { kind: 'modelRequired' }
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
-  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
+  | { kind: 'failed'; reason?: 'balance' | 'tools' | 'modelRequired'; cloudCode?: CloudErrorCode }
   // The stored code(s), shown only under 详情 (the web's RunErrorDetails); older servers omit it.
 ) & { raw?: string }
 

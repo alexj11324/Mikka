@@ -22,9 +22,9 @@ const copy = mobileMessages.MobileCore.failure
 const person = { from: 'person' }, reply = { from: 'coordinator' }, event = { from: 'event' }
 const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)'
 
-test('missing preparation model has its own copy and model settings recovery without retry', () => {
+test('missing preparation model keeps the installed mobile discriminator with model settings recovery', () => {
   const failure = chatFailure({ working: false, error: 'executionModelUnknown' })!
-  assert.deepEqual(failure, { kind: 'modelRequired' })
+  assert.deepEqual(JSON.parse(JSON.stringify(failure)), { kind: 'failed', reason: 'modelRequired' })
   assert.deepEqual(failureMessageKey(failure), { namespace: 'Coordinator', key: 'modelRequired' })
   assert.deepEqual(failureLine(failure), { text: mobileMessages.Coordinator.modelRequired, retry: false, recovery: 'models' })
   assert.equal(chatFailure({ working: true, error: 'executionModelUnknown' }), null)

@@ -76,7 +76,7 @@ test('a failure line keeps its words and folds the stored codes under 详情 (de
 
 test('a missing model opens model settings instead of resending a request that cannot start', async () => {
   let sent = 0
-  await render(<FailureReason failure={{ kind: 'modelRequired' }} botId="fixture-bot" onResend={() => { sent++ }} />)
+  await render(<FailureReason failure={{ kind: 'failed', reason: 'modelRequired' }} botId="fixture-bot" onResend={() => { sent++ }} />)
   assert.match(container.textContent ?? '', /Coordinator\.modelRequired/)
   assert.equal(container.querySelector('a')?.getAttribute('href'), '/settings?section=models')
   assert.equal(container.querySelector('button'), null)

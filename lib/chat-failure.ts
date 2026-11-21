@@ -16,12 +16,11 @@ import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 type WakeCode = 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted'
 
 export type ChatFailure = (
-  | { kind: 'modelRequired' }
   | { kind: 'hosted'; code: NonNullable<ReturnType<typeof hostedRefusal>> }
   | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
   | { kind: 'wake'; code: WakeCode }
   // Keep the existing discriminator readable by already-installed mobile clients.
-  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
+  | { kind: 'failed'; reason?: 'balance' | 'tools' | 'modelRequired'; cloudCode?: CloudErrorCode }
   // The stored code(s) as recorded, for 详情 only (decision 2026-11-05-0330): the
   // line's own code, then the turn failure behind a wake code. Never the words.
 ) & { raw?: string; failureDetails?: RunFailure }
@@ -53,7 +52,7 @@ function failureOf(chat: { working: boolean; error: string | null; items?: reado
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
   if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending && !chat.items.at(-1)?.native ? { kind: 'failed' } : null
-  if (chat.error === 'executionModelUnknown') return { kind: 'modelRequired' }
+  if (chat.error === 'executionModelUnknown') return { kind: 'failed', reason: 'modelRequired' }
   const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error.trim().replace(CLOUD_STREAM_STEP, ''))?.code)
   if (cloudCode) return { kind: 'failed', cloudCode }
   const hosted = hostedRefusal(chat.error)
@@ -76,11 +75,10 @@ export type FailureMessageKey =
 
 export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
   switch (failure.kind) {
-    case 'modelRequired': return { namespace: 'Coordinator', key: 'modelRequired' }
     case 'hosted':
       return { namespace: 'Billing.refusal', key: TRANSIENT_HOSTED.has(failure.code) ? 'unavailable' : failure.code === 'verification_required' ? 'verificationRequiredPlain' : failure.code as 'free_allowance_used' | 'points_exhausted' | 'platform_paused' | 'usage_budget_exhausted' | 'billing_authorization_revoked' }
     case 'subscription': return { namespace: 'Coordinator', key: `subscriptionRefusal.${failure.notice}` }
     case 'wake': return { namespace: 'Coordinator', key: `wakeErrors.${failure.code}` }
-    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
+    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'modelRequired' ? 'modelRequired' : failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
   }
 }

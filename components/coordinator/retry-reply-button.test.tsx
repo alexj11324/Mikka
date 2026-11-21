@@ -167,7 +167,7 @@ for (const full of [true, false]) for (const live of [true, false]) test(`a ${li
 for (const full of [true, false]) for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} missing model links settings in ${full ? 'full' : 'embedded'} chat without resending`, async () => {
   chatEnabled = true
   chatError = live ? 'executionModelUnknown' : null
-  chatItems = [{ id: 'fixture-no-model', position: 86, from: 'person', text: 'Start a cloud machine and print the Node.js version.', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: { kind: 'modelRequired' } }]
+  chatItems = [{ id: 'fixture-no-model', position: 86, from: 'person', text: 'Start a cloud machine and print the Node.js version.', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: { kind: 'failed', reason: 'modelRequired' } }]
   await act(async () => root.render(<CoordinatorChat embedded={full ? undefined : artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   const notice = container.querySelector(full ? '[data-official-thread]' : `[data-message-failure="${live ? 'live' : 'past'}"]`)!
   assert.ok(notice)
@@ -182,7 +182,7 @@ for (const full of [true, false]) for (const live of [true, false]) test(`a ${li
 for (const code of ['executionModelUnknown', 'HOOK_FAILED', 'HOOK_FAILED · ref fixture-reference']) test(`the failure code ${code} does not itself create composer load or unavailable warnings`, async () => {
   chatEnabled = true
   chatError = code
-  chatItems = [{ id: 'fixture-warning', position: 1, from: 'person', text: 'fixture request', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: code === 'executionModelUnknown' ? { kind: 'modelRequired' } : { kind: 'failed', raw: code } }]
+  chatItems = [{ id: 'fixture-warning', position: 1, from: 'person', text: 'fixture request', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: code === 'executionModelUnknown' ? { kind: 'failed', reason: 'modelRequired' } : { kind: 'failed', raw: code } }]
   await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
   assert.equal(container.querySelector('[data-chat-failure="load"]'), null)
   assert.doesNotMatch(container.textContent ?? '', /Coordinator.unavailable/)
@@ -517,7 +517,7 @@ test('a gated welcome shows model settings without looping, then starts once a m
 })
 
 test('a stored model-required welcome retries once after choosing a model', async () => {
-  chatItems = [{ id: 'fixture-model-welcome', position: 1, from: 'coordinator', text: '', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:00:00Z', welcome: true, failure: { kind: 'modelRequired' } }]
+  chatItems = [{ id: 'fixture-model-welcome', position: 1, from: 'coordinator', text: '', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:00:00Z', welcome: true, failure: { kind: 'failed', reason: 'modelRequired' } }]
   chatData = { items: chatItems, enabled: true, working: false, error: 'executionModelUnknown', artifacts: {} }
   menu = { current: { id: 'none', kind: 'none', available: false } }
   await act(async () => chat())

@@ -369,7 +369,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const liveFailure = data?.error && !working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
   const cloudCode = liveFailure?.kind === 'failed' ? liveFailure.cloudCode : undefined
   const [welcomeNeedsModel, setWelcomeNeedsModel] = useState(false)
-  const modelRequired = liveFailure?.kind === 'modelRequired' || (welcomeNeedsModel && !working && !items.length && !stream.replies.length)
+  const modelRequired = (liveFailure?.kind === 'failed' && liveFailure.reason === 'modelRequired') || (welcomeNeedsModel && !working && !items.length && !stream.replies.length)
   const liveRaw = liveFailure?.raw ?? null
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
@@ -633,7 +633,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         ]
         entries.push({ id: key, role: 'person', at, text, ...(attachments.length ? { attachments } : {}), status: item.pending ? 'sending' : 'sent',
           actions: item.text ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}><CopyAction text={text} />{item.id && <MessageReactions reactions={reactions[item.id]} align="end" />}</MessageActions> : undefined })
-        if (item.failure) entries.push({ id: `${key}-failure`, role: 'bot', at, parts: [item.position === failedAt ? liveFailurePart : { kind: 'error', text: t(item.failure.kind === 'modelRequired' ? 'modelRequired' : 'failedTitle'), actions: <FailureReason showReason={item.failure.kind !== 'modelRequired'} retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /> }] })
+        if (item.failure) entries.push({ id: `${key}-failure`, role: 'bot', at, parts: [item.position === failedAt ? liveFailurePart : { kind: 'error', text: t((item.failure.kind === 'failed' && item.failure.reason === 'modelRequired') ? 'modelRequired' : 'failedTitle'), actions: <FailureReason showReason={!(item.failure.kind === 'failed' && item.failure.reason === 'modelRequired')} retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /> }] })
         continue
       }
       const parts: ThreadEntryPart[] = item.welcome ? [] : replyRows(item, live).map((segment, index): ThreadEntryPart => segment.kind === 'tools'
@@ -645,7 +645,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       }
       const artifacts = item.artifacts.flatMap(id => data?.artifacts[id] ? [{ id, name: data.artifacts[id].title }] : [])
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
-      if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t(item.failure.kind === 'modelRequired' ? 'modelRequired' : 'failedTitle'), actions: <FailureReason showReason={item.failure.kind !== 'modelRequired'} retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
+      if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t((item.failure.kind === 'failed' && item.failure.reason === 'modelRequired') ? 'modelRequired' : 'failedTitle'), actions: <FailureReason showReason={!(item.failure.kind === 'failed' && item.failure.reason === 'modelRequired')} retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
       if (!live && item.position === unreadItems.findLast(row => row.reportable)?.position)
         parts.push({ kind: 'text', text: '', node: <VisibleReadEnd onSeen={unread.reportEnd} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),

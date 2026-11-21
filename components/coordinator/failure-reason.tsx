@@ -53,7 +53,7 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
   const action = cloudCode ? <CloudFailureAction code={cloudCode} fallback={resend} />
     : failure.kind === 'hosted' && !transient && failure.code !== 'platform_paused'
     ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{balance('topUp')}</Button>
-    : recovery === 'settings' || failure.kind === 'modelRequired'
+    : recovery === 'settings' || (failure.kind === 'failed' && failure.reason === 'modelRequired')
       ? <ModelSettingsAction />
       : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused') || (failure.kind === 'failed' && failure.reason === 'balance')
       ? <Button variant="link" size="xs" className={ACTION} onClick={() => openModelPicker(botId)}>{picker('changeModel')}</Button>

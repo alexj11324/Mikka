@@ -46,6 +46,15 @@ test('reconnect recovery opens subscription settings for the phone workspace wit
   assert.equal(calls, 0)
 })
 
+test('a model-required reason on the existing failed discriminator opens model settings', async () => {
+  await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed', reason: 'modelRequired' }, botId: null, onQueued: () => {} })))
+  assert.ok(container.textContent?.includes(mobileMessages.Coordinator.modelRequired))
+  assert.equal(container.querySelectorAll('button').length, 1)
+  await click()
+  assert.deepEqual(opened, [`/settings?section=models&workspace=${workspace}`])
+  assert.equal(calls, 0)
+})
+
 test('a rejected model uses the supplied native model menu directly', async () => {
   await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'subscription', notice: 'modelRejected' }, botId: 'fixture-bot', onQueued: () => {}, modelChoice: createElement('button', { onClick: () => { picks++ } }, 'fixture-native-menu') })))
   assert.ok(container.textContent?.includes(subscriptionCopy.modelRejected))
