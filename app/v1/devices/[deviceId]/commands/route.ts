@@ -11,6 +11,7 @@ import { pendingWorkspaceReads } from '@/lib/coding-workspace/requests'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { z } from 'zod'
+import { MCP_CHECK_HEADER } from '@mikka/protocol/mcp-check'
 
 
 /**
@@ -41,12 +42,15 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
       { diff: request.headers.get(WORKSPACE_DIFF_REQUEST_HEADER) === '1',
         git: request.headers.get(WORKSPACE_GIT_REQUEST_HEADER) === '1' }) : []
   const releases = knownRelease ? await daemonVersions() : undefined
-  noteLogOutcome(commands.length > 0 || queued.length > 0 || workspaceRequests.length > 0 || check.deviceCommand !== null ? 'work' : 'empty')
+  const mcpChecks = request.headers.get(MCP_CHECK_HEADER) === '1'
+    ? await (await import('@/lib/plugins/runtime')).mcpDeviceChecks.pending(caller.userId, deviceId) : []
+  noteLogOutcome(commands.length > 0 || queued.length > 0 || workspaceRequests.length > 0 || mcpChecks.length > 0 || check.deviceCommand !== null ? 'work' : 'empty')
   return NextResponse.json({
     commands,
     ...(workspaceRequests.length ? { workspaceRequests } : {}),
     ...(queued.length > 0 ? { queuedRuns: queued } : {}),
     ...(check.deviceCommand ? { deviceCommands: [check.deviceCommand] } : {}),
+    ...(mcpChecks.length ? { mcpChecks } : {}),
     ...(releases ? { daemonVersions: releases } : {}),
   }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

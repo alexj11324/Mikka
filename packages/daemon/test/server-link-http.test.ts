@@ -8,6 +8,7 @@ import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { RECOVERY_WORKTREE_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER } from "@mikka/protocol/device"
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
+import { MCP_CHECK_HEADER, type McpDeviceCheckCommand } from '@mikka/protocol/mcp-check'
 
 import {
   DaemonError,
@@ -336,6 +337,25 @@ describe("HttpServerLink", () => {
     const error = await new HttpServerLink("http://server.test", fetch).claimRun("d", "r").catch((e: unknown) => e)
     expect(error).toBeInstanceOf(DaemonUpgradeRequiredError)
     expect((error as DaemonUpgradeRequiredError).latest).toBe("0.0.401")
+  })
+
+  it('decodes owner-requested STDIO checks only through the versioned device transport and accepts older servers', async () => {
+    const command: McpDeviceCheckCommand = { id: '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20', expiresAt: SOON(),
+      server: { name: 'mcp_fixture', transport: 'stdio', command: 'node', args: [], env: {} } }
+    let response: unknown = { commands: [], mcpChecks: [command] }
+    const link = new HttpServerLink('http://server.test', (async (_url, init) => {
+      expect(new Headers(init?.headers).get(MCP_CHECK_HEADER)).toBe('1')
+      return json(response)
+    }) as typeof fetch)
+    const checks = vi.fn()
+    expect(await link.fetchCommands('device', 0, { onMcpChecks: checks })).toEqual([])
+    expect(checks).toHaveBeenCalledExactlyOnceWith([command])
+    response = { commands: [] }
+    expect(await link.fetchCommands('device', 0, { onMcpChecks: checks })).toEqual([])
+    expect(checks).toHaveBeenCalledOnce()
+    response = { commands: [], mcpChecks: [{ ...command, server: { ...command.server, command: 'bad\u0000command' } }] }
+    await expect(link.fetchCommands('device', 0, { onMcpChecks: checks })).rejects.toThrow()
+    expect(checks).toHaveBeenCalledOnce()
   })
 
   it("409 on a claim: no open session means redial; anything else is another device's run", async () => {

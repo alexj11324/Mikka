@@ -17,7 +17,7 @@ const remoteMcpSchema = z.object({
   transport: z.enum(['http', 'sse']).default('http'),
   enabled: z.boolean().default(true), auth: mcpAuthSchema.optional(), headers: mcpHeadersSchema.optional(),
 }).strict().refine(value => !(value.auth && value.headers), 'Use auth or headers, not both')
-const stdioMcpSchema = taskMcpServerSchema.options[1].omit({ name: true }).extend({ name: z.string().trim().min(1).max(80), enabled: z.boolean().default(true) })
+const stdioMcpSchema = taskMcpServerSchema.options[1].omit({ name: true, disabledTools: true }).extend({ name: z.string().trim().min(1).max(80), enabled: z.boolean().default(true) })
 export const createMcpSchema = z.union([remoteMcpSchema, stdioMcpSchema])
 export const updateMcpSchema = z.object({
   id: z.uuid(), name: z.string().trim().min(1).max(80).optional(), enabled: z.boolean().optional(),
@@ -34,7 +34,7 @@ export const installSkillSchema = z.object({
 export const updateSkillSchema = z.object({ id: z.uuid(), enabled: z.boolean() }).strict()
 export type McpServerView = {
   id: string; name: string; url: string; transport: 'http' | 'sse' | 'stdio'; enabled: boolean;
-  revision: number; authKind: 'header' | 'none' | 'env'; createdAt: string;
+  revision: number; authKind: 'header' | 'none' | 'env' | 'oauth'; createdAt: string;
 }
 export type McpWorkspaceServerView = Omit<McpServerView, 'url'> & {
   /** A teammate receives public metadata, never the owner's private endpoint. */
@@ -50,7 +50,7 @@ export const mcpServerGrantSchema = z.object({
   grantId: z.uuid().nullable(),
 }).strict()
 export const mcpAuthoritySchema = z.object({
-  requester: z.string().min(1), workspaceId: z.uuid().nullable(), servers: z.array(mcpServerGrantSchema).max(64),
+  requester: z.string().min(1), workspaceId: z.uuid().nullable(), environmentId: z.uuid().nullable().optional(), servers: z.array(mcpServerGrantSchema).max(64),
 }).strict()
 export type McpServerGrant = z.infer<typeof mcpServerGrantSchema>
 export type McpAuthority = z.infer<typeof mcpAuthoritySchema>

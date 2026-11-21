@@ -151,6 +151,11 @@ export function claudeAppServers(apps?: RunApps) {
   }
 }
 
+/** Native SDK deny-list: disabled MCP tools are unavailable without an approval loop. */
+export function claudeAppDeniedTools(apps?: RunApps): string[] {
+  return (apps?.servers ?? []).flatMap(server => (server.disabledTools ?? []).map(name => `mcp__${server.name}__${name}`))
+}
+
 export function claudeMailboxServer(mailbox: RunMailbox) {
   const server = createSdkMcpServer({ name: 'mikka_mailbox', version: '1' })
   for (const [name, schema] of Object.entries(mailboxInputs).filter(([name]) => mailbox.tools.some(tool => tool.name === name))) server.instance.registerTool(name, {
@@ -725,6 +730,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...claudeAppServers(options.apps),
         },
         strictMcpConfig: !options.machineEnvironment,
+        disallowedTools: claudeAppDeniedTools(options.apps),
         systemPrompt: {
           type: "preset" as const,
           preset: "claude_code" as const,

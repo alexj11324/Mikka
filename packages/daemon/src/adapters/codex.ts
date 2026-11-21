@@ -148,9 +148,10 @@ export function codexAppArgs(apps?: RunApps): string[] {
     "-c", `mcp_servers.${app.name}.http_headers={ Authorization = ${toml(`Bearer ${apps!.token}`)} }`,
   ]), ...(apps?.servers ?? []).map(codexMcpServer).flatMap(server => {
     const prefix = `mcp_servers.${server.name}`
-    if (server.transport !== 'stdio') return ['-c', `${prefix}.url=${toml(server.url)}`, '-c', `${prefix}.http_headers=${tomlTable(server.headers)}`]
+    const filters = server.disabledTools?.length ? ['-c', `${prefix}.disabled_tools=${toml(server.disabledTools)}`] : []
+    if (server.transport !== 'stdio') return [...filters, '-c', `${prefix}.url=${toml(server.url)}`, '-c', `${prefix}.http_headers=${tomlTable(server.headers)}`]
     const process = nativeMcpProcess(server)
-    return ['-c', `${prefix}.command=${toml(process.command)}`, '-c', `${prefix}.args=${toml(process.args)}`, '-c', `${prefix}.env=${tomlTable(process.env)}`]
+    return [...filters, '-c', `${prefix}.command=${toml(process.command)}`, '-c', `${prefix}.args=${toml(process.args)}`, '-c', `${prefix}.env=${tomlTable(process.env)}`]
   })]
 }
 

@@ -2,6 +2,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
 import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
+import { MCP_CHECK_HEADER } from '@mikka/protocol/mcp-check'
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -343,6 +344,7 @@ export class HttpServerLink implements ServerLink {
           [WORKSPACE_REQUEST_HEADER]: '1',
           [WORKSPACE_DIFF_REQUEST_HEADER]: '1',
           [WORKSPACE_GIT_REQUEST_HEADER]: '1',
+          [MCP_CHECK_HEADER]: '1',
           ...deviceSessionHeaders,
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -600,6 +602,7 @@ export class HttpServerLink implements ServerLink {
       onUpdates,
       workspaceSkip = [],
       onWorkspaceRequests,
+      onMcpChecks,
     }: FetchCommandsOptions = {}
   ): Promise<RunCommand[]> {
     const response = await this.call(
@@ -618,6 +621,7 @@ export class HttpServerLink implements ServerLink {
     )
     if (response.queuedRuns?.length) onQueuedRuns?.(response.queuedRuns)
     if (response.workspaceRequests?.length) onWorkspaceRequests?.(response.workspaceRequests)
+    if (response.mcpChecks?.length) onMcpChecks?.(response.mcpChecks)
     if (response.daemonVersions || response.deviceCommands?.length) onUpdates?.({ daemonVersions: response.daemonVersions, deviceCommands: response.deviceCommands ?? [] })
     return response.commands
   }

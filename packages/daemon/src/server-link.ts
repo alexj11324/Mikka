@@ -190,6 +190,7 @@ export interface ServerLink {
 }
 
 export interface FetchCommandsOptions {
+  onMcpChecks?: (commands: import('@mikka/protocol/mcp-check').McpDeviceCheckCommand[]) => void
   signal?: AbortSignal
   workspaceSkip?: readonly string[]
   onWorkspaceRequests?: (requests: WorkspaceReadCommand[]) => void

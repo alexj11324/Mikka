@@ -1,4 +1,4 @@
-import { appendFile, chmod, copyFile, cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, chmod, copyFile, cp, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 // Keep this build script inside the daemon's packaged source boundary.
@@ -16,23 +16,27 @@ console.log(`Retained build directory: ${out}`)
 const { build } = await import('esbuild')
 
 // Runtime SDKs retain their assets and native dependencies. The private
-// workspace protocol is bundled, so installing the tarball needs no workspace.
-const dependencies = Object.fromEntries(Object.entries(source.dependencies).filter(([name]) => name !== '@mikka/protocol'))
+// workspace protocol and the MCP client's pure JS graph are bundled. The MCP
+// SDK is consumed through its client subpaths; its root export is not usable.
+const bundled = new Set(['@mikka/protocol', '@modelcontextprotocol/sdk'])
+const dependencies = Object.fromEntries(Object.entries(source.dependencies).filter(([name]) => !bundled.has(name)))
 const entryPoints = {
   mikka: 'bin/mikka.ts', main: 'src/main.ts', cli: 'src/cli.ts',
   client: 'src/rpc/client.ts', env: 'src/env.ts', paths: 'src/paths.ts',
   'http-link': 'src/server-link-http.ts', login: 'src/login.ts', log: 'src/log.ts',
   sandbox: 'src/agents/sandbox.ts',
 }
-await build({
+const result = await build({
   absWorkingDir: root, entryPoints, outdir: out, bundle: true,
   platform: 'node', format: 'esm', target: 'node22',
+  // The MCP stdio client includes CommonJS helpers which require Node builtins.
+  banner: { js: 'import { createRequire as mikkaCreateRequire } from "node:module"; const require = mikkaCreateRequire(import.meta.url);' },
   // No shared chunks: import.meta.url is relative to the emitted entry,
   // keeping the existing hosted helper paths stable.
   splitting: false, sourcemap: false,
   define: { __MIKKA_DAEMON_BUNDLE__: 'true' },
   external: Object.keys(dependencies).flatMap(name => [name, `${name}/*`]),
-  logLevel: 'warning',
+  logLevel: 'warning', metafile: true,
 })
 for (const path of ['agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
   await mkdir(dirname(resolve(out, path)), { recursive: true })
@@ -55,6 +59,27 @@ for (const path of ['harness/pins.json', 'harness/install.mjs', 'harness/cli.mjs
 await copyFile(resolve(root, '../../LICENSE'), resolve(out, 'LICENSE'))
 await copyFile(resolve(root, 'README.md'), resolve(out, 'README.md'))
 await copyFile(resolve(root, 'THIRD_PARTY_NOTICES.md'), resolve(out, 'THIRD_PARTY_NOTICES.md'))
+// Record the exact third-party code that esbuild included, together with its
+// complete upstream license/notice files. External SDKs ship their own notices.
+const bundledPackages = new Set()
+for (const input of Object.keys(result.metafile.inputs)) {
+  const path = resolve(root, input).replaceAll('\\', '/')
+  const marker = '/node_modules/', offset = path.lastIndexOf(marker)
+  if (offset < 0) continue
+  const relative = path.slice(offset + marker.length).split('/')
+  const packageName = relative.slice(0, relative[0].startsWith('@') ? 2 : 1)
+  bundledPackages.add(resolve(path.slice(0, offset + marker.length), ...packageName))
+}
+for (const directory of [...bundledPackages].sort()) {
+  const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
+  const notices = (await readdir(directory, { withFileTypes: true }))
+    .filter(entry => entry.isFile() && /^(?:licen[cs]e|copying|notice)(?:[.-].*)?$/i.test(entry.name))
+    .map(entry => entry.name).sort()
+  if (!notices.length) throw new Error(`Missing bundled dependency license: ${manifest.name}@${manifest.version}`)
+  let notice = `\n## ${manifest.name}@${manifest.version}\n`
+  for (const file of notices) notice += `\n### ${file}\n\n\`\`\`text\n${(await readFile(resolve(directory, file), 'utf8')).trimEnd()}\n\`\`\`\n`
+  await appendFile(resolve(out, 'THIRD_PARTY_NOTICES.md'), notice)
+}
 const exports = Object.fromEntries(Object.entries(source.exports).map(([key]) => [key, `./${key === '.' ? 'main' : key.slice(2)}.js`]))
 await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   name: packageName, version: source.version, description: source.description,

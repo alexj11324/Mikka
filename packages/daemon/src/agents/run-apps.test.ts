@@ -1,12 +1,13 @@
 import { expect, it } from 'vitest'
 import { runApps, runAppsHost, nativeMcpProcess, hasRunAppServers, registeredRunAppServer, codexMcpServer } from './run-apps'
-import { claudeAppServers } from '../adapters/claude'
+import { claudeAppServers, claudeAppDeniedTools } from '../adapters/claude'
 import { codexAppArgs } from '../adapters/codex'
 import { cursorAppServers } from '../adapters/cursor'
 import { spawn } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { prepareCursorHome } from './harness-home'
 import { RunJournal } from '../runs/journal'
 import type { RunAssignment } from '@mikka/protocol'
 
@@ -111,4 +112,18 @@ it('Codex connects legacy SSE through a pinned native bridge with headers kept o
   expect(bridge).toEqual({name:'mcp_old',transport:'stdio',command:'npx',args:['--yes','mcp-remote@0.16.5','https://mcp.acme.dev/sse','--transport','sse-only','--header','Authorization:${MIKKA_NATIVE_MCP_HEADER_0}'],env:{MIKKA_NATIVE_MCP_HEADER_0:'Bearer synthetic-secret'}})
   if (bridge.transport === 'stdio') expect(JSON.stringify(bridge.args)).not.toContain('synthetic-secret')
   expect(codexAppArgs({token,apps:[],servers:[server]})).toContain('mcp_servers.mcp_old.command="npx"')
+})
+
+it('hands owner-disabled tools to native Claude, Codex and Cursor filters, including the SSE bridge', () => {
+  const servers = [{name:'mcp_docs',transport:'sse' as const,url:'https://docs.example/mcp',headers:{},disabledTools:['write_docs']}]
+  const native = runApps({...mcp,apps:[],servers})
+  expect(codexAppArgs(native)).toContain('mcp_servers.mcp_docs.disabled_tools=["write_docs"]')
+  expect(claudeAppDeniedTools(native)).toEqual(['mcp__mcp_docs__write_docs'])
+  const directory = mkdtempSync(join(tmpdir(), 'mikka-cursor-mcp-'))
+  try {
+    prepareCursorHome(directory, ['Mcp(mcp_docs:write_docs)'])
+    expect(JSON.parse(readFileSync(join(directory,'cli-config.json'),'utf8'))).toEqual({permissions:{deny:['Mcp(mcp_docs:write_docs)']}})
+    prepareCursorHome(directory)
+    expect(JSON.parse(readFileSync(join(directory,'cli-config.json'),'utf8'))).toEqual({permissions:{deny:[]}})
+  } finally { rmSync(directory,{recursive:true,force:true}) }
 })

@@ -403,7 +403,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   // revoked connection must visibly fail the task, never remove all MCP tools.
   let servers: TaskMcpServer[] = []
   if (run.agentDefinition?.customMcp && ['claude_code','codex','cursor'].includes(harness)) {
-    try { servers = await (await import('@/lib/plugins/runtime')).personalPlugins.nativeMcpConnections(caller.userId,run.agentDefinition.customMcp) }
+    try { servers = await (await import('@/lib/plugins/runtime')).personalPlugins.nativeMcpConnections(caller.userId,run.agentDefinition.customMcp,run.agentDefinition.projectExecution?.environment?.id ?? null) }
     catch (error) {
       logCodedError(new CodedError('mcpUnavailable',{cause:error}),{runId:run.id})
       const now = new Date()

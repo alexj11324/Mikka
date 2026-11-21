@@ -17,6 +17,7 @@
 // Naming (firm): the machine is a `device`; agents are named by `harness`.
 import { z } from "zod"
 import { taskMcpServerSchema } from './task-mcp'
+import { mcpDeviceCheckCommandSchema, mcpDeviceCheckReceiptSchema } from './mcp-check'
 import { workspaceReadCommand } from './coding-workspace'
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
@@ -262,6 +263,7 @@ export type DaemonUpdateFailure = z.infer<typeof daemonUpdateFailureSchema>
 export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update', 'uninstall']) })
 export type DeviceManagementCommand = z.infer<typeof deviceManagementCommand>
 export const deviceReportSchema = z.object({
+  mcpChecks: z.array(mcpDeviceCheckReceiptSchema).max(1).optional(),
   completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20).optional(),
@@ -733,6 +735,7 @@ export const runCommandsResponse = z.object({
   daemonVersions: daemonVersionsSchema.optional().catch(undefined),
   /** The oldest pending device command, so a person's update reaches the device now. */
   deviceCommands: z.array(deviceManagementCommand).max(1).optional().catch(undefined),
+  mcpChecks: z.array(mcpDeviceCheckCommandSchema).max(1).optional(),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 

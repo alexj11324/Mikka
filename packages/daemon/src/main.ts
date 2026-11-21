@@ -1,5 +1,6 @@
 import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
+import type { McpDeviceCheckCommand } from '@mikka/protocol/mcp-check'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -310,6 +311,8 @@ export class Daemon {
   private reportOnOpen = false
   /** A device command waiting to run (until idle, or until its runs end). */
   private heldDeviceCommand: DeviceManagementCommand | undefined
+  private mcpChecks = new Map<string, Promise<void>>()
+  private completedMcpChecks = new Set<string>()
   private heldCommandPass: Promise<void> | null = null
   /** The cloud worker's token expires within the hour: the next report asks for its successor. */
   private rotationDue = false
@@ -1015,7 +1018,27 @@ export class Daemon {
     return false
   }
 
-  /** One read after a push, or right after the socket opens. Wait is zero: the signal already arrived. */
+  /** Discovery stays on the selected device and sends one bounded receipt. */
+  private answerMcpChecks(deviceId: string, commands: readonly McpDeviceCheckCommand[]) {
+    for (const command of commands) {
+      if (this.stopped || this.mcpChecks.has(command.id) || this.completedMcpChecks.has(command.id)) continue
+      const work = (async () => {
+        const { checkStdioMcp } = await import('./mcp-check')
+        const receipt = await checkStdioMcp(command, this.lifetime.signal)
+        if (this.stopped) return
+        const result = await this.options.link.report(deviceId, { mcpChecks: [receipt] })
+        this.holdDeviceCommands(result.deviceCommands ?? [])
+        this.completedMcpChecks.add(command.id)
+        if (this.completedMcpChecks.size > 64) this.completedMcpChecks.delete(this.completedMcpChecks.values().next().value!)
+      })().catch(() => {
+        // Neither SDK errors nor command output/credentials enter daemon logs.
+        this.log.warn({ check_id: command.id }, 'MCP check receipt unavailable; next work push may retry')
+      }).finally(() => { this.mcpChecks.delete(command.id) })
+      this.mcpChecks.set(command.id, work)
+    }
+  }
+
+  /** One read after a push, or right after the socket opens. */
   private async pullSignaledWork(deviceId: string, signal: AbortSignal) {
     const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
     const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(0, COMMANDS_MAX_SKIP)
@@ -1024,6 +1047,7 @@ export class Daemon {
       signal,
       workspaceSkip: [...this.workspaceReads],
       onWorkspaceRequests: requests => this.answerWorkspaceRequests(deviceId, requests),
+      onMcpChecks: commands => this.answerMcpChecks(deviceId, commands),
       skipRuns,
       onQueuedRuns: (runIds) => { queued = runIds },
       updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION },
@@ -2044,6 +2068,7 @@ export class Daemon {
     if (this.rotationTimer) clearTimeout(this.rotationTimer)
     await this.quota?.stop()
     this.lifetime.abort()
+    await Promise.allSettled(this.mcpChecks.values())
     for (const arrived of [...this.credentialArrived]) arrived()
     await this.session?.stop()
     this.reviewAbort?.abort()

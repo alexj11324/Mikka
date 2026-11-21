@@ -61,7 +61,7 @@ export function codexMcpServer(server: TaskMcpServer): TaskMcpServer {
     env[key] = value
     return ['--header', `${name}:\${${key}}`]
   })
-  return { name:server.name,transport:'stdio',command:'npx',args:['--yes','mcp-remote@0.16.5',server.url,'--transport','sse-only',...headers],env }
+  return { name:server.name, ...(server.disabledTools ? { disabledTools: server.disabledTools } : {}),transport:'stdio',command:'npx',args:['--yes','mcp-remote@0.16.5',server.url,'--transport','sse-only',...headers],env }
 }
 
 /** The CLI APIs lack a portable per-STDIO cwd field. This launcher only changes cwd and execs argv. */
