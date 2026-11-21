@@ -13,7 +13,7 @@ test('native admission and quiet completion require an explicit native failure',
 })
 import { chatBalanceRefusal } from './chat-balance'
 import { failureLine } from '../apps/mobile/lib/chat-failure'
-import { mobileMessages } from '../apps/mobile/lib/messages'
+import { getMobileMessages, mobileMessages } from '../apps/mobile/lib/messages'
 
 // The line is read from the phone's catalog, not repeated here: the test then holds
 // under any device locale instead of only under zh-CN.
@@ -21,6 +21,11 @@ const copy = mobileMessages.MobileCore.failure
 
 const person = { from: 'person' }, reply = { from: 'coordinator' }, event = { from: 'event' }
 const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)'
+
+test('model-required copy names the state beside the settings action in both mobile catalogs', () => {
+  assert.equal(getMobileMessages('en').Coordinator.modelRequired, 'No task started: no model selected.')
+  assert.equal(getMobileMessages('zh-CN').Coordinator.modelRequired, '任务未启动：未选择模型。')
+})
 
 test('missing preparation model keeps the installed mobile discriminator with model settings recovery', () => {
   const failure = chatFailure({ working: false, error: 'executionModelUnknown' })!
