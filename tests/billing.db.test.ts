@@ -107,6 +107,7 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
     await billing.applyStripeEvent(event('invoice.paid', invoice), options)
     const view = await billing.workspaceBillingView(admin, ws.id, env)
     assert.deepEqual([view.live, view.billingModel, view.entitlementPlan, view.seats], [true, 'resource_v1', 'pro', 1])
+    assert.equal(view.planPointsLimit, 1000, 'the paid invoice grants the period its plan points')
     const grant = (await pool.query('select plan,"seatLimit","billingPlan","billingExpiresAt" from mikka_workspace_entitlements where "workspaceId"=$1', [ws.id])).rows[0]
     assert.deepEqual([grant.plan, grant.seatLimit, grant.billingPlan], ['enterprise', 20, 'pro'])
     assert.equal(grant.billingExpiresAt.getTime(), end * 1000)
