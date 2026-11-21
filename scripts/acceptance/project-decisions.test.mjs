@@ -296,7 +296,7 @@ test('workflow attests before OIDC and uploads only two explicit sanitized repor
   assert.ok(!workflow.includes('path: .cache'))
 })
 
-function fixture({ active = false, noWorking = false, providerFailureAtChat = false } = {}) {
+function fixture({ active = false, noWorking = false, providerFailureAtChat = false, submitStatus = 202, invalidSubmitReceipt = false } = {}) {
   let tick = EPOCH, counter = 100, orderCounter = 500
   const ids = () => id(counter++)
   const sources = CASES.map((item, index) => ({
@@ -426,11 +426,13 @@ function fixture({ active = false, noWorking = false, providerFailureAtChat = fa
         failure: failed ? { kind: 'failed' } : null, items: failed ? [{ from: 'person', text: 'private-user-message-sentinel' }] : [],
         sources: {}, artifacts: {}, reactions: {} })
     }
-    if (path === '/api/mobile/chat' && method === 'POST') {
-      const bot = bots.find(bot => bot.id === body.botId)
-      bot.sent = true; bot.botRecord = body.text.includes('"title":"' + bot.name + ' bot"')
+    if (path === '/api/agents/eve/v1/session' && method === 'POST') {
+      const bot = bots.find(bot => bot.id === url.searchParams.get('botId'))
+      assert.deepEqual(body.clientContext, { expectedOwnerId: OWNER, expectedWorkspaceId: WS })
+      assert.match(new Headers(init.headers).get('x-mikka-submission-id'), /^[a-f0-9-]{36}$/)
+      bot.sent = true; bot.botRecord = body.message.includes('"title":"' + bot.name + ' bot"')
       sequence.push('sent:' + bot.item.id)
-      return Response.json({ queued: true }, { status: 202 })
+      return Response.json(invalidSubmitReceipt ? { queued: true } : { ok: true, sessionId: 'wrun_project', deliveryId: 'delivery_fixture' }, { status: submitStatus })
     }
     if (path === '/api/factory/tasks') {
       const bot = bots.find(bot => bot.issueId === url.searchParams.get('issueId'))
@@ -566,4 +568,14 @@ test('an ended thread cannot pass as mid-run steering and does not stop the othe
 test('artifact download enforces a small byte bound before retaining arbitrary model output', async () => {
   assert.equal((await smallArtifactBytes(new Response('ok'))).toString(), 'ok')
   await assert.rejects(smallArtifactBytes(new Response('x'.repeat(4097))), /artifact_content/)
+})
+
+test('native message admission requires HTTP 202 and its actual receipt', async () => {
+  for (const options of [{ submitStatus: 200 }, { invalidSubmitReceipt: true }]) {
+    const f = fixture({ active: true, ...options })
+    const report = await runProjectDecisionsAcceptance({ env: env('active'), event: event('active'), attestation: attestation('active'), ...f })
+    assert.equal(report.cases.slice(1).every(row => row.status === 'blocked'), true)
+    assert.equal(report.cases.slice(1).every(row => row.code === (options.submitStatus ? 'http_refused' : 'response_invalid')), true)
+    assert.equal(report.sessionClosed, true)
+  }
 })

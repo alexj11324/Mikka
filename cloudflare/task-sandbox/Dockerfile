@@ -42,3 +42,7 @@ RUN test -x /usr/bin/setpriv && test -x /usr/bin/unshare && test -x /usr/bin/pyt
 RUN node /opt/mikka/task-sandbox/record-binaries.mjs
 WORKDIR /workspace
 CMD ["sleep", "900"]
+
+LABEL org.opencontainers.image.title="Mikka Task sandbox" \
+      org.opencontainers.image.description="Task workspace runtime with the Mikka daemon and pinned coding CLI tools." \
+      org.opencontainers.image.documentation="https://github.com/alexj11324/Mikka/blob/main/docs/operations/build-source-of-truth.md#service-builds-and-release-manifests"

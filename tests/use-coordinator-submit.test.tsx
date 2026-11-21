@@ -7,7 +7,7 @@ import type { UseEveAgentReturn } from 'eve/react'
 
 let owner = 'owner-a'
 let sessionReads = 0
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: {
   getSession: async () => { sessionReads++; return { data: { user: { id: owner } }, error: null } },
 } } })

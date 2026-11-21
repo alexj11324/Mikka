@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/lib/client-runtime/navigation'
 import { deleteAccount, updateDisplayName, uploadAvatar } from '@/app/actions/account'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { withBasePath } from '@/lib/base-path'

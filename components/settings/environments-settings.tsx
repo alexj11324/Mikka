@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Archive, Pencil, Plus } from '@/components/icons'
 import type { EnvironmentView, EnvironmentsView } from '@/app/actions/environments'
 import { listProjectSetupVersions, rollbackProjectSetup, saveEnvironment, setProjectDefaultEnvironment } from '@/app/actions/project-resources'
 import type { EnvironmentConfiguration, ProjectSetupHistory } from '@/lib/project-resources/contracts'
 import type { ActionResult } from '@/lib/action-result'
+import { MACHINE_SIZES, isMachineSize, type MachineSize } from '@/lib/cloud-computer/machine-pricing'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
@@ -146,6 +147,9 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
   const [command, setCommand] = useState(environment?.configuration.setup?.command ?? '')
   const [copyFiles, setCopyFiles] = useState(environment?.configuration.setup?.copyFiles.join('\n') ?? '')
   const [approved, setApproved] = useState(environment?.configuration.setup?.approved ?? false)
+  const [machineSize, setMachineSize] = useState<MachineSize | 'default'>(environment?.defaultMachineSize ?? 'default')
+  const sizes = [{ value: 'default', label: t('machineSizeDefault') }, ...(Object.keys(MACHINE_SIZES) as MachineSize[])
+    .map(value => ({ value, label: t('machineSizeOption', { vcpu: MACHINE_SIZES[value].vcpu, gib: MACHINE_SIZES[value].gib }) }))]
   const [pending, setPending] = useState(false), [failure, setFailure] = useState<string | null>(null)
   const options = (['any', 'local', 'cloud'] as const).map(value => ({ value, label: t(`runtimes.${value}`) }))
   async function save() {
@@ -156,7 +160,7 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
     if (!name.trim() || files.length > 200 || files.some(path => path.length > 1000)) { setFailure(t('invalid')); return }
     setPending(true); setFailure(null)
     try {
-      const result = await saveEnvironment({ workspaceId, name: name.trim(), configuration,
+      const result = await saveEnvironment({ workspaceId, name: name.trim(), configuration, defaultMachineSize: machineSize === 'default' ? null : machineSize,
         ...(environment ? { id: environment.id, revision: environment.revision } : {}) })
       if (result.error) {
         if (['authRequired', 'workspaceAccessDenied', 'workspaceMembershipSuspended'].includes(result.error)) onRefused(result.error)
@@ -179,6 +183,10 @@ function EnvironmentEditor({ workspaceId, environment, onClose, onSaved, onRefus
           <Field><FieldLabel htmlFor="environment-runtime">{t('runtime')}</FieldLabel><Select items={options} value={runtime} disabled={pending}
             onValueChange={value => { if (value === 'any' || value === 'local' || value === 'cloud') setRuntime(value) }}>
             <SelectTrigger id="environment-runtime"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select></Field>
+          <Field><FieldLabel htmlFor="environment-machine-size">{t('machineSize')}</FieldLabel><Select items={sizes} value={machineSize} disabled={pending}
+            onValueChange={value => { if (value === 'default' || isMachineSize(value)) setMachineSize(value) }}>
+            <SelectTrigger id="environment-machine-size"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{sizes.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
           </Select></Field>
           <Field><FieldLabel htmlFor="environment-setup">{t('setup')}</FieldLabel><Textarea id="environment-setup" value={command} maxLength={2000} rows={5} disabled={pending} onChange={event => { setCommand(event.target.value); setApproved(false) }} /></Field>
           <Field><FieldLabel htmlFor="environment-copy">{t('copyFiles')}</FieldLabel><Textarea id="environment-copy" value={copyFiles} rows={3} disabled={pending} onChange={event => { setCopyFiles(event.target.value); setApproved(false) }} /></Field>

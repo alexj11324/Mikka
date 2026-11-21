@@ -2,8 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-export function ingressConfig({ release, image, origin, taskMachine, eveService, businessWorld, credentialIdentityService, credentialBrokerService, liteLlmService, workersAi = false }) {
-  const account = image.split('/')[1]
+export function ingressConfig({ release, image, origin, taskMachine, eveService, businessWorld, credentialIdentityService, credentialBrokerService, liteLlmService }) {
   const services = [
     { binding: 'TASK_MACHINE', service: taskMachine },
     { binding: 'EVE_SERVICE', service: eveService, entrypoint: 'EveService' },
@@ -14,10 +13,9 @@ export function ingressConfig({ release, image, origin, taskMachine, eveService,
   ].filter(item => item.service !== undefined)
   return {
     ...(services.length ? { services } : {}),
-    ...(workersAi ? { ai: { binding: 'WORKERS_AI' } } : {}),
     name: 'mikka-api-' + release, main: resolve(dirname(fileURLToPath(import.meta.url)), 'worker.mjs'),
     compatibility_date: '2026-10-19', compatibility_flags: ['nodejs_compat'], workers_dev: false, preview_urls: false,
-    vars: { PUBLIC_ORIGIN: origin, MIKKA_DEPLOYMENT_ID: release, ...(workersAi ? { CLOUDFLARE_WORKERS_AI_ACCOUNT_ID: account } : {}) },
+    vars: { PUBLIC_ORIGIN: origin, MIKKA_DEPLOYMENT_ID: release },
     containers: [{ class_name: 'BusinessApi', image, instance_type: 'basic', max_instances: 1 }],
     durable_objects: { bindings: [{ name: 'BUSINESS_API', class_name: 'BusinessApi' }] },
     migrations: [{ tag: 'v1', new_sqlite_classes: ['BusinessApi'] }],

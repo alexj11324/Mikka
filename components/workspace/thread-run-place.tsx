@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { Cloud, Copy, Laptop, Server } from '@/components/icons'
 import { toast } from 'sonner'
 import { useThreadMachine } from '@/hooks/use-thread-run-reads'
@@ -9,6 +9,8 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import { cloudShortId, machineDot, machineStateWord, systemLabel, type ThreadMachine, type ThreadMachineKind } from '@/lib/thread-machine'
+import { markOfValue, stateMarkTone } from '@/lib/state-mark'
+import { statusDots } from '@/lib/status-appearance'
 import { cn } from '@/lib/utils'
 
 const KIND_ICONS: Record<ThreadMachineKind, typeof Cloud> = { cloud: Cloud, laptop: Laptop, server: Server }
@@ -21,9 +23,9 @@ export function useMachineName() {
     : machine.name || t(`kinds.${machine.kind}`)
 }
 
-/** The status dot (R-24): green while it can work, red on error, grey otherwise. */
+/** The status dot (R-24): the colour of the machine's own mark, so it agrees with the run mark on the same row. */
 function Dot({ dot, corner }: { dot: ReturnType<typeof machineDot>; corner?: boolean }) {
-  return <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full bg-muted-foreground/50', dot === 'running' && 'bg-success', dot === 'failed' && 'bg-destructive', corner && 'absolute -top-0.5 -right-0.5 ring-2 ring-background')} />
+  return <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', statusDots[stateMarkTone(markOfValue(dot))], corner && 'absolute -top-0.5 -right-0.5 ring-2 ring-background')} />
 }
 
 /** The device type icon with its status dot on the top right (R-24, R-74). */

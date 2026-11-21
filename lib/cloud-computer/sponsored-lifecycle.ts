@@ -10,13 +10,15 @@ import { openOwnedCloudflareTaskMachine, releaseOwnedCloudflareTaskMachine } fro
 import { finishThreadRegistration, prepareThreadRegistration } from './thread-registration'
 import { hostedSnapshot, type TaskMachineActor } from './sponsored-task'
 import { PaidResourceError } from '../abuse/policy'
-import { DEFAULT_MACHINE_SIZE, isMachineSize, MACHINE_CHUNK_MS, MACHINE_GRACE_MS, MACHINE_RENEW_BEFORE_MS } from './machine-pricing'
+import { DEFAULT_MACHINE_SIZE, isMachineSize, MACHINE_CHUNK_MS, MACHINE_GRACE_MS, MACHINE_RENEW_BEFORE_MS, type MachineSize } from './machine-pricing'
 
 const unavailable = () => new ComputerError(409, 'Cloudflare task machine unavailable')
 const fixedWorker =
   'exec /usr/local/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --cloudflare-task'
 
 type Handoff = {
+  /** The size the machine is billed at (decision 2026-11-15-1900): the run's own, else Mikka's default. */
+  size: MachineSize
   deviceId: string
   operationId: string
   leaseId: string
@@ -130,6 +132,8 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
       throw unavailable()
     definition.repositoryAdmission = { ...a, deviceId }
   }
+  const frozenSize = run.agentDefinition.taskMachine.size
+  const size: MachineSize = isMachineSize(frozenSize) ? frozenSize : DEFAULT_MACHINE_SIZE
   const issued = await prepareThreadRegistration(tx, {
     runId,
     deviceId,
@@ -155,10 +159,11 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
     "workerLeaseUntil"=clock_timestamp()+interval '90 seconds',"lifecycleAt"=clock_timestamp()+interval '90 seconds',
     lifecycle=lifecycle||jsonb_build_object('phase','create_requested','sponsoredUntil',clock_timestamp()+make_interval(secs=>$6::double precision/1000),
       'sponsoredRepositoryKey',$4::text,'sponsoredChunks',1,'sponsoredSize',$7::text) || CASE WHEN $5::jsonb IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('sponsoredRestore',$5::jsonb) END WHERE "runId"=$1`,
-    [runId, operationId, leaseId, run.repoPath, requiredCheckpoint ? JSON.stringify(requiredCheckpoint) : null, MACHINE_CHUNK_MS, DEFAULT_MACHINE_SIZE],
+    [runId, operationId, leaseId, run.repoPath, requiredCheckpoint ? JSON.stringify(requiredCheckpoint) : null, MACHINE_CHUNK_MS, size],
   )
   await tx.query(`UPDATE device_tokens SET "expiresAt"=clock_timestamp()+interval '15 minutes' WHERE id=$1`, [tokenId])
   return {
+    size,
     deviceId,
     operationId,
     leaseId,
@@ -213,7 +218,7 @@ export async function ensureSponsoredTaskMachine(pool: Pool, actor: TaskMachineA
   try {
     // Machine time is paid from Mikka 额度 before the machine opens (decision 2026-11-15-1900).
     const { fundMachineChunk } = await import('./machine-billing')
-    if (!await fundMachineChunk({ ownerId: actor.userId, workspaceId: actor.workspaceId, runId, operationId: handoff.operationId, index: 0, size: DEFAULT_MACHINE_SIZE }))
+    if (!await fundMachineChunk({ ownerId: actor.userId, workspaceId: actor.workspaceId, runId, operationId: handoff.operationId, index: 0, size: handoff.size }))
       throw new PaidResourceError('points_exhausted')
     const { connection, instanceId } = await openOwnedCloudflareTaskMachine(pool, actor, runId)
     const changed = await pool.query(

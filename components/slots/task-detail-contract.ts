@@ -139,6 +139,12 @@ export type TaskDetailFrameProps = {
   words: { previous: string; next: string; close: string; more: string; details: string; subtasks: string; subtaskPlaceholder: string; addSubtask: string; subtaskMenu: (title: string) => string; activity: string; comment: string; commentPlaceholder: string; send: string; reply: string; replyPlaceholder: string; sendReply: string; resolve: string; reopen: string; resolved: string; anchorRemoved: string; copyLink: string; commentBy: (name: string) => string }
   /** The star in the path. */
   favorite: { on: boolean; label: string; toggle: () => void; disabled: boolean }
+  /**
+   * Start work (decision 2026-11-19-2110): opens Mikka's dispatch window for this task (Bot, Agent, machine, profile),
+   * which comes in `dialogs`. The ⋯ menu also carries it as its first item (`startWork`). Absent while the task cannot
+   * be changed.
+   */
+  startWork?: { label: string; onStart: () => void }
   /** The ⋯ menu (its dialogs come in `dialogs`). */
   menu: { items: TaskMenuItem[]; disabled: boolean; onOpen: () => void }
   titleField: {

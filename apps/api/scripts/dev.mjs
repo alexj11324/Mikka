@@ -174,6 +174,15 @@ export async function developmentResponse(worker, origin, signal, read = fetch) 
   } finally { worker.dispose() }
 }
 
+/** The public port is the last thing that opens. A browser that reaches it
+ * before the worker has an address gets the runner's own wait as a 500
+ * ("Runner did not become ready in time"), which the workspace shows as a
+ * thread that failed to load for a server that is merely still starting. */
+export async function openPublicPort(worker, listen, deadline) {
+  await worker.wait(deadline)
+  await listen()
+}
+
 export async function closeDevelopment(development, log = console.error) {
   try { await development?.close(); return 0 }
   catch (error) {
@@ -283,12 +292,13 @@ export async function startDevelopment({ args = [], root = repository, log = con
     }
     vite.watcher.add(join(root, 'app'))
     for (const event of ['add', 'change', 'unlink']) vite.watcher.on(event, routeChanged)
-    await vite.listen()
     await prepare(nitro)
     await build(nitro)
-    // build() installs a watcher. Wait for the first real graph and one existing
-    // DB-free API through the public proxy before announcing readiness.
+    // build() installs a watcher. Wait for the first real graph, then for the
+    // worker's own address, and only then open the port a browser can reach:
+    // one existing DB-free API through the public proxy announces readiness.
     await compiled.promise
+    await openPublicPort(workerReady, () => vite.listen(), AbortSignal.timeout(30_000))
     await developmentResponse(workerReady, options.origin, AbortSignal.timeout(30_000))
     log(`[dev] Local: ${options.origin}/mikka`)
     log(`[dev] Ready in ${Math.ceil(performance.now() - started)}ms (Vite + Nitro)`)
@@ -307,7 +317,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const stop = () => stopping ??= Promise.resolve().then(() => closeDevelopment(development)).then(code => {
     process.exitCode = Math.max(Number(process.exitCode) || 0, code)
   })
-  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void stop() })
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { void stop() })
   try {
     development = await startDevelopment({ args: process.argv.slice(2) })
     if (stopping) await development.close()
@@ -326,6 +336,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const message = String(error?.message ?? '')
       const named = [...known].find(code => message.startsWith(code)) ?? (known.has(message) ? message : null)
       console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? named ?? 'API_DEV_START_FAILED', message: message.slice(0, 300) })
+      // The peer's own stderr is the only place its refusal is explained — "A dev
+      // server is already running for this eve agent", a module error, a port
+      // clash. A bare EVE_SERVICE_EXITED would send the developer hunting for a
+      // cause this process already has in hand.
+      const words = error?.detail?.reason ?? error?.detail?.stderr?.trim()
+      if (words) for (const line of words.split('\n').slice(-12)) console.error(`[dev] eve: ${line}`)
     }
     process.exitCode = 1
   }

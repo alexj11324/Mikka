@@ -496,7 +496,11 @@ export async function runProjectDecisionsAcceptance({ env = process.env, event, 
       const prompt = buildTaskPrompt({ marker, projectId: project.id, workspaceId, issueId: issue.id, item, botRecord })
       if (item.kind === 'api_key') assertFlashTestModel(item.model)
       await pin()
-      await json('/api/mobile/chat', { botId: bot.id, text: prompt, submissionId: deterministicId(marker) })
+      const submitted = await request('/api/agents/eve/v1/session?botId=' + bot.id, { message: prompt, clientContext: { expectedOwnerId: ownerId, expectedWorkspaceId: workspaceId } }, 'POST', { 'x-mikka-submission-id': deterministicId(marker) })
+      const receipt = await submitted.json().catch(() => null)
+      check(submitted.status === 202, 'http_refused', 'blocked', { httpStatus: submitted.status })
+      check(receipt?.ok === true && /^wrun_[A-Za-z0-9_-]+$/.test(receipt.sessionId ?? '')
+        && typeof receipt.deliveryId === 'string' && receipt.deliveryId.length > 0, 'response_invalid')
       const deadline = now() + 600000
       while (now() < deadline) {
         await pin()

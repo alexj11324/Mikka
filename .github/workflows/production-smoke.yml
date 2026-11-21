@@ -51,7 +51,7 @@ env:
 
 jobs:
   domain-model:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.domain_model_sha != '' || inputs.domain_model_scope != '' || (inputs.domain_model_mode != '' && inputs.domain_model_mode != 'preflight'))
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.domain_model_sha != '' || inputs.domain_model_scope != '' || (inputs.domain_model_mode != '' && inputs.domain_model_mode != 'preflight'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -221,7 +221,7 @@ jobs:
 
   smoke:
     # Only finished production deployments, plus the schedule and manual runs.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -258,7 +258,7 @@ jobs:
 
   deployment-comparison:
     # No browser/install/wait loop: quarter-hour follow-ups read the same fixed windows.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

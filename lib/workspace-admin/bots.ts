@@ -92,7 +92,7 @@ export interface WorkspaceBotView {
 /** Every bot in the workspace with its live thread count. Any active member may read it. */
 export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotView[]> {
   const [rows, names] = await Promise.all([
-    db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, model: bots.model, repository: bots.repository })
+    db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, model: bots.model, repository: bots.repository, environmentId: bots.environmentId })
       .from(bots).where(eq(bots.workspaceId, workspaceId)).orderBy(asc(bots.createdAt)),
     workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)),
   ])
@@ -101,9 +101,14 @@ export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotVi
     .where(and(inArray(agentRuns.botId, rows.map(row => row.id)), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).groupBy(agentRuns.botId)
   const threads = new Map(live.map(row => [row.botId, row.total]))
   const owners = new Map(names.map(row => [row.userId, row.name]))
-  return rows.map(row => {
+  const environmentIds = [...new Set(rows.flatMap(row => row.environmentId ? [row.environmentId] : []))]
+  const environments = new Map((environmentIds.length ? (await workspaceDb.execute<{ id: string; first: string | null }>(sql`select id,configuration->'repositoryKeys'->>0 as first
+    from workspace_environments where "workspaceId"=${workspaceId} and "archivedAt" is null and id in (${sql.join(environmentIds.map(id => sql`${id}::uuid`), sql`,`)})`)).rows : []).map(row => [row.id, row.first]))
+  return rows.map(({ environmentId, ...row }) => {
     const runningThreads = threads.get(row.id) ?? 0
-    return { ...row, ownerName: row.ownerId === null ? null : owners.get(row.ownerId) ?? null, status: runningThreads ? 'running' : 'idle', runningThreads }
+    // The Environment's first repository; the retired column only for a Bot not yet moved (lib/bot-environment.ts).
+    const repository = environmentId && environments.has(environmentId) ? environments.get(environmentId) ?? null : row.repository
+    return { ...row, repository, ownerName: row.ownerId === null ? null : owners.get(row.ownerId) ?? null, status: runningThreads ? 'running' : 'idle', runningThreads }
   })
 }
 

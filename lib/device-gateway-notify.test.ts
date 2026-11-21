@@ -4,11 +4,16 @@ import { once } from 'node:events'
 import { mock, test } from 'node:test'
 import type { PoolClient } from 'pg'
 
+// These cases mean "no gateway" when DEVICE_GATEWAY_URL is absent. A community installation with
+// BETTER_AUTH_URL and BETTER_AUTH_SECRET would select its built-in gateway instead (lib/builtin-gateway/config.ts),
+// which CI exports for database suites, so the file runs without that origin.
+delete process.env.BETTER_AUTH_URL
+
 const callbacks: (() => Promise<void>)[] = []
 const revokeReviews = mock.fn(async (_database: unknown, _scope: unknown, _reason: string) => ({ closed: 0, pending: 0 }))
 mock.module(new URL('./coding-workspace/review-sessions.ts', import.meta.url).href, { namedExports: { revokeReviewSessions: revokeReviews } })
 let outsideNext = false
-mock.module('next/server', { namedExports: { after: (callback: () => Promise<void>) => {
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (callback: () => Promise<void>) => {
   if (outsideNext) throw new Error('No request scope')
   callbacks.push(callback)
 } } })

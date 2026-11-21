@@ -45,7 +45,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
 } }) } })
 // The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
 mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
-mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translationsFor, useFormatter: () => ({
   dateTime: (value: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...options }).format(value),
   relativeTime: () => '',
 }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })

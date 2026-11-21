@@ -29,15 +29,15 @@ test('review capabilities follow real team relation changes and their transactio
   Object.assign(process.env, { E2E_DATABASE_URL: url.toString(), MIKKA_DATABASE_URL: url.toString(), DATABASE_URL: url.toString() })
   // Run real after() work at the request boundary. Bare Node otherwise starts
   // unrelated Live membership readers inside the gateway's exclusive lock probe.
-  const next = await import('next/server')
+  const next = await import('@/lib/server-runtime/server')
   const afterResponse: Array<() => unknown> = []
-  t.mock.module('next/server', { namedExports: { ...next, after: (work: () => unknown) => { afterResponse.push(work) } } })
+  t.mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => unknown) => { afterResponse.push(work) } } })
   t.afterEach(async () => { await Promise.all(afterResponse.splice(0).map(work => work())) })
   // Framework translation and audit request metadata are outside this SQL
   // regression. Session rows, membership, issue access, action authorization
   // and transactions are real; actAs uses the existing verified-actor path.
-  t.mock.module('next-intl/server', { namedExports: { getTranslations: async () => Object.assign((key: string) => key, { has: () => false }), getLocale: async () => 'en' } })
-  t.mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, set() {}, delete() {} }) } })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => Object.assign((key: string) => key, { has: () => false }), getLocale: async () => 'en' } })
+  t.mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, set() {}, delete() {} }) } })
   const { resolveTaskReviewAuthority: resolve, ReviewAuthorityError } = await import('./review-authority')
   const { beginReviewSession, readReviewSession, closeReviewSession, drainRevokedReviewSessions, reviewSessionTransport } = await import('./review-sessions')
   const { actAs } = await import('../acting-user')

@@ -9,6 +9,7 @@ export const SLACK_CALLBACK_PATH = withBasePath('/api/integrations/slack/callbac
 export const SLACK_SCOPES = [
   'app_mentions:read',
   'chat:write',
+  'chat:write.customize',
   'users:read',
   'channels:read',
   'channels:history',

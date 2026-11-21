@@ -44,8 +44,8 @@ export function assertFixtureEnvironment(env) {
   check(env.SMTP_URL === 'smtp://mailpit:1025' && env.S3_ENDPOINT === storage && env.S3_BUCKET === bucket
     && env.S3_ACCESS_KEY_ID === 'selfhost-ci' && env.S3_REGION === 'us-east-1', 'SERVICES_TARGET')
   check(/^[A-Za-z0-9+/]{43}=$/.test(env.S3_SECRET_ACCESS_KEY ?? ''), 'FIXTURE_KEY_REQUIRED')
-  check(env.MIKKA_DEFAULT_MODEL_BASE_URL === 'http://model:8080/v1'
-    && env.MIKKA_DEFAULT_MODEL_API_KEY === 'synthetic-selfhost-only' && env.MIKKA_DEFAULT_MODEL_ID === 'selfhost-ci', 'MODEL_TARGET')
+  check(env.MIKKA_LITELLM_URL === 'http://litellm:4000'
+    && env.MIKKA_LITELLM_MASTER_KEY === 'synthetic-selfhost-litellm', 'MODEL_TARGET')
   for (const name of ['VERCEL', 'VERCEL_ENV', 'DEVICE_GATEWAY_URL', 'CLOUDFLARE_ACCOUNT_ID', 'RESEND_API_KEY', 'AI_GATEWAY_API_KEY', 'GITHUB_APP_PRIVATE_KEY', 'MIKKA_CLOUD_URL']) {
     check(!env[name], 'EXTERNAL_CREDENTIALS_REFUSED')
   }
@@ -354,7 +354,7 @@ export async function runAcceptance(env = process.env) {
     for (let turn = 1; turn <= 31; turn++) {
       const number = String(turn).padStart(2, '0'), reply = `SELF_HOSTED_REPLY_${number}`
       const chatRequest = turn === 1 ? webRequest : request
-      await chatRequest('/mikka/api/mobile/chat', { method: 'POST', expected: [202], body: { botId: bot.id, text: `selfhost_turn_${number}`, submissionId: randomUUID() } })
+      await chatRequest(`/mikka/api/agents/eve/v1/session?botId=${bot.id}`, { method: 'POST', expected: [202], headers: { 'x-mikka-submission-id': randomUUID() }, body: { message: `selfhost_turn_${number}`, clientContext: { botId: bot.id } } })
       const deadline = Date.now() + 45_000
       for (;;) {
         const chat = await (await chatRequest(`/mikka/api/mobile/chat?bot=${bot.id}`)).json()

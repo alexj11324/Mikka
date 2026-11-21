@@ -1,12 +1,12 @@
 import 'server-only'
-import { createOpenAI } from '@ai-sdk/openai'
+import { createLiteLLMTranscriptionModel } from '@/lib/model-gateway/litellm-client'
 import { transcribe } from 'ai'
 import { pool } from '@/lib/db'
 import type { PoolClient } from 'pg'
 import { openApiKeyForChat, usableApiKeys } from '@/lib/model-api-keys'
 import { ChatFileError } from './extract'
 
-/** Transcription uses an already-authorized OpenAI key; never substitutes Mikka's paid model or a different account. */
+/** Transcription sends an already-authorized OpenAI key through LiteLLM; never substitutes Mikka's paid model or a different account. */
 export async function transcribeChatAudio(
   userId: string,
   workspaceId: string,
@@ -23,10 +23,9 @@ export async function transcribeChatAudio(
   if (!choice) throw new ChatFileError('audioKeyRequired')
   const { key, model } = choice
   const credential = await openApiKeyForChat(database, userId, workspaceId, key.id)
-  const provider = createOpenAI({ apiKey: credential.apiKey, baseURL: credential.baseUrl })
   try {
     const result = await transcribe({
-      model: provider.transcription(model),
+      model: createLiteLLMTranscriptionModel(model, { apiKey: credential.apiKey, baseUrl: credential.baseUrl, provider: 'openai', modelId: model }),
       audio,
       maxRetries: 0,
       abortSignal: AbortSignal.timeout(90000),

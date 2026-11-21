@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,8 +8,9 @@ import { launchElectron } from './electron-launch.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
 
-const require = createRequire(import.meta.url)
-const sharp = createRequire(require.resolve('next/package.json'))('sharp')
+// `sharp` is the product's own dependency; it used to be reached through the
+// Next install, which no longer exists.
+const { default: sharp } = await import('sharp')
 const viewport = { width: 1440, height: 900 }
 
 test('real Electron keeps exact layout, edge interaction and unscaled pixels when the native window is smaller', async () => {

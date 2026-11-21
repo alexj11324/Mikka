@@ -1,13 +1,11 @@
 import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http';
-import { NextResponse } from 'next/server';
+import { NextResponse } from '@/lib/server-runtime/server';
 import { auth } from '@/lib/api-auth';
 import { pool } from '@/lib/db';
 import { withRequestLog, noteLogUser } from '@/lib/request-log';
 import { factoryBrowserSession } from '@/lib/factory/browser-human';
 import { factoryHumanStore, factorySpecApproval } from '@/lib/factory/server';
 import { handleFactoryFlow } from '@/lib/factory/flow-http';
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 const respond = withRequestLog('/api/factory/tasks/[taskId]/flow', async (request: Request, context: { params: Promise<{ taskId: string }> }) => {
   const session = await factoryBrowserSession(request,headers => auth.api.getSession({ headers, query: { disableCookieCache: true } }));
   const actor = session ? { userId: session.user.id, sessionId: session.session.id } : null;

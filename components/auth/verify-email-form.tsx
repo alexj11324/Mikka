@@ -1,7 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { readLinkError, sendVerificationEmail } from '@/lib/auth-recovery'
 import { EmailRequestForm } from './email-request-form'
 

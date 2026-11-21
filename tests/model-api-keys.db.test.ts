@@ -17,7 +17,7 @@ const fakeKey = (label: string) => `test-${label}-${randomBytes(12).toString('he
 const [wrongKey, downKey, firstKey, newKey, customKey, gatewayKey, localKey] = ['wrong', 'down', 'first', 'new', 'custom', 'gateway', 'local'].map(fakeKey)
 const models = (ids: string[]) => new Response(JSON.stringify({ data: ids.map(id => ({ id, object: 'model' })) }), { status: 200, headers: { 'content-type': 'application/json' } })
 
-test('API keys: migration replay, sealed storage, shares, picker order and run injection', { skip: !databaseURL }, async () => {
+test('API keys: migration replay, sealed storage, shares, picker order and run authorization', { skip: !databaseURL }, async () => {
   const url = new URL(databaseURL!)
   assert.ok(['127.0.0.1', 'localhost'].includes(url.hostname))
   assert.ok(url.pathname.endsWith('_e2e'))
@@ -103,8 +103,8 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'https://llm.internal.example/v1', protocol: 'openai', apiKey: customKey }, { env, fetch: fetchWith(() => models([])), resolve: async () => ['192.168.1.4'] }), { code: 'apiKeyBaseUrlInvalid' })
     await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:9/v1', protocol: 'openai', apiKey: customKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1', VERCEL: '1' }, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
     const gateway = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Gateway', baseUrl: 'https://gateway.example.com/v1/', protocol: 'openai', apiKey: gatewayKey, models: ['qwen-max', 'qwen-max'] }, { env, fetch: fetchWith(() => models(['a', 'b'])), resolve: async () => ['93.184.216.34'] })
-    // A custom OpenAI-protocol provider is also asked whether it has the Responses API; an answer that is not a refusal changes nothing.
-    assert.deepEqual(calls.slice(-2).map(call => call.url), ['https://gateway.example.com/v1/models', 'https://gateway.example.com/v1/responses'])
+    // LiteLLM converts the CLI protocol; adding a key only reads its model catalogue.
+    assert.equal(calls.at(-1)!.url, 'https://gateway.example.com/v1/models')
     assert.equal(gateway.responsesApi, true)
     assert.deepEqual([gateway.baseUrl, gateway.protocol, gateway.models], ['https://gateway.example.com/v1', 'openai', ['qwen-max']])
     // Decision 2026-11-15-2000: the owner turns off request features the provider rejects; only the off ones are kept.
@@ -225,7 +225,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await assert.rejects(store.setBotApiKeyChoice(pool, scope, aliceBot, local.id, 'glm-5'), { code: 'executionModelUnknown' })
     await store.setApiKeyShare(pool, 'bob', team, local.id, false)
     // Each bot-chat model call opens the key again through the same rule.
-    assert.deepEqual(await store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { apiKey: gatewayKey, baseUrl: 'https://gateway.example.com/v1', keyOwnerId: 'bob' })
+    assert.deepEqual(await store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { apiKey: gatewayKey, baseUrl: 'https://gateway.example.com/v1', keyOwnerId: 'bob', provider: 'custom', protocol: 'openai' })
     for (const member of ['alice', 'bob']) {
       await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [team.id, member])
       await assert.rejects(store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { code: 'apiKeyNotFound' }, 'withdrawn requester or key-owner membership closes the shared chat key')
@@ -235,7 +235,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal((await store.openApiKeyForChat(pool, 'alice', anotherWorkspace.id, anthropic.id, env)).keyOwnerId, 'alice', 'Bot chat uses its own key across workspaces without team sharing')
     await assert.rejects(store.openApiKeyForChat(pool, 'carol', team.id, anthropic.id, env), { code: 'apiKeyNotFound' })
 
-    // Run injection: only an active run whose owner may use the key here.
+    // Run authorization: only an active run whose owner may use the key here.
     const teamBot = randomUUID(), personalBot = randomUUID()
     await pool.query('INSERT INTO bots VALUES ($1,$2),($3,$4)', [teamBot, team.id, personalBot, personal.id])
     const run = randomUUID(), done = randomUUID(), carolRun = randomUUID(), loose = randomUUID(), sharedRun = randomUUID()
@@ -243,34 +243,25 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const sharedDefinition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'Gateway task', parent: null, executionId: null, model: 'qwen-max', apiKey: { keyId: gateway.id, model: 'qwen-max' } })
     await pool.query('UPDATE agent_runs SET "agentDefinition"=$1 WHERE id=ANY($2::uuid[])', [JSON.stringify(sharedDefinition), [sharedRun, carolRun]])
     const stopped = async (id: string) => Boolean((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [id])).rows[0].stopRequestedAt)
-    const claude = await store.apiKeyForRun(pool, run, anthropic.id, 'claude_code', env)
-    assert.deepEqual(claude, { harness: 'claude_code', keyId: anthropic.id, ownerId: 'alice', env: { ANTHROPIC_API_KEY: newKey, ANTHROPIC_BASE_URL: 'https://api.anthropic.com' } })
+    assert.deepEqual(await store.validateRunApiKey(pool, run, anthropic.id), { ownerId: 'alice', workspaceId: team.id })
     const otherBot = randomUUID(), otherRun = randomUUID()
     await pool.query('INSERT INTO bots (id,"workspaceId","ownerId") VALUES ($1,$2,$3)', [otherBot, anotherWorkspace.id, 'alice'])
     await pool.query('INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,$2,$3,\'running\')', [otherRun, 'alice', otherBot])
-    assert.equal((await store.apiKeyForRun(pool, otherRun, anthropic.id, 'claude_code', env)).ownerId, 'alice', 'an Agent uses its own key across workspaces even with sharing disabled')
-    await assert.rejects(store.apiKeyForRun(pool, run, gateway.id, 'codex', env), { code: 'apiKeyNotFound' }, 'an unbound historical run cannot newly borrow another member\'s key')
-    const codex = await store.apiKeyForRun(pool, sharedRun, gateway.id, 'codex', env)
-    assert.equal(codex.harness, 'codex')
-    assert.deepEqual(codex.harness === 'codex' && [codex.env, codex.codex.model_providers.mikka], [{ MIKKA_MODEL_API_KEY: gatewayKey }, { name: 'Gateway', base_url: 'https://gateway.example.com/v1', env_key: 'MIKKA_MODEL_API_KEY', wire_api: 'responses' }])
-    await assert.rejects(store.apiKeyForRun(pool, done, anthropic.id, 'claude_code', env), { code: 'apiKeyNotFound' }, 'finished runs get nothing')
-    await assert.rejects(store.apiKeyForRun(pool, carolRun, anthropic.id, 'claude_code', env), { code: 'apiKeyNotFound' }, 'Alice did not share her key with the team')
-    assert.equal((await store.apiKeyForRun(pool, carolRun, gateway.id, 'codex', env)).ownerId, 'bob', 'Bob shared his with the team')
-    assert.equal((await store.apiKeyForRun(pool, loose, local.id, 'claude_code', env)).harness, 'claude_code', 'a run without a bot may use its owner\'s own key')
-    await assert.rejects(store.apiKeyForRun(pool, loose, anthropic.id, 'claude_code', env), { code: 'apiKeyNotFound' })
-    // A key that does not serve the run's Agent opens nothing: an Anthropic key for a Codex run, an OpenAI-protocol gateway for Claude Code.
-    await assert.rejects(store.apiKeyForRun(pool, run, anthropic.id, 'codex', env), { code: 'apiKeyNotFound' })
-    await assert.rejects(store.apiKeyForRun(pool, sharedRun, gateway.id, 'claude_code', env), { code: 'apiKeyNotFound' })
-    // DeepSeek speaks both protocols (decision 2026-11-02-1600): one key, each Agent on its own endpoint.
+    assert.equal((await store.validateRunApiKey(pool, otherRun, anthropic.id)).ownerId, 'alice', 'an Agent uses its own key across workspaces even with sharing disabled')
+    await assert.rejects(store.validateRunApiKey(pool, run, gateway.id), { code: 'apiKeyNotFound' }, 'an unbound historical run cannot newly borrow another member\'s key')
+    assert.deepEqual(await store.validateRunApiKey(pool, sharedRun, gateway.id), { ownerId: 'bob', workspaceId: team.id })
+    await assert.rejects(store.validateRunApiKey(pool, done, anthropic.id), { code: 'apiKeyNotFound' }, 'finished runs get nothing')
+    await assert.rejects(store.validateRunApiKey(pool, carolRun, anthropic.id), { code: 'apiKeyNotFound' }, 'Alice did not share her key with the team')
+    assert.equal((await store.validateRunApiKey(pool, carolRun, gateway.id)).ownerId, 'bob', 'Bob shared his with the team')
+    assert.deepEqual(await store.validateRunApiKey(pool, loose, local.id), { ownerId: 'bob', workspaceId: null }, 'a run without a bot may use its owner\'s own key')
+    await assert.rejects(store.validateRunApiKey(pool, loose, anthropic.id), { code: 'apiKeyNotFound' })
+    // Both CLI protocols are converted by LiteLLM; key authorization is independent of that protocol.
     const deepseekKey = `sk-${randomUUID()}`
     const deepseek = await store.addApiKey(pool, 'alice', { provider: 'deepseek', apiKey: deepseekKey }, { env, fetch: fetchWith(() => models(['deepseek-flash'])) })
     // Its own run, so the runs above keep the keys they were handed.
     const deepRun = randomUUID()
     await pool.query(`INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,'alice',$2,'running')`, [deepRun, teamBot])
-    const viaClaude = await store.apiKeyForRun(pool, deepRun, deepseek.id, 'claude_code', env)
-    assert.deepEqual(viaClaude.env, { ANTHROPIC_API_KEY: deepseekKey, ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic' })
-    const viaCodex = await store.apiKeyForRun(pool, deepRun, deepseek.id, 'codex', env)
-    assert.deepEqual(viaCodex.harness === 'codex' && [viaCodex.env, viaCodex.codex.model_providers.mikka.base_url], [{ MIKKA_MODEL_API_KEY: deepseekKey }, 'https://api.deepseek.com/v1'])
+    assert.deepEqual(await store.validateRunApiKey(pool, deepRun, deepseek.id), { ownerId: 'alice', workspaceId: team.id })
     assert.deepEqual((await store.setBotApiKeyChoice(pool, scope, null, deepseek.id, 'deepseek-flash')).harnesses, ['claude_code', 'codex'])
     await store.setBotApiKeyChoice(pool, scope, null, anthropic.id, 'claude-opus-5-5')
     await store.removeApiKey(pool, 'alice', deepseek.id)
@@ -282,39 +273,30 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal(await stopped(carolRun), true)
     assert.equal(await stopped(sharedRun), true, 'the paused Gateway run cannot resume with Bob\'s withdrawn key')
     assert.equal(await stopped(run), false, 'her own Anthropic run keeps its original key')
-    await assert.rejects(store.apiKeyForRun(pool, carolRun, gateway.id, 'codex', env), { code: 'apiKeyNotFound' })
+    await assert.rejects(store.validateRunApiKey(pool, carolRun, gateway.id), { code: 'apiKeyNotFound' })
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')
     // A copied ciphertext does not open on another row.
     await store.setApiKeyShare(pool, 'bob', team, gateway.id, true)
     await pool.query('UPDATE model_api_keys SET ciphertext=(SELECT ciphertext FROM model_api_keys WHERE id=$1), iv=(SELECT iv FROM model_api_keys WHERE id=$1) WHERE id=$2', [local.id, gateway.id])
-    await assert.rejects(store.apiKeyForRun(pool, carolRun, gateway.id, 'codex', env), { code: 'apiKeyNotFound' })
+    await assert.rejects(store.openGatewayApiKey(pool, gateway.id, env), { code: 'apiKeyNotFound' })
 
-    // A chat-only gateway (no Responses API, which Codex runs on): the key is saved, serves bot chats, and no Agent run.
+    // A Chat Completions provider is accepted without a model-generation probe.
     const chatKey = `sk-${randomUUID()}`
-    let responses = 404
-    const probes: { method?: string; body?: unknown; auth?: string }[] = []
+    const probes: string[] = []
     const chatFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith('/responses')) {
-        probes.push({ method: init?.method, body: init?.body, auth: (init?.headers as Record<string, string> | undefined)?.authorization })
-        return new Response('{"error":{"message":"bad request"}}', { status: responses })
-      }
+      probes.push(`${init?.method ?? 'GET'} ${String(input)}`)
       return models(['chat-1'])
     }) as typeof fetch
     const chatOnly = await store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Chat only', baseUrl: 'https://chat.example.com/v1', protocol: 'openai', apiKey: chatKey }, { env, fetch: chatFetch, resolve: async () => ['93.184.216.34'] })
-    assert.deepEqual(probes, [{ method: 'POST', body: '{}', auth: `Bearer ${chatKey}` }], 'one empty POST: no model is asked, so nothing is billed')
-    assert.deepEqual([chatOnly.responsesApi, chatOnly.models], [false, ['chat-1']])
-    assert.deepEqual((await store.setBotApiKeyChoice(pool, scope, null, chatOnly.id, 'chat-1')).harnesses, [], 'a bot chats on it; no thread runs on it')
-    assert.deepEqual((await store.openApiKeyForChat(pool, 'alice', team.id, chatOnly.id, env)).baseUrl, 'https://chat.example.com/v1')
-    // Its own run, so the runs above keep the keys they were handed.
+    assert.deepEqual(probes, ['GET https://chat.example.com/v1/models'])
+    assert.deepEqual([chatOnly.responsesApi, chatOnly.models], [true, ['chat-1']])
+    assert.deepEqual((await store.setBotApiKeyChoice(pool, scope, null, chatOnly.id, 'chat-1')).harnesses, ['codex'])
+    assert.equal((await store.openApiKeyForChat(pool, 'alice', team.id, chatOnly.id, env)).baseUrl, 'https://chat.example.com/v1')
     const chatRun = randomUUID()
     await pool.query(`INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,'alice',$2,'running')`, [chatRun, teamBot])
-    await assert.rejects(store.apiKeyForRun(pool, chatRun, chatOnly.id, 'codex', env), { code: 'apiKeyNotFound' })
-    // 重新获取模型 asks again: a provider that says nothing keeps what was known; one that refuses the empty body has it now.
-    responses = 503
-    assert.equal((await store.refreshApiKeyModels(pool, 'alice', chatOnly.id, { env, fetch: chatFetch, resolve: async () => ['93.184.216.34'] })).responsesApi, false)
-    responses = 400
+    assert.deepEqual(await store.validateRunApiKey(pool, chatRun, chatOnly.id), { ownerId: 'alice', workspaceId: team.id })
     assert.equal((await store.refreshApiKeyModels(pool, 'alice', chatOnly.id, { env, fetch: chatFetch, resolve: async () => ['93.184.216.34'] })).responsesApi, true)
-    assert.equal((await store.apiKeyForRun(pool, chatRun, chatOnly.id, 'codex', env)).harness, 'codex')
+    assert.deepEqual(probes, ['GET https://chat.example.com/v1/models', 'GET https://chat.example.com/v1/models'])
     await store.setBotApiKeyChoice(pool, scope, null, anthropic.id, 'claude-opus-5-5')
     await store.removeApiKey(pool, 'alice', chatOnly.id)
 

@@ -53,8 +53,8 @@ let rosterError: Error | undefined
 let rosterRetries = 0
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
@@ -99,7 +99,7 @@ mock.module('@/hooks/use-live-lists', { namedExports: {
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
+  ['../../app/actions/bots.ts', ['listBots', 'listBotsForWorkspace', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['listAgents', 'getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately
@@ -107,7 +107,7 @@ for (const [file, names] of [
 let chunkReady: Promise<void>
 let releaseChunk: () => void
 const delayedDynamic: typeof dynamic = (loader, options) => dynamic(async () => { await chunkReady; return loader() }, options)
-mock.module('next/dynamic', { defaultExport: delayedDynamic })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
@@ -506,12 +506,13 @@ test('Team Issues first-page readiness is independent of the unrelated workspace
   browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
   await render({ initialSection: 'team-issues' })
   assert.ok(container.querySelector('[data-team-board-visible]'), 'the ready Team list must be reachable without waiting for global pagination')
-  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'), null)
+  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loading"]'), null)
 
   scopedTasksPending = true // The Team-scoped read itself remains a real loading gate.
   await render({ initialSection: 'team-issues' })
   assert.equal(container.querySelector('[data-team-board-visible]'), null)
-  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'))
+  // The board's own frame stands while its first page reads; it is a page placeholder, not a task editor.
+  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
 })
 
 test('a Team board write refreshes its visible page while the workspace refresh is pending', async () => {

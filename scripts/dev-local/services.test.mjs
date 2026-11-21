@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { createGateway, generateText, jsonSchema, stepCountIs, streamText, tool } from 'ai'
+import { generateText, jsonSchema, stepCountIs, streamText, tool } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { MVP_DECISION_KEY } from '../../tests/mvp/transport.mjs'
 import { startLocalCron } from './cron.mjs'
 import { refreshQueue } from './refresh-queue.mjs'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { stopOwnedServices } from './shutdown.mjs'
-import { grantLocalCredits, localDecision, localModelAnswer, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './services.mjs'
+import { grantLocalCredits, localDecision, localModelAnswer, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY } from './services.mjs'
 
 test('the scripted model echoes, calls a registered tool on /tool and reports tool results', () => {
   const user = text => ({ prompt: [{ role: 'user', content: [{ type: 'text', text }] }], tools: [{ type: 'function', name: 'create_issue' }] })
@@ -29,7 +28,6 @@ test('decisions answer every question with a valid shape', () => {
     { type: 'predicate', name: 'ok' },
   ] })
   assert.equal(answer.model, 'm')
-  assert.match(answer.provider_metadata.gateway.generationId, /^local-/)
   assert.deepEqual(answer.answers, [{ type: 'choice', name: 'tier', choice: 'attention' }, { type: 'predicate', name: 'ok', probability: 0.5 }])
 })
 
@@ -43,7 +41,7 @@ test('credit grant covers every workspace once', async () => {
   assert.equal(await grantLocalCredits({ query: async () => ({ rows: [] }) }), 0)
 })
 
-test('the real AI SDK gateway provider and a Resend call reach the substitutes', async t => {
+test('Decisions and Resend calls reach the substitutes', async t => {
   const { routes } = localServiceRoutes({ log: () => {} })
   const server = createServer(async (request, response) => {
     if (!await routes(request, response, new URL(request.url, 'http://127.0.0.1'))) { response.writeHead(404); response.end() }
@@ -55,22 +53,16 @@ test('the real AI SDK gateway provider and a Resend call reach the substitutes',
   const local = (input, init) => {
     const request = new Request(input, init)
     const url = new URL(request.url)
-    const target = url.hostname === 'ai-gateway.vercel.sh' ? `${origin}/gateway${url.pathname}` : url.hostname === 'api.resend.com' ? `${origin}/resend${url.pathname}` : null
+    const target = url.hostname === 'litellm.invalid' ? `${origin}/litellm${url.pathname}` : url.hostname === 'api.resend.com' ? `${origin}/resend${url.pathname}` : null
     assert.ok(target, `unexpected request ${url.href}`)
     return fetch(new Request(target, request))
   }
 
-  // The provider's own default endpoint, as production code builds it.
-  const gateway = createGateway({ apiKey: MVP_DECISION_KEY, fetch: local })
-  const generated = await generateText({ model: gateway('deepseek/deepseek-v4.1-flash'), prompt: 'ping' })
-  assert.equal(generated.text, 'Local model: ping')
-  assert.match(generated.providerMetadata.gateway.generationId, /^local-/)
-  const streamed = streamText({ model: gateway('deepseek/deepseek-v4.1-flash'), prompt: 'a longer message than one chunk of the stream' })
-  assert.equal(await streamed.text, 'Local model: a longer message than one chunk of the stream')
-
-  const decision = await local('https://ai-gateway.vercel.sh/v1/decisions', { method: 'POST', headers: { authorization: `Bearer ${MVP_DECISION_KEY}` }, body: JSON.stringify({ model: 'm', questions: [{ type: 'predicate', name: 'p' }] }) })
+  const decision = await local('https://litellm.invalid/v1/decisions', { method: 'POST', headers: { authorization: `Bearer ${LOCAL_LITELLM_KEY}` }, body: JSON.stringify({ model: 'm', questions: [{ type: 'predicate', name: 'p' }] }) })
+  assert.match(decision.headers.get('x-litellm-call-id'), /^local-/)
+  assert.equal(decision.headers.get('x-litellm-response-cost'), '0')
   assert.deepEqual((await decision.json()).answers, [{ type: 'predicate', name: 'p', probability: 0.5 }])
-  const rejected = await local('https://ai-gateway.vercel.sh/v1/decisions', { method: 'POST', headers: { authorization: 'Bearer real-looking-key' }, body: '{}' })
+  const rejected = await local('https://litellm.invalid/v1/decisions', { method: 'POST', headers: { authorization: 'Bearer real-looking-key' }, body: '{}' })
   assert.equal(rejected.status, 401)
 
   const sent = await local('https://api.resend.com/emails', {
@@ -165,7 +157,7 @@ test('a stuck child or failing closer cannot leave the local stack running', asy
   assert.equal(child.signalCode, 'SIGKILL')
 })
 
-test('the real OpenAI-compatible provider reaches the ZeroCat substitute, tool calls included', async t => {
+test('the real OpenAI-compatible provider reaches the LiteLLM substitute, tool calls included', async t => {
   const { routes } = localServiceRoutes({ log: () => {} })
   const server = createServer(async (request, response) => {
     if (!await routes(request, response, new URL(request.url, 'http://127.0.0.1'))) { response.writeHead(404); response.end() }
@@ -175,11 +167,11 @@ test('the real OpenAI-compatible provider reaches the ZeroCat substitute, tool c
   const origin = `http://127.0.0.1:${server.address().port}`
   const local = (input, init) => {
     const request = new Request(input, init)
-    assert.equal(request.url, 'https://zero.cat/v1/chat/completions')
-    return fetch(new Request(`${origin}/zerocat/v1/chat/completions`, request))
+    assert.equal(request.url, 'https://litellm.invalid/v1/chat/completions')
+    return fetch(new Request(`${origin}/litellm/v1/chat/completions`, request))
   }
-  // As lib/abuse/zerocat.ts builds it.
-  const model = createOpenAICompatible({ name: 'zerocat', baseURL: 'https://zero.cat/v1', apiKey: LOCAL_ZEROCAT_KEY, includeUsage: true, fetch: local }).chatModel('deepseek-v4.1-flash')
+  // The LiteLLM client uses the same Chat Completions wire protocol.
+  const model = createOpenAICompatible({ name: 'litellm', baseURL: 'https://litellm.invalid/v1', apiKey: LOCAL_LITELLM_KEY, includeUsage: true, fetch: local }).chatModel('mikka-default')
   assert.equal((await generateText({ model, prompt: 'ping' })).text, 'Local model: ping')
   const streamed = streamText({ model, prompt: 'a longer message than one chunk of the stream' })
   assert.equal(await streamed.text, 'Local model: a longer message than one chunk of the stream')
@@ -187,6 +179,6 @@ test('the real OpenAI-compatible provider reaches the ZeroCat substitute, tool c
   const echo = tool({ inputSchema: jsonSchema({ type: 'object', properties: { word: { type: 'string' } } }), execute: async ({ word }) => ({ echoed: word }) })
   const called = streamText({ model, tools: { echo }, stopWhen: stepCountIs(2), prompt: '/tool echo {"word":"hi"}' })
   assert.equal(await called.text, 'echo: "{\\"echoed\\":\\"hi\\"}"')
-  const wrongKey = createOpenAICompatible({ name: 'zerocat', baseURL: 'https://zero.cat/v1', apiKey: 'real-looking-key', fetch: local }).chatModel('deepseek-v4.1-flash')
+  const wrongKey = createOpenAICompatible({ name: 'litellm', baseURL: 'https://litellm.invalid/v1', apiKey: 'real-looking-key', fetch: local }).chatModel('mikka-default')
   await assert.rejects(generateText({ model: wrongKey, prompt: 'ping', maxRetries: 0 }))
 })

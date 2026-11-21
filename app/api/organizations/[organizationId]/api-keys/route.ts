@@ -3,7 +3,6 @@ import { organizationSession } from '@/lib/enterprise/http'
 import { governanceResponse } from '@/lib/governance/http'
 import { listOrganizationApiKeys } from '@/lib/governance/organization-api-keys'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

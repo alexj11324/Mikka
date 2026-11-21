@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { defaultModelConfigured, selfHostedDefaultModelConfig } from './default-model-config'
+import { defaultModelConfigured } from './default-model-config'
 
-test('community default model needs an administrator-owned complete route', () => {
-  const env = { MIKKA_DEFAULT_MODEL_BASE_URL: 'http://127.0.0.1:8080/v1/', MIKKA_DEFAULT_MODEL_API_KEY: 'fixture-key', MIKKA_DEFAULT_MODEL_ID: 'local-model' }
-  assert.deepEqual(selfHostedDefaultModelConfig(env), { baseURL: 'http://127.0.0.1:8080/v1', apiKey: 'fixture-key', modelId: 'local-model' })
-  assert.equal(defaultModelConfigured(env), true)
-  assert.equal(defaultModelConfigured({}), false)
-  assert.equal(defaultModelConfigured({ VERCEL: '1' }), false)
-  assert.equal(defaultModelConfigured({ AI_GATEWAY_API_KEY: 'own-key' }), true)
-  for (const name of Object.keys(env)) assert.equal(selfHostedDefaultModelConfig({ ...env, [name]: undefined }), null)
-  for (const base of ['ftp://example.test/v1', 'https://key@example.test/v1', 'https://example.test/v1?key=secret']) {
-    assert.equal(selfHostedDefaultModelConfig({ ...env, MIKKA_DEFAULT_MODEL_BASE_URL: base }), null)
+test('default models require a complete LiteLLM route in every edition', () => {
+  const env = { MIKKA_LITELLM_URL: 'http://127.0.0.1:4000/v1/', MIKKA_LITELLM_MASTER_KEY: 'fixture-key' }
+  for (const edition of ['community', 'cloud']) {
+    assert.equal(defaultModelConfigured({ ...env, MIKKA_EDITION: edition }), true)
+    for (const name of Object.keys(env)) assert.equal(defaultModelConfigured({ ...env, [name]: undefined }), false)
   }
-  assert.equal(selfHostedDefaultModelConfig({ ...env, MIKKA_EDITION: 'cloud' }), null)
+  for (const base of ['ftp://example.test/v1', 'https://key@example.test/v1', 'https://example.test/v1?key=secret']) {
+    assert.equal(defaultModelConfigured({ ...env, MIKKA_LITELLM_URL: base }), false)
+  }
+  assert.equal(defaultModelConfigured({}), false)
+  for (const name of ['AI_GATEWAY_API_KEY', 'VERCEL_OIDC_TOKEN', 'ZEROCAT_API_KEY', 'MIKKA_DEFAULT_MODEL_API_KEY']) {
+    assert.equal(defaultModelConfigured({ [name]: 'retired-key', VERCEL: '1' }), false)
+  }
 })

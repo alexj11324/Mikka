@@ -4,7 +4,6 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { reactionsFor, visibleGroupMessages, REACTIONS, setReaction } from '@/lib/reactions'
 import { messagesOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 const input = z.object({ messageId: z.uuid(), emoji: z.enum(REACTIONS).nullable() }).strict()
 

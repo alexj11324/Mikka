@@ -1,33 +1,27 @@
 'use client'
 
-import { Fragment, useState, type MouseEvent } from 'react'
+import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
-import { CalendarClock, ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
-import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
+import { organizeAutomation, pauseAutomation, pinAutomation, restoreAutomation, resumeAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionError } from '@/lib/use-action-error'
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
-import { SearchInput } from '@/components/ui/search-input'
-import { Skeleton } from '@/components/ui/skeleton'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { InlineLoadError } from '@/components/load-error'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { invalidateAutomationList, useAutomations } from '@/hooks/use-automations'
 import type { AutomationView } from '@/lib/schedules/automation-view'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
-import { AUTOMATION_TEMPLATES } from './automation-templates'
+import { AUTOMATION_TEMPLATES, TEMPLATE_TRIGGERS } from './automation-templates'
+import { AutomationsPageView } from '@ui-slot/automations'
+import type { AutomationGroup, AutomationRow, AutomationsPageProps, AutomationsTab, AutomationTriggerKind } from '@/components/slots/automations-contract'
+import { navigate } from '@/components/workspace/workspace-navigation'
+import { useViewState } from '@/lib/hooks/view-state'
 
-type Filter = 'all' | 'active' | 'paused' | 'deleted'
 export type WorkspaceBotRow = { id: string; name: string; color: string; shape: string }
 
 /** The workspace's Bots by ID, for 交给 (any member may read them; the list follows `bot_list`). */
@@ -55,126 +49,140 @@ export function AutomationBot({ automation, bots }: { automation: AutomationView
   </span>
 }
 
-const statusVariant = { active: 'secondary', paused: 'outline', completed: 'outline', cancelled: 'outline' } as const
+/** What starts an automation, for its row's icon: its first event trigger, else its webhook, else its timing. */
+export function triggerKind(definition: AutomationView['definition']): AutomationTriggerKind {
+  const first = definition.events?.[0]
+  if (first) return first.source
+  if (definition.webhook) return 'webhook'
+  return definition.timing.kind === 'manual' ? 'manual' : 'schedule'
+}
+
+type Filters = AutomationsPageProps['filters']
+type Display = AutomationsPageProps['display']
+const TAB_FILTERS: Record<AutomationsTab, Pick<Filters, 'creatorIsMe' | 'scheduledOnly'>> = {
+  mine: { creatorIsMe: true, scheduledOnly: false },
+  all: { creatorIsMe: false, scheduledOnly: false },
+  scheduled: { creatorIsMe: false, scheduledOnly: true },
+}
 
 /**
- * 自动化 (Capy's Automations list, layout and interaction only): each row names the automation, says when it runs and
- * next runs, who it hands work to and whether it is on. Search and the 全部 / 运行中 / 已暂停 filter work on the rows read.
+ * 自动化 (Capy's Automations list): the 我的 / 全部 / 定时 tabs are presets of the 创建者是我 and 定时 filters, which the
+ * server applies (the list arrives a page at a time); 状态, search and tag narrow the rows read. Rows group by state
+ * (运行中 N, 已暂停 N with the server's counts) or by folder. The page is drawn by the automations slot.
  */
 export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }: { workspaceId: string | null; userId: string; href: (id: string) => string; onOpen: (id: string) => void; onAskBot: (text: string) => void }) {
   const t = useTranslations('Automations')
-  const tCommon = useTranslations('Common')
   const summary = useTimingSummary()
   const nextRun = useNextRunLabel()
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filters, setFilters] = useViewState<Filters>('automations:filters', { creatorIsMe: true, scheduledOnly: false, status: 'all' })
+  const [display, setDisplay] = useViewState<Display>('automations:display', { grouping: 'status', showTemplates: true })
   const [restoring, setRestoring] = useState<string | null>(null)
-  const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId, filter === 'deleted')
+  const [creating, setCreating] = useState(false)
+  const deleted = filters.status === 'deleted'
+  const { automations, counts, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId, { deleted, ...(filters.creatorIsMe ? { owner: 'me' as const } : {}), ...(filters.scheduledOnly ? { trigger: 'schedule' as const } : {}) })
   const { mutate: mutateCache } = useSWRConfig()
   const bots = useWorkspaceBotNames(workspaceId)
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
   const [organizing, setOrganizing] = useState<AutomationView | null>(null)
   const actionError = useActionError()
-  const visible = automations.filter(row => filter === 'deleted' ? row.deleted : row.status !== 'cancelled' && (filter === 'all' || row.status === filter))
+  const visible = automations.filter(row => deleted ? row.deleted : row.status !== 'cancelled' && (filters.status === 'all' || row.status === filters.status))
     .filter(row => !query.trim() || row.definition.title.toLowerCase().includes(query.trim().toLowerCase()))
     .filter(row => !tag || (row.tags ?? []).includes(tag))
-  // 已置顶 first, then each 文件夹 by name, then those in none; within each, the list's own order (newest first).
-  const folders = [...new Set(visible.filter(row => !row.pinned && row.folder).map(row => row.folder!))].sort((a, b) => a.localeCompare(b))
-  const groups: { key: string; label: string | null; rows: AutomationView[] }[] = [
-    { key: 'pinned', label: t('pinned'), rows: visible.filter(row => row.pinned) },
-    ...folders.map(folder => ({ key: `folder:${folder}`, label: folder, rows: visible.filter(row => !row.pinned && row.folder === folder) })),
-    { key: 'rest', label: folders.length ? t('noFolder') : null, rows: visible.filter(row => !row.pinned && !row.folder) },
-  ].filter(group => group.rows.length)
-  async function restore(row: AutomationView) {
-    if (restoring || !workspaceId) return
+  const byId = new Map(visible.map(row => [row.id, row]))
+  const toRow = (row: AutomationView): AutomationRow => ({
+    id: row.id, title: row.definition.title, href: href(row.id), trigger: triggerKind(row.definition),
+    // 含时区: a timed automation names the zone its clock reads.
+    schedule: row.definition.timing.kind === 'manual' ? summary(row.definition) : `${summary(row.definition)} (${row.definition.timezone})`,
+    nextRun: row.status === 'active' && row.next_at ? { at: new Date(row.next_at).toISOString(), label: nextRun(row.next_at, row.definition.timezone) } : null,
+    status: row.status, statusLabel: row.status === 'paused' && row.disabled_reason ? t('status.autoPaused') : t(`status.${row.status}`),
+    creator: row.owner_name ? { name: row.owner_name, image: row.owner_image ?? null } : null,
+    handler: <AutomationBot automation={row} bots={bots} />,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+    pinned: Boolean(row.pinned), tags: row.tags ?? [], deleted: Boolean(row.deleted),
+    canRestore: Boolean(row.deleted) && (row.owner_id === userId || Boolean(row.can_take_over)),
+    canOrganize: row.owner_id === userId || Boolean(row.can_take_over),
+    canPause: !row.deleted && (row.status === 'active' || row.status === 'paused'),
+  })
+  // The server's counts cover the whole filtered list; a search or tag narrows to the rows read, so it counts those.
+  const narrowed = Boolean(query.trim() || tag)
+  const groups: AutomationGroup[] = deleted ? [{ key: 'deleted', label: t('groups.deleted'), count: visible.length, rows: visible.map(toRow) }]
+    : display.grouping === 'status' ? (['active', 'paused', 'ended'] as const).map(state => {
+      // 置顶 first within each state, then the list's own order (newest first).
+      const rows = visible.filter(row => state === 'ended' ? row.status === 'completed' : row.status === state).sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
+      const count = state === 'ended' || narrowed || !counts ? rows.length : counts[state]
+      return { key: state, label: t(`groups.${state}`), count, rows: rows.map(toRow) }
+    }).filter(group => group.rows.length)
+      : (() => {
+        // 已置顶 first, then each 文件夹 by name, then those in none.
+        const folders = [...new Set(visible.filter(row => !row.pinned && row.folder).map(row => row.folder!))].sort((a, b) => a.localeCompare(b))
+        return [
+          { key: 'pinned', label: t('pinned'), rows: visible.filter(row => row.pinned) },
+          ...folders.map(folder => ({ key: `folder:${folder}`, label: folder, rows: visible.filter(row => !row.pinned && row.folder === folder) })),
+          { key: 'rest', label: t('noFolder'), rows: visible.filter(row => !row.pinned && !row.folder) },
+        ].filter(group => group.rows.length).map(group => ({ ...group, count: group.rows.length, rows: group.rows.map(toRow) }))
+      })()
+  async function restore(row: AutomationRow) {
+    const automation = byId.get(row.id)
+    if (restoring || !workspaceId || !automation) return
     setRestoring(row.id)
     try {
-      const result = await restoreAutomation({ scheduleId: row.id, version: row.version }, workspaceId)
+      const result = await restoreAutomation({ scheduleId: automation.id, version: automation.version }, workspaceId)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       await invalidateAutomationList(mutateCache, workspaceId, false)
       await mutate()
     } catch { toast.error(actionError('generic')) }
     finally { setRestoring(null) }
   }
-  async function pin(row: AutomationView) {
+  async function setPaused(row: AutomationRow, paused: boolean) {
+    const automation = byId.get(row.id)
+    if (!automation || !workspaceId) return
+    try {
+      const input = { scheduleId: automation.id, version: automation.version }
+      const result = paused ? await pauseAutomation(input, workspaceId) : await resumeAutomation(input, workspaceId)
+      if ('error' in result && result.error) toast.error(actionError(result.error))
+    } catch { toast.error(actionError('generic')) }
+    // Read again either way: a refused change shows the row as it is.
+    await mutate()
+  }
+  async function pin(row: AutomationRow) {
     const result = await pinAutomation({ scheduleId: row.id, pinned: !row.pinned }, workspaceId ?? undefined)
     if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
     await mutate()
   }
-  // A plain click opens the automation in place; a modified click keeps the browser's own new-tab behaviour.
-  const follow = (event: MouseEvent, id: string) => {
-    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-    event.preventDefault()
-    onOpen(id)
-  }
-  const create = <DropdownMenu>
-    <DropdownMenuTrigger render={<Button size="sm" />}><Plus data-icon="inline-start" />{t('new')}<ChevronDown data-icon="inline-end" /></DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuGroup>
-        <DropdownMenuItem onClick={() => onAskBot(t('askBotPrompt'))}>{t('askBot')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onOpen('new')}>{t('fromScratch')}</DropdownMenuItem>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuLabel>{t('fromTemplate')}</DropdownMenuLabel>
-        {AUTOMATION_TEMPLATES.map(template => <DropdownMenuItem key={template} onClick={() => onOpen(`new:${template}`)}>{t(`templates.${template}.title`)}</DropdownMenuItem>)}
-      </DropdownMenuGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>
-
-  return <section aria-labelledby="automations-title" className="flex min-h-0 flex-1 flex-col overflow-auto">
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between gap-3">
-        <h1 id="automations-title" className="text-xl font-semibold text-foreground">{t('title')}</h1>
-        {create}
-      </header>
-      {/* control-size-exempt: the clear-tag button sits inside a badge chip, sized to the chip. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput className="h-(--control-sm) min-w-0 flex-1 sm:max-w-64" type="search" value={query} maxLength={120} aria-label={t('search')} placeholder={t('search')} onChange={event => setQuery(event.target.value)} />
-        <ToggleGroup aria-label={t('filter.all')} size="sm" variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'active' || next === 'paused' || next === 'deleted') setFilter(next) }}>
-          {(['all', 'active', 'paused', 'deleted'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`filter.${value}`)}</ToggleGroupItem>)}
-        </ToggleGroup>
-        {tag && <Badge variant="secondary" className="gap-1">{t('tagFilter', { tag })}<Button size="icon-xs" variant="ghost" aria-label={t('clearTag')} onClick={() => setTag(null)}><X /></Button></Badge>}
-      </div>
-      {error && !data ? <InlineLoadError message={t('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} />
-        : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2].map(index => <Skeleton key={index} className="h-16 w-full rounded-xl" />)}</div>
-          : !visible.length ? <Empty className="min-h-72">
-            <EmptyHeader><EmptyMedia variant="icon"><CalendarClock aria-hidden="true" /></EmptyMedia><EmptyTitle>{filter === 'deleted' ? t('emptyDeleted') : automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
-            {filter !== 'deleted' && !automations.length && <EmptyContent>{create}</EmptyContent>}
-          </Empty>
-            : <div className="flex flex-col gap-4">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">
-              {group.label && <h2 className="flex items-center gap-1.5 px-1 text-sm font-medium text-muted-foreground">{group.key === 'pinned' && <Pin className="size-3.5" />}{group.label}</h2>}
-              <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">
-              {group.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={row.deleted ? undefined : <a href={href(row.id)} />} onClick={row.deleted ? undefined : (event: MouseEvent) => follow(event, row.id)}>
-                <ItemContent className="min-w-0">
-                  <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>
-                  <ItemDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span>{summary(row.definition)}</span>
-                    {row.status === 'active' && row.next_at && <time dateTime={new Date(row.next_at).toISOString()}>{t('nextRun', { time: nextRun(row.next_at, row.definition.timezone) })}</time>}
-                    {(row.tags ?? []).map(name => <Button key={name} size="xs" variant="secondary" className="rounded-full"
-                      onClick={event => { event.preventDefault(); event.stopPropagation(); setTag(name) }}>#{name}</Button>)}
-                  </ItemDescription>
-                </ItemContent>
-                <ItemMedia className="hidden max-w-40 text-sm sm:flex"><AutomationBot automation={row} bots={bots} /></ItemMedia>
-                <ItemActions>
-                  <Badge variant={statusVariant[row.status]}>{row.status === 'paused' && row.disabled_reason ? t('status.autoPaused') : t(`status.${row.status}`)}</Badge>
-                  {row.deleted ? (row.owner_id === userId || row.can_take_over) && <Button size="sm" variant="outline" disabled={restoring !== null} aria-busy={restoring === row.id} onClick={() => { void restore(row) }}>{t('restore')}</Button> : <DropdownMenu>
-                    <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t('rowMenu')} onClick={event => { event.preventDefault(); event.stopPropagation() }} />}><Ellipsis /></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={event => event.stopPropagation()}>
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem onClick={() => { void pin(row) }}>{row.pinned ? t('unpin') : t('pin')}</DropdownMenuItem>
-                        {(row.owner_id === userId || row.can_take_over) && <DropdownMenuItem onClick={() => setOrganizing(row)}>{t('organize')}</DropdownMenuItem>}
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>}
-                </ItemActions>
-              </Item></Fragment>)}
-              </ItemGroup>
-            </section>)}</div>}
-      {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}
-    </div>
-    {organizing && <OrganizeDialog automation={organizing} folders={[...new Set(automations.flatMap(row => row.folder ? [row.folder] : []))]} onClose={() => setOrganizing(null)} onSaved={() => { setOrganizing(null); void mutate() }} />}
-  </section>
+  const tab = (Object.keys(TAB_FILTERS) as AutomationsTab[]).find(key => TAB_FILTERS[key].creatorIsMe === filters.creatorIsMe && TAB_FILTERS[key].scheduledOnly === filters.scheduledOnly) ?? null
+  const clearFilters = () => { setFilters({ creatorIsMe: false, scheduledOnly: false, status: 'all' }); setQuery(''); setTag(null) }
+  const templates = AUTOMATION_TEMPLATES.map(id => {
+    const trigger = TEMPLATE_TRIGGERS[id]
+    return { id, title: t(`templates.${id}.title`), description: t(`templateDescriptions.${id}`), trigger, triggerLabel: t(`trigger.${trigger}`) }
+  })
+  return <AutomationsPageView
+    tab={tab} onTab={next => setFilters(current => ({ ...current, ...TAB_FILTERS[next] }))}
+    filters={filters} onFilters={change => setFilters(current => ({ ...current, ...change }))}
+    display={display} onDisplay={change => setDisplay(current => ({ ...current, ...change }))}
+    query={query} onQuery={setQuery} tag={tag} onTag={setTag}
+    loading={!data && !error} error={Boolean(error && !data)} onRetry={() => { void mutate() }}
+    groups={groups}
+    empty={!data || groups.length ? null : deleted ? 'deleted' : automations.length || narrowed || filters.creatorIsMe || filters.scheduledOnly || filters.status !== 'all' ? 'filtered' : 'none'}
+    onClearFilters={clearFilters}
+    more={more} loadingMore={isValidating} onMore={() => { void setSize(size + 1) }}
+    // A plain click opens the automation in place; a modified click keeps the browser's own new-tab behaviour.
+    onOpen={(id, event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      event.preventDefault()
+      onOpen(id)
+    }}
+    onPin={row => { void pin(row) }}
+    onOrganize={row => { const automation = byId.get(row.id); if (automation) setOrganizing(automation) }}
+    onRestore={row => { void restore(row) }}
+    onPause={(row, paused) => { void setPaused(row, paused) }}
+    onViewRuns={row => navigate({ section: 'conversations', directoryAutomation: row.id })}
+    restoring={restoring}
+    templates={templates}
+    onTemplate={id => { setCreating(false); onOpen(`new:${id}`) }}
+    create={{ open: creating, onOpenChange: setCreating, onScratch: () => { setCreating(false); onOpen('new') }, onAskBot: () => { setCreating(false); onAskBot(t('askBotPrompt')) } }}
+    dialogs={organizing && <OrganizeDialog automation={organizing} folders={[...new Set(automations.flatMap(row => row.folder ? [row.folder] : []))]} onClose={() => setOrganizing(null)} onSaved={() => { setOrganizing(null); void mutate() }} />}
+  />
 }
 
 /** 文件夹和标签 (decision 2026-11-15-2100): the workspace's folder and tags for one automation. */

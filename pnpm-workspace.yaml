@@ -2,22 +2,20 @@ packages:
   - 'packages/*'
   - 'apps/*'
 
-# Fix SWC's overflow-owner cache validation for next-intl in rootless Linux.
-# Keep Workflow's separate SWC 1.15.3 dependency unchanged.
-overrides:
-  'next-intl@4.14.9>@swc/core': '1.16.20'
-
 # The lockfile already pins these versions; pnpm's 24h release-age gate
 # blocks every install/typecheck run until it is disabled.
 minimumReleaseAge: 0
 
 pmOnFail: ignore
 
-minimumReleaseAgeExclude:
-  - '@next/*'
-  - next
 
+# pnpm 11 stops an install while any dependency's build script has no decision (ERR_PNPM_IGNORED_BUILDS), so every
+# package that ships one needs a value here — a placeholder reads as a string and fails the install just as loudly.
+# A value also decides the build itself, so the ones main left undecided stay `false`: that is the behaviour those
+# installs already had, and compiling a native binding that nothing externalizes makes Eve's bundler read a .node
+# file as JavaScript (UNLOADABLE_DEPENDENCY on @mongodb-js/zstd).
 allowBuilds:
+  # true: the script is what makes the package usable — it compiles or downloads the native binary the app loads.
   '@parcel/watcher': true
   '@swc/core': true
   electron: true
@@ -25,10 +23,27 @@ allowBuilds:
   ffmpeg-static: true
   sharp: true
 
+  # false: the script only prints a funding message, registers a daemon cache, refreshes a data file that ships with
+  # the package, compiles a native binding this repo does not externalize from Eve's bundle, copies a Windows-only
+  # 7-Zip binary onto a repo that has no Windows runner, or sends telemetry it already guards with try/catch. None of
+  # it is needed to run what this repo uses the package for.
+  '@mongodb-js/zstd': false
+  '@openuidev/lang-core': false
+  cbor-extract: false
+  core-js: false
+  core-js-pure: false
+  electron-winstaller: false
+  free-email-domains: false
+  node-liblzma: false
+  nx: false
+  tesseract.js: false
+  workerd: false
+
 patchedDependencies:
   '@fantasticfour/world-cloudflare@2.4.3': patches/@fantasticfour__world-cloudflare@2.4.3.patch
   '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch
   '@better-auth/sso@1.7.12': patches/@better-auth__sso@1.7.12.patch
+  '@workflow/world-postgres@5.2.0': patches/@workflow__world-postgres@5.2.0.patch
   ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch
   # Eve CLI reads this engine range; actual build/start is tested on 22 and 24.
   eve@1.0.0-rc.9: patches/eve@1.0.0-rc.9.patch

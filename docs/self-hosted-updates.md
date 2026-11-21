@@ -1,33 +1,9 @@
 # Self-hosted stable releases and upgrades
 
-Mikka has one backend source and two deployment editions. A source change does
-**not** require a second self-hosted implementation. CI builds the community
-image from main and tests it with disposable PostgreSQL, the daemon and the
-API/CLI acceptance driver. Main publishes a SHA image and the moving
-`latest` tag, but existing installations are **not** automatically restarted.
-
-## Stable channel (no silent main/latest upgrades)
-
-To promote a version, create or update `config/self-hosted-stable-version`
-with a new `vMAJOR.MINOR.PATCH` in a reviewed PR. An explicit stable tag on an accepted
-main commit can also initiate promotion. Ordinary merges publish the SHA image
-and `latest`. Desktop releases use a separate tag series.
-
-Promotion requires successful main source CI and the successful image job for
-that exact commit. CI reads GHCR's digest for the image job/attempt tag and the
-commit tag, checks the digest-pinned image's OCI revision and verifies the
-release tag against the same commit. The GitHub release records the digest,
-commit, migration fingerprint and tested desktop protocol range. The host
-pulls that digest and independently checks the revision and migrations. A
-repeat release with a different manifest or digest fails closed.
-
-When shipping new migrations, first merge the source and let the self-hosted
-image workflow publish its tested main SHA. Verify that digest is available
-from GHCR. Then open the version promotion PR on the same migration inventory.
-The release drill needs two real, previously published installations. The
-first has the new schema and can return to its previous image after a failed
-probe. The second has the older schema and must recover forward after a
-migration. This sequence also applies to the first stable version.
+Mikka ended dedicated self-hosted CI and automatic stable release publication
+on November 20, 2026. Use this guide to verify and operate previously
+published tags and images. Select the exact published digest for your
+installation.
 
 ## Verify a published stable release
 
@@ -44,10 +20,8 @@ passes, download the `self-hosted-upgrade-<tag>` artifact and open both JSON fil
   release body and rejected an invalid signature. Its transport field states
   how the message reached the test receiver.
 
-If a concurrent main merge adds a migration while the promotion PR is open,
-wait for an accepted SHA image with the new inventory. Check that image by
-digest before merging the promotion. The `baseline` fields in `upgrade.json`
-identify the images actually used for rollback and forward recovery.
+The `baseline` fields in `upgrade.json` identify the images the workflow used
+for rollback and forward recovery.
 
 ### Observed recovery on v0.1.0
 
@@ -278,32 +252,11 @@ the stable manifest and deploy its verified digest through their native
 drain, backup, migration and health-check facilities. The bundled updater
 operates only on its supported Compose layouts.
 
-## CI and forward compatibility
+## Historical compatibility evidence
 
-The Docker image gate exercises local PostgreSQL 17, the published external
-Compose file against a separate PostgreSQL 17 server and a PgBouncer
-transaction pool, and authenticated RPC requests from protocol 0, 1 and an
-unsupported client. The external fixture restricts DDL to the direct database role and checks
-actual query counts on the transaction pool. It uses disposable
-credentials and does not contact live Neon. The image job also tests the daemon, mail, object storage, model requests
-and restart persistence. The packaged Desktop login and live-chat steps run
-on explicit tag and manual image runs. On normal PRs and main pushes, the
-client protocol evidence comes from authenticated RPC requests.
-
-For each added backend module, added exported capability, migration or newly
-read environment variable, add an entry keyed by its source path to
-`config/self-hosted-requirements.json`. Each entry records `mode` (`built-in`,
-`operator-configured`, or `optional-cloud`), `environment` (variable names),
-`behavior` (the operator-visible behavior or fallback) and `test` (an actual
-test path). The image job executes the affected tests in community mode. For
-a test using a custom runner, also set `suite` to a `test:...` package script
-which executes that file. Stable releases rerun every declared test. The CI
-source comparison checks the declaration, environment names, new hard-coded
-hosted origins and test path. Declared PostgreSQL tests run with a separate
-loopback PG17 cluster and a fresh database whose name ends in `_e2e`.
-The Docker gate executes the installation
-acceptance separately. An irreversible migration always requires the
-operator's manual review and verified recovery point.
+The retired compatibility gate used `config/self-hosted-requirements.json`
+to record its test inventory. An irreversible migration still requires
+the installation operator's review and a verified recovery point.
 
 See [self-hosting](self-hosting.md), [self-hosted acceptance](self-hosting-acceptance.md),
 and [dependency-aware CI](ci/incremental.md).

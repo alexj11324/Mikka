@@ -5,7 +5,6 @@ import { governanceJson, governanceMutationSession, governanceResponse } from '@
 import { addProjectRepositoriesBody } from '@/lib/project-resources/contracts'
 import { saveProjectResources } from '@/lib/project-resources/store'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string; projectId: string }> }
 
 export const POST = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo, useState, type ComponentProps, type
 import useSWR from 'swr'
 import { Globe } from '@/components/icons'
 import { GitHubIcon } from '@/components/icons/brand-icons'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { getLinkPreviews } from '@/app/actions/link-preview'
 import { LINK_PREVIEWS_PER_REQUEST } from '@/lib/link-preview-batch'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'
@@ -180,7 +180,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationMeta>
           {status && <span data-task-status-label={status}><TaskStatusIcon status={status} />{statusLabel(status)}</span>}
           {indicator && <span data-run-indicator-label={indicator}>{runLabel(indicator)}</span>}
-          {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
+          {priority && <span><priority.icon />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>
     </InlineCitationContent>

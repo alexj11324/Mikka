@@ -66,22 +66,43 @@ const githubPage: PullDirectoryPage = {
     },
   ],
 };
-mock.module("next-intl", {
+mock.module("@/lib/intl/i18n-client", {
   namedExports: {
     useTranslations: () => (key: string) => key,
     useFormatter: () => ({ dateTime: () => "Today" }),
   },
 });
+const repositoryStatus = {
+  viewerId: "owner",
+  connected: true,
+  repositories: [{ fullName: "Owner/Repo" }],
+};
+const { useState } = await import("react");
+// Each read by its key, with a mutate that settles like SWR's: pins and saved views are server state now.
 mock.module("swr", {
-  defaultExport: () => ({
-    data: {
-      viewerId: "owner",
-      connected: true,
-      repositories: [{ fullName: "Owner/Repo" }],
-    },
-    isValidating: false,
-    mutate: async () => {},
-  }),
+  defaultExport: (key: readonly unknown[] | null) => {
+    const kind = key?.[0];
+    const [data, setData] = useState<unknown>(() =>
+      !key
+        ? undefined
+        : kind === "pull-pins" || kind === "saved-views" || kind === "pull-projects"
+          ? []
+          : kind === "pull-detail"
+            ? undefined
+            : repositoryStatus,
+    );
+    return {
+      data,
+      error: undefined,
+      isValidating: false,
+      mutate: async (next?: unknown) => {
+        if (typeof next !== "function") return data;
+        const value = await (next as () => Promise<unknown>)();
+        setData(value);
+        return value;
+      },
+    };
+  },
 });
 mock.module("swr/infinite", {
   defaultExport: (
@@ -108,6 +129,20 @@ const stub = (file: string, namedExports: Record<string, unknown>) =>
   mock.module(new URL(file, import.meta.url).href, { namedExports });
 stub("../../hooks/use-live-key.tsx", { useLiveKey: () => {} });
 stub("../../app/actions/task-runs.ts", { listConversations: () => linkedPage });
+const pinWrites: unknown[] = [];
+stub("../../app/actions/list-views.ts", {
+  listPullPins: async () => [],
+  setPullPins: async (workspaceId: string, urls: string[], pinned: boolean) => {
+    pinWrites.push([workspaceId, urls, pinned]);
+    return { pins: pinned ? urls.map((item) => item.toLowerCase()) : [] };
+  },
+  listSavedViews: async () => [],
+  saveView: async () => ({ error: "validationGeneric" }),
+  deleteSavedView: async () => ({ deleted: true }),
+});
+stub("../../app/actions/projects.ts", { listWorkspaceProjects: async () => [] });
+let address = "";
+stub("../../lib/client-runtime/navigation.ts", { useSearchParams: () => new URLSearchParams(address) });
 stub("../ui/resizable-pane.tsx", {
   ResizablePane: ({
     children,
@@ -135,6 +170,10 @@ stub("./workspace-navigation.ts", {
   openGroupConversation: (id: string) => calls.push("chat:" + id),
   openThread: (id: string) => calls.push("run:" + id),
   openTask: (id: string) => calls.push("task:" + id),
+});
+stub("../../hooks/code-review/use-review-page.ts", {
+  openPullReview: (pull: { owner: string; repo: string; number: number }) =>
+    calls.push(`pull:${pull.owner}/${pull.repo}#${pull.number}`),
 });
 const { PullDirectory } = await import("./pull-directory");
 
@@ -188,7 +227,11 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
     );
     assert.ok(linkedTask);
     await act(async () => (linkedTask as HTMLButtonElement).click());
-    assert.deepEqual(calls, ["task:00000000-0000-4000-8000-000000000002"]);
+    // The row's own press opened the PR's review first; the linked task still opens its task.
+    assert.deepEqual(calls, [
+      "pull:Owner/Repo#7",
+      "task:00000000-0000-4000-8000-000000000002",
+    ]);
     const pin = document.querySelector('button[aria-label="pin"]');
     assert.ok(pin);
     await act(async () => (pin as HTMLButtonElement).click());
@@ -200,7 +243,47 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
       )?.getAttribute("aria-pressed"),
       "true",
     );
+    assert.deepEqual(pinWrites.at(-1), ["workspace", [url], true], "a pin is written for the person, not kept on this device");
   } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+test("a row press opens the pull request in the app's review page, and GitHub stays a secondary action", async () => {
+  calls.length = 0;
+  const { root } = await mount();
+  try {
+    const source = document.querySelector('select[aria-label="source"]');
+    assert.ok(source instanceof browser.HTMLSelectElement);
+    await act(async () =>
+      change(source as unknown as HTMLSelectElement, "Owner/Repo"),
+    );
+    const row = [...document.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("Better PR overview"),
+    );
+    assert.ok(row);
+    await act(async () => (row as HTMLButtonElement).click());
+    // The PR's own reference, not its URL: the page reads it through the repository it belongs to.
+    assert.deepEqual(calls, ["pull:Owner/Repo#7"]);
+    const github = document.querySelector('a[aria-label="openGitHub"]');
+    assert.ok(github instanceof browser.HTMLAnchorElement);
+    assert.equal(github.getAttribute("href"), url);
+    assert.equal(github.getAttribute("target"), "_blank");
+    assert.equal(github.getAttribute("rel"), "noopener noreferrer");
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+test("a PR's own address opens its preview even when no loaded row or task has it", async () => {
+  address = "section=pulls&pull=Other/Repo/42";
+  const { root } = await mount();
+  try {
+    const preview = document.querySelector('aside[role="region"]');
+    assert.ok(preview, "the address opens the preview");
+    assert.match(preview.textContent ?? "", /Other\/Repo #42/);
+  } finally {
+    address = "";
     await act(async () => root.unmount());
   }
 });

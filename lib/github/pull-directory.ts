@@ -82,80 +82,24 @@ export async function repositoryPullDirectory(
   input: z.input<typeof pullPageInput>,
   budget: RequestBudget,
 ): Promise<PullDirectoryPage> {
-  const { repo, view, cursor } = pullPageInput.parse(input);
+  const { repo, view, cursor, since } = pullPageInput.parse(input);
   const access = await githubRepositoryReadCredential(
     userId,
     "v2/github.com/" + repo.toLowerCase(),
     budget,
   );
   const [owner, name] = access.repository.fullName.split("/");
-  let response: Response;
-  try {
-    response = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      redirect: "error",
-      cache: "no-store",
-      signal: requestBudgetSignal(budget),
-      headers: {
-        authorization: `Bearer ${access.token}`,
-        accept: "application/vnd.github+json",
-        "content-type": "application/json",
-        "user-agent": "Mikka",
-      },
-      body: JSON.stringify({
-        query,
-        variables: {
-          owner,
-          name,
-          after: cursor,
-          states:
-            view === "merged"
-              ? ["MERGED"]
-              : view === "all"
-                ? ["OPEN", "CLOSED", "MERGED"]
-                : ["OPEN"],
-        },
-      }),
-    });
-  } catch {
-    // error-cause: network errors may contain the credential-bearing request.
-    throw new GitHubAccessError("githubUnavailable", 502);
-  }
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new GitHubAccessError(
-      response.status === 401
-        ? "githubReconnectRequired"
-        : response.status === 403
-          ? "githubRepositoryForbidden"
-          : "githubUnavailable",
-      response.status === 401 ? 401 : response.status === 403 ? 403 : 502,
-    );
-  }
-  const reader = response.body?.getReader();
-  if (!reader) throw new GitHubAccessError("githubUnavailable", 502);
-  let raw: unknown;
-  try {
-    let size = 0;
-    const chunks: Uint8Array[] = [];
-    while (true) {
-      const item = await reader.read();
-      if (item.done) break;
-      size += item.value.byteLength;
-      if (size > 4 * 1024 * 1024) throw new Error("tooLarge");
-      chunks.push(item.value);
-    }
-    raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    await reader.cancel().catch(() => {});
-    // error-cause: provider bodies and parsing errors can include private source or credentials.
-    throw new GitHubAccessError("githubUnavailable", 502);
-  } finally {
-    reader.releaseLock();
-  }
-  // A partial GraphQL response is not a complete page or a successful empty list.
-  if (raw && typeof raw === "object" && "errors" in raw)
-    throw new GitHubAccessError("githubUnavailable", 502);
+  const raw = await githubGraphql(access.token, budget, query, {
+    owner,
+    name,
+    after: cursor,
+    states:
+      view === "merged"
+        ? ["MERGED"]
+        : view === "all"
+          ? ["OPEN", "CLOSED", "MERGED"]
+          : ["OPEN"],
+  });
   const parsed = result.safeParse(raw);
   if (!parsed.success) throw new GitHubAccessError("githubUnavailable", 502);
   const repository = parsed.data.data.repository;
@@ -171,10 +115,17 @@ export async function repositoryPullDirectory(
     (!page.pageInfo.endCursor || page.pageInfo.endCursor === cursor)
   )
     throw new GitHubAccessError("githubUnavailable", 502);
+  // Pages run newest update first and a PR is never updated before it opens:
+  // once a page reaches an update older than `since`, no later page can match.
+  const floor = since ? Date.parse(since) : null;
+  const exhausted =
+    floor !== null &&
+    page.nodes.some((row) => Date.parse(row.updatedAt) < floor);
   return {
     total: page.totalCount,
-    cursor: page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null,
-    items: page.nodes.map((row) => {
+    cursor:
+      page.pageInfo.hasNextPage && !exhausted ? page.pageInfo.endCursor : null,
+    items: page.nodes.filter((row) => floor === null || Date.parse(row.createdAt) >= floor).map((row) => {
       const commit = row.commits.nodes[0]?.commit;
       const avatar = row.author?.avatarUrl;
       return {
@@ -215,4 +166,72 @@ export async function repositoryPullDirectory(
       };
     }),
   };
+}
+
+/**
+ * One GitHub GraphQL read with the given credential. Every failure is the same
+ * coded refusal: provider bodies, parse errors and network errors can carry
+ * private source or the credential, so none of them leave as a cause.
+ */
+export async function githubGraphql(
+  token: string,
+  budget: RequestBudget,
+  graphql: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      redirect: "error",
+      cache: "no-store",
+      signal: requestBudgetSignal(budget),
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: "application/vnd.github+json",
+        "content-type": "application/json",
+        "user-agent": "Mikka",
+      },
+      body: JSON.stringify({ query: graphql, variables }),
+    });
+  } catch {
+    // error-cause: network errors may contain the credential-bearing request.
+    throw new GitHubAccessError("githubUnavailable", 502);
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new GitHubAccessError(
+      response.status === 401
+        ? "githubReconnectRequired"
+        : response.status === 403
+          ? "githubRepositoryForbidden"
+          : "githubUnavailable",
+      response.status === 401 ? 401 : response.status === 403 ? 403 : 502,
+    );
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new GitHubAccessError("githubUnavailable", 502);
+  let raw: unknown;
+  try {
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.byteLength;
+      if (size > 4 * 1024 * 1024) throw new Error("tooLarge");
+      chunks.push(item.value);
+    }
+    raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    await reader.cancel().catch(() => {});
+    // error-cause: provider bodies and parsing errors can include private source or credentials.
+    throw new GitHubAccessError("githubUnavailable", 502);
+  } finally {
+    reader.releaseLock();
+  }
+  // A partial GraphQL response is not a complete answer or a successful empty one.
+  if (raw && typeof raw === "object" && "errors" in raw)
+    throw new GitHubAccessError("githubUnavailable", 502);
+  return raw;
 }

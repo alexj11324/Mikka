@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronRight, type IconGlyph } from "@/components/icons"
 import { Button } from '@/components/ui/button'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 export function NavMain({
   items,

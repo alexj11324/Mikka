@@ -1,14 +1,12 @@
 import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
-import { NextResponse } from 'next/server';
+import { NextResponse } from '@/lib/server-runtime/server';
 import { z } from 'zod';
 import { auth } from '@/lib/api-auth';
 import { pool } from '@/lib/db';
 import { FactoryError } from '@/lib/factory/contract';
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from '@/lib/factory/runtime';
 import { questionRecoverySchema } from '@/lib/factory/questions/contract';
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 export const maxDuration = 300;
 export async function POST(request: Request, {params}: {params:Promise<{questionId:string}>}) {
   if(!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});

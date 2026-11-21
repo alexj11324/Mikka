@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { buildAccountExport, claimExport, isExportCurrent } from '@/lib/account/export'
 import { accountExportBody, accountExportFiles } from '@/lib/account/export-files'
 
-export const dynamic = 'force-dynamic'
 
 const privateHeaders = { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' }
 

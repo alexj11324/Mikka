@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { before, test } from 'node:test'
 import { act } from 'react'
 import { Window } from 'happy-dom'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import messages from '../messages/en.json'
 import type { CitationSource } from '../lib/coordinator/citations'
 import { taskPresentation } from '../lib/task-presentation'
@@ -78,7 +78,7 @@ test('a task chip uses the same authorized presentation as its detail, including
     await act(async () => { chips[3].click(); chips[5].click() })
     assert.deepEqual(opened, [ids[3], ids[5]])
     assert.deepEqual(chips.map(chip => chip.textContent), ['ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'Ship it'])
-    assert.match(chips[0].querySelector('svg')?.getAttribute('class') ?? '', /lucide-circle-dot/, '进行中 is the status ring, whatever the run does')
+    assert.equal(chips[0].querySelector('svg')?.getAttribute('data-mark'), 'half', '进行中 is the status mark, whatever the run does')
     assert.equal(chips[6].getAttribute('aria-label'), 'Open task: Ship it')
   } finally {
     await act(async () => { root.unmount() })

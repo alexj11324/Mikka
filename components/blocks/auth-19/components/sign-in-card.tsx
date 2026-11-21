@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type FormEvent, type FormEventHandler, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Link } from '@/i18n/navigation'
 import { ArrowRight, LoaderCircle, LockKeyhole, Mail, User } from '@/components/icons'
 import { Button } from '@/components/ui/button'

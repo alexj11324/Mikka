@@ -1,17 +1,17 @@
 import 'server-only'
 import { isCloudEdition } from './edition'
-import { COORDINATOR_MODEL } from './coordinator/model'
-import { catalogModel, CATALOG_SNAPSHOT, type CatalogModel } from './model-catalog'
+import { SELF_HOSTED_DEFAULT_CATALOG_ID } from './model-gateway/config'
+import type { CatalogModel } from './model-catalog'
 
 /**
  * The models Mikka 额度 runs here (decision 2026-11-15-1900). Mikka Cloud:
- * the whole Gateway catalogue. A self-hosted server: the one model its own
- * provider or connected Mikka Cloud serves for chats, under its internal id.
+ * the configured LiteLLM catalogue. A self-hosted server offers its default
+ * LiteLLM alias.
  */
 export async function creditsModels(ownerId?: string): Promise<CatalogModel[]> {
   if (isCloudEdition()) return (await import('./model-catalog-server')).modelCatalog()
   if (!(await (await import('./default-model')).defaultModelTarget(ownerId))) return []
-  return [catalogModel(COORDINATOR_MODEL, CATALOG_SNAPSHOT) ?? { id: COORDINATOR_MODEL, vendor: 'deepseek', name: COORDINATOR_MODEL,
+  return [{ id: SELF_HOSTED_DEFAULT_CATALOG_ID, vendor: 'mikka', name: SELF_HOSTED_DEFAULT_CATALOG_ID,
     contextWindow: null, maxTokens: null, pricing: null, tags: [], reasoning: [] }]
 }
 

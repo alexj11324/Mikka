@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR, { unstable_serialize } from 'swr'
 import { Laptop, Server } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'

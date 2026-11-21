@@ -7,7 +7,14 @@ export const RESOURCE_ACTIONS = ['canDiscover', 'canReadMetadata', 'canReadConte
 export type ResourceAction = typeof RESOURCE_ACTIONS[number]
 export type ResourceVisibility = 'shared' | 'private' | 'quarantined'
 export type ResourceReference = { kind: ResourceKind; id: string; workspaceId: string }
-export type ResourceSubject = { kind: 'account' | 'service'; id: string }
+export const RESOURCE_SUBJECT_KINDS = ['account', 'service', 'bot', 'run'] as const
+/** A `bot`, `run` or `service` subject is authorized on the resource itself only
+ * by an explicit grant, never by ownership or `shared` visibility. Above it, an
+ * ancestor passes for a `bot`/`run` when it is `shared` within the tenant or holds
+ * the subject's own grant; a `service` needs its own grant on every ancestor
+ * (decision 2026-11-19-2200-agent-bot-interop). */
+export type ResourceSubjectKind = typeof RESOURCE_SUBJECT_KINDS[number]
+export type ResourceSubject = { kind: ResourceSubjectKind; id: string }
 export type ResourcePolicy = ResourceReference & { ownerId: string | null; visibility: ResourceVisibility; revision: number;
   parentKind: ResourceKind | null; parentId: string | null; provenance: string; createdAt: Date; updatedAt: Date }
 export type ResourceCapabilities = Record<ResourceAction, boolean>

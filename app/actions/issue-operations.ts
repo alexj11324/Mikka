@@ -1,7 +1,7 @@
 'use server'
 
 import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db, withDatabaseTransaction } from '@/lib/db'

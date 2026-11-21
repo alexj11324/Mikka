@@ -1,7 +1,6 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
 import { governanceResponse, governanceSession } from '@/lib/governance/http'
 import { exportWorkspaceUsage, readWorkspaceUsage } from '@/lib/governance/usage'
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

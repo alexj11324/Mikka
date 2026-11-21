@@ -2,12 +2,18 @@ import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+import { BADGE_SIZE } from "@/components/ui/badge-size"
 import { statusTones, type StatusTone } from '@/lib/status-appearance'
 
+/** R-31's one secondary surface: `outline` and `secondary` are two names for it. */
+const badgeBase =
+  "group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!"
+
 const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  badgeBase,
   {
     variants: {
+      size: { ...BADGE_SIZE },
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         // R-31, R-33: a tag is a 6px grey fill with no stroke, the same as statusTones.neutral.
@@ -23,6 +29,7 @@ const badgeVariants = cva(
       },
     },
     defaultVariants: {
+      size: "md",
       variant: "default",
     },
   }
@@ -30,6 +37,7 @@ const badgeVariants = cva(
 
 function Badge({
   className,
+  size = "md",
   variant = "default",
   render,
   tone,
@@ -39,7 +47,7 @@ function Badge({
     defaultTagName: "span",
     props: mergeProps<"span">(
       {
-        className: cn(badgeVariants({ variant: tone ? 'outline' : variant }), tone && 'px-2', tone && statusTones[tone], className),
+        className: cn(badgeVariants({ size, variant: tone ? 'outline' : variant }), tone && statusTones[tone], className),
       },
       props
     ),

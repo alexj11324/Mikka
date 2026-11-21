@@ -3,7 +3,6 @@ import { enrollmentHTTP, enrollmentOperator, EnrollmentClient } from '@/lib/subs
 import { enrollmentConfiguration } from '@/lib/subscription-enrollment-runtime'
 import { byosEnrollmentEnabled } from '@/lib/cloud-computer-flag'
 
-export const runtime = 'nodejs'
 export const maxDuration = 120
 
 // This private operator-controlled receiver creates pending-unbound custody only.

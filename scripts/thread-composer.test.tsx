@@ -6,7 +6,7 @@ import type { Root } from 'react-dom/client'
 import type { State } from 'swr'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Window } from 'happy-dom'
-import { IntlProvider } from 'next-intl'
+import { IntlProvider } from '@/lib/intl/i18n-client'
 import * as actualViewState from '../lib/hooks/view-state'
 import * as actualAppBuild from '../lib/app-build'
 import type { FactoryTask } from '../components/workspace/factory-acceptance-pane'
@@ -60,7 +60,7 @@ mock.module('swr', {
     : { data: [], mutate: () => {} },
   namedExports: { useSWRConfig: () => liveRead ? actualSWR.useSWRConfig() : ({ mutate: () => {}, cache: new Map() }), unstable_serialize: actualSWR.unstable_serialize },
 })
-mock.module('next/dynamic', { defaultExport: () => () => null })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => () => null })
 mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : key.endsWith(':quote') && draftQuote ? draftQuote as T : initial),

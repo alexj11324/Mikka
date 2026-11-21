@@ -42,7 +42,7 @@ let nextDue: number | null = null, armed = 0
 mock.module(new URL('../../../../lib/run-recovery-due.ts', import.meta.url).href, { namedExports: { runRecoveryNextDue: async () => nextDue } })
 mock.module(new URL('../../../../lib/due-timer.ts', import.meta.url).href, { namedExports: { armDueTimer: async (kind: string) => { assert.equal(kind, 'run-recovery'); armed++ } } })
 const later: (() => unknown)[] = []
-mock.module('next/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false; nextDue = null; armed = 0 })

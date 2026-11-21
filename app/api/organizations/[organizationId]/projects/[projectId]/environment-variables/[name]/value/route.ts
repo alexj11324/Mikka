@@ -4,7 +4,6 @@ import { GovernanceError } from '@/lib/governance/errors'
 import { governanceResponse, governanceSession } from '@/lib/governance/http'
 import { readOrganizationProjectEnvironmentVariable } from '@/lib/project-resources/store'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string; projectId: string; name: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

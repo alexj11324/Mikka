@@ -14,7 +14,6 @@ import {
 } from '@/lib/chat-attachments/store'
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 const init = z
   .object({

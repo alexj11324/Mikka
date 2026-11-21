@@ -83,6 +83,8 @@ async function sessionDisconnected(deviceId: string, report: DeviceSessionReport
   return { applied: true }
 }
 
+const GATEWAY_STATUS_CONCURRENCY = 20
+
 /**
  * Run-recovery backstop (decision 2026-11-17-2215): the gateway retries each
  * report until it is acknowledged, but a report can still be lost (a gateway
@@ -96,10 +98,17 @@ export async function closeLostDeviceSessions(now = new Date()): Promise<{ check
     WHERE ${deviceSessionOpenSql('d')} AND d."sessionSocketId" IS NOT NULL AND d."removedAt" IS NULL
       AND EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=d.id AND r.status=ANY($1::text[]) AND r."leaseExpiresAt">now())
     ORDER BY d."sessionOpenedAt" LIMIT 200`, [[...LEASED_RUN_STATUSES]])
+  // Each status call may wait out its timeout, so they run a few at a time: one
+  // by one, a stalled gateway would hold the sweep past the cron's budget before
+  // the lease sweep that follows it. An unanswered status proves nothing; the
+  // next sweep asks again.
+  const offline: typeof rows = []
+  const pending = rows.values()
+  await Promise.all(Array.from({ length: Math.min(GATEWAY_STATUS_CONCURRENCY, rows.length) }, async () => {
+    for (const device of pending) if (await gatewayDeviceOnline(device.id) === false) offline.push(device)
+  }))
   let closed = 0
-  for (const device of rows) {
-    // An unanswered status proves nothing; the next sweep asks again.
-    if (await gatewayDeviceOnline(device.id) !== false) continue
+  for (const device of offline) {
     if ((await applyDeviceSessionReport(device.id, { state: 'disconnected', at: now.toISOString(), socketId: device.sessionSocketId })).applied) closed++
   }
   return { checked: rows.length, closed }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { BotPermissionsPage } from '@ui-slot/settings-bot-permissions'
 import { listBots, listBotsForWorkspace } from '@/app/actions/bots'
 import { listAgents } from '@/app/actions/agents'

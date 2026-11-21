@@ -2,17 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
-import { ArrowLeft, Play } from '@/components/icons'
+import { ArrowLeft, MoreHorizontal, Play } from '@/components/icons'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
-import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { listProjectResources } from '@/app/actions/project-resources'
+import { getModelOrder } from '@/app/actions/model-order'
+import { findThreadReferences } from '@/app/actions/task-runs'
+import { automationLinearLabels, automationRunAsChoices, setAutomationRunAs, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, duplicateAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -21,6 +26,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { InlineLoadError } from '@/components/load-error'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { AutomationSettings } from '@ui-slot/automation-editor'
+import type { AutomationSettingControl, AutomationSettingOption, AutomationSettingRow } from '@/components/slots/automation-editor-contract'
 import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { useTaskProfileChoices } from '@/components/coordinator/task-profile-picker'
 import { openTask } from '@/components/workspace/workspace-navigation'
@@ -41,6 +48,11 @@ import { SlackTriggers } from './slack-triggers'
 import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 import { harnessName } from '@/components/labels/entity-labels'
+import { MACHINE_SIZES, type MachineSize } from '@/lib/cloud-computer/machine-pricing'
+import { supportedModelEfforts } from '@/lib/model-routing'
+import { AUTOMATION_EFFORTS, type AutomationEffort } from '@/lib/schedules/contract'
+import { fetchSettingsData } from '@/lib/settings-data'
+import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
 const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' } }
@@ -81,7 +93,8 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const stale = Boolean(current && baseline && dirty && current.version !== baseline.version)
   const requestId = useRef(crypto.randomUUID())
   const pendingRun = useRef<{ scope: string; requestId: string } | null>(null)
-  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
+  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver' | 'duplicate' | 'runAs'>(null)
+  const duplicateRequest = useRef<{ target: string; requestId: string } | null>(null)
   const [cancellingRun, setCancellingRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmTakeOver, setConfirmTakeOver] = useState(false)
@@ -116,6 +129,22 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { installed: boolean; channels: { id: string; name: string; private: boolean }[] }
   }, { revalidateOnFocus: false })
+  // The Environments a run may use, 优先使用的模型 for the model choice, and the person's workspaces for Duplicate to.
+  const environments = useSWR(workspaceId ? ['automation-environments', workspaceId] as const : null, async ([, shown]) => {
+    const { environments } = await listProjectResources(shown)
+    return environments.map(environment => ({ id: environment.id, name: environment.name, archived: Boolean(environment.archivedAt) }))
+  }, { revalidateOnFocus: false })
+  const modelOrder = useSWR(workspaceId && draft?.agent ? ['automation-models', workspaceId] as const : null, async ([, shown]) => {
+    const result = await getModelOrder(shown)
+    return 'error' in result && result.error ? null : result as { entries: { harness: string; model: string }[] }
+  }, { revalidateOnFocus: false })
+  // Runs as' choices: every active member for an owner or admin, else only the reader.
+  const runAsChoices = useSWR(workspaceId && !creating ? ['automation-run-as', workspaceId] as const : null, async ([, shown]) => {
+    const result = await automationRunAsChoices(shown)
+    return 'error' in result && result.error ? [] : (result as { members: { id: string; name: string }[] }).members
+  }, { revalidateOnFocus: false })
+  const [menuOpen, setMenuOpen] = useState(false)
+  const workspaces = useSWR(menuOpen ? '/api/workspace/switcher' : null, fetchSettingsData<WorkspaceSwitcher>, { revalidateOnFocus: false, shouldRetryOnError: false })
   const profiles = useAgentProfiles(workspaceId ?? undefined, true)
   const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
   const check = useMemo(() => draft ? definitionFrom(draft) : null, [draft])
@@ -219,6 +248,31 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     } finally { setBusy(null) }
   }
 
+  async function runAs(userId: string | null) {
+    if (!current || !workspaceId || busy) return
+    setBusy('runAs')
+    try {
+      const result = await setAutomationRunAs({ scheduleId: current.id, version: current.version, userId }, workspaceId)
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); if (result.error === 'scheduleVersionConflict') await automation.mutate(); return }
+      await automation.mutate()
+      await invalidateAutomationList(mutateCache, workspaceId, false)
+    } finally { setBusy(null) }
+  }
+  async function duplicate(target: string) {
+    if (!current || !workspaceId || busy) return
+    setBusy('duplicate')
+    try {
+      // One request ID per target until it answers, so a retried click returns the first copy.
+      if (duplicateRequest.current?.target !== target) duplicateRequest.current = { target, requestId: crypto.randomUUID() }
+      const result = await duplicateAutomation({ scheduleId: current.id, targetWorkspaceId: target, requestId: duplicateRequest.current.requestId }, workspaceId)
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      duplicateRequest.current = null
+      const { schedule, cleared } = result as { schedule: AutomationView; cleared: string[] }
+      toast.success(cleared.length ? t('duplicatedPaused', { fields: cleared.map(field => t.has(`cleared.${field}` as never) ? t(`cleared.${field}` as never) : field).join(', ') }) : t('duplicated'))
+      if (target === workspaceId) { await invalidateAutomationList(mutateCache, workspaceId, false); onOpen(schedule.id) }
+    } finally { setBusy(null) }
+  }
+
   const ownBots = newTaskBotChoices(bots)
   const otherBot = draft.botId && !ownBots.some(bot => bot.id === draft.botId) ? workspaceBots.get(draft.botId) : null
   const localDevices = devices.filter(device => device.enabled || device.id === draft.machine)
@@ -226,6 +280,69 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const canToggle = current?.status !== 'completed' && (active || canManage)
   const canSave = canManage && !stale && Boolean(workspaceId && check && 'definition' in check) && !busy
   const creator = !current || current.owner_id === userId ? t('you') : current.owner_name ?? ''
+  const models = [...new Set((modelOrder.data?.entries ?? []).filter(entry => entry.harness === draft.agent).map(entry => entry.model))]
+  if (draft.model && !models.includes(draft.model)) models.unshift(draft.model)
+  const efforts = draft.model && draft.agent ? supportedModelEfforts(draft.model, draft.agent) : []
+  const shownEnvironments = (environments.data ?? []).filter(environment => !environment.archived || environment.id === draft.environmentId)
+  const targets = workspaces.data?.accounts[0]?.choices ?? []
+  // Runs in takes Hand to's place (decision 2026-11-19-2105): who dispatches a new or standing thread, or the thread every
+  // run goes to. The section is the automation-editor slot's (decision 2026-11-19-2120); the choices and saves are here.
+  const select = (label: string, value: string, options: AutomationSettingOption[], onChange: (value: string) => void, disabled?: boolean): AutomationSettingControl =>
+    ({ kind: 'select', label, value, options, onChange, ...(disabled ? { disabled } : {}) })
+  const settingRows: AutomationSettingRow[] = [
+    { id: 'runs-in', label: t('runsIn'), controls: [
+      select(t('runsIn'), draft.eachRun, [{ value: 'new_task', label: t('runsInNew') }, { value: 'same_task', label: t('runsInSame') }, { value: 'existing_thread', label: t('runsInExisting') }],
+        value => { if (value === 'new_task' || value === 'same_task' || value === 'existing_thread') set({ eachRun: value }) }),
+      ...(draft.eachRun !== 'existing_thread' ? [select(t('bot'), draft.botId ?? '', [{ value: '', label: tAll('coordinator') },
+        ...ownBots.map(bot => ({ value: bot.id, label: bot.name })), ...(otherBot ? [{ value: otherBot.id, label: otherBot.name }] : [])],
+      value => set({ botId: value || null }))] : []),
+    ] },
+    // Runs as saves on choice, as its own command (it is not part of the draft).
+    ...(current && current.definition.task.kind === 'dispatch_task' ? [{ id: 'runs-as', label: t('runsAs'), controls: [select(t('runsAs'), current.run_as_user_id ?? '', [
+      { value: '', label: t('runsAsCreator', { name: creator }) },
+      ...(current.run_as_user_id && !runAsChoices.data?.some(member => member.id === current.run_as_user_id) ? [{ value: current.run_as_user_id, label: current.run_as_name ?? current.run_as_user_id }] : []),
+      ...(runAsChoices.data ?? []).filter(member => member.id !== current.owner_id).map(member => ({ value: member.id, label: member.name }))],
+    value => { void runAs(value || null) }, busy !== null)] }] : []),
+    ...(draft.eachRun === 'existing_thread' && workspaceId ? [{ id: 'thread', content: <ThreadPicker workspaceId={workspaceId} value={draft.singleThreadId} onChange={singleThreadId => set({ singleThreadId })} /> }] : []),
+    { id: 'environment', label: t('environment'), controls: [select(t('environment'), draft.environmentId ?? '', [{ value: '', label: t('environmentDefault') },
+      ...(draft.environmentId && !shownEnvironments.some(environment => environment.id === draft.environmentId) ? [{ value: draft.environmentId, label: draft.environmentId }] : []),
+      ...shownEnvironments.map(environment => ({ value: environment.id, label: environment.name }))], value => set({ environmentId: value || null }))] },
+    // A failed device read leaves the list empty; the disabled line says why the person's own devices are missing.
+    { id: 'machine', label: t('machine'), controls: [select(t('machine'), draft.machine, [{ value: 'auto', label: t('machineDefault') }, { value: 'cloud', label: t('machineCloud') },
+      ...(draft.machine === 'cloudflare' ? [{ value: 'cloudflare', label: t('machineCloud') }] : []),
+      ...localDevices.map(device => ({ value: device.id, label: device.name })),
+      ...(devicesError ? [{ value: '', label: t('devicesError'), disabled: true }] : [])], value => set({ machine: value }))] },
+    { id: 'agent', label: t('agent'), controls: [select(t('agent'), draft.agent ?? '', [{ value: '', label: t('agentNone'), disabled: true },
+      { value: 'claude_code', label: harnessName('claude_code') }, { value: 'codex', label: harnessName('codex') }],
+    value => set({ agent: value === 'claude_code' || value === 'codex' ? value : null, model: null, effort: null }))] },
+    ...(draft.agent ? [{ id: 'model', label: t('model'), controls: [
+      select(t('model'), draft.model ?? '', [{ value: '', label: t('modelDefault') }, ...models.map(model => ({ value: model, label: model }))], value => set({ model: value || null, effort: null })),
+      ...(efforts.length ? [select(t('effort'), draft.effort ?? '', [{ value: '', label: t('effortDefault') }, ...efforts.map(effort => ({ value: effort, label: t(`efforts.${effort}`) }))],
+        value => set({ effort: value && (AUTOMATION_EFFORTS as readonly string[]).includes(value) ? value as AutomationEffort : null }))] : []),
+    ] }] : []),
+    { id: 'machine-size', label: t('machineSize'), controls: [select(t('machineSize'), draft.machineSize ?? '', [{ value: '', label: t('machineSizeDefault') },
+      ...(Object.keys(MACHINE_SIZES) as MachineSize[]).map(size => ({ value: size, label: t('machineSizeOption', { vcpu: MACHINE_SIZES[size].vcpu, gib: MACHINE_SIZES[size].gib }) }))],
+    value => set({ machineSize: value in MACHINE_SIZES ? value as MachineSize : null }))] },
+    { id: 'profile', label: t('profile'), controls: [select(t('profile'), draft.profileId, profileChoices.choices.map(choice => ({ value: choice.value, label: choice.label,
+      ...('disabled' in choice && choice.disabled ? { disabled: true } : {}) })), value => set({ profileId: value }), !workspaceId)] },
+    ...(draft.eachRun === 'new_task' ? [{ id: 'pin', label: t('pin'), controls: [{ kind: 'switch' as const, label: t('pin'), checked: draft.pin, onChange: (pin: boolean) => set({ pin }) }] }] : []),
+    { id: 'notify', label: t('notify'), controls: [slackWanted || draft.notify
+      ? select(t('notify'), draft.notify?.channel ?? '', [{ value: '', label: t('notifyOff') },
+        ...(draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) ? [{ value: draft.notify.channel, label: draft.notify.channel }] : []),
+        ...(slackChannels.data?.channels ?? []).map(channel => ({ value: channel.id, label: `#${channel.name}` }))],
+      value => set({ notify: value ? { ...draft.notify, channel: value, locale: draft.notify?.locale ?? (locale === 'en' ? 'en' : 'zh-CN') } : null }), !slackChannels.data && !draft.notify)
+      : { kind: 'button', label: t('notifyChoose'), onClick: () => setSlackWanted(true), disabled: busy !== null }] },
+    ...(draft.notify ? [
+      // Only the person posts would appear as can turn this on; anyone may turn it off.
+      { id: 'post-as-runner', label: t('postAsRunner'), controls: [{ kind: 'switch' as const, label: t('postAsRunner'), checked: draft.notify.postAsRunner === true,
+        disabled: draft.notify.postAsRunner !== true && Boolean(current) && (current!.run_as_user_id ?? current!.owner_id) !== userId,
+        onChange: (on: boolean) => set({ notify: { ...draft.notify!, postAsRunner: on || undefined } }) }] },
+      { id: 'quiet', label: t('quiet'), controls: [{ kind: 'switch' as const, label: t('quiet'), checked: draft.notify.quiet === true,
+        onChange: (on: boolean) => set({ notify: { ...draft.notify!, quiet: on || undefined } }) }] },
+    ] : []),
+    { id: 'timezone', label: t('timezone'), controls: [select(t('timezone'), draft.timezone, (zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => ({ value: zone, label: zone })),
+      value => set({ timezone: value, fold: null }))] },
+  ]
   const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
 
   return <EditorFrame onBack={onBack} backLabel={t('back')}>
@@ -236,8 +353,31 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         {!creating && <div className="flex shrink-0 items-center gap-2 pt-1.5">
           <Label htmlFor="automation-enabled">{t('enabled')}</Label>
           <Switch id="automation-enabled" checked={active} disabled={busy !== null || !canToggle} onCheckedChange={on => { void toggle(on) }} />
+          {current && <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t('more')} disabled={busy !== null} />}><MoreHorizontal /></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                {active && canManage && <DropdownMenuItem onClick={() => { void runNow() }}><Play />{t('runNow')}</DropdownMenuItem>}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>{t('duplicateTo')}</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuGroup>
+                      {!targets.length && <DropdownMenuLabel>{workspaces.error ? tAll('loadError') : tAll('loading')}</DropdownMenuLabel>}
+                      {targets.map(target => <DropdownMenuItem key={target.id} onClick={() => { void duplicate(target.id) }}>{target.name}</DropdownMenuItem>)}
+                    </DropdownMenuGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>{t('delete')}</DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>}
         </div>}
       </div>
+      <Textarea aria-label={t('description')} value={draft.description} readOnly={!canManage} maxLength={2000} rows={1} placeholder={t('descriptionPlaceholder')}
+        onChange={event => set({ description: event.target.value })} className="min-h-0 resize-none border-0 bg-transparent px-0 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-0 dark:bg-transparent" />
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>{t('creator')} · {creator}</span>
         {current?.can_take_over && <Button size="xs" variant="outline" disabled={busy !== null} onClick={() => setConfirmTakeOver(true)}>{t('takeOver')}</Button>}
@@ -251,46 +391,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     {!canManage && <p role="status" className="px-6 pt-1 text-sm text-muted-foreground">{t('viewOnly')}</p>}
 
     <FieldSet disabled={!canManage} className="contents">
-    {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
-      {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
-        <NativeSelectOption value="">{tAll('coordinator')}</NativeSelectOption>
-        {ownBots.map(bot => <NativeSelectOption key={bot.id} value={bot.id}>{bot.name}</NativeSelectOption>)}
-        {otherBot && <NativeSelectOption value={otherBot.id}>{otherBot.name}</NativeSelectOption>}
-      </NativeSelect>)}
-      {field(t('machine'), <NativeSelect aria-label={t('machine')} value={draft.machine} onChange={event => set({ machine: event.target.value })}>
-        <NativeSelectOption value="auto">{t('machineDefault')}</NativeSelectOption>
-        <NativeSelectOption value="cloud">{t('machineCloud')}</NativeSelectOption>
-        {draft.machine === 'cloudflare' && <NativeSelectOption value="cloudflare">{t('machineCloud')}</NativeSelectOption>}
-        {localDevices.map(device => <NativeSelectOption key={device.id} value={device.id}>{device.name}</NativeSelectOption>)}
-        {/* A failed read leaves the list empty; without this the only machine
-            choices are the two defaults, with nothing saying why the person's
-            own devices are missing. */}
-        {devicesError && <NativeSelectOption value="" disabled>{t('devicesError')}</NativeSelectOption>}
-      </NativeSelect>)}
-      {field(t('agent'), <NativeSelect aria-label={t('agent')} value={draft.agent ?? ''} onChange={event => set({ agent: event.target.value === 'claude_code' || event.target.value === 'codex' ? event.target.value : null })}>
-        <NativeSelectOption value="" disabled>{t('agentNone')}</NativeSelectOption>
-        <NativeSelectOption value="claude_code">{harnessName('claude_code')}</NativeSelectOption>
-        <NativeSelectOption value="codex">{harnessName('codex')}</NativeSelectOption>
-      </NativeSelect>)}
-      {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
-        {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}
-      </NativeSelect>)}
-      {field(t('eachRun'), <NativeSelect aria-label={t('eachRun')} value={draft.eachRun} onChange={event => set({ eachRun: event.target.value === 'same_task' ? 'same_task' : 'new_task' })}>
-        <NativeSelectOption value="new_task">{t('eachRunNew')}</NativeSelectOption>
-        <NativeSelectOption value="same_task">{t('eachRunSame')}</NativeSelectOption>
-      </NativeSelect>)}
-      {field(t('notify'), slackWanted || draft.notify
-        ? <NativeSelect aria-label={t('notify')} value={draft.notify?.channel ?? ''} disabled={!slackChannels.data && !draft.notify}
-          onChange={event => set({ notify: event.target.value ? { channel: event.target.value, locale: locale === 'en' ? 'en' : 'zh-CN' } : null })}>
-          <NativeSelectOption value="">{t('notifyOff')}</NativeSelectOption>
-          {draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) && <NativeSelectOption value={draft.notify.channel}>{draft.notify.channel}</NativeSelectOption>}
-          {(slackChannels.data?.channels ?? []).map(channel => <NativeSelectOption key={channel.id} value={channel.id}>#{channel.name}</NativeSelectOption>)}
-        </NativeSelect>
-        : <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('notifyChoose')}</Button>)}
-      {field(t('timezone'), <NativeSelect aria-label={t('timezone')} value={draft.timezone} onChange={event => set({ timezone: event.target.value, fold: null })}>
-        {(zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => <NativeSelectOption key={zone} value={zone}>{zone}</NativeSelectOption>)}
-      </NativeSelect>)}
-    </SettingsSection>}
+    {!draft.otherTask && <AutomationSettings id="automation-settings" title={t('settings')} disabled={!canManage} rows={settingRows} />}
 
     <SettingsSection id="automation-triggers" title={t('triggers')}>
       <SettingRow title={t('schedule')}>
@@ -397,7 +498,6 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
       <div className="flex items-center gap-2">
         {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null || !canToggle} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
-        {current && <Button variant="ghost" className="text-destructive-foreground" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>{t('delete')}</Button>}
       </div>
       <div className="flex items-center gap-3">
         {check && 'missing' in check && <span role="status" className="text-sm text-muted-foreground">{t(`missing.${check.missing}`)}</span>}
@@ -455,5 +555,26 @@ function RunRow({ run, timezone, onCancel, cancelling }: { run: AutomationRun; t
     {run.trigger && 'webhook' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.fromWebhook', { count: run.trigger.webhook.requests.length })}</span>}
     {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}
     {reason && <span className="min-w-0 text-muted-foreground">{reason}</span>}
+  </div>
+}
+
+/** Runs in › An existing thread: the person's threads in this workspace, searched by title; group chats are not threads. */
+function ThreadPicker({ workspaceId, value, onChange }: { workspaceId: string; value: string | null; onChange: (id: string | null) => void }) {
+  const t = useTranslations('Automations.editor')
+  const [query, setQuery] = useState('')
+  const [chosen, setChosen] = useState<{ id: string; title: string } | null>(null)
+  const [searching, setSearching] = useState(!value)
+  const results = useSWR(searching ? ['automation-threads', workspaceId, query.trim()] as const : null,
+    async ([, shown, text]) => (await findThreadReferences(shown, text, 'thread')).filter(item => item.kind === 'thread' && item.conversationKind !== 'chat'),
+    { revalidateOnFocus: false, keepPreviousData: true })
+  if (!searching && value) return <SettingRow title={t('threadChosen')}>
+    <div className="flex min-w-0 items-center justify-end gap-2">{chosen?.id === value && <bdi className="truncate text-sm">{chosen.title}</bdi>}
+      <Button size="sm" variant="outline" onClick={() => setSearching(true)}>{t('threadChange')}</Button></div>
+  </SettingRow>
+  return <div className="flex flex-col gap-2 px-5 pb-4">
+    <SearchInput aria-label={t('threadSearch')} placeholder={t('threadSearch')} value={query} maxLength={120} onChange={event => setQuery(event.target.value)} />
+    {results.data && !results.data.length && <p className="text-sm text-muted-foreground">{t('threadNone')}</p>}
+    {results.data?.map(item => <Button key={item.id} variant={item.id === value ? 'secondary' : 'ghost'} className="justify-start"
+      onClick={() => { setChosen({ id: item.id, title: item.title }); onChange(item.id); setSearching(false) }}><bdi className="truncate">{item.title}</bdi></Button>)}
   </div>
 }

@@ -1,5 +1,5 @@
 import 'server-only'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from '@/lib/server-runtime/server'
 import { logCodedError } from '@mikka/protocol/coded-error'
 import { resolveAppOrigin } from '@/lib/auth-config'
 import { isServerAdmin } from '@/lib/server-admin'

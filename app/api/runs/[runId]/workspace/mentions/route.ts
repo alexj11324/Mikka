@@ -10,7 +10,6 @@ import { workspaceReadResponse } from '@/lib/coding-workspace/response'
 import { ActionFailureError } from '@/lib/action-error'
 import { workspaceJSON, workspaceErrorStatus, workspaceSessionStillValid } from '@/lib/coding-workspace/http'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 

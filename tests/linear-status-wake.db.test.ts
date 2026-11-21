@@ -5,9 +5,9 @@ import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import type { LinearIssueSnapshot } from '../lib/linear-sync/client'
 
 test('a linked Linear status update wakes its Bot from the committed revision', { skip: !dbUrl, timeout: 30_000 }, async t => {
-  const next = await import('next/server')
+  const next = await import('@/lib/server-runtime/server')
   const jobs: Promise<unknown>[] = []
-  t.mock.module('next/server', { namedExports: { ...next, after: (job: () => Promise<unknown>) => { jobs.push(job()) } } })
+  t.mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (job: () => Promise<unknown>) => { jobs.push(job()) } } })
   const { db, pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { linearTeamSyncs } = await import('../lib/db/schema')

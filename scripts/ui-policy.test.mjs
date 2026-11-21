@@ -422,13 +422,12 @@ test('one container per surface: a frame inside a frame is a double border', () 
 })
 
 test('Chinese takes the system font, as in Comma: no self-hosted text font draws CJK and --font-sans names none before the system stack', async () => {
-  const { createRequire } = await import('node:module')
-  const fontkit = createRequire(import.meta.url)('next/dist/compiled/@next/font/dist/fontkit').default
+  const { create } = await import('fontkit')
   const root = new URL('../', import.meta.url)
   const cjk = cp => (cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFE30 && cp <= 0xFE4F) || (cp >= 0xFF00 && cp <= 0xFFEF)
   // A Latin font that drew CJK would win over the system font for those characters (mixed punctuation, wrong glyphs).
   for (const file of ['InterVariable.woff2', 'InterVariable-Italic.woff2']) {
-    const font = (fontkit.default ?? fontkit)(readFileSync(new URL(`app/fonts/${file}`, root)))
+    const font = create(readFileSync(new URL(`app/fonts/${file}`, root)))
     assert.deepEqual(font.characterSet.filter(cjk).map(cp => `U+${cp.toString(16).toUpperCase()}`), [], file)
   }
   const stack = readFileSync(new URL('app/globals.css', root), 'utf8').match(/--font-sans:\s*([^;]+);/)[1].split(',').map(family => family.trim().replaceAll('"', ''))

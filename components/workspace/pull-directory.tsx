@@ -1,11 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import useSWR from "swr";
 import useSWRInfinite, { unstable_serialize } from "swr/infinite";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { Copy, Pin, X } from "lucide-react";
 import { listConversations } from "@/app/actions/task-runs";
+import { listWorkspaceProjects } from "@/app/actions/projects";
+import { deleteSavedView, listPullPins, listSavedViews, saveView as storeView, setPullPins } from "@/app/actions/list-views";
+import { useActionError } from "@/lib/use-action-error";
+import { useSearchParams } from "@/lib/client-runtime/navigation";
 import { withBasePath } from "@/lib/base-path";
 import { useViewState } from "@/lib/hooks/view-state";
 import { useLiveKey } from "@/hooks/use-live-key";
@@ -14,6 +19,11 @@ import type { ConversationDirectoryPage } from "@/lib/conversation-directory-inp
 import {
   filterDirectoryPulls,
   groupDirectoryPulls,
+  initialPullFilters as initial,
+  pullFromAddress,
+  pullAddressRow,
+  pullSinceInstant,
+  readSavedPullView,
   linkedPullDirectory,
   pullViews,
   type PullDirectoryPage,
@@ -42,14 +52,6 @@ const viewKeys: Record<PullFilters["view"], `views.${PullFilters["view"]}`> = {
   merged: "views.merged",
   all: "views.all",
 };
-const initial: PullFilters = {
-  view: "open",
-  search: "",
-  state: "",
-  author: "",
-  linked: false,
-  label: "",
-};
 type RepoStatus = {
   viewerId: string;
   connected: boolean;
@@ -57,8 +59,8 @@ type RepoStatus = {
 };
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
+  attention: "states.attention",
   pending: "states.pending",
-  failed: "states.failed",
   draft: "states.draft",
   open: "states.open",
   merged: "states.merged",
@@ -86,17 +88,44 @@ export function PullDirectory({
 }) {
   const t = useTranslations("PullDirectory");
   const scope = `pull-directory:${ownerId}:${workspaceId}:${botId ?? "all"}`;
-  const [filters, setFilters] = useViewState<PullFilters>(
+  const [stored, setFilters] = useViewState<PullFilters>(
     scope + ":filters",
     initial,
   );
+  // Filters kept on this device before Created and Project existed read with their defaults.
+  const filters: PullFilters = { ...initial, ...stored };
+  const actionError = useActionError();
   const [repo, setRepo] = useViewState(scope + ":repo", "");
   const [grouping, setGrouping] = useViewState<PullGroup>(
     scope + ":group",
     "state",
   );
-  const [pinned, setPinned] = useViewState<string[]>(scope + ":pinned", []);
-  const [views, setViews] = useViewState<SavedPullView[]>(scope + ":views", []);
+  // Pins and saved views follow the person across devices (pull_pins, saved_views).
+  const pins = useSWR(
+    workspaceId ? ["pull-pins", ownerId, workspaceId] : null,
+    ([, , workspace]) => listPullPins(workspace),
+    { revalidateOnFocus: false },
+  );
+  const pinned = pins.data ?? [];
+  const savedViews = useSWR(
+    workspaceId ? ["saved-views", "pulls", ownerId, workspaceId] : null,
+    ([, , , workspace]) => listSavedViews(workspace, "pulls"),
+    { revalidateOnFocus: false },
+  );
+  const views = (savedViews.data ?? []).flatMap((view): SavedPullView[] => {
+    const read = readSavedPullView(view);
+    return read ? [read] : [];
+  });
+  const projects = useSWR(
+    workspaceId ? ["pull-projects", ownerId, workspaceId] : null,
+    ([, , workspace]) => listWorkspaceProjects(workspace),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const projectOptions = (Array.isArray(projects.data) ? projects.data : []).map(
+    (project: { id: string; name: string }) => ({ id: project.id, name: project.name }),
+  );
+  const params = useSearchParams();
+  const addressed = pullFromAddress(params.get("pull"));
   const [checked, setChecked] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"copied" | "copyError" | null>(
@@ -129,6 +158,8 @@ export function PullDirectory({
           botId,
           previous?.cursor ?? null,
           revision,
+          filters.project || null,
+          filters.since || null,
         ] as const);
   const linked = useSWRInfinite<
     ConversationDirectoryPage,
@@ -136,12 +167,14 @@ export function PullDirectory({
     typeof linkedKey
   >(
     linkedKey,
-    ([, , , bot, cursor]) =>
+    ([, , , bot, cursor, , project, since]) =>
       listConversations({
         botId: bot ?? undefined,
         archived: "any",
         pullState: "linked",
         cursor: cursor ?? undefined,
+        projectId: project ?? undefined,
+        since: pullSinceInstant(since ?? "") ?? undefined,
       }),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
@@ -155,16 +188,18 @@ export function PullDirectory({
           repo,
           filters.view,
           previous?.cursor ?? null,
+          filters.since || null,
         ] as const);
   const github = useSWRInfinite<PullDirectoryPage, Error, typeof githubKey>(
     githubKey,
-    ([, , , repository, view, cursor]) =>
+    ([, , , repository, view, cursor, since]) =>
       read(
         "/api/integrations/github/repositories/pulls?" +
           new URLSearchParams({
             repo: repository,
             view,
             ...(cursor ? { cursor } : {}),
+            ...(since ? { since: pullSinceInstant(since)! } : {}),
           }),
         ownerId,
       ),
@@ -205,14 +240,27 @@ export function PullDirectory({
       ]
     : linkedRows;
   const error = repo ? github.error : linked.error;
+  // GitHub's connection is the one state that replaces the list rather than
+  // sitting above it: an empty result under "connect GitHub" was two answers to
+  // one question.
+  const disconnected =
+    Boolean(repositoryError) ||
+    (repositories ? !repositories.connected : false);
   const busy = repo ? github.isValidating : linked.isValidating;
   const more = Boolean(data?.at(-1)?.cursor);
-  const visible = filterDirectoryPulls(rows, filters);
+  // A project names tasks; in a repository's list only PRs those tasks' threads delivered belong to it.
+  const scoped = repo && filters.project ? rows.filter((row) => row.threads.length > 0) : rows;
+  const visible = filterDirectoryPulls(scoped, filters);
   const groups = groupDirectoryPulls(visible, grouping, pinned);
   const ordered = groups.flatMap((group) =>
     collapsed.includes(group.key) ? [] : group.rows,
   );
-  const active = visible.find((row) => row.url === selected);
+  // A PR's own address (`pull=owner/name/number`, "Open in new tab") opens its preview, which reads
+  // the PR itself (pulls/detail), so it opens whether or not the PR is in the loaded list or a task's.
+  const addressedRow = addressed ? pullAddressRow(addressed, linkedByUrl) : null;
+  const active =
+    visible.find((row) => row.url === selected) ??
+    (addressedRow && selected === addressedRow.url ? addressedRow : undefined);
   const visibleChecked = visible.filter((row) => checked.includes(row.url));
   const set = (patch: Partial<PullFilters>) => {
     setFilters((previous) => ({ ...previous, ...patch }));
@@ -247,13 +295,33 @@ export function PullDirectory({
     setSelected(row.url);
     setCopyState(null);
   }
-  function pin(urls: string[]) {
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("copied"));
+    } catch {
+      toast.error(t("copyError"));
+    }
+  }
+  async function pin(urls: string[]) {
+    if (!workspaceId) return;
     const keys = urls.map(githubPullRequestKey);
-    setPinned((previous) =>
-      keys.every((key) => previous.includes(key))
-        ? previous.filter((key) => !keys.includes(key))
-        : [...new Set([...previous, ...keys])],
-    );
+    const next = !keys.every((key) => pinned.includes(key));
+    const optimistic = next
+      ? [...new Set([...pinned, ...keys])]
+      : pinned.filter((key) => !keys.includes(key));
+    try {
+      await pins.mutate(
+        async () => {
+          const result = await setPullPins(workspaceId, urls.slice(0, 100), next);
+          if (result.error) throw new Error(result.error);
+          return result.pins;
+        },
+        { optimisticData: optimistic, rollbackOnError: true, revalidate: false },
+      );
+    } catch (error) {
+      toast.error(actionError(error instanceof Error ? error.message : null));
+    }
   }
   const heading = (key: string) =>
     key === "pinned" || key === "results" || key === "unknownAuthor"
@@ -261,26 +329,40 @@ export function PullDirectory({
       : grouping === "state"
         ? t(stateKeys[key as PullState])
         : key;
-  // A repository that is not connected gets one state, not two: the banner that
-  // offers 连接 already says why the list is empty, and offering 清除筛选 beside it
-  // would point at a filter that changes nothing (R-96).
-  const notConnected = Boolean(repositoryError) || Boolean(repositories && !repositories.connected);
   const filtered =
     filters.search ||
     filters.state ||
     filters.author ||
     filters.label ||
     filters.linked ||
+    filters.since ||
+    filters.project ||
     filters.view !== "all";
-  const saveView = () => {
-    const name = t("viewDefaultName", { view: t(`views.${filters.view}`) });
-    setViews((previous) =>
-      [
-        ...previous.filter((view) => view.name !== name),
-        { name, filters, repo, grouping },
-      ].slice(-12),
-    );
-  };
+  async function saveView() {
+    if (!workspaceId) return;
+    const name = t("viewDefaultName", { view: t(viewKeys[filters.view]) });
+    try {
+      const result = await storeView({ workspaceId, scope: "pulls", name, filters: { filters, repo, grouping } });
+      if (result.error) toast.error(actionError(result.error));
+      else await savedViews.mutate();
+    } catch {
+      toast.error(actionError());
+    }
+  }
+  async function removeView(id: string) {
+    if (!workspaceId) return;
+    try {
+      const result = await deleteSavedView(workspaceId, id);
+      if (result.error && result.error !== "savedViewNotFound") toast.error(actionError(result.error));
+      await savedViews.mutate();
+    } catch {
+      toast.error(actionError());
+    }
+  }
+  const addressKey = addressedRow?.url ?? null;
+  useEffect(() => {
+    if (addressKey) setSelected(addressKey);
+  }, [addressKey]);
   return (
     <section
       aria-label={t("title")}
@@ -379,8 +461,9 @@ export function PullDirectory({
           setSelected(null);
           setChecked([]);
         }}
-        onDeleteView={(name) => setViews((previous) => previous.filter((view) => view.name !== name))}
-        onSaveView={saveView}
+        onDeleteView={(id) => void removeView(id)}
+        onSaveView={() => void saveView()}
+        projects={projectOptions}
       />
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <div
@@ -393,14 +476,14 @@ export function PullDirectory({
           )}
         >
           <div className="px-2">
-            {repositoryError || (repositories && !repositories.connected) ? (
+            {disconnected ? (
               <PullConnectState
                 error={Boolean(repositoryError)}
                 busy={busy}
                 onRetry={() => void retryRepositories()}
               />
             ) : null}
-            {error && (
+            {!disconnected && error && (
               <div role="alert" className="mx-4 mt-6 flex flex-col items-start gap-3 rounded-xl bg-control px-4 py-4">
                 <p className="text-sm text-foreground">{t("loadError")}</p>
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => void refresh()}>
@@ -408,14 +491,14 @@ export function PullDirectory({
                 </Button>
               </div>
             )}
-            {!data && !error && (
+            {!disconnected && !error && !data && (
               <div role="status" aria-label={t("loading")} className="flex flex-col py-1">
                 {[0, 1, 2, 3, 4, 5, 6].map((key) => (
                   <PullRowSkeleton key={key} />
                 ))}
               </div>
             )}
-            {data && !visible.length && !error && !notConnected && (
+            {!disconnected && !error && data && !visible.length && (
               <Empty className="min-h-72 border-0">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
@@ -437,10 +520,14 @@ export function PullDirectory({
                 </EmptyContent>
               </Empty>
             )}
-            {groups.map((group) => {
+            {groups.map((group, position) => {
               const open = !collapsed.includes(group.key);
               return (
-                <section key={group.key} aria-label={heading(group.key)} className="flex flex-col">
+                <section
+                  key={group.key}
+                  aria-label={heading(group.key)}
+                  className={cn("flex flex-col", position > 0 && "pt-1")}
+                >
                   <PullGroupHeader
                     label={heading(group.key)}
                     count={group.rows.length}
@@ -472,7 +559,9 @@ export function PullDirectory({
                             );
                             setCopyState(null);
                           }}
-                          onPin={(url) => pin([url])}
+                          onPin={(url) => void pin([url])}
+                          onCopy={(text) => void copyText(text)}
+                          workspaceId={workspaceId}
                         />
                       ))}
                     </ul>
@@ -510,7 +599,7 @@ export function PullDirectory({
             from="md"
             className="flex min-h-0 w-full flex-col border-s border-rule bg-background md:w-96"
           >
-            <PullPreview row={active} source={Boolean(repo)} onClose={() => setSelected(null)} />
+            <PullPreview row={active} source={Boolean(repo)} onClose={() => setSelected(null)} onMerged={() => void refresh()} />
           </ResizablePane>
         )}
       </div>
@@ -530,7 +619,7 @@ export function PullDirectory({
             <Copy data-icon />
             {t("copyLinks")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => pin(visibleChecked.map((row) => row.url))}>
+          <Button size="sm" variant="ghost" onClick={() => void pin(visibleChecked.map((row) => row.url))}>
             <Pin data-icon />
             {t(
               visibleChecked.every((row) => pinned.includes(githubPullRequestKey(row.url)))

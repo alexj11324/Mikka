@@ -8,7 +8,6 @@ import { projectVisibilityDefault } from '@/lib/project-input'
 import { resolveProjectVisibilityDefault } from '@/lib/resource-access/project-creation-default'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

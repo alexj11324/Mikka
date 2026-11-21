@@ -40,7 +40,7 @@ mock.module('../app/actions/team-relations.ts', { namedExports: {
     return relation === 'denied' ? { ok: false, error: 'denied' } : { ok: true, data: { ...saved, revision: 2 } }
   },
 } })
-mock.module('next-intl', { namedExports: { useTranslations: () => key => key, useMessages: () => ({}) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => key => key, useMessages: () => ({}) } })
 mock.module('../components/ui/dialog.tsx', { namedExports: {
   Dialog: children, DialogContent: children, DialogHeader: children, DialogTitle: children, DialogDescription: children,
 } })

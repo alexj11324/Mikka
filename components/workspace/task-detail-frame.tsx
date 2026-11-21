@@ -2,9 +2,9 @@
 
 import { githubPullRequestKey, taskWorkOwner } from '@/lib/issue-metadata'
 
-import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useMessages, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useMessages, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'
@@ -18,7 +18,12 @@ import type { IssueDetailNavigation } from './issue-detail-header'
 import { useIssueDetailMenu, type IssueActionRequest } from './issue-detail-actions'
 import { overdue } from './issue-detail-properties'
 import { AccessChangeDialog, IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
+import { ISSUE_PRIORITIES } from './issue-properties'
+import { issueStateMenuItems } from './issue-state-menu'
+import { Mark } from './state-mark'
+import { useIssueStates } from '@/hooks/use-issue-states'
+import { useTaskUnread } from '@/hooks/use-task-unread'
+import { issueStateLabel, taskIssueState } from '@/lib/issue-states'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
@@ -35,6 +40,9 @@ import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, pullRequestActivityEvents, taskActivityThreads, taskDiscussionEvents, type PullRequestActivitySource } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
+
+// Start work's window loads when it opens: its pickers read devices, Bots and profiles the task page does not need.
+const StartWorkDialog = lazy(() => import('@/components/coordinator/start-work-dialog').then(module => ({ default: module.StartWorkDialog })))
 
 type Issue = IssueView
 
@@ -92,6 +100,8 @@ export type FramedTaskProps = {
   task: Issue
   title: string
   status: string
+  /** The workspace state the task is in (lib/issue-states.ts); null before it is known. */
+  stateId?: string | null
   priority: string
   liveWorkspaceId: string | null
   saveLabel: string
@@ -117,7 +127,8 @@ export type FramedTaskProps = {
   getCurrent: () => Promise<Issue | null>
   adopt: (issue: Issue) => void
   onMetadataBusy: (busy: boolean) => void
-  onStatus: (value: string) => void
+  /** `stateId`: the workspace state picked; absent from a writer that only knows the category. */
+  onStatus: (value: string, stateId?: string | null) => void
   onPriority: (value: string) => void
   onHistory: () => void
   onMembers: () => void
@@ -135,6 +146,8 @@ export function FramedTask(props: FramedTaskProps) {
   const t = useTranslations('IssueDetail')
   const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
+  const tNewTask = useTranslations('Shell.newTaskDialog')
+  const [startingWork, setStartingWork] = useState(false)
   const tDetail = useTranslations('Workspace.detail')
   const tDirectory = useTranslations('ConversationDirectory')
   const tThreads = useTranslations('IssueThreads')
@@ -155,7 +168,15 @@ export function FramedTask(props: FramedTaskProps) {
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
 
-  const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority })
+  // The task page owns the states' live subscription; the menus below read the same entry (decision 2026-11-19-2115).
+  const issueStates = useIssueStates(task.workspaceId, { live: true }).states
+  // Opening a task the person marked unread marks it read again (Mark as unread, S1-C).
+  const taskUnread = useTaskUnread(task.workspaceId)
+  const markRead = taskUnread.unread.has(task.id) ? taskUnread.set : null
+  useEffect(() => { if (markRead) void markRead(task.id, false) }, [markRead, task.id])
+  const stateItems = issueStateMenuItems(issueStates, { status: props.status, stateId: props.stateId }, statusLabel, props.onStatus)
+  const currentState = issueStates ? taskIssueState(issueStates, { status: props.status, stateId: props.stateId }) : undefined
+  const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority, statusItems: stateItems })
 
   // The property choices are read when a menu opens, as the community page reads them when its popover opens.
   const [wantOptions, setWantOptions] = useState(false)
@@ -244,14 +265,13 @@ export function FramedTask(props: FramedTaskProps) {
   const rows: TaskDetailRow[] = [
     {
       id: 'status', label: tIssue('statusLabel'), disabled: locked,
-      value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } },
+      value: currentState
+        ? { text: issueStateLabel(currentState, statusLabel), mark: { kind: 'node', node: <Mark shape={currentState.icon} tone={currentState.color} /> } }
+        : { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } },
       state: presentation.data ?? undefined,
       menu: [
         ...presentation.error ? [{ id: 'reload', label: tAssignee('reload'), onSelect: presentation.retry }] : [],
-        ...ISSUE_STATUSES.map(item => ({
-          id: item.value, label: statusLabel(item.value), mark: { kind: 'status' as const, value: item.value },
-          checked: item.value === props.status, onSelect: () => props.onStatus(item.value),
-        })),
+        ...stateItems,
       ],
     },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
@@ -365,6 +385,9 @@ export function FramedTask(props: FramedTaskProps) {
     : [...menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item),
       // The task page shows the team only once it has one (as Capy shows only set properties): the ⋯ menu sets it.
       ...team.unavailable || team.selected ? [] : [{ id: 'team', label: team.label, mark: { kind: 'icon', icon: 'team' } as const, submenu: rows.find(row => row.id === 'team')?.menu ?? [] } satisfies TaskMenuItem]]
+  // Start work: 新建任务 only registers a task, so its work starts here (decision 2026-11-19-2110).
+  const startWork = preview || locked ? undefined : { label: tNewTask('startWork'), onStart: () => setStartingWork(true) }
+  const startWorkItem: TaskMenuItem[] = startWork ? [{ id: 'startWork', label: startWork.label, mark: { kind: 'icon', icon: 'open' }, onSelect: startWork.onStart }] : []
   const created = new Date(task.createdAt)
   return <Frame
     taskId={preview ? undefined : task.id}
@@ -381,7 +404,8 @@ export function FramedTask(props: FramedTaskProps) {
       anchorRemoved: tActivity('anchorRemoved'), copyLink: tMenu('copyLink'), commentBy: name => tActivity('comment', { author: name }),
     }}
     favorite={menu.favorite}
-    menu={{ items: menuItems, disabled: !readerMenu && menu.disabled, onOpen: loadOptions }}
+    startWork={startWork}
+    menu={{ items: [...startWorkItem, ...menuItems], disabled: !readerMenu && menu.disabled, onOpen: loadOptions }}
     titleField={props.titleField} saveError={props.saveError} syncNotice={props.syncNotice}
     descriptionEditable={props.descriptionEditable}
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
@@ -399,7 +423,8 @@ export function FramedTask(props: FramedTaskProps) {
     // Capy's line under the title: the code and how long ago it was made.
     meta={[task.identifier, format.relativeTime(created, now)].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
-    dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
+    dialogs={<>{props.dialogs}{menu.dialogs}{startingWork && <Suspense fallback={null}><StartWorkDialog open onOpenChange={setStartingWork} workspaceId={task.workspaceId ?? undefined}
+      task={{ id: task.id, identifier: task.identifier, title: props.title || task.title }} initialBotId={meta.delegate?.kind === 'bot' ? meta.delegate.id : undefined} /></Suspense>}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
 }
 

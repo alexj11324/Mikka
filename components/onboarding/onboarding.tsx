@@ -3,7 +3,7 @@ import { isBotListKey } from '@/lib/live/list-read'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from 'motion/react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import useSWR, { useSWRConfig } from 'swr'
 import { Check } from '@/components/icons'
 import { createBot, listBots, type BotView } from '@/app/actions/bots'

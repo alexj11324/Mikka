@@ -14,7 +14,6 @@ mock.module(new URL('../abuse/runtime.ts', import.meta.url).href, { namedExports
     settle: (...args: Parameters<HostedUsageStore['settle']>) => usage.settle(...args),
   },
 } })
-mock.module('ai', { namedExports: { gateway: () => { throw new Error('Only the isolated HTTP fixture is allowed') } } })
 mock.module(new URL('../abuse/alerts.ts', import.meta.url).href, { namedExports: { checkAbuseAlerts: async () => {} } })
 
 test('a real policy rejection after accounting admission settles zero and leaves the positive balance usable', { skip: !dbUrl }, async t => {
@@ -28,9 +27,10 @@ test('a real policy rejection after accounting admission settles zero and leaves
   let calls=0
   const server=createServer((_request,response)=>{
     calls++
-    response.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({
-      content:[],warnings:[],finishReason:{unified:'stop',raw:'stop'},
-      usage:{inputTokens:{total:0},outputTokens:{total:1}},providerMetadata:{gateway:{cost:'0.000001'}},
+    response.writeHead(200, { 'content-type': 'application/json', 'x-litellm-call-id': 'fixture-revocation', 'x-litellm-response-cost': '0.000001' }).end(JSON.stringify({
+      id: 'fixture-revocation', object: 'chat.completion', created: 1, model: 'mikka-default',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'Synthetic receipt' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 0, completion_tokens: 1, total_tokens: 1 },
     }))
   })
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve))
@@ -40,12 +40,15 @@ test('a real policy rejection after accounting admission settles zero and leaves
     await pool.end();await(await import('../db')).pool.end();await(await import('../workspace-db')).workspacePool.end()
   })
   const port=(server.address() as {port:number}).port
-  const provider={specificationVersion:'v4' as const,provider:'isolated-fixture',modelId:'postpay-revocation-fixture',supportedUrls:{},
-    async doGenerate(){return(await fetch(`http://127.0.0.1:${port}`,{method:'POST'})).json()},
-    async doStream(){throw new Error('Not used by this case')},
-  }
-  const {hostedModel}=await import('../abuse/model')
-  const model=await hostedModel(workspace.id,provider.modelId,provider,ownerId)
+  const saved = { url: process.env.MIKKA_LITELLM_URL, key: process.env.MIKKA_LITELLM_MASTER_KEY }
+  process.env.MIKKA_LITELLM_URL = `http://127.0.0.1:${port}`
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-revocation-only'
+  t.after(() => {
+    for (const [name, value] of [['MIKKA_LITELLM_URL', saved.url], ['MIKKA_LITELLM_MASTER_KEY', saved.key]] as const)
+      if (value === undefined) delete process.env[name]; else process.env[name] = value
+  })
+  const { hostedModel } = await import('../abuse/model')
+  const model = await hostedModel(workspace.id, 'mikka-default', undefined, ownerId)
   afterAdmission=async()=>{
     await pool.query(`INSERT INTO workspace_computer_policies("workspaceId",permission,model_admission)
       VALUES($1,'allow',$2) ON CONFLICT("workspaceId") DO UPDATE SET model_admission=EXCLUDED.model_admission`,

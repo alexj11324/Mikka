@@ -162,6 +162,40 @@ export function issueStatusEvent(before: { status: string }, after: { id: string
   }
 }
 
+/**
+ * A task was assigned to one of the person's Bots (Capy's `issue_activity`, "X assigned you CAP-12"). It goes into
+ * that Bot's own chat and wakes it; the Bot reads the task and decides whether to start work. One event per Bot and
+ * task revision, so a replayed save does not wake it twice.
+ */
+export function issueAssignedEvent(task: { id: string; ownerId: string; identifier: string | null; title: string; revision: number }, bot: { id: string }, actor: { name: string }): CoordinatorEventInput {
+  return {
+    userId: task.ownerId, botId: bot.id, kind: 'issue_assigned', dedupeKey: `issue_assigned:${task.id}:${bot.id}:${task.revision}`,
+    issueId: task.id, runId: null,
+    payload: { title: task.title, identifier: task.identifier, actorName: actor.name },
+  }
+}
+
+/** Longest comment text a wake carries; the Bot reads the task itself for the rest. */
+export const ISSUE_ACTIVITY_TEXT_MAX = 2000
+
+/**
+ * Someone commented on a task a Bot is assigned to, or @-mentioned a Bot in a task's comment or description (Capy's
+ * `issue_activity` for comments and mentions). Like an assignment it goes into that Bot's chat and wakes it. `key`
+ * names the comment (thread and message) or the description version, so the same activity wakes a Bot once.
+ */
+export function issueActivityEvent(task: { id: string; identifier: string | null; title: string }, bot: { id: string; ownerId: string },
+  activity: { kind: 'comment' | 'mention'; key: string; actorId: string; actorName: string; text: string | null }): CoordinatorEventInput {
+  return {
+    userId: bot.ownerId, botId: bot.id, kind: 'issue_activity', dedupeKey: `issue_activity:${task.id}:${bot.id}:${activity.key}`,
+    issueId: task.id, runId: null,
+    // Who wrote it, and whether that is the Bot's owner: anyone who may steer the task can comment on it, so the
+    // prompt quotes the text as untrusted content from that author (lib/coordinator/context.ts).
+    payload: { activity: activity.kind, title: task.title, identifier: task.identifier, actorName: activity.actorName,
+      actorId: activity.actorId, byOwner: activity.actorId === bot.ownerId,
+      ...(activity.text ? { text: activity.text.slice(0, ISSUE_ACTIVITY_TEXT_MAX) } : {}) },
+  }
+}
+
 /** The run an agent's worker tool call came from. */
 interface WorkerRun { id: string; userId: string; botId?: string | null; issueId: string | null }
 

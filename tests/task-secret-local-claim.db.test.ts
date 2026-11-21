@@ -76,14 +76,14 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const savedEnv = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
   // Use the same request adapters as the standalone API. Neither session nor
   // workspace/object authorization readers are replaced with fixture values.
-  const requestHeaders = await import('../apps/api/compat/headers')
-  const requestIntl = await import('../apps/api/compat/intl')
-  mock.module('next/headers', { namedExports: { ...requestHeaders } })
-  mock.module('next-intl/server', { namedExports: { ...requestIntl } })
+  const requestHeaders = await import('../lib/server-runtime/headers')
+  const requestIntl = await import('../lib/intl/i18n-server')
+  mock.module('@/lib/server-runtime/headers', { namedExports: { ...requestHeaders } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...requestIntl } })
   const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })

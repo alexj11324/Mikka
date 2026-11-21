@@ -2,7 +2,6 @@ import { freshSessionRoute } from '@/lib/fresh-session'
 import { governanceJson, governanceMutationSession, governanceResponse } from '@/lib/governance/http'
 import { clearCheckoutBody, writeDeviceCheckout } from '@/lib/project-resources/device-checkouts'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string; deviceId: string }> }
 
 export const POST = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

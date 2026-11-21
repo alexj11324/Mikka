@@ -1,15 +1,21 @@
 /*
- * The one glyph that lucide does not ship: a run under way (decision 2026-11-18-0300). It is lucide's `CircleDot`,
- * the static 进行中, whose ring turns as a broken arc while the run is live, as LobeHub swaps its static running glyph
- * for a turning ring of the same family. Under reduced motion it is `CircleDot` itself.
+ * The status glyphs `ISSUE_STATUSES` names, re-exported from the one mark registry
+ * (`components/workspace/state-mark.tsx`, decision 2026-11-19-1600). They keep lucide's props so a call site that
+ * passed `className` or `data-icon` still compiles: the size and the colour come from the status's own mark, which
+ * is what every call site was spelling out by hand.
+ *
+ * A run under way is the registry's too: `Mark`'s `spin` turns 进行中's own ring as a broken arc while the run is
+ * live (decision 2026-11-18-0300), so no glyph here is drawn by hand.
  */
-import { forwardRef } from 'react'
-import type { LucideIcon, LucideProps } from 'lucide-react'
+export { STATUS_ICONS as STATUS_MARKS, STATUS_ICONS } from './state-mark'
 
-/** Drawn where a lucide icon is, so it takes the same props; lucide's own sizing props are not SVG attributes. */
-export const RunningIcon = forwardRef<SVGSVGElement, LucideProps>(({ size: _size, absoluteStrokeWidth: _absolute, strokeWidth = 2, ...props }, ref) =>
-  <svg ref={ref} viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-    <circle cx="12" cy="12" r="10" className="origin-center [transform-box:fill-box] motion-safe:animate-spin motion-safe:[animation-duration:1.6s] motion-safe:[stroke-dasharray:44_19]" />
-    <circle cx="12" cy="12" r="1" />
-  </svg>) as LucideIcon
-RunningIcon.displayName = 'RunningIcon'
+import { STATUS_ICONS } from './state-mark'
+
+/** 进行中: a ring, its right half filled. */
+export const StatusProgressIcon = STATUS_ICONS.doing
+
+/** 评审中: a ring, the work done as an arc around it. */
+export const StatusReviewIcon = STATUS_ICONS.review
+
+/** 已完成: a filled disc with the check cut out. */
+export const StatusDoneIcon = STATUS_ICONS.done

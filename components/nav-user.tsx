@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDown, Languages, LogOut, Moon, Settings, Sun } from "@/components/icons"
 import { useTheme } from 'next-themes'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 
 import { usePathname, useRouter } from '@/i18n/navigation'
 

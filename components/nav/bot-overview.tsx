@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
@@ -19,6 +19,7 @@ import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } fr
 import { BotLookPicker } from './bot-look-picker'
 import { useBotPublicRole } from './bot-public-role-editor'
 import { useSaveBot } from './use-save-bot'
+import { useBotSettings } from './use-bot-settings'
 import { BotOverview } from '@ui-slot/bot-overview'
 import type { BotOverviewItem, BotOverviewProps, BotOverviewTab } from '@/components/slots/bot-overview-contract'
 
@@ -103,6 +104,10 @@ function RoleOf({ botId, workspaceId, visible, children }: { botId: string; work
   return children(useBotPublicRole(botId, workspaceId, visible))
 }
 
+function SettingsOf({ botId, workspaceId, visible, children }: { botId: string; workspaceId?: string; visible: boolean; children: (settings: BotOverviewProps['settings']) => ReactNode }) {
+  return children(useBotSettings(botId, workspaceId, visible))
+}
+
 function EditsOf({ botId, workspaceId, color, shape, children }: { botId: string; workspaceId?: string; color?: string; shape?: string; children: (edit: BotOverviewProps['edit']) => ReactNode }) {
   return children(useBotEdits(botId, workspaceId, color, shape))
 }
@@ -148,9 +153,10 @@ export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery
     }).filter(group => group.rows.length),
   }
   const glance = botGlance(threads, issues)
-  const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
-    edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
+  const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit'], settings: BotOverviewProps['settings'] = null) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
+    edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} settings={settings} dialogs={dialogs} />
   if (!botId) return draw(null, null)
   return <RoleOf key={botId} botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{role =>
-    <EditsOf botId={botId} workspaceId={workspaceId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>
+    <SettingsOf botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{settings =>
+      <EditsOf botId={botId} workspaceId={workspaceId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit, settings)}</EditsOf>}</SettingsOf>}</RoleOf>
 }

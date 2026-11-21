@@ -1,5 +1,5 @@
 import 'server-only'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { MOBILE_APP_ORIGIN } from '@/lib/auth'
 import { auth } from '@/lib/api-auth'
 import { appOrigin } from '@/lib/mcp/resource'

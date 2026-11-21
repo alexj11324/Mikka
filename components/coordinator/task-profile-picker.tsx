@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowUpRight, SlidersHorizontal } from '@/components/icons'
 import { ProfileMark } from '@/components/labels/profile-mark'
 import { resolveProfileMark } from '@/lib/factory/agent-profile-mark'

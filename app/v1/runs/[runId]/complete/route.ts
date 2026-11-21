@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { runCompleteRequest } from '@mikka/protocol/run'
@@ -19,7 +19,6 @@ import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { maskDeep } from '@/lib/secrets/mask'
 import { judgeRunOutcome } from '@/lib/run-outcome-judge'
 
-export const dynamic = 'force-dynamic'
 // The run's bounded recording finalizer finishes before its terminal receipt.
 export const maxDuration = 120
 

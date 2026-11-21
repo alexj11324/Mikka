@@ -12,12 +12,22 @@
     "components/agents/",
     "components/ai-elements/"
   ],
+  "frameworkShims": {
+    "$comment": "Link, Script and dynamic are the browser leaf this repository owns after retiring Next.js. A framework shim must call the JSX factory and create DOM elements itself, which is what components/no-element-factory and components/no-custom-implementation forbid in business code. Files under these paths drop only those two rules; style, typography, motion, control-size, interaction and icon rules still apply. See docs/design/decisions/2026-11-18-1500-retire-next-dependency.md.",
+    "paths": [
+      "lib/client-runtime/"
+    ]
+  },
   "asShipped": {
     "$comment": "Paid blocks and components are used as shipped: only data and text change. Files under these paths skip style/semantic-colors and typography/preset-only; every other rule applies. See docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md. Empty: paid source is not allowed in this repository; the hosted list is in its AGENTS.md.",
     "public": []
   },
   "typography": {
     "cssTokens": {
+      "--text-3xs": "0.625rem",
+      "--text-3xs--line-height": "0.875rem",
+      "--text-2xs": "0.6875rem",
+      "--text-2xs--line-height": "1rem",
       "--text-xs": "0.75rem",
       "--text-xs--line-height": "1.125rem",
       "--text-sm": "0.8125rem",
@@ -37,6 +47,8 @@
       "font-synthesis": "none"
     },
     "sizes": [
+      "3xs",
+      "2xs",
       "xs",
       "sm",
       "md",

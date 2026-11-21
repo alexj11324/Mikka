@@ -97,6 +97,11 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   // A chat attachment is read, and removed from the composer, by the same person.
   [new RegExp(`^/api/chat/attachments/${ID}$`), ['GET', 'DELETE']],
   [new RegExp(`^/api/tasks/${ID}/attachments$`), ['GET', 'POST', 'DELETE']],
+  // New-task dictation (S2) transcribes one recording for the signed-in member.
+  [/^\/api\/tasks\/dictation$/, ['POST']],
+  // PR directory (S3): one PR's preview reads its detail and merges it; both re-check the reader's repository access.
+  [/^\/api\/integrations\/github\/repositories\/pulls\/detail$/, ['GET']],
+  [/^\/api\/integrations\/github\/repositories\/pulls\/merge$/, ['POST']],
   [new RegExp(`^/api/artifacts/shared/${ID}$`), ['GET']],
   [new RegExp(`^/api/(?:mobile/(?:bots|artifacts)/${ID}|runs/${ID}/evidence)$`), ['GET']],
   [new RegExp(`^/api/factory/(?:agent-profiles/${ID}|tasks/${ID}(?:/(?:approval|dispatch(?:/cloud)?|evidence/${ID}))?|questions/${ID}(?:/recover)?|monitor-incidents/${ID}/links)$`), ['GET', 'POST', 'PATCH', 'DELETE']],
@@ -120,7 +125,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
-  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
+  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments' || path === '/api/settings/thread-titles') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'
