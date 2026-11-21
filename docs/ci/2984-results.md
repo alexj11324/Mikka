@@ -539,9 +539,144 @@ own paths, with original Owner worktrees and databases left intact. Temporary
 callers use the project's existing `tsx` loader on Node22 and the locked `pg`
 client when that PostgreSQL package lacks the optional `createdb` CLI. These
 environment adaptations do not alter fixture source or assertions. The completed
-Small browser failure is recorded above; the full local-gate outcomes remain
-pending their finished receipts. Transfer, dependency installation or process
+Small browser failure is recorded above; the later completed local-gate
+failures and genuine database successes are recorded below. Transfer,
+dependency installation or process
 startup is not acceptance.
+
+### Shared fixtures, source selection and duplicate work: later exact-source findings
+
+The original full local gate exposed additional common test infrastructure
+defects after ordinary IPC was available on the existing Small environment.
+These are independent #2984 repairs. The original product, fake-model and chat
+Owners retain their work. None of the following Drafts is counted as a merged
+delivery, and none of their focused results replaces the full local gate or
+protected CI.
+
+| Finding / exact candidate | Before | Actual after / qualification boundary |
+| --- | --- | --- |
+| SDLC-011, [#3008](https://github.com/aspectly-labs/Mikka/pull/3008), `7d9381ec6411873ba5c9864b65811c16b97e5e26` | Six existing billing fixtures implicitly inherited CI's Cloud edition; a clean local environment correctly defaults to Community. Original unit result37=31pass/6fail. Five affected original DB entries also fail at their Cloud preconditions. | Explicit fixture-owned Cloud setup/restoration gives original37/37, independent inherited-Community37/37, Stripe5/5 and edition3/3. Original PG17.12 entries card7/7, history1/1, credits8/8, personal13/13 and model-order22/22 exit0 under their unchanged owning-package flags. Counts retain original TAP suite structure. The exact7d whole gate still fails at the later agent-kit stage after196.707671763s. |
+| SDLC-012, [#3009](https://github.com/aspectly-labs/Mikka/pull/3009), `24fd353652cdaac5aec8337d9876815e8e26511b` | Synthetic clients lacked real commit observation/native transaction acknowledgements; adjacent response work escaped its unit fixture. Initial27 cases have3failures; eight later original file entries reproduce their own failures. | Existing observer, transaction responses and response-scheduler seam repair nine original fixture paths. Original agent-kit59/59+168/168 and eight adjacent file entries pass without skips or forced exit. All five owning scripts eventually pass on their recorded inputs. The first coordinator caller's Cloud+HTTP failure remains: only its caller URL changes to synthetic HTTPS, then all nine original legs pass54.472185893s. This is not one all-green whole-check run. |
+| SDLC-013, [#3010](https://github.com/aspectly-labs/Mikka/pull/3010), `adeee8809f60d056cbfd7f5a7d3b305a3d653837` | Postpay's business assertion passes, but an independent builtin-gateway PostgreSQL client remains open after fixture pools close. Native `SELECT pg_notify($1,$2)` and230s idle state establish ownership; diagnostic SIGTERM later makes the original invocation fail. | The existing `ownLiveRuntime(t)` lifecycle closes the gateway before fixture pools. Unchanged business body naturally completes1/1,0skip/cancel,3.350166586s, with PGstop0/status3/noPID. Manual diagnostic waiting is not a speedup denominator. |
+| SDLC-014, [#3012](https://github.com/aspectly-labs/Mikka/pull/3012), `bd0a4fabb367406609ca30c87870d25ac10bf75b` | Validated root DB fixtures were unknown to `select.area`, forcing the complete graph despite real inventory/task edges. Original selector RED32=31pass/1fail. | Same seven-file `304e124c2f1a56a8d88a15c9b8bbed53b02953bc` diff and graph:87DB/94unit becomes8DB/15unit. All three direct DB owners and five original reverse consumers remain selected. Original144/144 cases pass; GLOBAL/unknown/missing-edge/mode/migration/frozen guards remain. These are selection counts, not runtime or CI wall-time savings. The selector-changing PR itself still selects all87DB. |
+| SDLC-015, [#3023](https://github.com/aspectly-labs/Mikka/pull/3023), `c32d27e7bcde11c57c19d0b1713a827ad77a170e` | Local preflight fabricates100644 and discards native Git modes. Two actual cases—unstaged100644→100755 and newly staged120000 symlink—incorrectly select `full=false`, while the original selector with the same raw metadata correctly selects full. Original local suite RED13=9pass/4fail. | Native raw records retain all distinct Git layers and original object/mode identities; untracked uses `lstat`. Same local test blob plus original selector cases42/42,0skip,12.799240488s. Actual graph cases2/2 now match the original full87DB lists. Those87 entries were selected, not executed. |
+| SDLC-016, [#3024](https://github.com/aspectly-labs/Mikka/pull/3024), `6594e5093fd61e34f0aff215a7275bce20e026a4` | Exact main59b CI44852387451/1 jobs136686904731 and136686904801 both execute the same approved-writes24files/94pass/0skip on Node24.22.3. Their31.453223079s/22.714932922s are duplicated parallel runner work, not additional critical-path time. | Preserve core-30 and its trusted task identity; move the nested integrations call to the same position in literal `check`. Original54/54 selector/runner/frozen cases and approved-writes94/94 plus all seven integration legs pass; original local:check67.646s remains `ready:false`. All94 task identities,93 unaffected task inputs,1603-file input union and expanded local-check sequence are preserved. Real protected-CI after measurement is pending. |
+
+The complete source-bound measurements, original failures, commands, hashes,
+Owner exclusions and review boundaries are retained in the
+[billing fixture evidence](2984-billing-fixtures-evidence.json),
+[expanded transaction fixture evidence](2984-agent-kit-fixture-expanded.json),
+[postpay lifecycle evidence](2984-billing-live-cleanup-evidence.json),
+[DB selection evidence](2984-db-selection-evidence.json),
+[local Git-mode evidence](2984-local-modes-evidence.json) and
+[approved-writes duplicate evidence](2984-approved-writes-dedup.json).
+The expanded fixture JSON's original012 snapshot points to its unchanged
+[historical bdec evidence file](https://github.com/aspectly-labs/Mikka/blob/bdec301935a3ad2b07e14e7a24d03adcd16d5434/docs/ci/2984-agent-kit-fixture.json),
+SHA256 `312c3f38ef1871c7dbc66b5bd6674254da1f51f97fbe63793c6ef709ec82a405`;
+that older snapshot and review do not cover the expanded candidate.
+The audit's125 transaction-call candidates are candidates, not125 defects.
+Different runtime/environment test variants are retained; repeated filenames
+alone do not justify removing them.
+The four adjacent billing DB entries retain their original `--test-force-exit`
+flag; their passing assertions do not prove natural process cleanup. The card
+entry, postpay lifecycle regression and both complete integrated abuse-db legs
+have no such flag and have separately observed natural completion. No force-exit
+flag was added or removed by this work.
+
+Site search is also an independent `test:integrations` caller. It loses that
+incidental approved-writes invocation, while its actual search inputs,
+compiled HTTP, Better Auth and dual PostgreSQL17 checks remain unchanged.
+The complete approved-write proof remains in Core and the root check. Site's
+different environment is a separate necessity judgment and is excluded from
+the measured two-Cloud-lane same-input duplicate sample.
+
+#### Minimal shared-fixture integration and the exact whole-gate failure
+
+Only011/012/013 share the concrete complete-gate dependency in
+[#3011](https://github.com/aspectly-labs/Mikka/pull/3011), branch
+`batch/sdlc-2984-local-fixtures`. Normal parents304e+24fd produce head
+`219574cf8e13e0513bccd53eb1f6f0559e034af1`, tree
+`137607871f9ef890007eb953e520e219779232b9`. All19 modified paths preserve
+their original child-PR blobs. Other CI, marketing, selection, documentation
+and product changes are outside this integration. This concrete integration
+does not adopt this Draft ADR before it merges or change another Owner's batch.
+
+One exact219 original `local:ready --test=check --test=test:abuse-db` invocation
+on Small, native process181, finishes **exit1**, gate277.291715436s and
+whole310.047660923s. Original daemon, billing37/37 and agent-kit59/59+168/168
+pass. The unchanged `check:agent-ui` then fails `ERR_NO_TYPESCRIPT`: that
+environment's Node22.22.1 binary was compiled without TypeScript support.
+An additional native-cache ENOSPC fallback warning is retained separately;
+it does not prove the cause of this TypeScript failure or an OOM.
+
+The original runner subsequently executes both complete abuse-db legs:
+**26/26 and5/5,0skip/cancel, natural completion**. Own PG17.12/396 is normally
+stopped with stop0/status3/noPID, and source/tree end clean. These are genuine
+complete DB-entry results on the integrated helper, while the whole gate is
+still failed. Original local-ready writes no record on failure, so its
+individual receipt exits remain null rather than being invented from TAP.
+Receipt SHA256 is
+`99504da5912ebf5d360a06e298aca905596cc0ccfe40e2afd4f2d210403574d2`.
+
+The smallest unchanged failing entry, `pnpm run check:agent-ui`, subsequently
+passes on exact219 with the existing supported host Node24.22.3 and pnpm10.34.3:
+exit0,3.380461599s,121 component definitions, stderr empty, source/tree clean.
+Its receipt SHA256 is
+`8788806341553cfee21693c38f477a1fa167bc8a87ccb43e2278647fc7d0d314`.
+The project supports Node22/24 and pins major24; this identifies a particular
+binary capability, not a general Node22 incompatibility. The
+[independent environment diagnosis](2984-node-typescript-diagnosis.json)
+retains all13 unchanged control blobs and the original failed attempt.
+Another full gate requires admission of the actual supported target binary
+and its unchanged failing entry first. Adding a loader to the original gate,
+removing its native TypeScript option or relabelling the old failure would not
+be a valid repair.
+
+#### Development UI environment: distinct failure and verified recovery
+
+The documented original `dev:local` path is a separate development graph from
+the retained official compiled fixture. Fixed publicd30 and the same exact
+official UI pin are preserved. On Small, original PG17.12/396 preparation and
+zero-user account bootstrap pass, but `dev:local` exits before readiness:
+native173,whole47.016473322s, `EVE_SERVICE_EXITED`, no browser started and
+**0/2 completed journeys**. The locked Eve source ties its diagnostic to
+SIGKILL. No pre-run OOM counter was captured, cgroup memory counters were
+unavailable, and kernel logs were inaccessible; cumulative `oom_kill=4`
+therefore does not prove this event was an OOM.
+
+Own PG cleanup is confirmed. Immediate application-descendant cleanup was
+unconfirmed; a later read-only native175 snapshot finds no exact task-owned
+application process. The later snapshot does not rewrite the immediate
+receipt. The historical receipt's phase label incorrectly names the last
+completed bootstrap; the
+[safe development diagnosis](2984-d-development-inspect-sigkill.json)
+corrects that classification while preserving the original bytes and the
+[native observation addendum](2984-d-development-native-readonly-addendum.json).
+
+After this actual Small failure, an existing previously stopped Medium for a
+closed task is reused, following Small→Medium. No resource is created. Exact
+public Git closure and official private source are recovered clean; one source
+transport deadline is retained and its five verified complete parts reused.
+Public frozen install39.063892693s and original private frozen install5.301853336s
+then pass on the unchanged locks. Only the verified PG17.12 binary package is
+copied, with no database data. A browser archive has291of293 source entries,
+so it is rejected. Original pinned Playwright1.64.1 installs Chromium headless
+1248 through its normal command in6.000969459s; actual version
+156.0.8078.4 and native libraries are verified. The preparation's native318
+exit0/59.708240274s receipt SHA256 is
+`1dca7e1686f7d5cc4ff15aa8a73e8ccd4f6656c9781d004362df0d456fa7cf24`.
+The [original preparation receipt](2984-medium-runtime-preparation.json)
+preserves each command's exit, duration and log hashes without private source
+or credentials. This proves tool restoration, not a browser journey or
+product acceptance.
+
+Medium's existing Node24.22.2 reports TypeScript `strip`; it is reserved for
+the separately recorded full-gate environment. The D development pairing
+remains Node22.22.1 with its previously used locked `tsx` caller. Source,
+toolchain and environment receipts are not moved between these purposes.
+Original#2969 still owns the compiled fixture edition omission; original
+#2891 publication/fake fixes and#2912 chat assertion conflicts are tracked in
+their existing PRs rather than duplicated here.
 
 ## E. Independent delivery and exact post-merge evidence
 
@@ -663,7 +798,8 @@ staging admission and production acceptance. The child's corrected startup and
 the third B1 HTTP/DB regression are now independently observed; a completed
 browser journey is not. This
 remediation still owns private #418's applicable current-head security checks,
-normal merge/regression, the four later public repairs in the checkpoint table,
+normal merge/regression, the later public repairs in the checkpoint table and
+the shared-fixture, selection and duplicate-work repairs recorded above,
 completed protected post-merge observations and this documentation PR's own
 review/CI/merge. The automatic-E2B event contract repair
 is merged and independently verified at its merge source; live publication is

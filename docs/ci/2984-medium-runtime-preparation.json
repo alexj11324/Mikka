@@ -1,0 +1,197 @@
+{
+  "startedAt": "2026-11-21T05:13:52.424214+00:00",
+  "scope": "Restore existing PG17.12 package, install exact public/private locked dependencies and original pinned Playwright headless browser; no database, build, application, browser session or model call",
+  "source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+  "tree": "33348a5d313ee170a1ec6c898edabdbda4281473",
+  "evidenceDirectory": "/home/agent/sdlc-2984/medium-runtime-preparation-20261121T051352.423633Z",
+  "steps": [
+    {
+      "name": "paired-node-capability",
+      "args": [
+        "node",
+        "-p",
+        "JSON.stringify({version:process.version,typescript:process.features.typescript??null,arch:process.arch,platform:process.platform})"
+      ],
+      "startedAt": "2026-11-21T05:13:52.636125+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.20685022700126865,
+      "stdoutSha256": "16f2c1a38c869a96e2eb4476607dc3a38d5249fde66ec49e6c461e4c36f66bdd",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "pinned-pnpm",
+      "args": [
+        "pnpm",
+        "--version"
+      ],
+      "startedAt": "2026-11-21T05:13:52.843808+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.8436429789981048,
+      "stdoutSha256": "b56120c37d13e5e38e8b44c69156e36cc55e4885d4a1c108e130a503457ae941",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "existing-node24-capability",
+      "args": [
+        "/var/lib/mikka-dev/node-v24.22.2-linux-x64/bin/node",
+        "-p",
+        "JSON.stringify({version:process.version,typescript:process.features.typescript??null,arch:process.arch,platform:process.platform})"
+      ],
+      "startedAt": "2026-11-21T05:13:53.690412+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.6490050329994119,
+      "stdoutSha256": "dc3c5ae0fe1010cb6c51f8ba8f187fafceb8020f970eba9fe7b0bc981857d088",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "extract-verified-pg17.12",
+      "args": [
+        "tar",
+        "-xzf",
+        "/home/agent/sdlc-2984/toolchains/pg17-12-package.tar.gz",
+        "-C",
+        "/home/agent/sdlc-2984/toolchains/pg17.12"
+      ],
+      "startedAt": "2026-11-21T05:13:55.763644+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.6306679180015635,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "pg17.12-version",
+      "args": [
+        "/home/agent/sdlc-2984/toolchains/pg17.12/package/native/bin/postgres",
+        "--version"
+      ],
+      "startedAt": "2026-11-21T05:13:56.414962+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.009495517999312142,
+      "stdoutSha256": "76209c0de9003b9dbdfce55efb16134af004cd50349b0093bd8e0618b5a5d093",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "public-frozen-install",
+      "args": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile",
+        "--prefer-offline",
+        "--store-dir",
+        "/home/agent/.local/share/pnpm/store",
+        "--package-import-method=hardlink"
+      ],
+      "startedAt": "2026-11-21T05:13:56.425297+00:00",
+      "exitCode": 0,
+      "wallSeconds": 39.063892693000525,
+      "stdoutSha256": "0ce0db08d9e21079e759dba645f8e87040b514efdd76ed592fb3d8e53b746663",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "private-original-frozen-install",
+      "args": [
+        "python3",
+        "/home/agent/sdlc-2984/private-dev-source/install-ui-dependencies.py"
+      ],
+      "startedAt": "2026-11-21T05:14:35.556943+00:00",
+      "exitCode": 0,
+      "wallSeconds": 5.3018533360009314,
+      "stdoutSha256": "fe1754e11083774fada125e8f32d29d3fda94e2d973e6d26bdffdae1e1057309",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "original-playwright-version",
+      "args": [
+        "pnpm",
+        "exec",
+        "playwright",
+        "--version"
+      ],
+      "startedAt": "2026-11-21T05:14:40.900690+00:00",
+      "exitCode": 0,
+      "wallSeconds": 1.3459045730014623,
+      "stdoutSha256": "4901ec0877db7d2570d7a819257096c4fd2f395fa3c64fa700eb4af1468def59",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "original-playwright-install",
+      "args": [
+        "pnpm",
+        "exec",
+        "playwright",
+        "install",
+        "chromium",
+        "--only-shell"
+      ],
+      "startedAt": "2026-11-21T05:14:42.247471+00:00",
+      "exitCode": 0,
+      "wallSeconds": 6.000969459000771,
+      "stdoutSha256": "b8f817191a686d595ba113489f306dc636fbf5e24a1ee21cdbebb7bc84fd20ae",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "headless-browser-version",
+      "args": [
+        "/home/agent/sdlc-2984/browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell",
+        "--version"
+      ],
+      "startedAt": "2026-11-21T05:14:48.682286+00:00",
+      "exitCode": 0,
+      "wallSeconds": 3.203564806997747,
+      "stdoutSha256": "dda01c13b4e730c9c5f5cb71be35ebec555c280068671c5f9211085502f4f02f",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "headless-browser-libraries",
+      "args": [
+        "ldd",
+        "/home/agent/sdlc-2984/browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell"
+      ],
+      "startedAt": "2026-11-21T05:14:51.987990+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.0346305780003604,
+      "stdoutSha256": "4c5d45bef112d09ac54fae2f334f4455f63b7e57b244849e3c45ee9b60bd9cb9",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "phase": "headless-browser-libraries",
+  "node22": {
+    "version": "v22.22.1",
+    "typescript": false,
+    "arch": "x64",
+    "platform": "linux"
+  },
+  "existingNode24": {
+    "version": "v24.22.2",
+    "typescript": "strip",
+    "arch": "x64",
+    "platform": "linux",
+    "path": "/var/lib/mikka-dev/node-v24.22.2-linux-x64/bin/node",
+    "sha256": "904a6d3484241d466989f9df9ba3aab822b1496191bdb28230eb491a55c32a52"
+  },
+  "freeBytesBefore": 17997676544,
+  "postgresVersion": "postgres (PostgreSQL) 17.12",
+  "postgresBinaryDirectory": "/home/agent/sdlc-2984/toolchains/pg17.12/package/native/bin",
+  "privateDependencyReceipt": {
+    "status": "passed",
+    "installExit": 0,
+    "wallSeconds": 5.144222979000915,
+    "privateSourceUnchanged": true,
+    "publicSourceUnchanged": true,
+    "lockUnchanged": true,
+    "evidenceDirectory": "/home/agent/sdlc-2984/private-dev-source/dependency-install-20261121T051435.702118Z"
+  },
+  "playwrightVersion": "Version 1.64.1",
+  "browser": {
+    "path": "/home/agent/sdlc-2984/browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell",
+    "sha256": "4fa61f0ba0b4f89b7bec242c32ca16d3bccf69dbfef0651924a9ba8fede5f9d6",
+    "cache": "/home/agent/sdlc-2984/browsers",
+    "revision": 1248,
+    "version": "Google Chrome for Testing 156.0.8078.4"
+  },
+  "sourceAndLocksUnchanged": true,
+  "status": "passed",
+  "wallSeconds": 59.708240273997944,
+  "finishedAt": "2026-11-21T05:14:52.132456+00:00",
+  "freeBytesAfter": 17136799744
+}

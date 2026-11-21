@@ -1,0 +1,741 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-21T03:49:25.115520+00:00",
+  "issue": 2984,
+  "finding": "SDLC-011",
+  "repository": "aspectly-labs/Mikka",
+  "pr": 3008,
+  "branch": "feat/sdlc-2984-billing-fixtures",
+  "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+  "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+  "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+  "status": "in_progress; protected delivery and complete local verification not yet established",
+  "rootCause": "Existing hosted billing fixtures inherited workflow-global Cloud edition. Ordinary local environment defaults to Community; runtime metering is eagerly fixed at module import. Fix each affected fixture before import and restore its original environment. Product Community and Stripe refusal rules remain unchanged.",
+  "changedFiles": [
+    "lib/abuse/card.db.test.ts",
+    "lib/abuse/card.test.ts",
+    "tests/billing-history.db.test.ts",
+    "tests/credit-shares.db.test.ts",
+    "tests/model-order.db.test.ts",
+    "tests/personal-workspace.db.test.ts"
+  ],
+  "sourceBlobs": {
+    "lib/abuse/card.db.test.ts": "e06687d2641ff189a3547f77f3d2bbed93358ff4",
+    "lib/abuse/card.test.ts": "8c649fb958282a36677e47b1f7276c581430d0f3",
+    "tests/billing-history.db.test.ts": "fbd533c1acfc5229a31271de7df56d17997c2cd4",
+    "tests/credit-shares.db.test.ts": "67a895aa55626fb114fd64d9b1e5f461ac14b06c",
+    "tests/model-order.db.test.ts": "0cc673f209702f0b39341fb89c57db1b777ba8a3",
+    "tests/personal-workspace.db.test.ts": "08dd51b643626d1721728dd942b447e7323faf6a",
+    "lib/abuse/card.ts": "d74e0b228b0a616804a76ca7861de16c02a0966e",
+    "lib/abuse/runtime.ts": "176e1ac04c9c5637199238a89e6f6b1805bc1f3d",
+    "lib/billing/stripe.ts": "a3b82a73445138ddd86741657cd19ee81d48c98a",
+    "lib/edition.ts": "bbee750760addebb58147a4913fa77d709e886c9",
+    "lib/billing/history.ts": "12420abdd0f2e2ccd89a4d7be66740e2d96362bc",
+    "lib/credit-shares.ts": "d0e158f1b10a5646de848db20defaad9cff0e40c",
+    "lib/points-fallback.ts": "754245f766a73bf6bf80ed759433517743032c15",
+    "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+    "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+    ".github/workflows/ui-policy.yml": "e1a534079ec6916e45da4555042ea003af2032bf"
+  },
+  "productAndGateBlobsEqualBase": [
+    "lib/abuse/card.ts",
+    "lib/abuse/runtime.ts",
+    "lib/billing/stripe.ts",
+    "lib/edition.ts",
+    "lib/billing/history.ts",
+    "lib/credit-shares.ts",
+    "lib/points-fallback.ts",
+    "package.json",
+    "pnpm-lock.yaml",
+    ".github/workflows/ui-policy.yml"
+  ],
+  "before": [
+    {
+      "scope": "test:abuse",
+      "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "command": [
+        "pnpm",
+        "test:abuse"
+      ],
+      "exit": 1,
+      "wallSeconds": 2.332974431999901,
+      "counts": {
+        "tests": 37,
+        "pass": 31,
+        "fail": 6,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/billing-fixture-2984/red-070/receipt.json",
+        "sha256": "410205f6332e958b59b47f106f307548086e1a72e2a509af4fc334116cfb6021",
+        "bytes": 1502
+      },
+      "stdoutSha256": "80fbbbcd7aff3fe7965eabb6d019f2591ae8d5f18b7f2ac306bed25fad0e518f",
+      "cleanup": null,
+      "boundary": "Original Node counts include parent tests where applicable; no aggregate of independent root causes is inferred."
+    },
+    {
+      "scope": "card.db",
+      "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "command": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/abuse/card.db.test.ts"
+      ],
+      "exit": 1,
+      "wallSeconds": 1.4681499959988287,
+      "counts": {
+        "tests": 7,
+        "pass": 0,
+        "fail": 7,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/billing-fixture-2984/card-db-red-070/receipt.json",
+        "sha256": "6a2f4c96da85bfa22c4f3230a561d7b5c45ed14d4dc2834d5f4b5329e10d9a11",
+        "bytes": 7780
+      },
+      "stdoutSha256": "f9b5ee1f25e58900638187e77239bf2040117ce42fba25ab1a51d28446b22110",
+      "cleanup": {
+        "stopExit": 0,
+        "statusExit": 3,
+        "pidPresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "boundary": "Original Node counts include parent tests where applicable; no aggregate of independent root causes is inferred."
+    },
+    {
+      "scope": "billing-history.db",
+      "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "command": [
+        "node",
+        "--test-force-exit",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/billing-history.db.test.ts"
+      ],
+      "exit": 1,
+      "wallSeconds": 1.6981738020003831,
+      "counts": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/billing-adjacent-review/history-red-070/receipt.json",
+        "sha256": "194a453e0c90d5a099edc09edf25097f355af274b4fbdbba28dd81708f17765b",
+        "bytes": 7853
+      },
+      "stdoutSha256": "7795c57c1a8ceba2be1ed572a6af123d02da279e565c0d30d53b0a5bc229b1b1",
+      "cleanup": {
+        "stopExit": 0,
+        "statusExit": 3,
+        "pidPresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "boundary": "Original Node counts include parent tests where applicable; no aggregate of independent root causes is inferred."
+    },
+    {
+      "scope": "credit-shares.db",
+      "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "command": [
+        "node",
+        "--test-force-exit",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/credit-shares.db.test.ts"
+      ],
+      "exit": 1,
+      "wallSeconds": 1.8211920660014584,
+      "counts": {
+        "tests": 8,
+        "pass": 2,
+        "fail": 6,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/billing-adjacent-review/shares-personal-red-070/receipt.json",
+        "sha256": "4b7ddabf813181b4ece20825421f453a0b7e1ea446496fb0948c9535441036e5",
+        "bytes": 9101
+      },
+      "stdoutSha256": "d95da2fa6e3f9ed0412a6e2dbc5394d6b2eece897c0c1fcf93489c050b16c937",
+      "cleanup": {
+        "stopExit": 0,
+        "statusExit": 3,
+        "pidPresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "boundary": "Original Node counts include parent tests where applicable; no aggregate of independent root causes is inferred."
+    },
+    {
+      "scope": "personal-workspace.db",
+      "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "command": [
+        "node",
+        "--test-force-exit",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/personal-workspace.db.test.ts"
+      ],
+      "exit": 1,
+      "wallSeconds": 3.743494661999648,
+      "counts": {
+        "tests": 13,
+        "pass": 10,
+        "fail": 3,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/billing-adjacent-review/shares-personal-red-070/receipt.json",
+        "sha256": "4b7ddabf813181b4ece20825421f453a0b7e1ea446496fb0948c9535441036e5",
+        "bytes": 9101
+      },
+      "stdoutSha256": "c04ec2764f49d79f6da4031c5edafbcdd2c356f3a1cb673b4b822b06f97212ee",
+      "cleanup": {
+        "stopExit": 0,
+        "statusExit": 3,
+        "pidPresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "boundary": "Original Node counts include parent tests where applicable; no aggregate of independent root causes is inferred."
+    },
+    {
+      "scope": "model-order.db",
+      "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "--experimental-test-module-mocks",
+        "--test-force-exit",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/model-order.db.test.ts"
+      ],
+      "exit": 1,
+      "wallSeconds": 3.35408416700011,
+      "counts": {
+        "tests": 22,
+        "pass": 20,
+        "fail": 2,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/billing-adjacent-review/model-order-red-070/receipt.json",
+        "sha256": "28af5e5af8a14989ef7bb21272b8a107c41ba95ed6e7140a4ba5de420e1d7ae0",
+        "bytes": 7994
+      },
+      "stdoutSha256": "847c457cba90ece56ff63457f313d26a7b556fa9774a76f8631b26d462134eac",
+      "cleanup": {
+        "stopExit": 0,
+        "statusExit": 3,
+        "pidPresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "boundary": "Original Node counts include parent tests where applicable; no aggregate of independent root causes is inferred."
+    }
+  ],
+  "after": {
+    "defaultUnit": {
+      "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+      "command": [
+        "pnpm",
+        "local:check",
+        "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "--test=test:abuse"
+      ],
+      "counts": {
+        "tests": 37,
+        "pass": 37,
+        "fail": 0,
+        "skip": 0
+      },
+      "exit": 0,
+      "outerSelectorAndUnitWallSeconds": 14.186614921,
+      "partialSnapshot": {
+        "path": "research/billing-fixture-2984/host-partial-7d/observation.json",
+        "sha256": "1d0203e737fc0412cfac87235c5177b9a3b0048c8a76d88bac7906571d79f0fd",
+        "bytes": 2203
+      },
+      "timingBoundary": "The outer local selector plus unit command is not directly comparable to the earlier direct pnpm test:abuse timing."
+    },
+    "independentCommunityUnit": {
+      "actualSource": "6c5d87a4363c98f045460184e3e86d0fd7eb6040",
+      "testedInputBlobsEqualCandidate": true,
+      "counts": {
+        "tests": 37,
+        "pass": 37,
+        "fail": 0,
+        "skip": 0
+      },
+      "exit": 0,
+      "receipt": {
+        "path": "research/ci-validation/billing-011-community-review/pinned-pnpm-10/receipt.json",
+        "sha256": "24a9ddacbf2b846674c10c3ccd9e9408c9ddd37cc49554b4e742f3b37531a59a",
+        "bytes": 3110
+      }
+    },
+    "independentBoundaries": {
+      "stripe": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skip": 0
+      },
+      "edition": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "skip": 0
+      },
+      "receipt": {
+        "path": "research/ci-validation/billing-011-community-review/receipt.json",
+        "sha256": "d2c21bd2532c0897a97040e5f1b762cf916f7ac9c0a7c32fefaf10e7fc18605e",
+        "bytes": 3897
+      },
+      "boundary": "The receipt also retains an initial pnpm11 pre-suite failure with zero cases. The two direct original Node boundary commands passed; the later pinned-pnpm10 original unit invocation is separately recorded."
+    },
+    "abuseDb": {
+      "state": "interrupted/incomplete original host command; tool control session returned exit130",
+      "firstLegCounts": {
+        "tests": 26,
+        "pass": 26,
+        "fail": 0,
+        "skip": 0
+      },
+      "cardSubtreeCounts": {
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "skip": 0
+      },
+      "secondLeg": "Generation subtest success text exists, but no aggregate or enclosing command exit. No whole-suite success is claimed.",
+      "cause": "not established",
+      "cleanup": "Unconfirmed: original Python receipt still running, no pg_ctl stop/status/finally output and PID file remains. No subsequent signal or PID/file removal was attempted.",
+      "interruptEvidence": {
+        "path": "research/billing-fixture-2984/host-before-interrupt-7d/interrupt-result.json",
+        "sha256": "b29249edcf88cbd62747c877e3551c4deff251a561e1f550b83fd721949f62ed",
+        "bytes": 1279
+      },
+      "capabilityBoundary": "The original exec control session has terminated. Current exec has no matched original process and its loopback connect failed; these are observation boundaries, not proof of a still-running or orderly stopped PostgreSQL. No cloud environment status/diagnostic/stop interface is exposed for the original execution namespace.",
+      "healthySmallFollowup": {
+        "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+        "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+        "receipt": {
+          "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/receipt.json",
+          "sha256": "6a7ae3dd88d9d220600e4a268ce91742179248fee051e6592102b7a0c82ecde9",
+          "bytes": 19769
+        },
+        "rows": {
+          "card-db": {
+            "command": [
+              "node",
+              "--import",
+              "./tests/support/server-only.mjs",
+              "--import",
+              "tsx",
+              "--test",
+              "lib/abuse/card.db.test.ts"
+            ],
+            "exit": 0,
+            "wallSeconds": 2.1081828759997734,
+            "counts": {
+              "tests": 7,
+              "pass": 7,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0
+            },
+            "stdout": {
+              "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/card-db.stdout.log",
+              "sha256": "e2578a19ed1b86f5240966736c70f7fb75a5ff099d73019b537b82ecc007bbb6",
+              "bytes": 1964
+            },
+            "leafTests": 6
+          },
+          "postpay-db": {
+            "command": [
+              "node",
+              "--experimental-test-module-mocks",
+              "--import",
+              "./scripts/server-test.mjs",
+              "--import",
+              "tsx",
+              "--test",
+              "lib/abuse/model-postpay.db.test.ts"
+            ],
+            "exit": 1,
+            "wallSeconds": 426.35414421099995,
+            "counts": {
+              "tests": 2,
+              "pass": 1,
+              "fail": 1,
+              "cancelled": 0,
+              "skipped": 0
+            },
+            "stdout": {
+              "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/postpay-db.stdout.log",
+              "sha256": "0ef05f0d531139c689ddd3526e20bd02ae2a50b8b238469e83f60f43003ab913",
+              "bytes": 1489
+            },
+            "qualification": "One business assertion case completed; the second file-level failure was emitted only after the verified diagnostic SIGTERM. No natural successful command exit occurred."
+          }
+        },
+        "wholeSetupTestCleanupWallSeconds": 435.4331383360004,
+        "cleanup": {
+          "postgresStopExit": 0,
+          "postgresStatusExit": 3,
+          "pidfilePresent": false,
+          "orderlyStopConfirmed": true
+        },
+        "endingStatus": "",
+        "independentOfHostInterruptedCommand": true
+      },
+      "independentEstablishedCause": "Healthy Small reproduced the same postpay source with its business case complete, but an independently owned builtin gateway Client remained alive. Its cleanup is the separate SDLC-013 / #3010 repair; this does not retroactively establish the unavailable managed host process state."
+    },
+    "remainingFourDb": {
+      "status": "passed",
+      "actualSource": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+      "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+      "node": "v22.22.1",
+      "pnpm": "10.34.3",
+      "database": {
+        "ownedData": "/home/agent/sdlc-2984/billing-7d9381-adjacent-db-20261121T032526.799614Z/pgdata",
+        "address": "127.0.0.1",
+        "name": "mikka_2984_billing_adjacent_e2e",
+        "requireDb": true,
+        "newOwnedCluster": true,
+        "port": 40711,
+        "nativeIdentity": {
+          "database": "mikka_2984_billing_adjacent_e2e",
+          "address": "127.0.0.1",
+          "port": 40711,
+          "version": "17.12",
+          "version_number": "170012",
+          "max_locks": "512"
+        },
+        "migrationCount": 396
+      },
+      "receipt": {
+        "path": "research/billing-fixture-2984/small-adjacent-db-2026-11-21T03-25-03.355Z/receipt.json",
+        "sha256": "486a831ad68f8259a689bc76530be315892f34a08a02a6effad9df7241f8a7f9",
+        "bytes": 21759
+      },
+      "rows": [
+        {
+          "scope": "billing-history",
+          "command": [
+            "node",
+            "--test-force-exit",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/billing-history.db.test.ts"
+          ],
+          "exit": 0,
+          "wallSeconds": 1.6270391389989527,
+          "counts": {
+            "tests": 1,
+            "pass": 1,
+            "fail": 0,
+            "skip": 0,
+            "cancel": 0,
+            "leafTests": 1
+          },
+          "stdout": {
+            "path": "research/billing-fixture-2984/small-adjacent-db-2026-11-21T03-25-03.355Z/billing-history.stdout.log",
+            "sha256": "0a5b4b8cf2c3467d5aee98549433954f3b3b0d4082269ba209fcb1ad1ed3c090",
+            "bytes": 323
+          }
+        },
+        {
+          "scope": "credit-shares",
+          "command": [
+            "node",
+            "--test-force-exit",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/credit-shares.db.test.ts"
+          ],
+          "exit": 0,
+          "wallSeconds": 2.0365128890007327,
+          "counts": {
+            "tests": 8,
+            "pass": 8,
+            "fail": 0,
+            "skip": 0,
+            "cancel": 0,
+            "leafTests": 7
+          },
+          "stdout": {
+            "path": "research/billing-fixture-2984/small-adjacent-db-2026-11-21T03-25-03.355Z/credit-shares.stdout.log",
+            "sha256": "089e23bb9e67335acabc9b76af83111c45f6ea39d31151618d6ffc1eb2758fa7",
+            "bytes": 1725
+          }
+        },
+        {
+          "scope": "personal-workspace",
+          "command": [
+            "node",
+            "--test-force-exit",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/personal-workspace.db.test.ts"
+          ],
+          "exit": 0,
+          "wallSeconds": 3.2651175369974226,
+          "counts": {
+            "tests": 13,
+            "pass": 13,
+            "fail": 0,
+            "skip": 0,
+            "cancel": 0,
+            "leafTests": 12
+          },
+          "stdout": {
+            "path": "research/billing-fixture-2984/small-adjacent-db-2026-11-21T03-25-03.355Z/personal-workspace.stdout.log",
+            "sha256": "397762f8b89020200c5f75b3f1401ff3fab102169367846e1a719b147e76be39",
+            "bytes": 3628
+          }
+        },
+        {
+          "scope": "model-order",
+          "command": [
+            "node",
+            "--test-reporter=tap",
+            "--experimental-test-module-mocks",
+            "--test-force-exit",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/model-order.db.test.ts"
+          ],
+          "exit": 0,
+          "wallSeconds": 3.602059377997648,
+          "counts": {
+            "tests": 22,
+            "pass": 22,
+            "fail": 0,
+            "skip": 0,
+            "cancel": 0,
+            "leafTests": 21
+          },
+          "stdout": {
+            "path": "research/billing-fixture-2984/small-adjacent-db-2026-11-21T03-25-03.355Z/model-order.stdout.log",
+            "sha256": "b8949a45ee4b9da734e9c5dec65ad151df56fa65cf16f00d4fbd62491e81e476",
+            "bytes": 6843
+          }
+        }
+      ],
+      "wholeSetupTestCleanupWallSeconds": 20.653260987997783,
+      "cleanup": {
+        "postgresStopExit": 0,
+        "postgresStatusExit": 3,
+        "pidfilePresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "endingStatus": "",
+      "totalNodeTests": 44,
+      "totalLeafTests": 41,
+      "boundary": "Four original files, one native Small invocation each; counts retain Node parent tests. They are independent of the interrupted host abuse-db command."
+    },
+    "lint": {
+      "path": "research/billing-fixture-2984/lint-7d9381ec6411/receipt.json",
+      "sha256": "10f10bfe31f046835584108cbec408fcae07e9440751db0f37ae779c2897a7ac",
+      "bytes": 789
+    },
+    "fullLocalGate": {
+      "status": "failed",
+      "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+      "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+      "node": "v22.22.1",
+      "pnpm": "10.34.3",
+      "command": [
+        "pnpm",
+        "local:ready",
+        "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "--test=check",
+        "--no-product-change=tooling: make existing synthetic Cloud billing fixtures explicit; product behavior and all original business assertions unchanged"
+      ],
+      "exit": 1,
+      "gateWallSeconds": 196.70767176299705,
+      "wholeSetupTestCleanupWallSeconds": 212.17829010100104,
+      "receipt": {
+        "path": "research/billing-fixture-2984/small-check-2026-11-21T03-17-28.499Z/receipt.json",
+        "sha256": "ec1a191340026ed3248d84e2ecf5bc0cc32ea7a4cbf6ad0ef151b0a99be8233f",
+        "bytes": 19030
+      },
+      "cleanup": {
+        "postgresStopExit": 0,
+        "postgresStatusExit": 3,
+        "pidfilePresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "endingStatus": "",
+      "abuseUnit": {
+        "tests": 37,
+        "pass": 37,
+        "fail": 0,
+        "skip": 0
+      },
+      "firstFailingSuite": {
+        "name": "test:agent-kit-compat",
+        "tests": 59,
+        "pass": 56,
+        "fail": 3,
+        "causeObserved": "Commit effects require an observed node-postgres executor. Root cause/ownership investigated separately; no assertion or gate changes here."
+      },
+      "readyRecordPassed": false
+    },
+    "protectedCi": "No final protected pass claimed; PR remains Draft.",
+    "merge": "not merged",
+    "cardDbWithOrderlyCleanup": {
+      "command": [
+        "node",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/abuse/card.db.test.ts"
+      ],
+      "exit": 0,
+      "wallSeconds": 2.1081828759997734,
+      "counts": {
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "stdout": {
+        "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/card-db.stdout.log",
+        "sha256": "e2578a19ed1b86f5240966736c70f7fb75a5ff099d73019b537b82ecc007bbb6",
+        "bytes": 1964
+      },
+      "leafTests": 6,
+      "receipt": {
+        "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/receipt.json",
+        "sha256": "6a7ae3dd88d9d220600e4a268ce91742179248fee051e6592102b7a0c82ecde9",
+        "bytes": 19769
+      },
+      "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+      "cleanup": {
+        "postgresStopExit": 0,
+        "postgresStatusExit": 3,
+        "pidfilePresent": false,
+        "orderlyStopConfirmed": true
+      }
+    },
+    "independentReview": {
+      "reviewId": 6002633393,
+      "commitId": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+      "state": "COMMENT",
+      "specBlockingFindings": 0,
+      "standardsBlockingFindings": 0,
+      "qualification": "Six fixtures only; full readiness/CI remain incomplete.",
+      "receipt": {
+        "path": "research/ci-validation/billing-011-final-review.json",
+        "sha256": "4909ae4e6724963ef659bc1aa6dcd1eaab3320c13e41cef9cfe844a6cb59b848",
+        "bytes": 8152
+      }
+    }
+  },
+  "scopeEvidence": [
+    {
+      "path": "research/billing-fixture-2984/open-pr-file-audit.json",
+      "sha256": "499d815d7b61f45aee2c146edbc9c739ee3e3b540af55d8c5df2f9b20fff18f8",
+      "bytes": 23773
+    },
+    {
+      "path": "research/billing-fixture-2984/adjacent-owner-addendum.json",
+      "sha256": "981ba2af911aee7f777bd43855becd534e2be1852e051f7ae147601bbc3084c8",
+      "bytes": 8620
+    },
+    {
+      "path": "research/billing-fixture-2984/model-order-owner-addendum.json",
+      "sha256": "f17ce65bda50f4de598458f7ae8512993791f0655a0aaf8aa158a12ad253439c",
+      "bytes": 4932
+    },
+    {
+      "path": "research/billing-adjacent-review/2984-billing-adjacent-audit.json",
+      "sha256": "e11b8ae788a4e6e2a1564c294b62a1fe15b79f0e531fa4e2640768939be1cf6b",
+      "bytes": 64309
+    }
+  ],
+  "priorFullFailure": {
+    "path": "research/billing-fixture-2984/small-full-local-check-070.json",
+    "sha256": "565318e3e59fbe66376764588fb0a6b2a74f5e6aa886e3adbfb12a3c45fa1d7f",
+    "bytes": 6649
+  },
+  "independentStaticReview": {
+    "path": "research/ci-validation/billing-011-static-review.json",
+    "sha256": "ab7e801331af7de314d8654450e1ec7a5ea22f9537c0f42cb7b20f934fe29b39",
+    "bytes": 8264
+  },
+  "smallTransport": {
+    "path": "research/billing-fixture-2984/transfer/pack-receipt.json",
+    "sha256": "a569052724079f68c6a5f429fbe3d7790cf2a339db256faa7d41bd15ea6496b2",
+    "bytes": 3363
+  },
+  "remainingDbCaller": {
+    "path": "research/billing-fixture-2984/small-transfer/run-billing-7d9381-adjacent-db-small.py",
+    "sha256": "84cab16bb5de3039d432e5565ff6a227d79267bae4517541bcce30934ee5b2eb",
+    "bytes": 15497
+  },
+  "retainedContracts": [
+    "No product, CI, migration, lockfile, assertion, skip or timeout changes.",
+    "Existing explicit Community subtest and restoration remain in personal-workspace.",
+    "No global Cloud setting, live provider key, model inference, VM request or production operation.",
+    "Original ownership, including #1853 separate subscription assertions, retained."
+  ],
+  "completionBoundary": "This is truthful progress evidence. It is not a Ready record, final CI receipt, merge receipt, production acceptance or #2984 completion.",
+  "rawOpenPrInventory": {
+    "path": "research/billing-fixture-2984/open-pr-raw-files/manifest.json",
+    "sha256": "a2e6726cd698f6e9c21d6e4f26bace0abd037e1a0c2aa2834b124e2cac1b6192",
+    "bytes": 15610
+  },
+  "cardPostpayCaller": {
+    "path": "research/billing-fixture-2984/small-transfer/run-billing-7d9381-card-postpay-small.py",
+    "sha256": "d7f5b4b2a46e6455231d6f01d28f29415f5ee092f6c831dfa44a139d6f3cf2b5",
+    "bytes": 15263
+  }
+}

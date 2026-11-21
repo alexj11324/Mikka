@@ -1,0 +1,263 @@
+{
+  "schema": "mikka.sdlc2984.d-development-startup-diagnosis.v1",
+  "capturedAt": "2026-11-21T04:21:08.975006+00:00",
+  "publicSource": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+  "publicTree": "33348a5d313ee170a1ec6c898edabdbda4281473",
+  "sourceScope": "Unmerged #2891/#2969 candidate; original authorized official private UI pin matched by boolean checks and not disclosed.",
+  "mode": "development; not historical compiled fixture acceptance",
+  "originalReceipt": {
+    "path": "research/fixture-recovery/d-development-inspect-2026-11-21T04-15-49.797Z/receipt.safe.json",
+    "sha256": "6529b30d7aaca518ab702f9750e31aa93934b5bb3a727670615347df62caaea8",
+    "unchanged": true,
+    "status": "failed",
+    "rawFailure": {
+      "class": "RuntimeError",
+      "stage": "original-bootstrap"
+    },
+    "startedAt": "2026-11-21T04:16:26.211817+00:00",
+    "finishedAt": "2026-11-21T04:17:13.228002+00:00",
+    "wallSeconds": 47.01647332199718
+  },
+  "caller": {
+    "sha256": "329693d6d34c6d2d355e30f43a477bda5398909541f664f95d18074f278bde35",
+    "command": "node scripts/dev-local.mjs",
+    "packageScriptEquivalent": "pnpm dev:local",
+    "directNodeInvocationDisclosed": true,
+    "ownedDevPid": 19121,
+    "devStartedAt": "2026-11-21T04:16:35.129558+00:00",
+    "originalReadyEventCount": 0
+  },
+  "native": {
+    "name": "processes/proc-1795234586146446290-173",
+    "pid": 18981,
+    "exitCode": 1,
+    "incomplete": false
+  },
+  "nativeFinal": {
+    "state": "exited",
+    "exitCode": 1
+  },
+  "stages": [
+    {
+      "name": "node-version",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:26.260826+00:00",
+      "finishedAt": "2026-11-21T04:16:26.285622+00:00",
+      "wallSeconds": 0.02460298000005423,
+      "stdoutSha256": "d757d43c53951704e32c04b9b1e6b4cc65713b659e72fcdbb02f5200675c7fd8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "pnpm-version",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:26.286104+00:00",
+      "finishedAt": "2026-11-21T04:16:27.616244+00:00",
+      "wallSeconds": 1.3298802800018166,
+      "stdoutSha256": "b56120c37d13e5e38e8b44c69156e36cc55e4885d4a1c108e130a503457ae941",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "postgres-version",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:27.617620+00:00",
+      "finishedAt": "2026-11-21T04:16:27.625102+00:00",
+      "wallSeconds": 0.0071186149980349,
+      "stdoutSha256": "76209c0de9003b9dbdfce55efb16134af004cd50349b0093bd8e0618b5a5d093",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "postgres-init",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:27.627409+00:00",
+      "finishedAt": "2026-11-21T04:16:28.186419+00:00",
+      "wallSeconds": 0.5587501390000398,
+      "stdoutSha256": "d95df0b25fd955be6c332ea12a95459ee54f2b0350a2de513e4fb6d19912aebc",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "postgres-start",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:28.187021+00:00",
+      "finishedAt": "2026-11-21T04:16:28.291856+00:00",
+      "wallSeconds": 0.1045771839999361,
+      "stdoutSha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "database-create",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:28.292348+00:00",
+      "finishedAt": "2026-11-21T04:16:28.657898+00:00",
+      "wallSeconds": 0.3653083239987609,
+      "stdoutSha256": "119c91eb5bd893fd4ee662d42bb95ba96e028b05d6908d79c4e981cedbb9ae99",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "database-identity",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:28.658957+00:00",
+      "finishedAt": "2026-11-21T04:16:28.989047+00:00",
+      "wallSeconds": 0.3298183849983616,
+      "stdoutSha256": "a0585c058f6da76d235a866f07a98a6d560649fbebb8feaa90f1587f4fb45d02",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "database-setup",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:28.990145+00:00",
+      "finishedAt": "2026-11-21T04:16:34.351391+00:00",
+      "wallSeconds": 5.360991514000489,
+      "stdoutSha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "database-empty-migrated",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:34.352252+00:00",
+      "finishedAt": "2026-11-21T04:16:34.696453+00:00",
+      "wallSeconds": 0.3439458969987754,
+      "stdoutSha256": "809ef91960a218b2338919990bb660cc0dc14220bc58e0f20abc747672a7b092",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "original-bootstrap",
+      "exit": 0,
+      "startedAt": "2026-11-21T04:16:34.697227+00:00",
+      "finishedAt": "2026-11-21T04:16:35.128888+00:00",
+      "wallSeconds": 0.4314099580005859,
+      "stdoutSha256": "8ca9a6b0eb3d588c7d893645d63d2120a0499236b40703fecf7ce142521dbc63",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "postgres-stop",
+      "exit": 0,
+      "startedAt": null,
+      "finishedAt": null,
+      "wallSeconds": 2.809154539998417,
+      "stdoutSha256": "c1523409ba1a5a6fa5d744982f42a44402a8cfb8b8b32bca92b4a39560042db9",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "postgres-status",
+      "exit": 3,
+      "startedAt": null,
+      "finishedAt": null,
+      "wallSeconds": 0.0008576410000387114,
+      "stdoutSha256": "e138ccb54fdb08283c6eb21159c53207bbbbf07077246e2804e18d22efe6e250",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "observedResult": {
+    "correctFailureStage": "original-dev-local / Eve development build",
+    "rawFailureStageMeaning": "The wrapper selected the last completed synchronous stage (original-bootstrap); that stage actually exited 0. This diagnostic corrects classification without modifying the original receipt.",
+    "startupErrorCode": "EVE_SERVICE_EXITED",
+    "dependencyDiagnostic": "The agent development build child was killed before completing; its diagnostic mentions low memory only conditionally.",
+    "matchingLocalPinnedDependency": {
+      "version": "1.0.0-rc.9",
+      "relativePath": "node_modules/eve/dist/src/internal/nitro/host/dev-build-host.js",
+      "sha256": "6bcda4a497dec92d1a5c799303c6f32732ca5429e3c4a951144e063e41d2bec5",
+      "bytes": 4166,
+      "lockFileSha256": "b69a4eeb908bf0dc817da0095f7a3b1d7066ae593e50367d8c28dd767b4b578d",
+      "sourceAnalysis": "This exact diagnostic is returned only for child signal SIGKILL; separate branches handle SIGABRT/code134, exit0 and other exits.",
+      "nativeSmallDependencyHashRecheck": "Requested from root; not yet observed by reviewer."
+    },
+    "classification": "development compiler child termination before application readiness",
+    "oomProven": false,
+    "diskExhaustionProven": false,
+    "browserStarted": false,
+    "browserJourneys": {
+      "completed": 0,
+      "required": 2
+    },
+    "businessMutations": 0,
+    "HmrOrUiFailureObserved": false,
+    "devBuildDurationSeconds": null,
+    "durationBoundary": "Only whole caller wall time is recorded. Dev-start time exists, but no exact Eve child start/end timestamps; whole duration is not pure build time."
+  },
+  "verifiedBeforeFailure": {
+    "postgresVersion": "17.12",
+    "postgresVersionNumber": "170012",
+    "migrationCount": 396,
+    "userCountBeforeBootstrap": 0,
+    "originalBootstrapExit": 0,
+    "frozenPublicSourceClean": true,
+    "privatePinUnchanged": true,
+    "privateSourceClean": true
+  },
+  "logs": {
+    "dev.stdout.private.log": {
+      "bytes": 386,
+      "sha256": "c89c0f754e0db1421aa35be23fa48600d2351d92758db8cf5054381879af417d",
+      "privateRawContentNotPublished": true
+    },
+    "dev.stderr.private.log": {
+      "bytes": 335,
+      "sha256": "d282aa34713cdf2a55df4c685b324593bcdc03d8e7139b772f4b1b0de5d19205",
+      "privateRawContentNotPublished": true
+    },
+    "database-setup.stdout.private.log": {
+      "bytes": 32028,
+      "sha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172",
+      "privateRawContentNotPublished": true
+    },
+    "original-bootstrap.stdout.private.log": {
+      "bytes": 176,
+      "sha256": "8ca9a6b0eb3d588c7d893645d63d2120a0499236b40703fecf7ce142521dbc63",
+      "privateRawContentNotPublished": true
+    }
+  },
+  "diskSnapshots": {
+    "initial": {
+      "freeBytes": 419213312,
+      "availableInodes": 315789
+    },
+    "final": {
+      "freeBytes": 336064512,
+      "availableInodes": 312507
+    },
+    "boundary": "Endpoint snapshots and no ENOSPC in captured dev logs do not constitute a peak resource measurement."
+  },
+  "cleanup": {
+    "applicationConfirmed": false,
+    "postgresConfirmed": true,
+    "devExit": 1,
+    "remainingKnownProcesses": [],
+    "remainingOwnedListeners": [],
+    "exitsNotYetObserved": [],
+    "privateOutputDrainsFinished": true,
+    "expectedPortsAvailable": {
+      "fake3191": true,
+      "applicationV4": true,
+      "applicationV6": true
+    },
+    "processObservation": "Original owned descendant snapshots plus native exit notifications; no unrelated process signals",
+    "postgres-stopExit": 0,
+    "postgres-statusExit": 3,
+    "pidfilePresent": false
+  },
+  "cleanupInterpretation": {
+    "postgresConfirmed": true,
+    "applicationConfirmed": false,
+    "why": "Parent exit1, completed drains and free expected ports were observed, but the parent failed before a descendant snapshot. Empty recorded descendant/listener arrays are not proof that every application child exited.",
+    "ownEveSymlink": {
+      "absentBefore": true,
+      "ownedTarget": "/home/agent/sdlc-2984/d-dev-inspect-20261121T041626.211589Z/eve-world",
+      "removedOwnLinkAfterExit": false
+    },
+    "noOtherOwnerProcessSignaledByReviewer": true
+  },
+  "nextEvidence": [
+    "Root read-only native memory/cgroup counters and process/storage state tied to this owned run; distinguish SIGKILL from proven OOM.",
+    "Bind the installed native dependency hash to the documented diagnostic branch.",
+    "Do not rerun identical failing inputs or modify Owner source, safety checks, timeouts, edition guards or browser assertions.",
+    "If resource evidence justifies an authorized environment change, retain this failed attempt and execute only the necessary original entry with the new resource facts."
+  ],
+  "reviewerActions": {
+    "sourceAndLogsRead": true,
+    "rawHashChecks": true,
+    "newRuntimeExecution": false,
+    "sourceChanged": false,
+    "historicalReceiptChanged": false,
+    "realModelProviderProductionAction": false
+  }
+}

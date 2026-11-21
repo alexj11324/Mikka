@@ -1,0 +1,327 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-21T03:56:09.190313+00:00",
+  "issue": 2984,
+  "finding": "SDLC-013",
+  "repository": "aspectly-labs/Mikka",
+  "pr": 3010,
+  "branch": "feat/sdlc-2984-billing-live-cleanup",
+  "source": "adeee8809f60d056cbfd7f5a7d3b305a3d653837",
+  "tree": "482f13e17974b42b8f8321c5689c2cec9d1e5fe4",
+  "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+  "status": "Focused original postpay regression passed with a natural process exit; Draft and complete local/protected gates remain pending",
+  "changedFiles": [
+    "lib/abuse/model-postpay.db.test.ts"
+  ],
+  "changedBlob": "89847e4173eef8c73cf4749f012323c64d0e0c7b",
+  "before": {
+    "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+    "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+    "receipt": {
+      "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/receipt.json",
+      "sha256": "6a7ae3dd88d9d220600e4a268ce91742179248fee051e6592102b7a0c82ecde9",
+      "bytes": 19769
+    },
+    "rows": {
+      "card-db": {
+        "command": [
+          "node",
+          "--import",
+          "./tests/support/server-only.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "lib/abuse/card.db.test.ts"
+        ],
+        "exit": 0,
+        "wallSeconds": 2.1081828759997734,
+        "counts": {
+          "tests": 7,
+          "pass": 7,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "stdout": {
+          "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/card-db.stdout.log",
+          "sha256": "e2578a19ed1b86f5240966736c70f7fb75a5ff099d73019b537b82ecc007bbb6",
+          "bytes": 1964
+        },
+        "leafTests": 6
+      },
+      "postpay-db": {
+        "command": [
+          "node",
+          "--experimental-test-module-mocks",
+          "--import",
+          "./scripts/server-test.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "lib/abuse/model-postpay.db.test.ts"
+        ],
+        "exit": 1,
+        "wallSeconds": 426.35414421099995,
+        "counts": {
+          "tests": 2,
+          "pass": 1,
+          "fail": 1,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "stdout": {
+          "path": "research/billing-fixture-2984/small-card-postpay-2026-11-21T03-30-52.147Z/postpay-db.stdout.log",
+          "sha256": "0ef05f0d531139c689ddd3526e20bd02ae2a50b8b238469e83f60f43003ab913",
+          "bytes": 1489
+        },
+        "qualification": "One business assertion case completed; the second file-level failure was emitted only after the verified diagnostic SIGTERM. No natural successful command exit occurred."
+      }
+    },
+    "wholeSetupTestCleanupWallSeconds": 435.4331383360004,
+    "cleanup": {
+      "postgresStopExit": 0,
+      "postgresStatusExit": 3,
+      "pidfilePresent": false,
+      "orderlyStopConfirmed": true
+    },
+    "endingStatus": "",
+    "independentOfHostInterruptedCommand": true,
+    "nativeClientObservation": {
+      "path": "research/billing-fixture-2984/small-transfer/card-postpay-inspect-2026-11-21T03-35-10.712Z.json",
+      "sha256": "375b96348799a034d5a80c7087ae477006fb03695e0b73b454c915ddfd88bdbf",
+      "bytes": 6736
+    },
+    "sourceComparison": [
+      {
+        "path": "lib/abuse/model-postpay.db.test.ts",
+        "mainBlob": "10a358450033279fb48eb154bed0a85a1dc7a2f9",
+        "beforeNative7dBlob": "10a358450033279fb48eb154bed0a85a1dc7a2f9",
+        "equal": true
+      },
+      {
+        "path": "lib/abuse/model-generation.db.test.ts",
+        "mainBlob": "8cbd924f03255a302a314818fa362ef32807bd1a",
+        "beforeNative7dBlob": "8cbd924f03255a302a314818fa362ef32807bd1a",
+        "equal": true
+      },
+      {
+        "path": "lib/builtin-gateway/runtime.ts",
+        "mainBlob": "8907562dbab34af64f448195b2d04c210ebc2ea8",
+        "beforeNative7dBlob": "8907562dbab34af64f448195b2d04c210ebc2ea8",
+        "equal": true
+      },
+      {
+        "path": "lib/builtin-gateway/config.ts",
+        "mainBlob": "6305b4023a5d7dcc22fee92555267b556579ee98",
+        "beforeNative7dBlob": "6305b4023a5d7dcc22fee92555267b556579ee98",
+        "equal": true
+      },
+      {
+        "path": "lib/builtin-gateway/postgres.ts",
+        "mainBlob": "e1767805f12fb10af48e141317ba45cf757ec5c6",
+        "beforeNative7dBlob": "e1767805f12fb10af48e141317ba45cf757ec5c6",
+        "equal": true
+      },
+      {
+        "path": "lib/live/billing.ts",
+        "mainBlob": "7d724a3021ba7bf6d6759b7d45ebf814aed67dd8",
+        "beforeNative7dBlob": "7d724a3021ba7bf6d6759b7d45ebf814aed67dd8",
+        "equal": true
+      },
+      {
+        "path": "lib/live/notify.ts",
+        "mainBlob": "6948f0014dbee3d19d6165e5c053e9dfb6d80e2f",
+        "beforeNative7dBlob": "6948f0014dbee3d19d6165e5c053e9dfb6d80e2f",
+        "equal": true
+      },
+      {
+        "path": "lib/abuse/store.ts",
+        "mainBlob": "1fea827b4a60da5705402a0dd5900413447b6f74",
+        "beforeNative7dBlob": "1fea827b4a60da5705402a0dd5900413447b6f74",
+        "equal": true
+      },
+      {
+        "path": "tests/support/live-runtime.ts",
+        "mainBlob": "52861b5772e92b7e86b08993086a2a4bef4b725a",
+        "beforeNative7dBlob": "52861b5772e92b7e86b08993086a2a4bef4b725a",
+        "equal": true
+      },
+      {
+        "path": "lib/background.ts",
+        "mainBlob": "7f33e1c45020cdbd1572c19726128e9dcde4e472",
+        "beforeNative7dBlob": "7f33e1c45020cdbd1572c19726128e9dcde4e472",
+        "equal": true
+      }
+    ],
+    "qualification": "Only the original postpay command is the SDLC-013 RED. The card pass is retained as an independent SDLC-011 result. The SIGTERM-generated file failure is not a product assertion failure."
+  },
+  "rootCause": "Postpay seeds a real workspace member and store.verify registers a real post-COMMIT hosted billing invalidation. The fixture closes HTTP and three pools but does not own the built-in gateway independent pg.Client. Its pg_notify connection survives those pool closures.",
+  "callPath": [
+    "HostedUsageStore.verify -> transaction COMMIT observer",
+    "hostedBillingChanged -> afterDatabaseCommit -> scheduleLive",
+    "afterJob after:live-notify -> hostedBillingTargets -> sendLiveInvalidations",
+    "builtinGateway().hub.live -> PostgresGatewayBus.publish -> SELECT pg_notify($1, $2)"
+  ],
+  "existingLifecycle": {
+    "path": "tests/support/live-runtime.ts",
+    "name": "ownLiveRuntime",
+    "blob": "52861b5772e92b7e86b08993086a2a4bef4b725a",
+    "behavior": "Join existing finite post-commit live work, restore existing scheduler seam, then await gateway.stop(). Existing stop closes the independent client; no new scheduler or helper."
+  },
+  "ownerAudit": {
+    "path": "research/billing-live-cleanup-2984/owner-audit.json",
+    "sha256": "c8e16a3549ec370006a37133685f3659ca33313976ef4d3a11f2de77110aa2a8",
+    "bytes": 1397
+  },
+  "fix": {
+    "scope": "Only the postpay fixture owns the existing live runtime; no production/helper/command/timeout change.",
+    "environment": "Per-fixture Community plus generated local authentication, no Worker override, direct gateway database pinned to already asserted isolated target; seven modified environment keys restored in finally.",
+    "cleanup": "Existing live.close joins finite original live jobs and stops the builtin Client before pool cleanup; original HTTP cleanup and all three pools remain.",
+    "businessBodyByteEqualToBase": true,
+    "businessBodySha256": "26472f202e01230eaa1997ac1f862b341470bcbbdee333981c32476fddb255f0",
+    "addedAssertion": "The configured live gateway mode is builtin, so ambient CI Cloud cannot bypass this regression."
+  },
+  "after": {
+    "focusedDatabase": {
+      "source": "adeee8809f60d056cbfd7f5a7d3b305a3d653837",
+      "tree": "482f13e17974b42b8f8321c5689c2cec9d1e5fe4",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/abuse/model-postpay.db.test.ts"
+      ],
+      "node": "v22.22.1",
+      "pnpm": "10.34.3",
+      "receipt": {
+        "path": "research/billing-live-cleanup-2984/small-green-2026-11-21T03-53-34.279Z/receipt.json",
+        "sha256": "97588bc407c55e9464699046a62a2ab60f1028a2b5e3a4c340f326edd81ecf7a",
+        "bytes": 19351
+      },
+      "startedAt": "2026-11-21T03:54:14.032377+00:00",
+      "finishedAt": "2026-11-21T03:54:17.382641+00:00",
+      "exit": 0,
+      "naturalExit": true,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "commandWallSeconds": 3.3501665860021603,
+      "businessCaseMilliseconds": 2709.40514,
+      "tapDurationMilliseconds": 3234.607283,
+      "wholeSetupTestCleanupWallSeconds": 13.207632778001425,
+      "database": {
+        "ownedData": "/home/agent/sdlc-2984/billing-live-adeee8-20261121T035406.240227Z/pgdata",
+        "address": "127.0.0.1",
+        "name": "mikka_2984_billing_live_e2e",
+        "requireDb": true,
+        "newOwnedCluster": true,
+        "port": 47005,
+        "nativeIdentity": {
+          "database": "mikka_2984_billing_live_e2e",
+          "address": "127.0.0.1",
+          "port": 47005,
+          "version": "17.12",
+          "version_number": "170012",
+          "max_locks": "512"
+        },
+        "migrationCount": 396
+      },
+      "cleanup": {
+        "postgresStopExit": 0,
+        "postgresStatusExit": 3,
+        "pidfilePresent": false,
+        "orderlyStopConfirmed": true
+      },
+      "endingSourceClean": true,
+      "sourceBlobsVerified": {
+        "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+        "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+        "lib/abuse/model-postpay.db.test.ts": "89847e4173eef8c73cf4749f012323c64d0e0c7b",
+        "lib/abuse/store.ts": "1fea827b4a60da5705402a0dd5900413447b6f74",
+        "tests/support/live-runtime.ts": "52861b5772e92b7e86b08993086a2a4bef4b725a",
+        "lib/builtin-gateway/config.ts": "6305b4023a5d7dcc22fee92555267b556579ee98",
+        "lib/builtin-gateway/runtime.ts": "8907562dbab34af64f448195b2d04c210ebc2ea8",
+        "lib/builtin-gateway/postgres.ts": "e1767805f12fb10af48e141317ba45cf757ec5c6",
+        "lib/live/billing.ts": "7d724a3021ba7bf6d6759b7d45ebf814aed67dd8",
+        "lib/live/notify.ts": "6948f0014dbee3d19d6165e5c053e9dfb6d80e2f",
+        "lib/background.ts": "7f33e1c45020cdbd1572c19726128e9dcde4e472",
+        "lib/db/commit-effects.ts": "ac1702b18e5daeaa816ce728c639d425e38cb5ba",
+        "lib/abuse/model.ts": "b6db7c464dfec5a3a48898163639b5e8d1d1a356",
+        "lib/abuse/runtime.ts": "176e1ac04c9c5637199238a89e6f6b1805bc1f3d",
+        "lib/edition.ts": "bbee750760addebb58147a4913fa77d709e886c9",
+        "lib/model-admission/runtime.ts": "514cad3f09bb09e4f0d72a3bb029a345ebf7fb9a",
+        "lib/model-admission/store.ts": "94a7863d7754865a75e6fab2ecd4ce9fb8a735e4",
+        "tests/support/server-only.mjs": "0824d2931a1c6c67b1f34c3a7ce94fa5ad217fd4",
+        "scripts/server-test.mjs": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae"
+      },
+      "stdout": {
+        "path": "research/billing-live-cleanup-2984/small-green-2026-11-21T03-53-34.279Z/postpay-db.stdout.log",
+        "sha256": "c0c511ba0dd9edfe858defdddd8b52e620ddc43dfbf98b6044e8b7945bf2cd32",
+        "bytes": 1405
+      },
+      "stderr": {
+        "path": "research/billing-live-cleanup-2984/small-green-2026-11-21T03-53-34.279Z/postpay-db.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "boundary": "Original command, synthetic loopback provider, one new isolated PG17 cluster, original 396 setup. No forced exit, timeout change, real model/provider, VM or publication. This standalone source does not prove the full abuse-db package, literal pnpm check, final CI or merged result."
+    },
+    "localPlan": {
+      "path": "research/billing-live-cleanup-2984/preflight/receipt.json",
+      "sha256": "0b4a2186a51bf5fa2c44e473cc24c19afdbd5a33d3d5b7af15b72b9eb8cefe7b",
+      "bytes": 1865
+    },
+    "offlineFrozenInstall": {
+      "path": "research/billing-live-cleanup-2984/install/receipt.json",
+      "sha256": "cb92ae6ab9c6558ef1bd632b301afd6d55344eefcd241b9069aa6227ac30544f",
+      "bytes": 816
+    },
+    "initialSetupFailure": {
+      "path": "research/billing-live-cleanup-2984/initial-plan-setup-failure.json",
+      "sha256": "c28d92a1a78439d98ba6a7042f49a803d4200dd4365d3f1c0f5c6c13f24b445b",
+      "bytes": 615
+    },
+    "targetedLint": {
+      "path": "research/billing-live-cleanup-2984/lint-observation.json",
+      "sha256": "7d42c4fe2ce8e05a69b2c48ce246fff840c81c5737a251ba81f23a481d300461",
+      "bytes": 650
+    },
+    "fullLocalReadiness": null,
+    "protectedCi": null,
+    "merge": null
+  },
+  "transport": {
+    "path": "research/billing-live-cleanup-2984/transfer/pack-receipt.json",
+    "sha256": "c2f9728d5420f27acb24d6924f4ad2feef6586643e6e03fefc6ee96e0a496b9c",
+    "bytes": 3820
+  },
+  "smallCaller": {
+    "path": "research/billing-live-cleanup-2984/small-transfer/wrapper-receipt.json",
+    "sha256": "e1a19739c3fe02a789c4135aab22a9a51eae43c0060465c74a69e517ba24d53a",
+    "bytes": 1326
+  },
+  "completionBoundary": "The focused real PG17/loopback accounting regression is GREEN at the exact source. Full local readiness, independent protected CI, normal merge and exact post-merge verification remain required; no #2984 completion is claimed.",
+  "beforeAfterComparison": {
+    "beforeOriginalCommandInvocations": 1,
+    "afterOriginalCommandInvocations": 1,
+    "sameArgv": true,
+    "beforeNaturalExit": false,
+    "afterNaturalExit": true,
+    "beforeNativeClientIdleSeconds": 230.324859,
+    "meaning": "The completed accounting case now releases its independent live Client and exits naturally.",
+    "timingBoundary": "Before duration includes manual native inspection and diagnostic SIGTERM; it is not an execution-latency baseline and no speedup ratio or statistical estimate is calculated."
+  },
+  "smallCallerCorrectionReview": {
+    "path": "research/ci-validation/billing-live-013-caller-review-correction.json",
+    "sha256": "513f5743aa32e17eaa3c21c21354a6dac9189e392fe2b4df5936d50cb2870b68",
+    "bytes": 2286
+  }
+}
