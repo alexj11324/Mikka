@@ -8,9 +8,11 @@ import time
 from pathlib import Path
 
 def main():
-    if len(sys.argv) != 4:
+    # Older launchers pass a fourth policyVersion argument; ignore it while
+    # pre-upgrade workers exist in the wild.
+    if len(sys.argv) not in (4, 5):
         raise ValueError('invalid lease')
-    display, bot, owner = sys.argv[1:]
+    display, bot, owner = sys.argv[1:4]
     if not re.fullmatch(r':[1-9][0-9]{0,2}', display) or os.environ.get('DISPLAY') != display:
         raise ValueError('invalid display')
     if (Path('/run/mikka-viewer') / f'{display[1:]}.guard').exists():

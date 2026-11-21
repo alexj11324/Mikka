@@ -75,7 +75,7 @@ export class ComputerStore {
         for (const machine of machines) {
           if (!machine.sandboxId || !machine.runtimeReady) continue
           const sandbox = await this.runtime.connectComputer(workspaceId, machine.sandboxId)
-          for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny'))
+          for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', Number(policy?.version ?? 0)))
         }
         // Dedicated threads have their own driver lease. Updating only the
         // Bot machine leaves a thread's agent on an old policy.
@@ -84,7 +84,7 @@ export class ComputerStore {
           WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows
         for (const thread of threads) {
           const sandbox = await this.runtime.connectComputer(workspaceId, thread.sandboxId)
-          await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny' })
+          await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny', policyVersion: Number(policy?.version ?? 0) })
         }
       }
       // Every transition increments the policy version. The display lock
@@ -142,8 +142,8 @@ export class ComputerStore {
       live: computerLiveState(actor.workspaceId, deadlines, now),
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}) }
   }
-  private lease(d: Desktop, computerAllowed = true): provider.DesktopLease {
-    return { botId: d.botId, ownerId: d.ownerId, display: d.display, epoch: d.epoch, controlledBy: d.controlledBy, controlUntil: d.controlUntil ? new Date(d.controlUntil).getTime() / 1000 : 0, computerAllowed }
+  private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {
+    return { botId: d.botId, ownerId: d.ownerId, display: d.display, epoch: d.epoch, controlledBy: d.controlledBy, controlUntil: d.controlUntil ? new Date(d.controlUntil).getTime() / 1000 : 0, computerAllowed, policyVersion }
   }
   async operate(actor: Actor, botId: string, action: 'wake' | 'viewer' | 'takeover' | 'handback', mode: 'view' | 'control' = 'view') {
     await this.bot(actor, botId)
@@ -180,7 +180,7 @@ export class ComputerStore {
         desktop.controlUntil = new Date(Date.now() + 5 * 60_000)
       }
       const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-      const lease = this.lease(desktop, policy?.permission !== 'deny')
+      const lease = this.lease(desktop, policy?.permission !== 'deny', Number(policy?.version ?? 0))
       await client.query('UPDATE bot_desktops SET control=$2,"controlledBy"=$3,"controlUntil"=$4,epoch=$5 WHERE "botId"=$1', [botId, desktop.control, desktop.controlledBy, desktop.controlUntil, desktop.epoch])
       // Holding the Bot's desktop holds only work on that desktop, and no run executes there: every
       // run is claimed on its own thread machine (decision 0251), so a takeover pauses no run.
