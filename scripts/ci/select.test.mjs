@@ -128,7 +128,10 @@ test('the actual required gate scripts reject unselected failures and selected s
   const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
     const block = workflow.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
-    const script = block.split('        run: |\n')[1].split('      - uses:')[0].split('\n').map(line => line.slice(10)).join('\n')
+    const gateName = job === 'ui-policy' ? 'Require every selected source, unit and daemon job' : 'Require every selected database shard'
+    const gate = block.split(`- name: ${gateName}\n`)[1]
+    assert.ok(gate, gateName)
+    const script = gate.split('        run: |\n')[1].split('      - uses:')[0].split('\n').map(line => line.slice(10)).join('\n')
     const run = overrides => {
       const env = {
         PATH: process.env.PATH,
