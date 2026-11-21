@@ -2028,9 +2028,15 @@ test(
             assert.equal(replay.replayed, true);
             assert.equal((await db.query('SELECT "questionContinuation" FROM agent_runs WHERE id=$1', [recoveryRun.id])).rows[0].questionContinuation.followUp,
               recoveryRun.questionContinuation.followUp);
-            // Evidence delivery is not acceptance. This test stops at the
-            // strict native claim and does not alter the existing recovery gate.
-            assert.equal((await state(pending.task.id)).task.status, 'running');
+            // #1451: the recovered continuation's own terminal clears the same
+            // independence gate via its receipted recovery chain, without
+            // rewriting the first answer's immutable result.
+            await terminal(recoveryRun.id, nativeSession, true);
+            await reconcile('owner');
+            const failed = await state(pending.task.id);
+            assert.equal(failed.task.status, 'failed');
+            assert.equal(failed.attempts.find(a => a.runId === recoveryRun.id)!.status, 'failed');
+            assert.equal((failed.attempts.find(a => a.runId === recoveryRun.id)!.output.completion as { trustedFailureProvenance: boolean }).trustedFailureProvenance, true);
             return;
           }
           await terminal(run.id, nativeSession);
