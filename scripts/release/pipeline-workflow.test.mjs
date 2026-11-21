@@ -36,6 +36,25 @@ test('only actual successful same-repository main pushes or explicit recovery ac
   assert.doesNotMatch(source, /GITHUB_EVENT_NAME:\s|GITHUB_REF:\s|GITHUB_ACTOR_ID:\s/)
 })
 
+test('automatic staging accepts the merge queue pair but manual recovery remains owner-only', () => {
+  const allowed = new Function('github', 'inputs', `return ${workflow.jobs.pipeline.if}`)
+  const github = { repository_id: '1427517699', repository_owner_id: '359279274', ref: 'refs/heads/main',
+    actor_id: '118344674', actor: 'github-merge-queue[bot]', triggering_actor: 'github-merge-queue[bot]', event_name: 'workflow_run', event: {
+      repository: { id: 1427517699 }, workflow_run: { event: 'push', head_branch: 'main', conclusion: 'success', head_repository: { id: 1427517699 } } } }
+  assert.equal(allowed(github, {}), true)
+  assert.equal(allowed({ ...github, triggering_actor: 'alexj11324' }, {}), true)
+  assert.equal(allowed({ ...github, actor_id: '183887963', actor: 'alexj11324' }, {}), true)
+  for (const patch of [{ actor_id: '7' }, { actor: 'outsider' }, { actor_id: undefined }, { triggering_actor: 'outsider' },
+    { ref: 'refs/heads/feature' }, { repository_id: '7' }, { repository_owner_id: '7' }])
+    assert.equal(allowed({ ...github, ...patch }, {}), false)
+  for (const patch of [{ event: 'workflow_dispatch' }, { head_branch: 'feature' }, { conclusion: 'failure' }, { head_repository: { id: 7 } }])
+    assert.equal(allowed({ ...github, event: { ...github.event, workflow_run: { ...github.event.workflow_run, ...patch } } }, {}), false)
+  for (const phase of ['pipeline-stage', 'pipeline-rollback']) {
+    assert.equal(allowed({ ...github, event_name: 'workflow_dispatch' }, { phase }), false)
+    assert.equal(allowed({ ...github, actor_id: '183887963', event_name: 'workflow_dispatch' }, { phase }), true)
+  }
+})
+
 test('public records cannot receive the private rollback receipt or runtime credentials', () => {
   const upload = workflow.jobs.pipeline.steps.find(step => step.name === 'Upload pipeline receipts')
   assert.equal(upload.with.name, 'deploy-pipeline-${{ github.run_id }}-${{ github.run_attempt }}')
