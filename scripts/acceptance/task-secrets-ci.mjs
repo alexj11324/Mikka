@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { expectedRelease, assertReleaseIdentity, selectRelease, REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW } from './thread-lifecycle-ci.mjs'
 import { assertCurrentMain, PRODUCTION_VERSION_URL } from '../release/web-deploy.mjs'
 import { assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export { REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW }
 export const MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
@@ -69,20 +70,27 @@ async function readGithub(path, { token, fetchImpl = fetch }) {
 }
 
 export function assertArtifactIdentity(expected, run, artifact, now = Date.now()) {
+  // The caller binds these fields after its official-run API check. Artifact
+  // metadata cannot choose a repository or supply the authenticated download URL.
+  const repository = expected?.repositoryFullName
+  check(positive(expected?.repositoryId)
+    && officialMikkaRepository(repository, String(expected.repositoryId)), 'artifact_identity')
+  const api = `https://api.github.com/repos/${repository}`
   const name = `e2b-release-evidence-${expected.runId}-${expected.runAttempt}`
   const created = Date.parse(artifact?.created_at), expires = Date.parse(artifact?.expires_at), started = Date.parse(run?.run_started_at)
   check(positive(artifact?.id) && artifact.name === name && artifact.expired === false
     && Number.isFinite(created) && Number.isFinite(expires) && Number.isFinite(started)
     && created >= started && created <= now + 60_000 && expires > now
-    && positive(run.repository?.id) && run.head_repository?.id === run.repository.id
-    && artifact.workflow_run?.id === expected.runId && artifact.workflow_run.repository_id === run.repository.id
-    && artifact.workflow_run.head_repository_id === run.repository.id && artifact.workflow_run.head_branch === 'main'
+    && run.repository?.id === expected.repositoryId && run.head_repository?.id === expected.repositoryId
+    && run.repository?.full_name === repository && run.head_repository?.full_name === repository
+    && artifact.workflow_run?.id === expected.runId && artifact.workflow_run.repository_id === expected.repositoryId
+    && artifact.workflow_run.head_repository_id === expected.repositoryId && artifact.workflow_run.head_branch === 'main'
     && artifact.workflow_run.head_sha === expected.sourceCommit
-    && artifact.url === `${API}/actions/artifacts/${artifact.id}`
-    && artifact.archive_download_url === `${API}/actions/artifacts/${artifact.id}/zip`, 'artifact_identity')
+    && artifact.url === `${api}/actions/artifacts/${artifact.id}`
+    && artifact.archive_download_url === `${api}/actions/artifacts/${artifact.id}/zip`, 'artifact_identity')
   check(positive(artifact.size_in_bytes) && artifact.size_in_bytes <= MAX_ARCHIVE_BYTES, 'artifact_size')
   check(typeof artifact.digest === 'string' && /^sha256:[a-f0-9]{64}$/.test(artifact.digest), 'artifact_digest')
-  return { id: artifact.id, name, sha256: artifact.digest.slice(7), sizeBytes: artifact.size_in_bytes,
+  return { id: artifact.id, repositoryId: expected.repositoryId, name, sha256: artifact.digest.slice(7), sizeBytes: artifact.size_in_bytes,
     createdAt: artifact.created_at, expiresAt: artifact.expires_at }
 }
 
@@ -101,12 +109,13 @@ export async function verifyTaskRelease({ env, event, files, fetchImpl = fetch, 
     upstream: { runId: expected.runId, runAttempt: expected.runAttempt, workflowId: expected.workflowId },
     driver: { runId: Number(env.GITHUB_RUN_ID), runAttempt: Number(env.GITHUB_RUN_ATTEMPT) }, ...selection }
   if (selection.selected) {
+    const artifactExpected = { ...expected, repositoryId: Number(publicRepositoryId), repositoryFullName: REPOSITORY }
     const listing = await readGithub(`/actions/runs/${expected.runId}/artifacts?per_page=100`, options)
     check(Array.isArray(listing?.artifacts) && listing.total_count === listing.artifacts.length && listing.total_count <= 100, 'artifact_identity')
     const matches = listing.artifacts.filter(artifact => artifact.name === `e2b-release-evidence-${expected.runId}-${expected.runAttempt}`)
     check(matches.length === 1, 'artifact_missing')
-    const listed = assertArtifactIdentity(expected, run, matches[0], now())
-    const artifact = assertArtifactIdentity(expected, run, await readGithub(`/actions/artifacts/${listed.id}`, options), now())
+    const listed = assertArtifactIdentity(artifactExpected, run, matches[0], now())
+    const artifact = assertArtifactIdentity(artifactExpected, run, await readGithub(`/actions/artifacts/${listed.id}`, options), now())
     check(JSON.stringify(artifact) === JSON.stringify(listed), 'artifact_identity')
     proof.artifact = artifact
   }
@@ -154,10 +163,11 @@ export function archiveReport(bytes) {
 }
 
 export async function downloadReleaseReport(proof, { token, fetchImpl = fetch }) {
-  check(proof?.selected === true && positive(proof.artifact?.id) && DIGEST.test(proof.artifact.sha256 ?? ''), 'attestation')
+  check(proof?.selected === true && positive(proof.artifact?.id) && proof.artifact.repositoryId === Number(publicRepositoryId)
+    && DIGEST.test(proof.artifact.sha256 ?? ''), 'attestation')
   let response
   try {
-    const redirect = await fetchImpl(`${API}/actions/artifacts/${proof.artifact.id}/zip`, {
+    const redirect = await fetchImpl(`https://api.github.com/repositories/${proof.artifact.repositoryId}/actions/artifacts/${proof.artifact.id}/zip`, {
       headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'x-github-api-version': '2022-11-28' },
       redirect: 'manual', signal: AbortSignal.timeout(20_000) })
     check(redirect.status === 302, 'artifact_redirect')
