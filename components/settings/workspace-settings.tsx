@@ -68,7 +68,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
             <Pencil data-icon />
           </Button>
           <Input ref={fileRef} type="file" accept={WORKSPACE_ICON_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={event => void pickIcon(event)} />
-          {current.icon ? <Button type="button" variant="ghost" size="sm" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button> : null}
+          {current.icon ? <Button type="button" variant="ghost" size="default" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button> : null}
         </div>
       </SettingRow>
       <SettingRow title={t('name')} description={t('nameHint')}>

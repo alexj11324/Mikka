@@ -5,6 +5,7 @@ import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronRight, Cloud, Image, Pencil, Plus } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { ColorSwatch } from '@/components/ui/color-swatch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SettingRow, SettingSelect, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
@@ -101,9 +102,9 @@ export function AppearanceSettings() {
     <SettingsSection title={t('background')}>
       <SettingRow title={t('dashboardBackground')} description={t('dashboardHint')}>
         <div className="flex items-center gap-2">
-          <span className={cn('flex size-8 items-center justify-center overflow-hidden rounded-md border', ui.background === 'color' ? 'text-primary-foreground' : 'bg-muted text-foreground')} style={ui.background === 'color' ? { background: ui.accent } : undefined} aria-hidden>
+          <ColorSwatch shape="tile" color={ui.background === 'color' ? ui.accent : undefined} className={cn('flex size-8 items-center justify-center', ui.background === 'color' ? 'text-primary-foreground' : 'bg-muted text-foreground')} aria-hidden>
             <Image data-icon />
-          </span>
+          </ColorSwatch>
           <Button type="button" variant="ghost" size="icon" aria-label={t('editBackground')} onClick={() => paint({ background: ui.background === 'color' ? 'none' : 'color' })}>
             <Pencil data-icon />
           </Button>
@@ -131,7 +132,7 @@ export function AppearanceSettings() {
     <DiffPreview color={ui.diffColor} />
     <SettingsSection title={t('hidden')}>
       <SettingRow title={t('hiddenFold')} description={t('hiddenFoldHint')}>
-        <SettingSelect className="w-auto max-w-full" label={t('hiddenFold')} value={ui.hiddenFiles} options={[{ value: 'generated', label: t('hiddenGenerated') }, { value: 'none', label: t('hiddenNone') }, { value: 'all', label: t('hiddenAll') }]} onValueChange={value => { if (value === 'generated' || value === 'none' || value === 'all') paint({ hiddenFiles: value }) }} />
+        <SettingSelect fluid label={t('hiddenFold')} value={ui.hiddenFiles} options={[{ value: 'generated', label: t('hiddenGenerated') }, { value: 'none', label: t('hiddenNone') }, { value: 'all', label: t('hiddenAll') }]} onValueChange={value => { if (value === 'generated' || value === 'none' || value === 'all') paint({ hiddenFiles: value }) }} />
       </SettingRow>
     </SettingsSection>
   </>
@@ -141,26 +142,26 @@ function ModeThumb({ mode }: { mode: 'light' | 'dark' | 'system' }) {
   const light = mode !== 'dark'
   const dark = mode !== 'light'
   return <span className="flex h-14 w-full overflow-hidden rounded-md">
-    {light ? <span className="flex flex-1" style={{ background: '#ffffff' }}><span className="m-1 w-3" style={{ background: '#e7e5e4' }} /><span className="m-1 h-2 flex-1" style={{ background: '#d6d3d1' }} /></span> : null}
-    {dark ? <span className="flex flex-1" style={{ background: '#171717' }}><span className="m-1 w-3" style={{ background: '#404040' }} /><span className="m-1 h-2 flex-1" style={{ background: '#525252' }} /></span> : null}
+    {light ? <ColorSwatch color="#ffffff" className="flex flex-1"><ColorSwatch color="#e7e5e4" className="m-1 w-3" /><ColorSwatch color="#d6d3d1" className="m-1 h-2 flex-1" /></ColorSwatch> : null}
+    {dark ? <ColorSwatch color="#171717" className="flex flex-1"><ColorSwatch color="#404040" className="m-1 w-3" /><ColorSwatch color="#525252" className="m-1 h-2 flex-1" /></ColorSwatch> : null}
   </span>
 }
 
 function ThemeThumb({ fill, accent, foreground }: { fill: string; accent: string; foreground: string }) {
-  return <span className="flex h-16 w-full overflow-hidden rounded-md border" style={{ background: fill }}>
-    <span className="w-5" style={{ background: accent }} />
+  return <ColorSwatch color={fill} shape="tile" className="flex h-16 w-full">
+    <ColorSwatch color={accent} className="w-5" />
     <span className="flex flex-1 flex-col gap-1 p-1.5">
-      <span className="h-1.5 w-8 rounded-full" style={{ background: foreground }} />
-      <span className="h-1 w-full rounded-full opacity-30" style={{ background: foreground }} />
-      <span className="mt-auto h-4 w-full rounded-sm opacity-80" style={{ background: accent }} />
+      <ColorSwatch color={foreground} className="h-1.5 w-8 rounded-full" />
+      <ColorSwatch color={foreground} className="h-1 w-full rounded-full opacity-30" />
+      <ColorSwatch color={accent} className="mt-auto h-4 w-full rounded-sm opacity-80" />
     </span>
-  </span>
+  </ColorSwatch>
 }
 
 function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <SettingRow title={label}>
     <Label className="flex h-7 items-center gap-2 rounded-full border bg-background px-1.5 pr-2.5 text-sm">
-      <span className="size-4 rounded-sm border" style={{ background: value }} />
+      <ColorSwatch color={value} shape="chip" />
       <span className="font-mono text-xs">{value}</span>
       <Input aria-label={label} type="color" value={value} onChange={event => onChange(event.target.value)} className="sr-only" />
     </Label>
@@ -168,16 +169,21 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
 }
 
 function DiffPreview({ color }: { color: 'redGreen' | 'blue' }) {
-  const removed = color === 'blue' ? 'bg-sidebar-primary/20' : 'bg-destructive/15'
-  const added = color === 'blue' ? 'bg-attention/25' : 'bg-success/15'
-  const row = (mark: string, text: string, tone?: string) => <div className={cn('grid grid-cols-[1.25rem_minmax(0,1fr)] px-3', tone)}>
+  const blue = color === 'blue'
+  const row = (mark: string, text: string, kind?: 'removed' | 'added') => <div className={cn(
+    'grid grid-cols-[1.25rem_minmax(0,1fr)] px-3',
+    kind === 'removed' && blue && 'bg-sidebar-primary/20',
+    kind === 'removed' && !blue && 'bg-destructive/15',
+    kind === 'added' && blue && 'bg-attention/25',
+    kind === 'added' && !blue && 'bg-success/15',
+  )}>
     <span>{mark}</span>
     <span className="min-w-0 break-all">{text}</span>
   </div>
   return <pre className="rounded-xl border bg-card font-mono text-xs leading-6 whitespace-pre-wrap">
     {row('1', 'export function add(a: number, b: number) {')}
-    {row('-', 'return a - b;', removed)}
-    {row('+', 'return a + b;', added)}
+    {row('-', 'return a - b;', 'removed')}
+    {row('+', 'return a + b;', 'added')}
     {row('3', '}')}
   </pre>
 }
