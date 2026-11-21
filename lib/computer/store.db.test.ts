@@ -148,6 +148,24 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(created, 1)
     await pool.query(`UPDATE cloud_machines SET state='waking' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'a resumed desktop stays waking until provisioning completes')
+    const leaseExpiresAt = Date.now() + 60_000
+    await pool.query(`UPDATE cloud_machines SET "provisionLeaseUntil"=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId, new Date(leaseExpiresAt)])
+    const query = pool.query.bind(pool)
+    let now = leaseExpiresAt - 1
+    const clock = t.mock.method(Date, 'now', () => now)
+    const queries = t.mock.method(pool, 'query', async (sql: string, values: unknown[]) => {
+      const result = await query(sql, values)
+      if (sql.includes('FROM local_computer_reviews')) now = leaseExpiresAt
+      return result
+    })
+    try {
+      const expiredDuringRead = await computer(new Request(computerUrl), bot.id)
+      assert.equal(expiredDuringRead.status, 200)
+      assert.deepEqual(await expiredDuringRead.json(), { machine: 'error', control: 'idle', live: { workspaceId: actor.workspaceId } }, 'a lease expiring during the review query offers retry in the same response')
+    } finally {
+      queries.mock.restore()
+      clock.mock.restore()
+    }
     await pool.query(`UPDATE cloud_machines SET "provisionLeaseId"=$3,"provisionLeaseUntil"=now()-interval '1 second' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId, randomUUID()])
     assert.deepEqual(await stateView(), { machine: 'error', control: 'idle' }, 'an abandoned resume also offers retry')
     const retried = await computer(new Request(`${computerUrl}/wake`, { method: 'POST', headers: { origin: 'http://localhost' } }), bot.id, 'wake')

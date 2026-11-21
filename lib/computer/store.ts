@@ -122,14 +122,16 @@ export class ComputerStore {
       LEFT JOIN bot_desktops d ON d."botId" = b.id AND d."workspaceId" = m."workspaceId" AND d."ownerId" = m."ownerId"
       WHERE b.id = $1 AND b."workspaceId" = $2 AND b."ownerId" = $3`, [botId, actor.workspaceId, actor.userId])
     if (!row) throw new ComputerError(404, 'Computer not found')
-    const abandonedProvision = row.machine === 'waking' && row.provisionLeaseUntil != null
-      && new Date(row.provisionLeaseUntil).getTime() <= Date.now()
-    let machine = abandonedProvision ? 'error' : row.machine
-    const deadlines: (Date | null | undefined)[] = machine === 'waking' ? [row.provisionLeaseUntil] : []
+    const provisionDeadline = row.machine === 'waking' ? row.provisionLeaseUntil : null
+    const provisionExpired = (now: number) => provisionDeadline != null && new Date(provisionDeadline).getTime() <= now
+    let machine = row.machine
     if (row.control === null) {
+      const now = Date.now()
+      const abandonedProvision = provisionExpired(now)
       return { machine: abandonedProvision ? 'error' : machine === 'waking' ? 'waking' : 'sleeping', control: 'idle',
-        live: computerLiveState(actor.workspaceId, deadlines) }
+        live: computerLiveState(actor.workspaceId, abandonedProvision ? [] : [provisionDeadline], now) }
     }
+    const deadlines: (Date | null | undefined)[] = []
     if (row.sandboxId && machine !== 'error' && machine !== 'waking') {
       machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
     }
@@ -154,8 +156,11 @@ export class ComputerStore {
           expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     if (held) deadlines.push(row.controlUntil)
     if (pendingApproval) deadlines.push(review.visibleUntil)
+    const now = Date.now()
+    if (provisionExpired(now)) machine = 'error'
+    else if (provisionDeadline != null) deadlines.push(provisionDeadline)
     return { machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
-      live: computerLiveState(actor.workspaceId, deadlines),
+      live: computerLiveState(actor.workspaceId, deadlines, now),
       ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
   }
   private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {
