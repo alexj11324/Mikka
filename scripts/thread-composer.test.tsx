@@ -129,6 +129,17 @@ const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => 
   <IssueThreadPanel bare issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
 
+test('an explicitly opened run requires an owned detail read before exposing a composer', () => {
+  for (const read of [null, { ...base, ownedByCurrentUser: false }, { ...base, detail: null }]) {
+    thread = read
+    const html = render({ runId: 'outside-topology' })
+    assert.doesNotMatch(html, /data-composer=""/)
+  }
+  thread = { ...base }
+  assert.match(render({ runId: 'outside-topology' }), /data-composer=""/)
+  assert.equal(shownThread?.readOnly, false)
+})
+
 test('a recorded model stays available to the composer without a context estimate in the thread', () => {
   runContext = { used: 6, promptUsed: 6, promptBudget: 25_000, estimated: true, segments: [], unmeasured: [], model: null,
     compactAtTokens: null, windowTokens: null, composerModel: { selected: 'gpt-5.1', served: null } }
