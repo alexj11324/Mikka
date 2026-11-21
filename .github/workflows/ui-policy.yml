@@ -82,6 +82,8 @@ jobs:
           console.log('Infisical OIDC and issuer credential validation succeeded')
           JS
 
+  # PR updates run the selected suites on Node 24. Merge candidates and main
+  # still verify both supported majors.
   ui-policy-full:
     name: Core unit checks${{ matrix.node == '22' && ' (Node 22)' || '' }}
     needs: changes
@@ -92,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        node: ${{ fromJSON(github.event_name == 'pull_request' && '["24"]' || '["22","24"]') }}
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
@@ -130,7 +132,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        node: ${{ fromJSON(github.event_name == 'pull_request' && '["24"]' || '["22","24"]') }}
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
@@ -370,7 +372,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.db_matrix).shard }}
-        node: ['22', '24']
+        node: ${{ fromJSON(github.event_name == 'pull_request' && '["24"]' || '["22","24"]') }}
     services:
       postgres:
         image: postgres:17
