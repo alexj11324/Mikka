@@ -29,6 +29,26 @@ test('non-documentation plans keep the suite that actually exercises the docs cl
   assert.deepEqual(owners, ['ci-core-7'])
 })
 
+for (const [file, primary] of [
+  ['lib/agent-kit/registry-compat.test.ts', 'ci-core-29'],
+  ['lib/agent-kit/tool-defaults-compat.test.ts', 'ci-core-29'],
+  ['lib/coordinator/issue-tools.test.ts', 'ci-core-43'],
+  ['components/workspace/issue-workspace-settings.test.tsx', 'ci-core-57'],
+  ['lib/search/search.test.ts', 'ci-integration-9'],
+]) test(`same-environment shared regression has one selected owner: ${file}`, async () => {
+  const result = await pick(file)
+  const owners = result.units.filter(unit =>
+    plan.graph.dependencies[unit]?.some(edge => edge.target === sourceId(file)))
+  assert.deepEqual(owners, [primary])
+})
+
+test('personal mailbox shell legs keep their last test files in the selection graph', async () => {
+  for (const file of ['lib/personal-mailbox-retry-context.test.ts', 'lib/personal-mailbox-runtime-off.test.ts']) {
+    assert(plan.graph.dependencies['ci-core-18'].some(edge => edge.target === sourceId(file)), file)
+    assert((await pick(file)).units.includes('ci-core-18'), file)
+  }
+})
+
 test('web component edits select their consumers without server DB or Docker', async () => {
   const result = await pick('components/settings/settings-view.tsx')
   assert.equal(result.full, false)
