@@ -10,7 +10,7 @@ import { frozenUnitInventory } from './frozen-inventory.mjs'
 export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
 // Keep the expression readable without a trailing whitespace token.
 const globalPath = file => !isDocsOnly([file]) && (GLOBAL.test(file) || /(?:^|\/)(?:package\.json|tsconfig[^/]*\.json)$/.test(file))
-export function area(file) {
+export function area(file, plan) {
   if (file.startsWith('apps/mobile/')) return 'mobile'
   if (file.startsWith('apps/desktop/')) return 'desktop'
   if (file.startsWith('packages/daemon/')) return 'daemon'
@@ -22,6 +22,12 @@ export function area(file) {
   if (file.startsWith('scripts/e2b/')) return 'e2b/runtime'
   if (globalPath(file)) return 'ci/release/security'
   if (isDocsOnly([file])) return 'docs-only'
+  // A filename is not coverage: require the validated DB inventory and the
+  // existing graph's direct command edge before recognizing an unmapped test.
+  if (plan?.db.files.includes(file) && plan.db.scripts.some(script => {
+    const id = dbId(script)
+    return plan.graph.nodes[id] && plan.graph.dependencies[id]?.some(edge => edge.target === `source:${file}`)
+  })) return 'database/tests'
   return 'unknown'
 }
 export function diffRange(env, event) {
@@ -33,7 +39,7 @@ export function diffRange(env, event) {
 export async function select(plan, changes, { force = false } = {}) {
   const { tasks } = plan
   const files = changes.map(c => c.file)
-  const areas = [...new Set(files.map(area))].sort()
+  const areas = [...new Set(files.map(file => area(file, plan)))].sort()
   const reasons = []
   if (force || !files.length) reasons.push('full integration or no trustworthy diff')
   if (changes.some(c => !['A', 'M'].includes(c.status) || c.mode !== '100644' || (c.oldMode !== '000000' && c.oldMode !== '100644'))) reasons.push('deletion, rename or non-regular/mode-changing file')
