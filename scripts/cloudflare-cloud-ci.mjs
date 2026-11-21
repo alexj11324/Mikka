@@ -3,12 +3,10 @@ import { existsSync } from 'node:fs'
 import { mkdir, realpath, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { actionsMikkaRepository, hasGitHubOrigin, privateMikkaRepository } from './cloudflare-source.mjs'
+import { assertPrivateRunnerPlacement } from './ci/private-runner-placement.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const repository = 'alexj11324/Mikka'
-const privateRepository = 'alexj11324/mikka-cloud'
-const workflowRef = `${repository}/.github/workflows/cloud-services-ci.yml@refs/heads/main`
 const fullSha = /^[a-f0-9]{40}$/
 const stages = [
   'platform', 'github-source-download',
@@ -32,7 +30,9 @@ function hasOrigin(directory, expected) {
 
 export function sourceContext(env, publicSource) {
   if (env.GITHUB_ACTIONS !== 'true') fail('CLOUD_PUBLIC_CI_PROVIDER_REQUIRED')
-  if (env.GITHUB_REPOSITORY !== repository || env.GITHUB_REPOSITORY_ID !== '1427517699') fail('CLOUD_PUBLIC_CI_REPOSITORY_REQUIRED')
+  const repository = actionsMikkaRepository(env)
+  if (!repository) fail('CLOUD_PUBLIC_CI_REPOSITORY_REQUIRED')
+  const workflowRef = `${repository}/.github/workflows/cloud-services-ci.yml@refs/heads/main`
   if (!fullSha.test(publicSource) || env.GITHUB_SHA !== publicSource || env.GITHUB_WORKFLOW_SHA !== publicSource) fail('CLOUD_PUBLIC_CI_SOURCE_MISMATCH')
   if (!fullSha.test(env.MIKKA_CLOUD_SOURCE_SHA ?? '')) fail('CLOUD_PUBLIC_CI_PRIVATE_PIN_REQUIRED')
   if (env.GITHUB_EVENT_NAME !== 'workflow_dispatch' || env.GITHUB_REF !== 'refs/heads/main' ||
@@ -83,8 +83,9 @@ export function verifyPublishedArtifact(artifact, receipt, context) {
 export async function runCloudCi({ env = process.env, verify = false, publish = false, publicRoot = root } = {}) {
   verify ||= publish
   publicRoot = await realpath(publicRoot)
-  if (git(publicRoot, 'rev-parse', '--show-toplevel') !== publicRoot || !hasOrigin(publicRoot, repository)) fail('CLOUD_PUBLIC_CI_REPOSITORY_REQUIRED')
   const context = sourceContext(env, git(publicRoot, 'rev-parse', 'HEAD'))
+  if (git(publicRoot, 'rev-parse', '--show-toplevel') !== publicRoot || !hasOrigin(publicRoot, context.repository)) fail('CLOUD_PUBLIC_CI_REPOSITORY_REQUIRED')
+  const privateRepository = privateMikkaRepository('mikka-cloud', env)
   const privateRoot = resolve(publicRoot, '.mikka-cloud')
   if (!existsSync(privateRoot)) {
     if (verify) fail('CLOUD_PUBLIC_CI_PRIVATE_CHECKOUT_REQUIRED')
@@ -104,6 +105,9 @@ export async function runCloudCi({ env = process.env, verify = false, publish = 
       !hasOrigin(privateRoot, privateRepository) || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource ||
       git(privateRoot, 'status', '--porcelain', '--untracked-files=no') !== '') fail('CLOUD_PUBLIC_CI_PRIVATE_SOURCE_MISMATCH')
   git(privateRoot, 'ls-files', '--error-unmatch', 'scripts/cloudflare-ci.mjs')
+  // New qualification cannot add private hosted runners. Original verification
+  // and publication keep the workflow bytes of their authenticated release.
+  if (!verify) assertPrivateRunnerPlacement(privateRoot, context.privateSource)
   const { runCi } = await import(pathToFileURL(resolve(privateRoot, 'scripts/cloudflare-ci.mjs')).href)
   const receipt = await runCi({ env, verify, publicRoot, publicSource: context.publicSource })
   if (git(publicRoot, 'rev-parse', 'HEAD') !== context.publicSource || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource) fail('CLOUD_PUBLIC_CI_SOURCE_CHANGED')

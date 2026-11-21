@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { wrapLanguageModel } from 'ai'
 import { gatewayLiteLlm, managedLiteLlmModel } from './config'
+import { decodeHostedCallId } from './hosted-call-id.mjs'
 
 type Credential = {
   provider: 'anthropic' | 'openai'
@@ -61,7 +62,8 @@ function providerFields(credential: Credential) {
   }
 }
 
-export function createLiteLLMModel(modelId: string, options: { user?: string; credential?: Credential } = {}) {
+export function createLiteLLMModel(modelId: string, options: { user?: string; credential?: Credential; callId?: string } = {}) {
+  if (options.callId !== undefined && !decodeHostedCallId(options.callId)) throw new Error('hosted_call_identity_invalid')
   const config = connection()
   const provider = createOpenAICompatible({
     ...config,
@@ -74,6 +76,8 @@ export function createLiteLLMModel(modelId: string, options: { user?: string; cr
       // Auth and routing come from the server, even when an SDK caller supplies headers.
       headers.set('authorization', 'Bearer ' + config.apiKey)
       headers.delete('x-litellm-api-key')
+      if (options.callId) headers.set('x-litellm-call-id', options.callId)
+      else headers.delete('x-litellm-call-id')
       const fields = options.credential ? providerFields(options.credential) : {}
       const body = JSON.stringify({ ...JSON.parse(String(init?.body)), ...(options.user && { user: options.user }), ...fields })
       // Add the person's key beyond the SDK's request-body recording boundary.

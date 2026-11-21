@@ -10,7 +10,8 @@ import { canUseMikkaPaid, hostedUsage as defaultHostedUsage } from './runtime'
 import type { HostedUsageStore } from './store'
 import { withSharedCredits } from '@/lib/credit-shares'
 import { observedModel, recordAiRoute, recordAiUsage, type AiMetadata } from '@/lib/tracing/ai'
-import { modelTokenUsage } from '@/lib/model-call-timing'
+import { modelTokenUsage, stepIdentity } from '@/lib/model-call-timing'
+import { hostedCallId } from '@/lib/model-gateway/hosted-call-id.mjs'
 import { HOSTED_CALL_TIMEOUT_MS, PaidResourceError } from './policy'
 type Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 
@@ -51,6 +52,7 @@ export async function hostedModel(
   })
   if (provider) throw new ModelAdmissionError('modelRouteDenied')
   const model = createLiteLLMModel(modelId, { user: workspaceId })
+  const forCall = async (id: string) => createLiteLLMModel(modelId, { user: workspaceId, callId: hostedCallId(id, await stepIdentity()) })
   const reserve = async (id: string, args: CallArgs) => {
     await admitHostedModel(scope, modelId, { signal: args.abortSignal, auditAllowed: false })
     // An input-size boundary, not a prepaid or estimated-cost balance check.
@@ -80,10 +82,11 @@ export async function hostedModel(
           try {
             if (hostedUsage.metered !== false) await checkAbuseAlerts()
             await admitHostedModel(scope, modelId, { signal: args.abortSignal })
+            const selected = await forCall(id)
             const prepared = options(args)
             if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
             requestStarted = true
-            const result = await model.doGenerate(prepared)
+            const result = await selected.doGenerate(prepared)
             const cost = liteLLMCost(result.providerMetadata)
             recordAiUsage(result.usage)
             recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
@@ -113,10 +116,11 @@ export async function hostedModel(
           try {
             if (hostedUsage.metered !== false) await checkAbuseAlerts()
             await admitHostedModel(scope, modelId, { signal: args.abortSignal })
+            const selected = await forCall(id)
             const prepared = options(args)
             if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
             requestStarted = true
-            const result = await model.doStream(prepared)
+            const result = await selected.doStream(prepared)
             const reader = result.stream.getReader()
             let finished = false
             let consumerCancelled = false

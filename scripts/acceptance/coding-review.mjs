@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { submitEveMessage } from './eve-session.mjs'
 /** #1723/#1724: normal product tasks, normal owner HTTP APIs and native PTYs.
  * Explicit manual workspace-review mode only. No provider SDK, database, model
  * order changes, extra identity, task repair, retry, acceptance merge or polling.
@@ -208,14 +209,11 @@ async function executeCase(client, record, scope, profile, options, { checkpoint
     const message = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read the exact existing description, do not create another task. `
       + `Use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${record.harness}, selected Profile ${profile.id}, needsSpec false. `
       + 'Follow the task criteria and injected delivery instructions, submit the tested candidate and leave the task PR open for human review. Do not merge.'
-    // Preserve the public RPC's undefined sentinel, including the distinct
-    // existing-issue message contract (no task-dialog destination override).
-    const undefinedWire = { $mikka: 'undefined' }
-    const dispatched = await write('dispatch', () => client.rpc('coordinator.sendCoordinatorMessage',
-      [message, null, record.botId, record.submissionId, undefinedWire, null, [], undefinedWire, profile.id]), value => {
-      check(value?.queued === true, 'dispatch_uncertain'); record.dispatched = true
+    const dispatched = await write('dispatch', () => submitEveMessage(client, record.botId, message, record.submissionId,
+      { profileId: profile.id, expectedWorkspaceId: scope.workspaceId, expectedOwnerId: scope.ownerId }), value => {
+      check(value?.ok === true, 'dispatch_uncertain'); record.dispatched = true
     })
-    check(dispatched.queued === true, 'dispatch')
+    check(dispatched.ok === true, 'dispatch')
     const deadline = now() + options.timeoutMs
     const readDispatch = async () => {
       const found = await client.json(`/api/factory/tasks?issueId=${record.issueId}`)

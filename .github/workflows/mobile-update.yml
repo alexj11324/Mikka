@@ -37,15 +37,20 @@ concurrency:
   group: mobile-update-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
+
 jobs:
   update:
     name: EAS Update
     if: >-
-      github.event_name != 'workflow_run' ||
+      (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) &&
+      (github.event_name != 'workflow_run' ||
       (github.event.workflow_run.event == 'workflow_run' &&
        github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.repository.id == 1427517699 &&
-       github.event.workflow_run.head_repository.id == 1427517699 && !github.event.workflow_run.head_repository.fork)
+       github.event.workflow_run.head_repository.id == 1427517699 && !github.event.workflow_run.head_repository.fork))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -67,12 +72,17 @@ jobs:
         run: node --test scripts/mobile-ota-credentials.test.mjs
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
+      - name: Validate the selected private UI owner before credential access
+        run: |
+          node --input-type=module - <<'JS'
+          import { privateMikkaRepository } from './scripts/cloudflare-source.mjs'
+          privateMikkaRepository('mikka-hosted-ui')
+          JS
       - name: Select the trusted main OTA candidate
         id: candidate
         if: >-
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') &&
-          github.ref == 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
-          github.repository_id == '1427517699' && github.repository_owner_id == '183887963' && github.actor_id == '183887963'
+          github.ref == 'refs/heads/main' && (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.actor_id == '183887963'
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict'
@@ -194,7 +204,7 @@ jobs:
         if: steps.eligibility.outputs.allowed == 'true' && env.HOSTED_UI_READ_KEY != ''
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: alexj11324/mikka-hosted-ui
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: ${{ steps.eligibility.outputs.overlay_sha }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui
@@ -236,8 +246,7 @@ jobs:
         if: >-
           steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected == 'true' &&
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') && github.ref == 'refs/heads/main' &&
-          github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
-          github.repository_owner_id == '183887963'
+          (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc

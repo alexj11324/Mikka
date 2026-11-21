@@ -374,10 +374,19 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
   record.messageSubmittedAt = iso(now())
   record.phase = 'coordinator_submit'
-  await client.rpc('coordinator.sendCoordinatorMessage', [text, null, botId, randomUUID(),
-    deviceId ? { kind: 'device', deviceId, ...(agentId ? { agentId } : {}) } : sponsored ? {kind:'cloud',provider:'cloudflare'} : { $mikka: 'undefined' },
-    null, [], { $mikka: 'undefined' }, profileId, ...(sponsored ? [scope.workspaceId, record.title] : [])],
-  { headers: { traceparent: trace.traceparent } })
+  const submitted = await client.request('/api/agents/eve/v1/session?botId=' + encodeURIComponent(botId), {
+    ...post({ message: text, clientContext: { expectedOwnerId: scope.ownerId, expectedWorkspaceId: scope.workspaceId, profileId,
+      ...(deviceId ? { taskDestination: { kind: 'device', deviceId, ...(agentId ? { agentId } : {}) } }
+        : sponsored ? { taskDestination: { kind: 'cloud', provider: 'cloudflare' } } : {}),
+      ...(sponsored ? { taskTitle: record.title } : {}),
+    } }), headers: { 'content-type': 'application/json', 'x-mikka-submission-id': randomUUID(), traceparent: trace.traceparent },
+  })
+  if (!submitted.ok) { await submitted.body?.cancel().catch(() => {}); fail(`http_${submitted.status}`) }
+  assert(submitted.status === 202, 'response_invalid')
+  let receipt
+  try { receipt = await submitted.json() } catch (error) { fail('response_invalid', error) }
+  assert(receipt?.ok === true && /^wrun_[A-Za-z0-9_-]+$/.test(receipt.sessionId ?? '')
+    && typeof receipt.deliveryId === 'string' && receipt.deliveryId.length > 0, 'response_invalid')
   record.phase = 'coordinator_stream'
   let selectedCall, completed = false
   await observeEveSession(client, botId, { timeoutMs,
@@ -386,6 +395,7 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
       fail(code === 'identity' ? 'workflow_run_missing' : code === 'too_large' ? 'coordinator_stream_too_large' : code === 'unavailable' ? 'coordinator_stream_unavailable' : 'coordinator_stream_invalid', error)
     },
     onEvent: async (event, sessionId) => {
+      assert(sessionId === receipt.sessionId, 'workflow_run_missing')
       record.eveSessionId = sessionId
       // Session id is the durable Workflow run id, not the model's run_ label.
       record.workflowRunId = sessionId

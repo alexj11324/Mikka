@@ -17,8 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: marketing-build
     timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
     env:
       MIKKA_MARKETING_SOURCE_SHA: ${{ inputs.marketing_source }}
+      MIKKA_MARKETING_GITHUB_OWNER: ${{ vars.MIKKA_MARKETING_GITHUB_OWNER || 'alexj11324' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -30,16 +34,92 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24.22.1
+      - name: Validate the public source and website installation owner
+        id: website-owner
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          import { appendFileSync } from 'node:fs'
+          import { marketingGitHubOwner, sourceContext } from './scripts/cloudflare-marketing-ci.mjs'
+          sourceContext(process.env, execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim())
+          const owner = marketingGitHubOwner(process.env.MIKKA_MARKETING_GITHUB_OWNER)
+          appendFileSync(process.env.GITHUB_OUTPUT, 'owner=' + owner + '\n')
+          NODE
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ steps.website-owner.outputs.owner }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
+      - name: Read the existing source App id
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the existing source App private key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("MARKETING_APP_ID_MISMATCH")'
+      - name: Mint a short-lived read-only website checkout token
+        id: website-read-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.website-owner.outputs.owner }}
+          repositories: mikka-web
+          permission-contents: read
+      - name: Mint a short-lived website release token
+        id: website-release-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.website-owner.outputs.owner }}
+          repositories: mikka-web
+          permission-contents: write
+      - name: Remove App credentials before loading private website code
+        if: always()
+        run: |
+          echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
+          echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
       - name: Build and test the pinned website once
-        run: node scripts/cloudflare-marketing-ci.mjs build
+        run: exec env -u GITHUB_APP_ID -u GITHUB_APP_PRIVATE_KEY -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL node scripts/cloudflare-marketing-ci.mjs build
         env:
-          MIKKA_MARKETING_READ_TOKEN: ${{ secrets.MIKKA_MARKETING_READ_TOKEN }}
+          MIKKA_MARKETING_READ_TOKEN: ${{ steps.website-read-token.outputs.token }}
       - name: Verify the compiled archive
-        run: node scripts/cloudflare-marketing-ci.mjs verify
+        run: exec env -u GITHUB_APP_ID -u GITHUB_APP_PRIVATE_KEY -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL node scripts/cloudflare-marketing-ci.mjs verify
       - name: Store the compiled archive in the private website release
-        run: node scripts/cloudflare-marketing-ci.mjs publish
+        run: exec env -u GITHUB_APP_ID -u GITHUB_APP_PRIVATE_KEY -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL node scripts/cloudflare-marketing-ci.mjs publish
         env:
-          GH_TOKEN: ${{ secrets.MIKKA_MARKETING_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.website-release-token.outputs.token }}
       - name: Retain public build metadata
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
