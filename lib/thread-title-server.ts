@@ -50,7 +50,7 @@ export async function nameThread(database: Query, runId: string, ownerId: string
     const runIds = await chainOf(database, ownerId, runId)
     const chain = ((await database.query(READ_CHAIN_TITLE, [runIds, ownerId])).rows[0] ?? { title: null, titleSource: null }) as { title: string | null; titleSource: ThreadTitleSource | null }
     const protection = await readRuntimeSetting(database, 'protectManualThreadTitles', { userId: ownerId, workspaceId: tenant })
-    const plan = threadTitlePlan(trigger, run, chain, runIds.length, protection.value as boolean)
+    const plan = threadTitlePlan(trigger, run, chain, runIds.length, protection.value)
     if (plan.do === 'keep') return null
     if (plan.do === 'copy') {
       const changed = await write(database, ownerId, tenant, runIds, plan.title, plan.source, plan.source === 'manual',
@@ -69,8 +69,9 @@ export async function nameThread(database: Query, runId: string, ownerId: string
   if (!title) return null
   const changed = await withConversationWorkspace(ownerId, tenant, async () => {
     const protection = await readRuntimeSetting(database, 'protectManualThreadTitles', { userId: ownerId, workspaceId: tenant })
-    return write(database, ownerId, tenant, input.runIds, title, 'generated',
-      trigger === 'regenerate' || (input.protectManual === false && protection.value === false),
+    // A protection change during generation must not authorize overwriting a manual title.
+    const mayReplaceManual = trigger === 'regenerate' || (!input.protectManual && !protection.value)
+    return write(database, ownerId, tenant, input.runIds, title, 'generated', mayReplaceManual,
       input.chain.titleSource === 'manual' ? input.chain.title : null)
   })
   return changed ? title : null

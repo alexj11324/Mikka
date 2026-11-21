@@ -6,6 +6,7 @@ import { Pool } from 'pg'
 import { bindFixtureWorkspaceDatabase, createFixtureWorkspaceTables } from '../../tests/helpers/workspace-database'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { applySettingsMigration } from '../../tests/support/settings-migration'
 import { SubagentStore } from './subagents'
 import { wakeTokens, wakeTransport } from '@/lib/workflow-wake'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -59,6 +60,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       CREATE TABLE byos_native_runs("runId" uuid PRIMARY KEY,"bindingId" uuid);
     `)
     for (const name of ['20261027164501_cloud_computers.sql', '20261027164502_computer_run_bindings.sql']) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
+    await applySettingsMigration(pool)
     await pool.query('ALTER TABLE cloud_machines ADD COLUMN "deviceId" uuid')
     const migration = await readFile(new URL('../../drizzle/20261029011635_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)

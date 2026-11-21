@@ -65,7 +65,7 @@ export class SubagentStore {
       const count = Number((await client.query(`SELECT count(*) AS n FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND (status IN ('running','needs_you') OR (status='queued' AND "startLeaseUntil">now()))`, [actor.workspaceId,actor.userId])).rows[0].n)
       const older = await client.query(`SELECT 1 FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND status='queued' AND ("startLeaseUntil" IS NULL OR "startLeaseUntil"<=now()) AND "createdAt"<(SELECT "createdAt" FROM bot_subagents WHERE id=$3) LIMIT 1`, [actor.workspaceId,actor.userId,id])
       const limit = await readRuntimeSetting(client, 'subagentMaxConcurrent', actor)
-      if (count >= Number(limit.value) || older.rowCount) { await client.query('COMMIT'); return row }
+      if (count >= limit.value || older.rowCount) { await client.query('COMMIT'); return row }
       const claimed = await client.query(`UPDATE bot_subagents SET "startLeaseId"=$2,"startLeaseUntil"=now()+interval '3 minutes' WHERE id=$1 AND status='queued' AND ("startLeaseUntil" IS NULL OR "startLeaseUntil"<=now()) RETURNING id`, [id,leaseId])
       await client.query('COMMIT')
       if (!claimed.rowCount) return row
