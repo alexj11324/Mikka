@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, TEMPLATE_BOUND, checkSummary, cloneDatabaseName, createClones, concurrency, inventory, runScript, scriptSteps, shardScripts, suiteEnv, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, TEMPLATE_BOUND, checkSummary, cloneDatabaseName, createClones, concurrency, inventory, launch, runScript, scriptSteps, shardScripts, suiteEnv, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
@@ -471,6 +471,18 @@ test('runner rejects invalid shards before execution and preserves per-shard sum
   assert.ok(errors.some(error => /test:b-db: no node:test summary/.test(error)))
   assert.ok(errors.some(error => /test:b-db: ran no tests/.test(error)))
   assert.ok(errors.some(error => /test:b-db: 1 skipped/.test(error)))
+})
+
+test('force-exit node tests run with blocking stdio so the TAP summary is flushed before exit', () => {
+  const plain = launch('test:plain', 'node --test tests/plain.db.test.mjs')
+  assert.deepEqual(plain, ['pnpm', ['-s', 'test:plain']])
+  const quoted = launch('test:quoted', 'node --test-force-exit "tests/odd name.db.test.mjs"')
+  assert.deepEqual(quoted, ['pnpm', ['-s', 'test:quoted']])
+  const [bin, args] = launch('test:workspace-admin-db', 'node --test-force-exit --import tsx --test tests/one.db.test.mjs')
+  assert.equal(bin, process.execPath)
+  assert.equal(args[0], '--import')
+  assert.match(args[1], /blocking-stdio\.mjs$/)
+  assert.deepEqual(args.slice(2), ['--test-force-exit', '--import', 'tsx', '--test', 'tests/one.db.test.mjs'])
 })
 
 test('parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions', () => {

@@ -224,7 +224,9 @@ test('a trusted stdin wrapper can import the paired classifier without running i
 test('blocking CI checks synthetic PR merge candidates once and preserves every main run', () => {
   const source = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const events = source.split('\npermissions:')[0]
-  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n  merge_group:/)
+  // Draft and ready-for-review must re-run the merge candidate. The types list
+  // is what delivers those events; merge_group stays the next trigger.
+  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft\]\n  merge_group:/)
   assert.doesNotMatch(events, /branches-ignore:/)
   assert.doesNotMatch(source, /github\.event\.pull_request\.head\.repo\.full_name != github\.repository/)
   assert.match(source, /name: UI policy \(strict\)/)
