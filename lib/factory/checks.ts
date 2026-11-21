@@ -1,5 +1,4 @@
 import { factoryReviewCriteriaComplete, factoryReviewVerdict } from './validation';
-import { withDatabaseClient } from '../db';
 import { codeReviewConfiguration } from '../code-review/settings-storage';
 import { codeReviewInstructions } from '../code-review/configuration';
 import { runChanged } from '../live/panels';
@@ -398,7 +397,7 @@ export async function configureFactoryCheck(
   };
   const currentRequest = await currentFactoryRequest(tx, task);
   const reviewConfig = task.stage === 'review' && task.workspaceId
-    ? await withDatabaseClient(tx, () => codeReviewConfiguration(task.workspaceId!)) : null;
+    ? await (await import('../db')).withDatabaseClient(tx, () => codeReviewConfiguration(task.workspaceId!)) : null;
   const prompt = [
     ...(currentRequest ? [currentRequest] : []),
     `Factory stage: ${task.stage}. Independent read-only check of candidate ${row.id}, fixed worktree ${row.executionSha}.`,

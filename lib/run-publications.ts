@@ -381,7 +381,8 @@ export type OwnerPullRequestOpener = (input: Omit<Parameters<typeof openRunPullR
  */
 export function createOwnerPullRequestOpener(deps: { credential?: (userId: string, remoteKey: string) => Promise<{ token: string; githubAccountId?: string; installationId?: string }>; fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): OwnerPullRequestOpener {
   return async ({ userId, ...input }) => {
-    const credential = await (deps.credential ?? ownerGitHubCredential)(userId, input.remoteKey, input.autoMerge)
+    const requireUserToken = input.autoMerge
+    const credential = await (deps.credential ?? ownerGitHubCredential)(userId, input.remoteKey, requireUserToken)
     const { recordRepositoryInstallation } = await import('@/lib/github/repository-installation')
     return openRunPullRequest({ ...input, installationId: credential.installationId, ...credential, ...(deps.fetcher ? { fetcher: deps.fetcher } : {}),
       onVerified: async binding => {
@@ -393,10 +394,10 @@ export function createOwnerPullRequestOpener(deps: { credential?: (userId: strin
 export const openOwnerPullRequest = createOwnerPullRequestOpener()
 
 /** The run owner's own GitHub token, as a publication outcome when there is none. */
-async function ownerGitHubCredential(userId: string, remoteKey: string, humanMerge = false): Promise<{ token: string; githubAccountId?: string; installationId?: string }> {
-  const { GitHubAccessError } = await import('@/lib/github/user-access')
+async function ownerGitHubCredential(userId: string, remoteKey: string, requireUserToken = false): Promise<{ token: string; githubAccountId?: string; installationId?: string }> {
+  const { GitHubAccessError, githubTokenForUser } = await import('@/lib/github/user-access')
   const { githubMachineCredential } = await import('@/lib/github/machine-credential')
-  try { return humanMerge ? await (await import('@/lib/github/user-access')).githubTokenForUser(userId) : await githubMachineCredential(userId, { remoteKey }) }
+  try { return requireUserToken ? await githubTokenForUser(userId) : await githubMachineCredential(userId, { remoteKey }) }
   catch (error) {
     if (!(error instanceof GitHubAccessError)) throw error
     if (error.code === 'githubNotConnected') throw new PublicationError('github_identity_required')

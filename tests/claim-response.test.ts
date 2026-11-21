@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { CodedError } from '@mikka/protocol/coded-error'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, RUN_CREDENTIALS_HEADER, MODEL_CREDENTIAL_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
+import { REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, RUN_CREDENTIALS_HEADER, MODEL_CREDENTIAL_HEADER, CUSTOM_TASK_BRANCH_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER } from '@mikka/protocol/subscription'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
@@ -52,6 +52,7 @@ function fixture() {
     issueAccessError: undefined as Error | undefined,
     credentialCapability: false,
     modelCredentialCapability: false,
+    customBranchCapability: false,
     catalogueCapability: false,
     secretCapability: undefined as string | undefined,
     secretInjection: undefined as Partial<TaskSecretInjection> | undefined,
@@ -87,7 +88,7 @@ function fixture() {
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings'], expectsProjectAdmission = true) {
   const diagnostics: unknown[][] = []
   const errors = mock.method(console, 'error', (...args: unknown[]) => { diagnostics.push(args) })
-  try { return await POST(new Request(claimRequestURL,{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.modelCredentialCapability ? {[MODEL_CREDENTIAL_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {}),...(probe.secretCapability ? {[TASK_SECRETS_HEADER]:probe.secretCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+  try { return await POST(new Request(claimRequestURL,{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.customBranchCapability ? {[CUSTOM_TASK_BRANCH_HEADER]:'1'} : {}),...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.modelCredentialCapability ? {[MODEL_CREDENTIAL_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {}),...(probe.secretCapability ? {[TASK_SECRETS_HEADER]:probe.secretCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     errors.mock.restore()
     // The route logs only error names. Keep the intentional refusal distinct
@@ -346,6 +347,7 @@ test('every github.com run of a connected owner gets the owner credential endpoi
   overrideDeploymentSwitch('byos', true)
   try { for (const variant of ['implement', 'plan', 'readOnly'] as const) {
     const probe = fixture()
+    probe.customBranchCapability = true
     if (variant === 'plan') probe.run.kind = 'plan'
     if (variant === 'readOnly') Object.assign(probe.run, { agentDefinition: { readOnly: true } })
     probe.cliPolicy.policy.permissions.git_push = 'deny' as never
@@ -360,6 +362,11 @@ test('every github.com run of a connected owner gets the owner credential endpoi
     assert.deepEqual((probe as unknown as { githubLookups: string[] }).githubLookups, ['member'], 'only the run owner\'s connection is looked up')
     assert.deepEqual(probe.cloudGitHubLookups, ['member'])
     assert.deepEqual(probe.localBindingLookups, variant === 'readOnly' ? [] : [['member', 'agent', 'codex']], 'legacy unpinned runs read only their own subscription metadata')
+    if (variant === 'implement') {
+      const legacy = await claim(fixture())
+      assert.equal(legacy.status, 200)
+      assert.equal((await legacy.json()).github?.branch, undefined)
+    }
   } } finally { overrideDeploymentSwitch('personalMailbox', undefined); overrideDeploymentSwitch('byos', undefined) }
 })
 

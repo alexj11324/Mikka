@@ -140,9 +140,15 @@ export async function openRunPullRequest(options: Options & {
   const access = await repositoryAccess(options)
   const { request, path, binding } = access
   await options.onVerified?.(binding)
-  const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, access.token, { missing: 'branch_not_pushed' }))
-  if (ref.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
   const writeToken = access.token
+  const branchRef = `${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`
+  const assertHeadUnchanged = async (latest?: z.infer<typeof prSchema>, missing?: 'branch_not_pushed') => {
+    const expected = options.commit.toLowerCase()
+    if (latest && latest.head.sha?.toLowerCase() !== expected) throw new PublicationError('branch_changed')
+    const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(branchRef, writeToken, missing ? { missing } : undefined))
+    if (ref.object.sha.toLowerCase() !== expected) throw new PublicationError('branch_changed')
+  }
+  await assertHeadUnchanged(undefined, 'branch_not_pushed')
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
   const verified = (raw: unknown) => {
@@ -168,9 +174,7 @@ export async function openRunPullRequest(options: Options & {
           if (latest.head.ref !== options.branch || latest.head.repo?.id !== binding.repositoryId
             || latest.base.repo.id !== binding.repositoryId || !latest.body?.trimEnd().endsWith(marker)
             || latest.state !== 'open' || latest.merged_at) throw new PublicationError('pull_request_conflict')
-          if (latest.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
-          const head = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
-          if (head.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+          await assertHeadUnchanged(latest)
           const body = bodyWithPublicationEvidence(latest.body, options.issueId, visualEvidence)
           if (!body) throw new PublicationError('pull_request_conflict')
           if (body === latest.body) return latest
@@ -196,9 +200,7 @@ export async function openRunPullRequest(options: Options & {
         const latest = verified(await request(`${path}/pulls/${pr.number}`, writeToken))
         if (latest.number !== pr.number || latest.node_id !== pr.node_id || latest.state !== 'open' || latest.merged_at) throw new PublicationError('pull_request_conflict')
         if (!latest.title?.trim()) throw new PublicationError('github_request_failed')
-        if (latest.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
-        const head = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
-        if (head.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        await assertHeadUnchanged(latest)
         const title = prefixedTitle(latest.title)
         if (title === latest.title) return latest
         const saved = verified(await request(`${path}/pulls/${pr.number}`, writeToken, { method: 'PATCH', body: { title } }))
@@ -241,9 +243,7 @@ export async function openRunPullRequest(options: Options & {
       await write(async () => {
         const latest = verified(await request(`${path}/pulls/${pr.number}`, writeToken))
         if (latest.node_id !== nodeId || latest.state !== 'open' || latest.draft || latest.merged_at) throw new PublicationError('pull_request_conflict')
-        if (latest.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
-        const head = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
-        if (head.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        await assertHeadUnchanged(latest)
         const enabled = parse(z.object({ data: z.object({ enablePullRequestAutoMerge: z.object({ pullRequest: z.object({ id: z.string(), autoMergeRequest: z.object({ enabledAt: z.string() }) }) }) }) }),
           await request('/graphql', writeToken, { method: 'POST', body: {
             query: 'mutation($id: ID!, $head: GitObjectID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, expectedHeadOid: $head, mergeMethod: MERGE}) { pullRequest { id autoMergeRequest { enabledAt } } } }',
@@ -291,10 +291,7 @@ export async function openRunPullRequest(options: Options & {
   let created: z.infer<typeof prSchema>
   try {
     created = parse(prSchema, await write(async () => {
-      if (visualEvidence) {
-        const current = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
-        if (current.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
-      }
+      if (visualEvidence) await assertHeadUnchanged()
       return request(`${path}/pulls`, writeToken, { method: 'POST', body: {
       title: `${prefix.data ? `${maskCredentials(prefix.data)} ` : ''}${visualEvidence ? factoryPullRequestText(options.issueId).title : `${options.identifier}: ${maskCredentials(options.title)}`}`.slice(0, 256),
       head: options.branch, base: options.baseBranch ?? binding.defaultBranch,

@@ -14,12 +14,16 @@ type Source = { id: string; botId: string | null; issueId: string | null; payloa
 const reviewSchedule = z.object({ scheduleId: z.uuid(), occurrenceId: z.uuid(), codeReview: z.literal(true) })
 const unavailable = () => new ScheduleError('scheduleDispatchUnavailable', 403)
 
-async function originalReviewRequest(userId: string, sourceEventId?: string | null, botId?: string | null): Promise<Source | null> {
+async function originalReviewRequest(userId: string, sourceEventId?: string | null, botId?: string | null, requireSource = true): Promise<Source | null> {
   if (!sourceEventId) return null
   const { rows: [source] } = await pool.query<Source>(`SELECT e.id,e."botId",coalesce(e."issueId",r."issueId") AS "issueId",e.payload
     FROM coordinator_events e LEFT JOIN agent_runs r ON r.id=e."runId" AND r."userId"=e."userId"
     WHERE e.id=$1 AND e."userId"=$2`, [sourceEventId, userId])
-  if (!source || botId !== undefined && source.botId !== botId) throw unavailable()
+  if (!source) {
+    if (requireSource) throw unavailable()
+    return null
+  }
+  if (botId !== undefined && source.botId !== botId) throw unavailable()
   if (reviewSchedule.safeParse(source.payload.schedule).success) return source
   const retry = z.uuid().safeParse(source.payload.taskRequestSourceEventId)
   const { rows: [original] } = await pool.query<Source>(`SELECT e.id,e."botId",e."issueId",e.payload FROM coordinator_events e
@@ -34,7 +38,10 @@ async function originalReviewRequest(userId: string, sourceEventId?: string | nu
  * GitHub call when its repository configuration disappears. */
 export async function withReviewRequestAuthority<T>(userId: string, sourceEventId: string | null | undefined,
   botId: string | null | undefined, work: (authority: ReviewGitHubAuthority | null) => Promise<T>): Promise<T> {
-  const source = await originalReviewRequest(userId, sourceEventId, botId)
+  return withReviewAuthority(userId, await originalReviewRequest(userId, sourceEventId, botId), work)
+}
+
+async function withReviewAuthority<T>(userId: string, source: Source | null, work: (authority: ReviewGitHubAuthority | null) => Promise<T>): Promise<T> {
   if (!source) return work(null)
   const stored = reviewSchedule.parse(source.payload.schedule)
   const { rows: [hint] } = await pool.query<{ workspace_id: string }>('SELECT workspace_id FROM user_schedules WHERE id=$1', [stored.scheduleId])
@@ -71,5 +78,5 @@ export async function withReviewRequestAuthority<T>(userId: string, sourceEventI
 /** Only host-marked review requests get a read-only worker. It tightens the
  * existing native policy; it does not change native credential or network rules. */
 export async function requestedCodeReviewReadOnly(userId: string, sourceEventId?: string | null): Promise<boolean> {
-  return withReviewRequestAuthority(userId, sourceEventId, undefined, async authority => authority !== null)
+  return withReviewAuthority(userId, await originalReviewRequest(userId, sourceEventId, undefined, false), async authority => authority !== null)
 }

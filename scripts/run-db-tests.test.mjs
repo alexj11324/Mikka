@@ -724,7 +724,7 @@ test('isolated fixture databases create distinct empty databases and close admin
   const first = new URL(await isolatedPostgresURL(target))
   const second = new URL(await isolatedPostgresURL(target))
   assert.notEqual(first.pathname, second.pathname)
-  assert.match(first.pathname, /^\/mikka_fixture_[a-f0-9]{32}$/)
+  assert.match(first.pathname, /^\/mikka_fixture_[a-f0-9]{32}_e2e$/)
   assert.equal(first.origin, new URL(target).origin)
   assert.equal(first.username, new URL(target).username)
   assert.equal(first.password, new URL(target).password)

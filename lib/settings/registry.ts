@@ -5,12 +5,15 @@ import { DEFAULT_TITLE_TRIGGERS, THREAD_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX }
 import { pullRequestBranchPrefix, pullRequestTitlePrefix, reviewIgnoredPaths, reviewModel, REVIEW_OUTPUTS, REVIEW_SEVERITIES } from '@/lib/code-review/settings-contract'
 import { settingMetadata } from './metadata'
 
+export type ReviewSettingMirror =
+  | { table: 'pull-request'; column: 'titlePrefix' | 'branchPrefix' | 'autoMerge' | 'draft' }
+  | { table: 'code-review'; column: 'model' | 'severity' | 'ignoredPaths' | 'output' }
+
 export interface SettingDefinition extends SettingSchemaEntry {
   guard: z.ZodType<SettingValue>
   /** Existing account preferences stay global; title overrides belong to one workspace. */
   personalContext: 'account' | 'workspace'
-  legacy?: 'archive-days' | 'title-instructions' | 'title-triggers'
-  storage?: 'pull-request' | 'code-review'
+  mirror?: ReviewSettingMirror
 }
 
 const inherited = {
@@ -24,19 +27,19 @@ export const SETTINGS_REGISTRY = {
     ...inherited, key: 'archiveIdleAfterDays', group: 'threads', page: 'threads',
     ...settingMetadata('archiveIdleAfterDays'),
     type: 'integer', guard: z.literal(archiveIdleDays), defaultValue: 30, options: [...archiveIdleDays],
-    personalContext: 'account', legacy: 'archive-days',
+    personalContext: 'account',
   },
   threadTitleInstructions: {
     ...inherited, key: 'threadTitleInstructions', group: 'threads', page: 'threads',
     ...settingMetadata('threadTitleInstructions'),
     type: 'string', guard: z.string().trim().max(TITLE_INSTRUCTIONS_MAX), defaultValue: '',
-    personalContext: 'workspace', legacy: 'title-instructions',
+    personalContext: 'workspace',
   },
   threadTitleTriggers: {
     ...inherited, key: 'threadTitleTriggers', group: 'threads', page: 'threads',
     ...settingMetadata('threadTitleTriggers'),
     type: 'string', guard: z.enum(THREAD_TITLE_TRIGGERS), defaultValue: DEFAULT_TITLE_TRIGGERS, options: [...THREAD_TITLE_TRIGGERS],
-    personalContext: 'workspace', legacy: 'title-triggers',
+    personalContext: 'workspace',
   },
   subagentMaxConcurrent: {
     key: 'subagentMaxConcurrent', scope: ['workspace'], group: 'threads', page: 'threads',
@@ -47,42 +50,42 @@ export const SETTINGS_REGISTRY = {
   prTitlePrefix: {
     ...inherited, key: 'prTitlePrefix', group: 'git', page: 'git',
     ...settingMetadata('prTitlePrefix'),
-    type: 'string', guard: pullRequestTitlePrefix, defaultValue: '', personalContext: 'workspace', storage: 'pull-request',
+    type: 'string', guard: pullRequestTitlePrefix, defaultValue: '', personalContext: 'workspace', mirror: { table: 'pull-request', column: 'titlePrefix' },
   },
   prBranchPrefix: {
     ...inherited, key: 'prBranchPrefix', group: 'git', page: 'git',
     ...settingMetadata('prBranchPrefix'),
-    type: 'string', guard: pullRequestBranchPrefix, defaultValue: 'mikka', personalContext: 'workspace', storage: 'pull-request',
+    type: 'string', guard: pullRequestBranchPrefix, defaultValue: 'mikka', personalContext: 'workspace', mirror: { table: 'pull-request', column: 'branchPrefix' },
   },
   prAutoMerge: {
     ...inherited, key: 'prAutoMerge', group: 'git', page: 'git',
     ...settingMetadata('prAutoMerge'),
-    type: 'boolean', guard: z.boolean(), defaultValue: false, personalContext: 'workspace', storage: 'pull-request',
+    type: 'boolean', guard: z.boolean(), defaultValue: false, personalContext: 'workspace', mirror: { table: 'pull-request', column: 'autoMerge' },
   },
   prDraft: {
     ...inherited, key: 'prDraft', group: 'git', page: 'git',
     ...settingMetadata('prDraft'),
-    type: 'boolean', guard: z.boolean(), defaultValue: false, personalContext: 'workspace', storage: 'pull-request',
+    type: 'boolean', guard: z.boolean(), defaultValue: false, personalContext: 'workspace', mirror: { table: 'pull-request', column: 'draft' },
   },
   codeReviewModel: {
     key: 'codeReviewModel', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewModel'),
-    type: 'string', guard: reviewModel, defaultValue: '', personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
+    type: 'string', guard: reviewModel, defaultValue: '', personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', mirror: { table: 'code-review', column: 'model' },
   },
   codeReviewSeverity: {
     key: 'codeReviewSeverity', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewSeverity'),
-    type: 'string', guard: z.enum(REVIEW_SEVERITIES), defaultValue: 'medium', options: [...REVIEW_SEVERITIES], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
+    type: 'string', guard: z.enum(REVIEW_SEVERITIES), defaultValue: 'medium', options: [...REVIEW_SEVERITIES], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', mirror: { table: 'code-review', column: 'severity' },
   },
   codeReviewIgnoredPaths: {
     key: 'codeReviewIgnoredPaths', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewIgnoredPaths'),
-    type: 'string-array', guard: reviewIgnoredPaths, defaultValue: [], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
+    type: 'string-array', guard: reviewIgnoredPaths, defaultValue: [], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', mirror: { table: 'code-review', column: 'ignoredPaths' },
   },
   codeReviewOutput: {
     key: 'codeReviewOutput', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewOutput'),
-    type: 'string', guard: z.enum(REVIEW_OUTPUTS), defaultValue: 'comments', options: [...REVIEW_OUTPUTS], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
+    type: 'string', guard: z.enum(REVIEW_OUTPUTS), defaultValue: 'comments', options: [...REVIEW_OUTPUTS], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', mirror: { table: 'code-review', column: 'output' },
   },
 } satisfies Record<string, SettingDefinition>
 
@@ -118,5 +121,5 @@ export function resolveSettingValue(key: string, personal: SettingValue | null |
 }
 
 export function settingsSchema(): SettingSchemaEntry[] {
-  return Object.values(SETTINGS_REGISTRY).map(({ guard: _guard, personalContext: _context, legacy: _legacy, storage: _storage, ...entry }: SettingDefinition) => entry)
+  return Object.values(SETTINGS_REGISTRY).map(({ guard: _guard, personalContext: _context, mirror: _mirror, ...entry }: SettingDefinition) => entry)
 }
