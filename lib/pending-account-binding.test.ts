@@ -43,7 +43,6 @@ stub('./composio.ts', {
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
 stub('./cloud-computer/credential-reviews.ts', { executeCredentialOperation: async (...args: unknown[]) => { reviews.push(['credential', ...args.slice(1)]); return { data: {} } } })
-stub('./cloud-computer/action-reviews.ts', { executeApprovedBrowserAction: async (...args: unknown[]) => { reviews.push(['browser', ...args.slice(1)]); return { data: {} } } })
 const appCalls: unknown[][] = []
 stub('./app-tools-server.ts', { executeAppToolCall: async (_client: unknown, userId: string, call: { toolkit: string }, accountId: string | null) => { appCalls.push([userId, call.toolkit, accountId]); return { successful: true, data: {} } } })
 stub('./plugins/catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), isNoAuthToolkit: async (_list: unknown, id: string) => id === 'hackernews' })
@@ -108,17 +107,25 @@ test('a model-selected account is frozen in the proposal', async () => {
   assert.equal(row.connectedAccountId, 'selected-account')
 })
 
-test('computer and credential reviews retain their own approval authority without a Composio account', async () => {
+test('credential reviews retain their own approval authority without a Composio account', async () => {
   calls.length = 0; reviews.length = 0
-  for (const [action, kind] of [['credential_operation', 'credential'], ['browser_operation', 'browser']]) {
-    for (const approve of [true, false]) {
-      row = { id: 'review', action, input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
-      const result = await actions.decidePendingAction('u', 'review', approve)
-      assert.equal(result.status, approve ? 'done' : 'declined')
-      assert.deepEqual(reviews.at(-1), [kind, 'u', { summary: 'Review' }, approve])
-    }
+  for (const approve of [true, false]) {
+    row = { id: 'review', action: 'credential_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
+    const result = await actions.decidePendingAction('u', 'review', approve)
+    assert.equal(result.status, approve ? 'done' : 'declined')
+    assert.deepEqual(reviews.at(-1), ['credential', 'u', { summary: 'Review' }, approve])
   }
   assert.deepEqual(calls, [])
+})
+
+test('a legacy browser card can only decline: approval has no executor any more', async () => {
+  calls.length = 0; reviews.length = 0
+  row = { id: 'review', action: 'browser_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
+  assert.equal((await actions.decidePendingAction('u', 'review', false)).status, 'declined')
+  row = { id: 'review', action: 'browser_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
+  const approved = await actions.decidePendingAction('u', 'review', true)
+  assert.equal(approved.status, 'failed'); assert.equal(approved.error, 'pendingActionUnavailable')
+  assert.deepEqual(reviews, []); assert.deepEqual(calls, [])
 })
 
 test('a mail send or calendar write runs at once in the connected account and stays as a record, not a card', async () => {

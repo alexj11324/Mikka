@@ -196,6 +196,6 @@ test('actual browser action commits its event before notification and external a
   await assert.rejects(perform(rejected), /fixture event write rejected/)
   const row = await store.get(actor, botId, rejected)
   assert.equal(row.status, 'running'); assert.equal(row.activeActionId, null)
-  assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 1)
+  assert.equal((await observer.query('SELECT count(*)::int AS count FROM pending_actions')).rows[0].count, 0, 'direct browser actions write no approval row')
   await Promise.all(probes); assert.equal(notices.length, 1); assert.equal(runtimeCalls, 1)
 })

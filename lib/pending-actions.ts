@@ -25,7 +25,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       .returning()
     if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== 'credential_operation' && row.action !== APP_TOOL_ACTION)) throw new ActionFailureError('pendingActionUnavailable')
     await pendingActionsChanged(executor, row.id, userId)
-    if (!approve && row.action !== 'browser_operation' && row.action !== 'credential_operation') {
+    if (!approve && row.action !== 'credential_operation') {
       await recordCoordinatorEvent(executor, actionDecidedEvent(row, { status: 'declined', error: null, outcome: {} }, { botId: row.botId }))
       return null
     }
@@ -54,7 +54,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     const result = (row.action === 'browser_operation' || row.action === 'credential_operation')
       ? row.action === 'credential_operation'
         ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
-        : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
+        : { error: 'pendingActionUnavailable' }
       : row.action === APP_TOOL_ACTION
         ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId ?? null)
         : !row.connectedAccountId

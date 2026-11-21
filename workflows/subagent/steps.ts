@@ -32,17 +32,19 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
         const outcome=await executeCredentialOperation(pool,actor.userId,previous.input,true)
         return 'error' in outcome?'waiting':'running'
       }
-      if(previous?.action==='browser_operation' && previous.status==='running') {
-        const {executeApprovedBrowserAction}=await import('@/lib/cloud-computer/action-reviews')
-        const result=await executeApprovedBrowserAction(pool,actor.userId,previous.input,true)
-        return 'error' in result && result.error!=='browserActionExpired'?'waiting':'running'
-      }
       if(previous?.status==='pending') {
         const expired=await pool.query(`UPDATE pending_actions SET status='failed',error='browserActionExpired' WHERE id=$1 AND status='pending' AND "createdAt"<now()-interval '5 minutes' RETURNING id`,[row.activeActionId])
         if(!expired.rowCount) return 'waiting'
         await pool.query(`UPDATE bot_subagents SET "activeActionId"=NULL WHERE id=$1 AND "ownerId"=$2`,[id,actor.userId])
         await store.update(actor,botId,id,'running','Approval expired; observing current page')
         return 'running'
+      }
+      // Direct browser actions keep no pending_actions replay record: a bound
+      // action id that survives a process loss has an unknown outcome and is
+      // never repeated blindly.
+      if(!previous || previous.action==='browser_operation') {
+        await store.update(actor,botId,id,'needs_you','Action outcome unknown; do not repeat blindly')
+        return 'waiting'
       }
     }
     if(row.status==='needs_you') return 'waiting'
