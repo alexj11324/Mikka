@@ -306,11 +306,30 @@ jobs:
       (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     uses: ./.github/workflows/workspace-governance-acceptance.yml
 
+  frontend-screenshots:
+    # Description evidence only. No browser (decision 2026-11-01-1520).
+    # Editing the description reruns .github/workflows/frontend-screenshots.yml
+    # without rerunning this suite.
+    name: Frontend changes include a screenshot
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Require a screenshot or recording in the description
+        run: node scripts/ci/frontend-screenshot-check.mjs
+
   ui-policy:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, analytics-checks, workspace-governance-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, analytics-checks, workspace-governance-checks, frontend-screenshots]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -332,7 +351,9 @@ jobs:
           EXPECT_DAEMON: ${{ needs.changes.outputs.daemon }}
           EXPECT_ANALYTICS: ${{ github.event_name != 'push' && needs.changes.outputs.analytics == 'true' }}
           EXPECT_GOVERNANCE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.changes.outputs.db == 'true' }}
+          EXPECT_SCREENSHOTS: ${{ github.event_name == 'pull_request' }}
           GOVERNANCE: ${{ needs.workspace-governance-checks.result }}
+          SCREENSHOTS: ${{ needs.frontend-screenshots.result }}
           ANALYTICS: ${{ needs.analytics-checks.result }}
           CORE: ${{ needs.ui-policy-full.result }}
           INTEGRATION: ${{ needs.ui-policy-integrations.result }}
@@ -340,7 +361,7 @@ jobs:
           DAEMON: ${{ needs.daemon-checks.result }}
         run: |
           test "$CHANGES_RESULT" = success
-          for name in CORE INTEGRATION SOURCE DAEMON ANALYTICS GOVERNANCE; do
+          for name in CORE INTEGRATION SOURCE DAEMON ANALYTICS GOVERNANCE SCREENSHOTS; do
             expected="EXPECT_$name"
             case "${!expected}" in
               true) test "${!name}" = success ;;

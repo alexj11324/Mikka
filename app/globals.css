@@ -91,6 +91,7 @@
 --color-object-chip: var(--object-chip);
 --color-object-chip-hover: var(--object-chip-hover);
 --color-object-chip-foreground: var(--object-chip-foreground);
+--color-settings-nav-active: var(--settings-nav-active);
 --color-sidebar-accent: var(--sidebar-accent);
 --color-sidebar-item: var(--sidebar-item);
 --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -282,6 +283,7 @@
 --object-chip: color-mix(in oklch, var(--sidebar-primary) 8%, transparent);
 --object-chip-hover: color-mix(in oklch, var(--sidebar-primary) 14%, transparent);
 --object-chip-foreground: var(--sidebar-primary);
+--settings-nav-active: var(--sidebar-primary-soft);
 --sidebar-accent: oklch(0.97 0 0);
 --sidebar-item: #dfe0e2; /* Comma's sidebar-bg-item: the rail's hover and current fill */
 --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -370,6 +372,7 @@
 --object-chip: color-mix(in oklch, var(--sidebar-primary) 22%, transparent);
 --object-chip-hover: color-mix(in oklch, var(--sidebar-primary) 32%, transparent);
 --object-chip-foreground: color-mix(in oklch, var(--sidebar-primary) 55%, white);
+--settings-nav-active: var(--object-chip);
 --sidebar-accent: oklch(0.269 0 0);
 --sidebar-item: #222326;
 --sidebar-accent-foreground: oklch(0.985 0 0);

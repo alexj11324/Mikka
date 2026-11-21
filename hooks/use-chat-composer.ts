@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { MESSAGE_MAX } from '@/lib/message-limits'
 import { sendsMessage } from '@/lib/send-key'
+import { currentUiPreferences, runKeyAction } from '@/lib/ui-preferences'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { useChatFiles } from '@/components/chat/use-chat-files'
 import type { ChatComposerProps } from '@/components/slots/chat-composer-contract'
@@ -16,7 +17,7 @@ import type { ChatComposerProps } from '@/components/slots/chat-composer-contrac
  * drop and paste, the length limit. The default slot and the hosted layer both
  * call it, so the two composers cannot behave differently.
  */
-export function useChatComposer({ ref, value, onChange, onSubmit, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, sendKey = 'enter', thread = false, attachmentScope, attachmentDisabled = false }: ChatComposerProps) {
+export function useChatComposer({ ref, value, onChange, onSubmit, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, onRunKey, sendKey = 'enter', thread = false, attachmentScope, attachmentDisabled = false }: ChatComposerProps) {
   const tShell = useTranslations('Shell')
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -96,7 +97,13 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
       const { key, shiftKey, metaKey, ctrlKey } = event
       // In a bot chat Esc stops the reply, as the stop button does.
       if (key === 'Escape' && stoppable && !thread && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
-      if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
+      const chord = { key, shiftKey, metaKey, ctrlKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing }
+      if (running) {
+        const action = runKeyAction(chord, currentUiPreferences())
+        if (action === 'interrupt') { event.preventDefault(); if (onRunKey) onRunKey('interrupt'); else onStop?.(); return }
+        if (action === 'steer' || action === 'queue') { event.preventDefault(); if (!canSend) return; if (onRunKey) onRunKey(action); else submit(); return }
+      }
+      if (!sendsMessage(chord, sendKey)) return
       event.preventDefault()
       submit()
     },

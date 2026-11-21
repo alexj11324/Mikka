@@ -4,6 +4,8 @@ import { useTranslations } from '@/lib/intl/i18n-client'
 import { useEffect, useState } from 'react'
 import { CircleArrowDown, SquarePen } from '@/components/icons'
 import { RAIL_ITEMS, type RailProps } from '@/components/nav/rail-items'
+import { useUiPreferenceSnapshot } from '@/hooks/use-ui-preference-snapshot'
+import type { UiPreferences } from '@/lib/ui-preferences'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { bridgeFromWindow } from '@/lib/platform/detect'
@@ -22,12 +24,21 @@ const ITEM_ICON = 'flex rounded-sm p-2 group-hover/rail-item:bg-sidebar-item in-
  * Comma's light gray, and the current item swaps to the solid icon. It never
  * collapses; the bot list inside the card does.
  */
+export function orderedRail(ui: UiPreferences) {
+  const allowed = ui.sidebarPages ? new Set<string>(ui.sidebarPages) : null
+  const items = RAIL_ITEMS.filter(item => !allowed || allowed.has(item.id))
+  if (!ui.pinPages) return items
+  const pinned = new Set(['board', 'pulls'])
+  return [...items.filter(item => pinned.has(item.id)), ...items.filter(item => !pinned.has(item.id))]
+}
+
 export function IconRailView({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
+  const ui = useUiPreferenceSnapshot()
   // A non-collapsing Sidebar, as in shadcn's nested icon-rail pattern; phones get these items in the list footer.
   return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-17 shrink-0 items-center gap-1 bg-transparent pt-1 pb-1 md:flex">
     {menu.chats?.onNewConversation && <Button size="icon" variant="ghost" aria-label={i18nText('Nav.startConversation')} title={i18nText('Nav.startConversation')} onClick={menu.chats.onNewConversation}><SquarePen /></Button>}
-    {RAIL_ITEMS.map(item => {
+    {orderedRail(ui).map(item => {
       const selected = active === item.id
       const Icon = selected ? item.selectedIcon : item.icon
       const label = i18nText(item.label)

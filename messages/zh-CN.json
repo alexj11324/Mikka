@@ -2206,7 +2206,9 @@
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",
     "groups": {
-      "personal": "账号",
+      "personal": "个人设置",
+      "agent": "Agent",
+      "review": "审阅",
       "workspace": "工作区",
       "administration": "管理",
       "yourTeams": "你的团队"
@@ -2219,13 +2221,25 @@
         "title": "成员"
       },
       "preferences": {
-        "title": "偏好设置"
+        "title": "常规"
+      },
+      "appearance": {
+        "title": "外观"
+      },
+      "instructions": {
+        "title": "指令",
+        "keywords": "记忆 建议"
+      },
+      "threads": {
+        "title": "线程",
+        "keywords": "标题"
       },
       "memory": {
         "title": "记忆与建议"
       },
       "account": {
-        "title": "账户"
+        "title": "个人资料",
+        "keywords": "账户 资料 隐私"
       },
       "teams": {
         "title": "团队"
@@ -2237,13 +2251,15 @@
         "title": "安全"
       },
       "connections": {
-        "title": "连接"
+        "title": "集成",
+        "keywords": "连接 插件 MCP"
       },
       "bot-permissions": {
         "title": "应用与运行权限"
       },
       "models": {
         "title": "模型与订阅",
+        "nav": "模型",
         "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 优先使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
       },
       "logins": {
@@ -2256,10 +2272,11 @@
         "title": "设备"
       },
       "developer": {
-        "title": "个人访问令牌"
+        "title": "个人访问令牌",
+        "nav": "API"
       },
       "general": {
-        "title": "常规"
+        "title": "工作区常规"
       },
       "permissions": {
         "title": "团队权限"
@@ -2272,6 +2289,7 @@
       },
       "organization": {
         "title": "组织",
+        "nav": "身份与访问",
         "keywords": "Organization SSO SAML OIDC SCIM 单点登录 企业 身份 目录 策略 审批 法律保留"
       },
       "usage": {
@@ -2288,8 +2306,17 @@
         "title": "运行环境"
       },
       "issue-states": {
-        "title": "任务状态"
-      }
+        "title": "任务状态",
+        "nav": "任务状态与标签"
+      },
+      "shortcuts": { "title": "快捷键" },
+      "git": { "title": "Git" },
+      "review-repositories": { "title": "审阅仓库" },
+      "review-config": { "title": "审阅配置" },
+      "activity": { "title": "活动" },
+      "referrals": { "title": "推荐" },
+      "experiments": { "title": "实验" },
+      "cloud-credentials": { "title": "云凭据" }
     },
     "appearance": {
       "title": "外观",
@@ -2302,7 +2329,106 @@
       "language": "界面语言",
       "languageName": "简体中文",
       "languageZh": "简体中文",
-      "languageEn": "English"
+      "languageEn": "English",
+      "displayMode": "显示模式",
+      "sync": "外观同步",
+      "syncHint": "在你的设备之间应用更改",
+      "themes": "主题",
+      "colors": "颜色",
+      "accent": "强调色",
+      "fill": "背景",
+      "surface": "背景",
+      "foreground": "前景",
+      "advanced": "高级颜色",
+      "border": "边框",
+      "background": "背景",
+      "themeLead": "编辑主题时会创建你的副本。",
+      "themeName": "主题名称",
+      "explore": "探索",
+      "exploreCard": "我的主题",
+      "exploreHint": "提交主题并查看审核状态",
+      "myThemesEmpty": "还没有自己的主题。",
+      "useTheme": "使用",
+      "dashboardBackground": "仪表盘背景",
+      "dashboardHint": "首页使用的图片或 GIF",
+      "editBackground": "编辑仪表盘背景",
+      "backgroundEffect": "背景效果",
+      "effectHint": "同步到你登录的设备",
+      "effectColorful": "彩色",
+      "wallpaper": "账号壁纸",
+      "wallpaperEmpty": "还没有壁纸，可保存当前背景或从探索添加。",
+      "wallpaperSaved": "已保存当前背景。",
+      "saveCurrent": "保存当前",
+      "code": "代码",
+      "codeSize": "代码字号",
+      "codeSizeHint": "差异、文件和代码块中的文字大小",
+      "diffView": "差异视图",
+      "diffViewHint": "线程中的代码变更如何显示",
+      "diffColor": "差异颜色",
+      "diffColorHint": "蓝色／橙色可用于红绿色觉差异",
+      "hidden": "隐藏文件",
+      "hiddenFold": "在拉取请求中折叠",
+      "hiddenFoldHint": "灰显且不计入变更行数",
+      "hiddenGenerated": "测试、数据库、生成内容",
+      "hiddenNone": "不折叠",
+      "hiddenAll": "全部折叠",
+      "interface": "界面",
+      "input": "输入",
+      "sidebarPages": "侧栏显示页面",
+      "sidebarPagesHint": "选择侧栏显示哪些页面。",
+      "sidebarLayout": "侧栏布局",
+      "sidebarLayoutHint": "混合布局把 Bot 放在线程上方。分栏一次显示一组。",
+      "pinPages": "页面置顶",
+      "pinPagesHint": "将任务和拉取请求放在 Bot 和线程前面。",
+      "openInApp": "在桌面应用打开链接",
+      "openInAppHint": "用已安装的 Mikka 桌面应用打开 Mikka 链接。",
+      "scrollTop": "将新消息滚到顶部",
+      "scrollTopHint": "回复生成时，将最新消息留在视窗顶部。",
+      "enter": "Enter",
+      "enterHint": "运行过程中按 Enter 时的行为。",
+      "modEnter": "⌘ / Ctrl + Enter",
+      "modEnterHint": "运行过程中按 ⌘ / Ctrl + Enter 时的行为。",
+      "altEnter": "⌥ / Alt + Enter",
+      "altEnterHint": "运行过程中按 ⌥ / Alt + Enter 时的行为。",
+      "microphone": "麦克风",
+      "microphoneHint": "这台设备上的语音输入设备。",
+      "systemDefault": "系统默认",
+      "unavailable": "这项还没有接口",
+      "noPermission": "你没有权限修改这项",
+      "steer": "引导当前运行",
+      "interrupt": "中断当前运行",
+      "queue": "加入队列",
+      "hybrid": "混合",
+      "columns": "分栏",
+      "synced": "已同步",
+      "notSynced": "仅此设备",
+      "codeDefault": "默认",
+      "codeSmall": "小",
+      "codeLarge": "大",
+      "diffUnified": "统一",
+      "diffSplit": "并排",
+      "diffRedGreen": "红色／绿色",
+      "diffBlue": "蓝色／橙色",
+      "hiddenHide": "隐藏",
+      "hiddenDim": "变淡",
+      "hiddenShow": "显示",
+      "backgroundNone": "无",
+      "backgroundColor": "纯色",
+      "createTheme": "创建主题",
+      "theme_mikka": "Mikka",
+      "theme_sakura": "暖灰",
+      "theme_oled": "OLED",
+      "theme_softPurple": "柔和紫",
+      "theme_terminal": "终端蓝",
+      "theme_deepSea": "深海",
+      "theme_forest": "森林",
+      "theme_warm": "暖棕",
+      "theme_codeCyan": "代码浅色",
+      "theme_contrast": "高对比",
+      "theme_slate": "蓝灰",
+      "theme_lilac": "淡紫",
+      "theme_bright": "纸白",
+      "theme_midnight": "午夜"
     },
     "profile": {
       "heading": "账户信息",
@@ -2354,10 +2480,31 @@
     "workspaceForm": {
       "name": "名称",
       "loading": "正在加载工作区",
-      "icon": "图标",
+      "profile": "工作区资料",
+      "icon": "标志",
       "changeIcon": "更换",
       "removeIcon": "移除",
-      "address": "地址",
+      "address": "工作区地址",
+      "taskPrefix": "任务编号前缀",
+      "taskPrefixHint": "这个工作区的前缀。已发出的编号不变。",
+      "deleteHint": "永久删除工作区，并撤销所有成员的访问权限。",
+      "iconHint": "显示在工作区切换器中。",
+      "nameHint": "显示在线程和邀请中。",
+      "id": "工作区 ID",
+      "idHint": "用于支持和 API 请求。",
+      "copied": "已复制",
+      "copyId": "复制工作区 ID",
+      "unavailable": "这项还没有接口",
+      "share": "共享",
+      "newWorkVisibility": "我的新工作默认可见性",
+      "newWorkHint": "新建线程或 Bot 时预选。",
+      "workspaceWorkVisibility": "工作区新工作默认可见性",
+      "workspaceWorkHint": "成员未选择个人默认时使用。",
+      "allowPrivate": "允许私有工作",
+      "allowPrivateHint": "允许团队成员将新工作设为私有。",
+      "visibilityInherit": "继承工作区",
+      "visibilityMembers": "工作区成员",
+      "visibilityPrivate": "仅自己",
       "danger": "危险操作",
       "deleteWorkspace": "删除工作区",
       "personalUndeletable": "个人工作区不能删除",
@@ -3715,6 +3862,27 @@
       "instructionsMine": "Mikka 给你发起的线程起名时，在工作区说明之外再遵循这些",
       "instructionsWorkspace": "Mikka 给这个工作区里每个线程起名时遵循这些",
       "placeholder": "提到客户时，在标题前加上客户名",
+      "lead": "设置线程的命名、运行和归档行为。",
+      "scopeMine": "个人",
+      "scopeWorkspace": "工作区",
+      "command": "标题指令",
+      "none": "无指令",
+      "edit": "编辑",
+      "regenerate": "何时重新生成标题",
+      "inheritNever": "从不 · 继承工作区",
+      "archive": "归档",
+      "archiveIdle": "自动归档闲置线程",
+      "archiveHint": "置顶线程和有开放拉取请求的线程会保留。",
+      "archiveOff": "关闭",
+      "archiveDays": "{days} 天",
+      "subagents": "子代理",
+      "subagentsHint": "线程启动时使用的并发与嵌套限制。",
+      "parallel": "并行子代理",
+      "parallelHint": "这个线程树中可同时运行的子代理数量。",
+      "depth": "嵌套深度",
+      "depthHint": "设为 1 时，子代理不能再启动子代理。",
+      "countWorkspace": "{count} · 工作区",
+      "unavailable": "这项还没有接口",
       "saved": "标题说明已保存",
       "cleared": "标题说明已清除",
       "saveError": "标题说明保存失败",

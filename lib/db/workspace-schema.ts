@@ -1,11 +1,20 @@
 import type { AuditRow } from '@/lib/audit/events'
-import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index, jsonb } from 'drizzle-orm/pg-core'
+import { boolean, integer, pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index, jsonb } from 'drizzle-orm/pg-core'
 
 export const workspaces = pgTable('mikka_workspaces', {
   id: uuid('id').primaryKey(),
   userId: text('userId').notNull(),
   name: varchar('name', { length: 120 }).notNull(),
   slug: varchar('slug', { length: 64 }).unique('mikka_workspaces_slug_unique'),
+  /** Four-letter prefix shown for this workspace. Issued task numbers do not change. */
+  taskPrefix: varchar('taskPrefix', { length: 4 }),
+  /** Saved from 线程. Not applied to a running thread until #2956. */
+  parallelSubagents: integer('parallelSubagents').notNull().default(8),
+  nestDepth: integer('nestDepth').notNull().default(2),
+  /** Saved from 工作区常规 › 共享. Not applied when work is created until #2956. */
+  newWorkVisibility: text('newWorkVisibility').$type<'inherit' | 'members' | 'private'>().notNull().default('inherit'),
+  workspaceWorkVisibility: text('workspaceWorkVisibility').$type<'members' | 'private'>().notNull().default('members'),
+  allowPrivate: boolean('allowPrivate').notNull().default(false),
   /** A small image data URL (≤200 KB decoded); see lib/workspace-admin/icon.ts. */
   icon: text('icon'),
   /** 'personal': the one workspace each person has, with only them as a member (decision 2026-10-31-2130). */

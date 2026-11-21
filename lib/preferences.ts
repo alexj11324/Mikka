@@ -5,6 +5,7 @@ import { archiveIdleDays } from './conversation-directory-input'
 import { db } from '@/lib/db'
 import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/schema'
 import { SEND_KEYS } from '@/lib/send-key'
+import { DEFAULT_UI, normalizeUi, uiPreferencesSchema, type UiPreferences } from '@/lib/ui-preferences'
 import { ActionFailureError } from '@/lib/action-error'
 import { setAttentionEnabled } from '@/lib/attention/store'
 
@@ -29,11 +30,13 @@ export interface Preferences {
   personalInstructions: string
   /** 每日建议. Always false while memoryEnabled is false. */
   dailySuggestions: boolean
+  ui: UiPreferences
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   archiveIdleAfterDays: 30, proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
   organizationInvitationEmails: true, sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
+  ui: DEFAULT_UI,
 }
 
 /** Longest the personal instructions may be, in characters (code points). */
@@ -47,6 +50,7 @@ export const preferencesPatch = z.object({
   proactive: z.boolean(), pushDecide: z.boolean(), pushReview: z.boolean(), pushFinished: z.boolean(), pushBriefing: z.boolean(),
   organizationInvitationEmails: z.boolean(), pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
   sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),
+  ui: uiPreferencesSchema,
 }).partial().strict()
 
 export type PreferencesPatch = z.infer<typeof preferencesPatch>
@@ -87,8 +91,8 @@ export async function readPreferences(userId: string, executor: Pick<typeof db, 
   const row = settings?.preferences
   const proactive = settings?.proactive ?? true
   if (!row) return { ...DEFAULT_PREFERENCES, proactive }
-  const { userId: _user, updatedAt: _at, suggestionSources: _sources, ...stored } = row
-  return { ...stored, dailySuggestions: stored.dailySuggestions && stored.memoryEnabled, proactive }
+  const { userId: _user, updatedAt: _at, suggestionSources: _sources, uiPreferences, ...stored } = row
+  return { ...stored, ui: normalizeUi(uiPreferences), dailySuggestions: stored.dailySuggestions && stored.memoryEnabled, proactive }
 }
 
 /**
@@ -106,8 +110,13 @@ export async function savePreferences(userId: string, patch: PreferencesPatch): 
     const memoryEnabled = rest.memoryEnabled ?? current.memoryEnabled
     if (rest.dailySuggestions && !memoryEnabled) throw new ActionFailureError('dailySuggestionsNeedMemory')
     if (proactive !== undefined) await setAttentionEnabled(userId, proactive, tx)
-    const { proactive: _proactive, ...merged } = { ...current, ...rest }
-    const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
+    const { ui: uiPatch, ...restWithoutUi } = rest
+    const { proactive: _currentProactive, ui: currentUi, ...currentWithoutUi } = current
+    const merged = { ...currentWithoutUi, ...restWithoutUi }
+    const { wallpaper, ...appearancePatch } = uiPatch ?? {}
+    const background = appearancePatch.background ?? wallpaper ?? currentUi.background
+    const ui = normalizeUi({ ...currentUi, ...appearancePatch, background })
+    const stored = { ...merged, uiPreferences: ui, dailySuggestions: merged.dailySuggestions && memoryEnabled }
     await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
       .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
     if (rest.archiveIdleAfterDays !== undefined && current.archiveIdleAfterDays !== rest.archiveIdleAfterDays) {

@@ -1,7 +1,10 @@
 import type { ComponentProps, ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 
 /**
  * S-Q: a section that is still loading keeps its shape instead of rendering nothing.
@@ -103,6 +106,36 @@ export function SettingRow({
       <div className="shrink-0 text-sm">{children}</div>
     </div>
   )
+}
+
+/**
+ * A switch row's control. The caller passes the existing save function;
+ * a later generic settings write can replace `onCheckedChange` without changing the row.
+ */
+export function SettingSwitch({ label, checked, disabled, onCheckedChange }: {
+  label: string
+  checked: boolean
+  disabled?: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return <Switch aria-label={label} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+}
+
+/** A select row's control. Options are the caller's; the value is not read from a new API. */
+export function SettingSelect({ label, value, onValueChange, options, disabled, fluid = false }: {
+  label: string
+  value: string
+  onValueChange: (value: string | null) => void
+  options: readonly { value: string; label: string }[]
+  disabled?: boolean
+  /** Hug the label instead of the fixed 10rem trigger. */
+  fluid?: boolean
+}) {
+  const current = options.find(option => option.value === value)
+  return <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+    <SelectTrigger aria-label={label} className={cn(fluid ? 'w-auto max-w-full' : 'w-40')}><span>{current?.label ?? value}</span></SelectTrigger>
+    <SelectContent><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
+  </Select>
 }
 
 /** Spread on the Button in a section header (添加, 打开设置…): gray-filled secondary, small. */

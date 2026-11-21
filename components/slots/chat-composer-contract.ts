@@ -9,6 +9,8 @@ export type ChatComposerProps = {
   value: string
   onChange: (value: string) => void
   onSubmit: () => void
+  /** While a run is in progress, Enter's saved action. Steer and queue are not the same call. */
+  onRunKey?: (action: 'steer' | 'queue' | 'interrupt') => void
   label: string
   placeholder?: string
   /** Waiting for a reply. With `onStop`, the send button turns into stop. */

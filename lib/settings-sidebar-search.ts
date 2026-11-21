@@ -6,7 +6,7 @@ export const SETTINGS_SECTION_KEYWORDS: Partial<Record<string, readonly string[]
 }
 
 /** Whether a settings sidebar item stays visible for the current search query. */
-export function settingsItemVisible({ query, groupTitle, groupLabel, itemTitle, label, keywords: translated = '', section, routed }: {
+export function settingsItemVisible({ query, groupTitle, groupLabel, itemTitle, label, keywords: translated = '', section }: {
   /** Raw search input. */
   query: string
   /** English group name (e.g. "Administration"). */
@@ -20,11 +20,10 @@ export function settingsItemVisible({ query, groupTitle, groupLabel, itemTitle, 
   /** Translated search words for the item, space separated. */
   keywords?: string
   section?: string
-  /** True on the routed /settings pages; Teams and Members only exist there. */
-  routed: boolean
+  /** Kept for callers. 成员 and 团队 stay listed on every settings surface. */
+  routed?: boolean
 }) {
   const normalized = query.trim().toLowerCase()
   const keywords = (section && SETTINGS_SECTION_KEYWORDS[section]) || []
-  const matches = `${groupTitle} ${groupLabel} ${itemTitle} ${label} ${translated} ${keywords.join(' ')}`.toLowerCase().includes(normalized)
-  return matches && (routed || (section !== 'teams' && section !== 'members'))
+  return `${groupTitle} ${groupLabel} ${itemTitle} ${label} ${translated} ${keywords.join(' ')}`.toLowerCase().includes(normalized)
 }

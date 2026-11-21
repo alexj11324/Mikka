@@ -20,13 +20,10 @@ import { creditBillingKey } from '@/components/billing/balance-section'
 import { cardVerificationKey } from '@/components/billing/free-allowance-section'
 import { computerPolicyKey, readComputerPolicy } from '@/hooks/settings/use-team-permissions'
 import { connectedAppsKey, readConnectedApps } from '@/components/plugins/connected-apps'
-import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plugins-view'
-import { listAgents } from '@/app/actions/agents'
-import { listBotsForWorkspace } from '@/app/actions/bots'
 import { currentMonth } from '@/lib/usage/month'
 import { settingsRead } from '@/lib/settings-read'
 import type { SettingsSectionId } from '@/lib/settings-sections'
-import { botPermissionsKeys, settingsKeys } from '@/lib/swr/keys'
+import { settingsKeys } from '@/lib/swr/keys'
 import { prefetchScopedRead } from '@/lib/swr/prefetch'
 
 type Result<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>
@@ -38,19 +35,12 @@ type Result<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>
  */
 const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: Key, read: () => Promise<unknown>][]>> = {
   preferences: () => [[settingsKeys.issuePrefix(), () => settingsRead<Result<typeof getIssuePrefixState>>('issue-prefix')]],
+  threads: id => [[settingsKeys.threadTitles(id), () => settingsRead('thread-titles', { workspace: id })]],
   security: () => [[settingsKeys.password(), () => settingsRead<Result<typeof getPasswordStatus>>('password')], [settingsKeys.sessions(), () => settingsRead<Result<typeof listSessions>>('sessions')]],
   notifications: () => [[settingsKeys.preferences(), () => settingsRead<Result<typeof getPreferences>>('preferences')]],
   logins: () => [[settingsKeys.savedLogins(), () => settingsRead<Result<typeof listSavedLogins>>('saved-logins')]],
   // 连接 is also the rail's 插件 page: the Composio apps' state, a GET.
   connections: () => [[connectedAppsKey, readConnectedApps]],
-  // 应用与运行权限 waits on four reads before it can draw a row, and its policy reads wait on the first:
-  // the Bots, their agent, the workspace's own app states and the connected apps all start here.
-  'bot-permissions': id => [
-    [botPermissionsKeys.bots(id), () => listBotsForWorkspace(id)],
-    [botPermissionsKeys.agents(), () => listAgents()],
-    [OWN_APP_STATES_KEY, () => fetchOwnAppStates()],
-    [connectedAppsKey, readConnectedApps],
-  ],
   general: id => [
     [settingsKeys.workspaceGeneral(id), () => settingsRead<Result<typeof getWorkspaceGeneral>>('workspace-general', { workspace: id })],
     [settingsKeys.transferTargets(id), () => settingsRead<Result<typeof getWorkspaceTransferTargets>>('transfer-targets', { workspace: id })],

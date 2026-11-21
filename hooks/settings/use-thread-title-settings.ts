@@ -41,13 +41,16 @@ export function useThreadTitleSettings(scope: 'mine' | 'workspace', workspaceId:
   return {
     loaded: Boolean(view),
     loadFailed: Boolean(read.error || (read.data && 'error' in read.data)),
+    reload: () => { void read.mutate() },
     canEdit, busy, message,
     instructions,
     type: (value: string) => setDraft(value),
     /** On leaving the field: saves when it changed, saying 已保存 or 已清除 as Capy does. */
-    commit: () => {
-      if (!stored || busy || draft === null || draft.trim() === stored.instructions) { setDraft(null); return }
-      void save({ instructions: draft }, t('saveError'), draft.trim() ? t('saved') : t('cleared'))
+    commit: (next?: string) => {
+      const value = next ?? draft
+      if (!stored || busy || value === null || value.trim() === stored.instructions) { setDraft(null); return }
+      setDraft(value)
+      void save({ instructions: value }, t('saveError'), value.trim() ? t('saved') : t('cleared'))
     },
     /** The member's own choice, or null for the workspace's (Capy's "Org default"); the workspace always has one. */
     triggers: stored?.triggers ?? null,

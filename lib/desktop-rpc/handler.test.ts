@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
+import { createBrowserRpc } from '../browser-rpc/handler'
 import { createDesktopRpc, desktopBearerHeaders, humanSessionHeaders } from './handler'
 import { desktopActionSchemas } from './schemas'
 import { currentDesktopSession, withDesktopSession, safeDesktopSession } from './session'
@@ -167,6 +168,54 @@ test('registry schemas reject forged authority, malformed nested input and extra
   ]
   for (const [name, args] of cases) assert.equal(desktopActionSchemas[name].safeParse(args).success, false, name)
   assert.equal(desktopActionSchemas['coordinator.pollCoordinatorChat'].safeParse([null, undefined, { after: 2, cursor: 1, prefix: 'a'.repeat(32) }]).success, true)
+})
+
+test('browser settings saves forward supported patches and reject invalid input before writing', async () => {
+  const origin = 'https://app.example'
+  const preferences = 'preferences.updatePreferences'
+  const workspace = 'workspace-settings.updateWorkspace'
+  const calls: unknown[][] = []
+  const invoke = async (args: never[]) => { calls.push(args); return args[0] }
+  const handle = createBrowserRpc({
+    trustedBaseURL: origin,
+    authenticate: async headers => headers.get('cookie') === 'session=settings' ? owner : null,
+    scope: async (_session, work) => work(),
+    actions: {
+      [preferences]: { args: desktopActionSchemas[preferences], invoke },
+      [workspace]: { args: desktopActionSchemas[workspace], invoke },
+    },
+  })
+  const save = (action: string, args: unknown[]) => handle(new Request(`${origin}/api/rpc`, {
+    method: 'POST',
+    headers: { origin, cookie: 'session=settings', 'x-mikka-rpc': '1', 'content-type': 'application/json' },
+    body: JSON.stringify({ version: 1, action, args: encode(args) }),
+  }))
+  const valid = [
+    [preferences, [{ ui: { sidebarLayout: 'columns' } }]],
+    [preferences, [{ ui: { colorScheme: 'dark' } }]],
+    [workspace, [{ taskPrefix: 'QAPR' }, owner]],
+    [workspace, [{ allowPrivate: true }, owner]],
+  ] as const
+  for (const [action, args] of valid) {
+    const response = await save(action, [...args])
+    assert.equal(response.status, 200, JSON.stringify(args))
+    assert.deepEqual(decode((await response.json()).result), args[0])
+  }
+  assert.deepEqual(calls, valid.map(([, args]) => args))
+
+  const invalid: [string, unknown[]][] = [
+    [preferences, [{ ui: { colorScheme: 'invalid' } }]],
+    [preferences, [{ ui: { userId: peer } }]],
+    [workspace, [{ taskPrefix: 'TOOLONG' }, owner]],
+    [workspace, [{ allowPrivate: 'true' }, owner]],
+    [workspace, [{ userId: peer }, owner]],
+  ]
+  for (const [action, args] of invalid) {
+    const response = await save(action, args)
+    assert.equal(response.status, 400, JSON.stringify(args))
+    assert.equal((await response.json()).error.code, 'desktop_rpc_request_invalid')
+  }
+  assert.equal(calls.length, valid.length)
 })
 
 test('Board status moves accept an optional checked block change across the shared RPC boundary', () => {

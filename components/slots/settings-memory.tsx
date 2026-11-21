@@ -5,8 +5,7 @@ import { useTranslations } from '@/lib/intl/i18n-client'
 import { Pencil, Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
-import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingSwitch, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { USER_FACT_KINDS, type UserFactKind } from '@/lib/profile/kinds'
 import { useMemorySettings, type MemoryFact as Fact } from '@/hooks/settings/use-memory-settings'
 
@@ -29,7 +28,7 @@ export function MemorySettings() {
   return <div className="flex flex-col gap-6">
     <SettingsSection id="memory-heading" title={t('enabled')}>
       <SettingRow title={t('learn')}>
-        <Switch aria-label={t('learn')} checked={data?.enabled ?? true} disabled={!data} onCheckedChange={enabled => { void setEnabled(enabled) }} />
+        <SettingSwitch label={t('learn')} checked={data?.enabled ?? true} disabled={!data} onCheckedChange={enabled => { void setEnabled(enabled) }} />
       </SettingRow>
     </SettingsSection>
     {(error || failed) && <SettingsSaveError message={t('error')} retryLabel={common('retry')} onRetry={() => { void reload() }} />}

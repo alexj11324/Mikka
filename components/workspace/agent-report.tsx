@@ -1,5 +1,6 @@
 'use client'
 
+import { useUiPreferenceSnapshot } from '@/hooks/use-ui-preference-snapshot'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
@@ -45,16 +46,27 @@ export function AgentTable({ columns = [], rows = [] }: { columns?: string[]; ro
 
 type Folder = { folders: Map<string, Folder>; files: string[] }
 
-function folderNodes(folder: Folder, prefix: string): ReactNode[] {
+function hiddenEntry(name: string) {
+  return name.startsWith('.')
+}
+
+function folded(name: string, mode: 'generated' | 'none' | 'all') {
+  if (mode === 'none') return false
+  if (hiddenEntry(name)) return true
+  return /^(dist|coverage|generated|__generated__|node_modules)$/.test(name) || (mode === 'all' && /\.(test|spec)$/.test(name))
+}
+
+function folderNodes(folder: Folder, prefix: string, mode: 'generated' | 'none' | 'all'): ReactNode[] {
   return [
-    ...[...folder.folders].map(([name, child]) => <FileTreeFolder key={`${prefix}${name}/`} value={`${prefix}${name}/`} name={name}>{folderNodes(child, `${prefix}${name}/`)}</FileTreeFolder>),
-    ...folder.files.map(name => <FileTreeFile key={`${prefix}${name}`} value={`${prefix}${name}`} name={name} />),
+    ...[...folder.folders].flatMap(([name, child]) => folded(name, mode) ? [] : [<FileTreeFolder key={`${prefix}${name}/`} value={`${prefix}${name}/`} name={name}>{folderNodes(child, `${prefix}${name}/`, mode)}</FileTreeFolder>]),
+    ...folder.files.flatMap(name => folded(name, mode) ? [] : [<FileTreeFile key={`${prefix}${name}`} value={`${prefix}${name}`} name={name} />]),
   ]
 }
 
 /** Groups slash-separated paths into beUI FileTree folders, every folder open. */
 export function AgentFileTree({ paths = [] }: { paths?: string[] }) {
   const agentCopy = useAgentCopy()
+  const hiddenFiles = useUiPreferenceSnapshot().hiddenFiles
   const { nodes, folders } = useMemo(() => {
     const root: Folder = { folders: new Map(), files: [] }
     const folders: string[] = []
@@ -71,8 +83,8 @@ export function AgentFileTree({ paths = [] }: { paths?: string[] }) {
       const name = parts.at(-1)
       if (name && !path.endsWith('/')) folder.files.push(name)
     }
-    return { nodes: folderNodes(root, ''), folders }
-  }, [paths])
+    return { nodes: folderNodes(root, '', hiddenFiles), folders }
+  }, [paths, hiddenFiles])
   return <FileTree ariaLabel={agentCopy.files} defaultExpandedIds={folders}>{nodes}</FileTree>
 }
 

@@ -32,6 +32,7 @@ createRoot(root).render(
             onSignOut={() => {}}
             signingOut={false}
             accountError=""
+            preview
           />
         </AppFrame>
       </SWRConfig>

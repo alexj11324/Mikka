@@ -14,7 +14,9 @@ export type SettingsSidebarProps = {
   personal?: boolean
   billing?: boolean
   cloudAdmin?: boolean
-  /** The second group is named after the current workspace. */
+  /** A UI layer draws 组织. */
+  organization?: boolean
+  /** The workspace group is named after the current workspace. */
   workspaceName?: string
   selectedTeamId?: string
   workspaceId?: string

@@ -43,6 +43,7 @@ import type {
   CodeBlockWordSpec,
 } from "@/components/reui/code-block/code-block-highlight"
 
+import { useUiPreferenceSnapshot } from "@/hooks/use-ui-preference-snapshot"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 
@@ -799,6 +800,7 @@ function CodeBlock({
 
   const shouldHighlight =
     !linesProp && highlight && Boolean(resolvedLanguage) && source.length > 0
+  const diffView = useUiPreferenceSnapshot().diffView
 
   /* Presentation props enter the effect as ONE serialized key: they are
      inline literals at most call sites, and reference deps would re-tokenize
@@ -1218,6 +1220,7 @@ function CodeBlock({
         <CodeBlockActionsContext.Provider value={actionsRegistry}>
           <div
             data-slot="code-block"
+            data-diff-view={diffView}
             data-variant={variant}
             data-streaming={streaming || undefined}
             data-has-diff={hasDiff || undefined}

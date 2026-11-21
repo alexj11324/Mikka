@@ -2206,7 +2206,9 @@
     "searchPlaceholder": "Search settings…",
     "noResults": "No matching settings",
     "groups": {
-      "personal": "Account",
+      "personal": "Personal settings",
+      "agent": "Agent",
+      "review": "Review",
       "workspace": "Workspace",
       "administration": "Administration",
       "yourTeams": "Your teams"
@@ -2219,13 +2221,25 @@
         "title": "Members"
       },
       "preferences": {
-        "title": "Preferences"
+        "title": "General"
+      },
+      "appearance": {
+        "title": "Appearance"
+      },
+      "instructions": {
+        "title": "Instructions",
+        "keywords": "memory suggestions"
+      },
+      "threads": {
+        "title": "Threads",
+        "keywords": "titles"
       },
       "memory": {
         "title": "Memory and suggestions"
       },
       "account": {
-        "title": "Account"
+        "title": "Profile",
+        "keywords": "account privacy"
       },
       "teams": {
         "title": "Teams"
@@ -2237,13 +2251,15 @@
         "title": "Security"
       },
       "connections": {
-        "title": "Connections"
+        "title": "Integrations",
+        "keywords": "connections plugins MCP"
       },
       "bot-permissions": {
         "title": "App & run permissions"
       },
       "models": {
         "title": "Models and subscriptions",
+        "nav": "Models",
         "keywords": "model subscriptions quota API key provider models preferred order dispatch run location cloud local bots agents"
       },
       "logins": {
@@ -2256,10 +2272,11 @@
         "title": "Devices"
       },
       "developer": {
-        "title": "Personal access tokens"
+        "title": "Personal access tokens",
+        "nav": "API"
       },
       "general": {
-        "title": "General"
+        "title": "Workspace general"
       },
       "permissions": {
         "title": "Team permissions"
@@ -2272,6 +2289,7 @@
       },
       "organization": {
         "title": "Organization",
+        "nav": "Identity and access",
         "keywords": "SSO SAML OIDC SCIM single sign-on enterprise identity directory policy approvals legal hold"
       },
       "usage": {
@@ -2288,8 +2306,17 @@
         "title": "Run environments"
       },
       "issue-states": {
-        "title": "Issue states"
-      }
+        "title": "Issue states",
+        "nav": "Issue states and labels"
+      },
+      "shortcuts": { "title": "Shortcuts" },
+      "git": { "title": "Git" },
+      "review-repositories": { "title": "Review repositories" },
+      "review-config": { "title": "Review config" },
+      "activity": { "title": "Activity" },
+      "referrals": { "title": "Referrals" },
+      "experiments": { "title": "Experiments" },
+      "cloud-credentials": { "title": "Cloud credentials" }
     },
     "appearance": {
       "title": "Appearance",
@@ -2302,7 +2329,106 @@
       "language": "Language",
       "languageName": "English",
       "languageZh": "Chinese (Simplified)",
-      "languageEn": "English"
+      "languageEn": "English",
+      "displayMode": "Display mode",
+      "sync": "Sync appearance",
+      "syncHint": "Apply changes across your devices",
+      "themes": "Themes",
+      "colors": "Colors",
+      "accent": "Accent",
+      "fill": "Background",
+      "surface": "Background",
+      "foreground": "Foreground",
+      "advanced": "Advanced colors",
+      "border": "Border",
+      "background": "Background",
+      "themeLead": "Editing a theme creates your own copy.",
+      "themeName": "Theme name",
+      "explore": "Explore",
+      "exploreCard": "My themes",
+      "exploreHint": "Submit a theme and see its review status",
+      "myThemesEmpty": "No themes of your own yet.",
+      "useTheme": "Use",
+      "dashboardBackground": "Dashboard background",
+      "dashboardHint": "The image or GIF used on the home page",
+      "editBackground": "Edit dashboard background",
+      "backgroundEffect": "Background effect",
+      "effectHint": "Sync to the devices you sign in on",
+      "effectColorful": "Color",
+      "wallpaper": "Account wallpaper",
+      "wallpaperEmpty": "No wallpaper yet. Save the current background, or add one from Explore.",
+      "wallpaperSaved": "The current background is saved.",
+      "saveCurrent": "Save current",
+      "code": "Code",
+      "codeSize": "Code size",
+      "codeSizeHint": "Type size in diffs, files and code blocks",
+      "diffView": "Diff view",
+      "diffViewHint": "How code changes show in a thread",
+      "diffColor": "Diff colors",
+      "diffColorHint": "Blue and orange stay distinct for red-green color vision",
+      "hidden": "Hidden files",
+      "hiddenFold": "Fold in pull requests",
+      "hiddenFoldHint": "Dimmed, and left out of the changed-line count",
+      "hiddenGenerated": "Tests, databases and generated files",
+      "hiddenNone": "Don't fold",
+      "hiddenAll": "Fold all",
+      "interface": "Interface",
+      "input": "Input",
+      "sidebarPages": "Sidebar pages",
+      "sidebarPagesHint": "Choose which pages the sidebar shows.",
+      "sidebarLayout": "Sidebar layout",
+      "sidebarLayoutHint": "Hybrid puts Bots above threads. Columns show one group at a time.",
+      "pinPages": "Pin pages",
+      "pinPagesHint": "Put tasks and pull requests before Bots and threads.",
+      "openInApp": "Open links in the desktop app",
+      "openInAppHint": "Open Mikka links in the installed desktop app.",
+      "scrollTop": "Scroll new messages to the top",
+      "scrollTopHint": "Keep the newest message at the top of the viewport while a reply generates.",
+      "enter": "Enter",
+      "enterHint": "What Enter does while a run is in progress.",
+      "modEnter": "⌘ / Ctrl + Enter",
+      "modEnterHint": "What ⌘ / Ctrl + Enter does while a run is in progress.",
+      "altEnter": "⌥ / Alt + Enter",
+      "altEnterHint": "What ⌥ / Alt + Enter does while a run is in progress.",
+      "microphone": "Microphone",
+      "microphoneHint": "The voice input device on this computer.",
+      "systemDefault": "System default",
+      "unavailable": "No API for this yet",
+      "noPermission": "You cannot change this",
+      "steer": "Steer the current run",
+      "interrupt": "Interrupt the current run",
+      "queue": "Add to the queue",
+      "hybrid": "Hybrid",
+      "columns": "Columns",
+      "synced": "Synced",
+      "notSynced": "This device only",
+      "codeDefault": "Default",
+      "codeSmall": "Small",
+      "codeLarge": "Large",
+      "diffUnified": "Unified",
+      "diffSplit": "Split",
+      "diffRedGreen": "Red / green",
+      "diffBlue": "Blue / orange",
+      "hiddenHide": "Hide",
+      "hiddenDim": "Dim",
+      "hiddenShow": "Show",
+      "backgroundNone": "None",
+      "backgroundColor": "Color",
+      "createTheme": "Create theme",
+      "theme_mikka": "Mikka",
+      "theme_sakura": "Warm gray",
+      "theme_oled": "OLED",
+      "theme_softPurple": "Soft purple",
+      "theme_terminal": "Terminal",
+      "theme_deepSea": "Deep sea",
+      "theme_forest": "Forest",
+      "theme_warm": "Warm brown",
+      "theme_codeCyan": "Code light",
+      "theme_contrast": "High contrast",
+      "theme_slate": "Blue gray",
+      "theme_lilac": "Lilac",
+      "theme_bright": "Paper",
+      "theme_midnight": "Midnight"
     },
     "profile": {
       "heading": "Account",
@@ -2354,10 +2480,31 @@
     "workspaceForm": {
       "name": "Name",
       "loading": "Loading workspace",
-      "icon": "Icon",
+      "profile": "Workspace profile",
+      "icon": "Logo",
       "changeIcon": "Change",
       "removeIcon": "Remove",
-      "address": "Address",
+      "address": "Workspace address",
+      "taskPrefix": "Task prefix",
+      "taskPrefixHint": "This workspace's prefix. Numbers already issued stay as they are.",
+      "deleteHint": "Permanently delete the workspace and revoke every member's access.",
+      "iconHint": "Shown in the workspace switcher.",
+      "nameHint": "Shown on threads and invitations.",
+      "id": "Workspace ID",
+      "idHint": "Used for support and API requests.",
+      "copied": "Copied",
+      "copyId": "Copy workspace ID",
+      "unavailable": "No API for this yet",
+      "share": "Sharing",
+      "newWorkVisibility": "Default visibility of my new work",
+      "newWorkHint": "Preselected when creating a thread or Bot.",
+      "workspaceWorkVisibility": "Default visibility of new workspace work",
+      "workspaceWorkHint": "Used when a member has not chosen a personal default.",
+      "allowPrivate": "Allow private work",
+      "allowPrivateHint": "Members can make new work private.",
+      "visibilityInherit": "Inherit workspace",
+      "visibilityMembers": "Workspace members",
+      "visibilityPrivate": "Only me",
       "danger": "Danger zone",
       "deleteWorkspace": "Delete workspace",
       "personalUndeletable": "A personal workspace cannot be deleted",
@@ -3715,6 +3862,27 @@
       "instructionsMine": "How Mikka names the threads you start, on top of the workspace's instructions",
       "instructionsWorkspace": "How Mikka names every thread started in this workspace",
       "placeholder": "Prefix titles with the customer name when one is mentioned",
+      "lead": "How threads are named, run and archived.",
+      "scopeMine": "Personal",
+      "scopeWorkspace": "Workspace",
+      "command": "Title instructions",
+      "none": "No instructions",
+      "edit": "Edit",
+      "regenerate": "When to regenerate the title",
+      "inheritNever": "Never · inherit workspace",
+      "archive": "Archive",
+      "archiveIdle": "Archive idle threads",
+      "archiveHint": "Pinned threads and threads with an open pull request stay.",
+      "archiveOff": "Off",
+      "archiveDays": "{days} days",
+      "subagents": "Subagents",
+      "subagentsHint": "Concurrency and nesting used when a thread starts.",
+      "parallel": "Parallel subagents",
+      "parallelHint": "How many subagents this thread tree can run at once.",
+      "depth": "Nesting depth",
+      "depthHint": "At 1, a subagent cannot start another subagent.",
+      "countWorkspace": "{count} · workspace",
+      "unavailable": "No API for this yet",
       "saved": "Title instructions saved",
       "cleared": "Title instructions cleared",
       "saveError": "Could not save title instructions",

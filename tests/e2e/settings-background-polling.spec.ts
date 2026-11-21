@@ -134,7 +134,7 @@ test('workspace idle reads stay within budget across settings, return and page d
     const beforeLegacy = actions.length
     await page.goto(app('/?settings=account&section=all-issues'))
     await page.clock.resume()
-    await expect(page.getByRole('heading', { level: 1, name: '账户', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '个人资料', exact: true })).toBeVisible()
     await waitForActionsQuiet()
     await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1_000)
     await waitForActionsQuiet()

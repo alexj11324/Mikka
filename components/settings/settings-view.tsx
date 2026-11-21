@@ -10,6 +10,8 @@ import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SecurityAndSignIn } from '@ui-slot/settings-security'
 import { RestoreSetupChecklist } from '@/components/coordinator/setup-checklist'
 import { PreferencesSettings } from '@ui-slot/settings-preferences'
+import { AppearanceSettings } from '@/components/settings/appearance-settings'
+import { GeneralInterface } from '@/components/settings/general-interface'
 import { WorkspaceGeneral } from '@ui-slot/settings-general'
 import { MembersScreen } from '@ui-slot/settings-members'
 import { SettingsContent } from '@/components/ui/settings-layout'
@@ -28,6 +30,7 @@ import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
+import { ThreadSettings } from '@/components/settings/thread-settings'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
@@ -76,12 +79,12 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const billing = workspace !== undefined && workspace.edition !== 'community'
   const community = workspace?.edition === 'community'
   const cloudAdmin = community && workspace?.serverAdmin === true
-  // 组织 exists only where a UI layer draws it (slot settings-organization).
-  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) || (requestedSection === 'organization' && !ORGANIZATION_SETTINGS) ? 'preferences' : requestedSection
   const admin = workspace?.role === 'admin'
   const personal = workspace?.workspace.kind === 'personal'
   // Team settings show once the workspace is known to be a team, as admin-only ones wait for the role.
   const team = workspace !== undefined && !personal
+  // A personal workspace has no 身份与访问. The public page draws team permissions; the official slot replaces that body.
+  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) || (requestedSection === 'organization' && !team) ? 'preferences' : requestedSection
   const router = useRouter()
   // A personal workspace has no team settings (decision 2026-11-01-2310); an old link to one opens 偏好设置 instead.
   const teamOnly = personal && TEAM_ONLY_SECTIONS.has(requestedSection)
@@ -121,7 +124,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const enter = switched.current ? 'animate-in fade-in-0 duration-(--motion-fast) motion-reduce:animate-none' : undefined
 
   return <>
-    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} cloudAdmin={cloudAdmin} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} cloudAdmin={cloudAdmin} organization={ORGANIZATION_SETTINGS} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
     <SettingsContentFrame parent={t('title')} title={title}>
 
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
@@ -134,7 +137,12 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
           <MembersScreen key={resolvedWorkspaceId} section={section} workspaceId={resolvedWorkspaceId} inviteInitially={inviteInitially} onSection={openSection} />
         </> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>}
       </SettingsContent> : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
-        {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
+        {section === 'computers' ? <>
+          <DevicesSettings workspaceId={resolvedWorkspaceId} />
+          <WebServerControl settings />
+          <DesktopServerSettings />
+          {resolvedWorkspaceId && !preview ? <BotPermissionsSettings admin={admin} workspaceId={resolvedWorkspaceId} /> : null}
+        </> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} community={community} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
     </SettingsContentFrame>
@@ -148,19 +156,19 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
     : null
   switch (section) {
-    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} /><WebServerControl settings /><DesktopServerSettings />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
+    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} /><PrivacySettings />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
     case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 
-    case 'environments': return workspaceId && !preview ? <EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'environments': return workspaceId && !preview ? <><EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} /><SecretsPage side="workspace" onSide={() => onSection('logins')} workspaceId={workspaceId} workspaceName={workspaceName} waiting={waiting} /></> : waiting
     case 'issue-states': return workspaceId && !preview ? <IssueStatesSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
-    case 'privacy': return <PrivacySettings />
     case 'logins':
-    case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
-    case 'preferences': return <><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
+    case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'environments')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
+    case 'preferences': return <><GeneralInterface /><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
+    case 'appearance': return <AppearanceSettings />
+    case 'instructions': return <MemorySettings />
+    case 'threads': return <ThreadSettings workspaceId={workspaceId} personal={personal} />
     case 'notifications': return <NotificationSettings />
-    case 'memory': return <MemorySettings />
-    case 'bot-permissions': return <BotPermissionsSettings admin={admin} workspaceId={workspaceId} />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
     case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} cloudUserKey={community ? userKey : undefined} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
@@ -171,7 +179,9 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
         ? <SectionErrorBoundary key={`audit-${workspaceId}`} message={t('audit.loadFailed')} retryLabel={common('retry')}><AuditLogSettings key={workspaceId} workspaceId={workspaceId} /></SectionErrorBoundary>
         : <p role="status" className="text-sm text-muted-foreground">{t('audit.adminOnly')}</p>
       : waiting
-    case 'organization': return !preview ? <OrganizationSettings key={workspaceId ?? 'organization-only'} workspaceId={workspaceId ?? ''} personal={!team} /> : waiting
+    case 'organization': return !preview ? (ORGANIZATION_SETTINGS
+      ? <OrganizationSettings key={workspaceId ?? 'organization-only'} workspaceId={workspaceId ?? ''} personal={!team} />
+      : workspaceId ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : null) : waiting
     case 'usage': return workspaceId && !preview ? <><UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />{team && <GovernanceUsage key={`governance-${workspaceId}`} workspaceId={workspaceId} />}</> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}<BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} admin={admin} /></> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).

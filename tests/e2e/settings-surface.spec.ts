@@ -1,7 +1,7 @@
 import { expect, test } from './test-account-fixtures'
 
 // 常规 is a team workspace's (decision 2026-11-01-2310); a pool account may be in its personal one.
-const sections = ['偏好设置', '账户', '安全']
+const sections = ['常规', '个人资料', '安全']
 
 /**
  * A settings card groups rows; its divider lines must reach the card edges.
