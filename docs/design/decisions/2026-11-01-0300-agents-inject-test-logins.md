@@ -39,3 +39,9 @@
 | --- | --- | --- |
 | MVP end-to-end runs (GitHub-linked) | `zhixuanj@andrew.cmu.edu` | `MVP_TEST_EMAIL`, `MVP_TEST_PASSWORD` |
 | YC demo recording (Acme, English) | `alex@acme.aspectlylabs.com` | `ACME_DEMO_EMAIL`, `ACME_DEMO_PASSWORD` |
+| Devin Bot QA and UX walkthroughs | `devin-qa@aspectlylabs.com` | Devin Bot secrets `MIKKA_QA_EMAIL`, `MIKKA_QA_PASSWORD` (not yet in Infisical) |
+
+`ORVILO_TEST_USER_EMAIL` / `ORVILO_TEST_USER_PASSWORD` are a Clerk login for the
+retired Orvilo app. Mikka uses Better Auth, so they never sign in here; use a row
+above. Scripted sign-in to `app.aspectlylabs.com` needs a browser `User-Agent`
+and `Origin`, or Cloudflare rejects it with error 1010 before it reaches Mikka.
