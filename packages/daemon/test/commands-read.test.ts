@@ -191,7 +191,7 @@ function desktopAssignment(subscriptionOwnerId: string) {
       workspaceId: '10000000-0000-4000-8000-000000000002',
       consumerId: '10000000-0000-4000-8000-000000000003', route: 'codex_cli',
     },
-    computer: { botId: '10000000-0000-4000-8000-000000000004', ownerId: 'task-owner', display: ':1', policyVersion: 0 },
+    computer: { botId: '10000000-0000-4000-8000-000000000004', ownerId: 'task-owner', display: ':1' },
   })
 }
 

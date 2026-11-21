@@ -747,8 +747,7 @@ async function startThreadDesktop(pool: Pool, actor: Actor, runId: string, lease
     const machine = (await client.query('SELECT "botId",epoch FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\'', [runId, leaseId])).rows[0]
     if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-    const policyVersion = Number(policy?.version ?? 0)
-    await runtime.syncDesktopLease(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: computerPermission(policy?.permission) === 'allow', policyVersion }, budget)
+    await runtime.syncDesktopLease(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: computerPermission(policy?.permission) === 'allow', policyVersion: Number(policy?.version ?? 0) }, budget)
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }

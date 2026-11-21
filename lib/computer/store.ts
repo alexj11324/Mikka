@@ -56,8 +56,6 @@ export class ComputerStore {
         RETURNING version`, [workspaceId, permission])).rows[0]
       if (previous !== permission) {
         await client.query('UPDATE computer_run_bindings SET "approvedForRun"=false WHERE "workspaceId"=$1', [workspaceId])
-        await client.query(`UPDATE local_computer_reviews v SET decision=false FROM computer_run_bindings b
-          WHERE v."runId"=b."runId" AND b."workspaceId"=$1 AND v.decision IS NULL`, [workspaceId])
         // Local and cloud direct runners use the authority admitted at claim.
         // Revoke that generation through a durable stop, never a per-call read.
         await stopRunsForPolicyChange(client, { kind: 'workspace', workspaceId })
@@ -77,7 +75,7 @@ export class ComputerStore {
         for (const machine of machines) {
           if (!machine.sandboxId || !machine.runtimeReady) continue
           const sandbox = await this.runtime.connectComputer(workspaceId, machine.sandboxId)
-          for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
+          for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', Number(policy?.version ?? 0)))
         }
         // Dedicated threads have their own driver lease. Updating only the
         // Bot machine leaves a thread's agent on an old policy.
@@ -86,7 +84,7 @@ export class ComputerStore {
           WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows
         for (const thread of threads) {
           const sandbox = await this.runtime.connectComputer(workspaceId, thread.sandboxId)
-          await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny', policyVersion: policy.version })
+          await this.runtime.syncDesktopLease(sandbox, { botId: thread.botId, ownerId: thread.ownerId, display: 1, epoch: thread.epoch, controlledBy: null, controlUntil: 0, computerAllowed: permission !== 'deny', policyVersion: Number(policy?.version ?? 0) })
         }
       }
       // Every transition increments the policy version. The display lock
@@ -136,32 +134,13 @@ export class ComputerStore {
       machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId, expiresAt => deadlines.push(expiresAt))
     }
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
-    const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt",
-      LEAST(v."expiresAt",r."leaseExpiresAt") AS "visibleUntil"
-      FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
-      JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-      WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
-        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
-        AND v."expiresAt">now() AND v."seenAt"<>'-infinity'::timestamptz AND r."stopRequestedAt" IS NULL
-        AND EXISTS (SELECT 1 FROM devices d WHERE d.id=r."deviceId" AND (d."sessionOpenedAt" IS NOT NULL AND (d."sessionClosedAt" IS NULL OR d."sessionClosedAt" < d."sessionOpenedAt"))) AND r."leaseExpiresAt">now()
-        AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
-    const call = review?.call
-    const pendingApproval: ComputerState['pendingApproval'] = call && (call.name === 'click' || call.name === 'type_text' || call.name === 'get_desktop_state' || call.name === 'press_key' || call.name === 'scroll')
-      ? { id: review.id, digest: review.digest, runId: review.runId, botId,
-          action: call.name === 'click' ? { tool: 'click', x: call.arguments.x, y: call.arguments.y }
-            : call.name === 'type_text' ? { tool: 'type', text: call.arguments.text }
-              : call.name === 'press_key' ? { tool: 'key', text: [...(call.arguments.modifiers ?? []), call.arguments.key].join('+') }
-                : call.name === 'scroll' ? { tool: 'scroll', text: `${call.arguments.direction} × ${call.arguments.amount}`, x: call.arguments.x, y: call.arguments.y } : { tool: 'screenshot' },
-          summary: call.name,
-          expiresAt: new Date(review.expiresAt).toISOString() } : undefined
     if (held) deadlines.push(row.controlUntil)
-    if (pendingApproval) deadlines.push(review.visibleUntil)
     const now = Date.now()
     if (provisionExpired(now)) machine = 'error'
     else if (provisionDeadline != null) deadlines.push(provisionDeadline)
     return { machine, control: held ? 'user' : row.control === 'user' ? 'agent' : row.control,
       live: computerLiveState(actor.workspaceId, deadlines, now),
-      ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}), ...(pendingApproval ? { pendingApproval } : {}) }
+      ...(held ? { controlledBy: { userId: row.controlledBy } } : {}), ...(row.lastAction ? { lastAction: row.lastAction } : {}) }
   }
   private lease(d: Desktop, computerAllowed = true, policyVersion = 0): provider.DesktopLease {
     return { botId: d.botId, ownerId: d.ownerId, display: d.display, epoch: d.epoch, controlledBy: d.controlledBy, controlUntil: d.controlUntil ? new Date(d.controlUntil).getTime() / 1000 : 0, computerAllowed, policyVersion }
@@ -201,7 +180,7 @@ export class ComputerStore {
         desktop.controlUntil = new Date(Date.now() + 5 * 60_000)
       }
       const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-      const lease = this.lease(desktop, policy?.permission !== 'deny', policy?.version ?? 0)
+      const lease = this.lease(desktop, policy?.permission !== 'deny', Number(policy?.version ?? 0))
       await client.query('UPDATE bot_desktops SET control=$2,"controlledBy"=$3,"controlUntil"=$4,epoch=$5 WHERE "botId"=$1', [botId, desktop.control, desktop.controlledBy, desktop.controlUntil, desktop.epoch])
       // Holding the Bot's desktop holds only work on that desktop, and no run executes there: every
       // run is claimed on its own thread machine (decision 0251), so a takeover pauses no run.

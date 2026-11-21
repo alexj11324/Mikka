@@ -22,8 +22,6 @@ const points: Array<[string, string, RegExp]> = [
   ['MCP artifacts', 'lib/mcp/artifacts.ts', /maskForRun\(/],
   ['pending_actions summary', 'lib/cloud-computer/action-reviews.ts', /maskFor\(\{ workspaceId: actor\.workspaceId, ownerId: actor\.userId \}/],
   ['subagent workflow report', 'workflows/subagent/steps.ts', /maskFor\(\{workspaceId:actor\.workspaceId,ownerId:actor\.userId\}/],
-  ['computer review call', 'lib/computer/reviews.ts', /maskDeep\(row\.call, mask\)/],
-  ['computer review route passes masker', 'app/v1/devices/[deviceId]/computer/route.ts', /secretMaskerFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}\)/],
 ]
 
 for (const [name, file, pattern] of points) {

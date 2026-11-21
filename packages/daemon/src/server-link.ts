@@ -38,13 +38,11 @@ import {
   type DeviceRegistered,
 } from "@mikka/protocol"
 
-import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCaptureRequest, ScreenCaptureResponse } from "@mikka/protocol/capture"
 import type { RunChunk } from "./chunks"
 import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
 import type { RunDrive } from './run-drive'
-import type { ServerDecide } from './server-decision'
 import type { WorkspaceReadCommand, WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import type { ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
@@ -85,8 +83,6 @@ export interface ServerLink {
    * request came from, so the daemon stops before its next request.
    */
   onUpgradeRequired?(listener: (latest?: string) => void): void
-  /** The server's Decisions API on behalf of one run (server-decision.ts). */
-  decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   /** The run's shared Drive mirror over its MCP endpoint (decision 2026-11-19-2200). */
@@ -119,8 +115,6 @@ export interface ServerLink {
   localComputerAuthority?(deviceId: string, runId: string): Promise<NonNullable<RunAssignment['localComputer']>>
   /** Receipted resumes require a current online source/access/lease fence. */
   validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
-  /** Owner-reviewed computer requests; responses carry decisions only. */
-  syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]>
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal,requireModelCatalogue?:boolean):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>

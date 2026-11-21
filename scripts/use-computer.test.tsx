@@ -116,8 +116,6 @@ test('mock pushes keep their existing patches and release the previous Bot liste
   listener!({ type: 'computer.control', botId: 'demo-a', control: 'user', controlledBy: { userId: 'owner' } })
   listener!({ type: 'computer.action', botId: 'demo-a', lastAction: { tool: 'click', x: 5, y: 9, at: '2030-01-01T00:00:00.000Z' } })
   assert.equal(state.machine, 'running'); assert.equal(state.control, 'user'); assert.equal(state.lastAction?.x, 5)
-  listener!({ type: 'computer.approval', botId: 'demo-a', approval: null })
-  assert.equal(state.pendingApproval, undefined)
   await act(async () => root.render(<Probe botId="demo-b" />))
   assert.equal(cleanups, 1); assert.equal(subscriptions, 2)
   await act(async () => root.render(<Probe botId={null} />))

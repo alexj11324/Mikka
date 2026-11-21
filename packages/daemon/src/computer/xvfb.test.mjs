@@ -135,7 +135,6 @@ app.run()
           params: call,
         }) + "\n",
       );
-      assert.equal(broker.list().length, 0, 'default allow must not create a human approval');
       for (let i = 0; i < 1600 && !replies.has(id); i++)
         await new Promise((r) => setTimeout(r, 20));
       assert.ok(

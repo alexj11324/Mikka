@@ -18,12 +18,7 @@ test("local computer injection requires a driver, explicit permission and a writ
     assert.equal(spec.args[0], "/app/proxy.mjs");
     assert.equal(spec.args[1], "/test/socket");
     assert.notEqual(spec.command, driver.path);
-    const pending = broker.request(spec.args[2], { name: "click", arguments: { x: 3, y: 4 } });
-    assert.equal(executions, permission === "ask" ? 0 : 1);
-    const [review] = broker.list();
-    if (permission === "ask") await broker.decide(review.id, review.digest, true);
-    else assert.equal(review, undefined);
-    assert.equal(await pending, "done");
+    assert.equal(await broker.request(spec.args[2], { name: "click", arguments: { x: 3, y: 4 } }), "done");
   }
   assert.equal(executions, 2);
   await broker.close();

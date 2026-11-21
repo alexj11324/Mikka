@@ -18,15 +18,14 @@ export function computerStatus(state: ComputerState | undefined): ComputerStatus
   if (state.machine === 'waking') return 'waking'
   if (state.machine === 'error') return 'failed'
   if (state.control === 'user') return 'user'
-  if (state.pendingApproval) return 'approval'
   return state.control === 'agent' ? 'working' : 'running'
 }
 
-/** The chat card's status: the task's own state, with a live approval winning. */
-export function taskStatus(task: ComputerTaskState, state: ComputerState | undefined, runId: string): ComputerStatus {
+/** The chat card's status: the task's own state under live machine control. */
+export function taskStatus(task: ComputerTaskState, state: ComputerState | undefined): ComputerStatus {
   if (task === 'done' || task === 'failed') return task
   if (state?.machine === 'sleeping' || state?.machine === 'waking') return state.machine
-  if (state?.pendingApproval?.runId === runId || task === 'approval') return 'approval'
+  if (task === 'approval') return 'approval'
   if (state?.control === 'user') return 'user'
   return 'working'
 }

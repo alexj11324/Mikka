@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, mock, test } from 'node:test'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
@@ -9,7 +9,6 @@ import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { liveChannelId } from './scope'
-import type { LocalComputerRequest } from '@mikka/protocol/computer'
 import type * as Provider from '../computer/e2b-provider'
 
 const url = process.env.E2E_DATABASE_URL
@@ -18,15 +17,12 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 const scheduled: (() => Promise<void>)[] = []
 mock.module('@/lib/server-runtime/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
 let ComputerStore: typeof import('../computer/store')['ComputerStore']
-let syncComputerReviews: typeof import('../computer/reviews')['syncComputerReviews']
-let decideComputerReview: typeof import('../computer/reviews')['decideComputerReview']
 let reconcileCloudMachines: typeof import('../computer/reconcile')['reconcileCloudMachines']
 let computerChanged: typeof import('./computer-state')['computerChanged']
 let computerLiveTargets: typeof import('./computer-state')['computerLiveTargets']
 
 async function loadRuntime() {
   ;({ ComputerStore } = await import('../computer/store'))
-  ;({ syncComputerReviews, decideComputerReview } = await import('../computer/reviews'))
   ;({ reconcileCloudMachines } = await import('../computer/reconcile'))
   ;({ computerChanged, computerLiveTargets } = await import('./computer-state'))
 }
@@ -94,10 +90,6 @@ test('real PG: computer changes publish committed owner state without heartbeat 
     async viewerGrant() { return { url: 'wss://fixture.invalid', expiresAt: new Date(Date.now() + 90_000).toISOString() } },
   } as unknown as typeof Provider
   const store = new ComputerStore(database, runtime)
-  const snapshot = (id = randomUUID(), selectedRun = runId): LocalComputerRequest => {
-    const value = { id, runId: selectedRun, target: 'a'.repeat(64), display: ':1', call: { name: 'click' as const, arguments: { x: 12, y: 20 } }, expiresAt: Date.now() + 120_000 }
-    return { ...value, digest: createHash('sha256').update(JSON.stringify(value)).digest('hex') }
-  }
   try {
     await database.query('CREATE TABLE "user" (id text PRIMARY KEY)')
     await database.query('INSERT INTO "user" VALUES ($1),($2)', [actor.userId, peer.userId])
@@ -171,74 +163,6 @@ test('real PG: computer changes publish committed owner state without heartbeat 
       await drain()
       assert.equal(received.length, 0)
       assert.equal((await database.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rowCount, 0)
-    })
-
-    await t.test('new and reappearing cloud approvals notify; an unchanged snapshot does not', async () => {
-      await clear()
-      const request = snapshot()
-      await syncComputerReviews(database, deviceId, actor.userId, [request]); await drain()
-      assert.equal(received.length, 1); assert.equal(received[0].events[0].id, botId)
-      const state = await store.state(actor, botId)
-      assert.equal(state.pendingApproval?.id, request.id)
-      // No 10-second freshness: the approval stays until it expires or the run's lease ends.
-      const observed = (await database.query(`SELECT LEAST(v."expiresAt",r."leaseExpiresAt") AS expires FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" WHERE v.id=$1`, [request.id])).rows[0].expires
-      assert.equal(state.live?.deadline?.at, observed.toISOString())
-      await clear()
-      await syncComputerReviews(database, deviceId, actor.userId, [request]); await drain()
-      assert.equal(received.length, 0, 'an unchanged snapshot does not cause a page read')
-      await syncComputerReviews(database, deviceId, actor.userId, []); await drain(); await clear()
-      await syncComputerReviews(database, deviceId, actor.userId, [request]); await drain()
-      assert.equal(received.length, 1)
-    })
-
-    await t.test('a later invalid snapshot rolls back the earlier pending approval and its effect', async () => {
-      await clear()
-      const first = snapshot(), invalid = snapshot(randomUUID(), randomUUID())
-      await assert.rejects(syncComputerReviews(database, deviceId, actor.userId, [first, invalid]), /Run or desktop unavailable/)
-      await drain()
-      assert.equal(received.length, 0)
-      assert.equal((await database.query('SELECT id FROM local_computer_reviews WHERE id=$1', [first.id])).rowCount, 0)
-    })
-
-    await t.test('decisions and withdrawal refresh the matching Bot; replay and foreign owners do not', async () => {
-      await clear()
-      const request = snapshot()
-      await syncComputerReviews(database, deviceId, actor.userId, [request]); await clear()
-      deviceWakes.length = 0
-      assert.equal(await decideComputerReview(database, peer, request.id, request.digest, false), false)
-      assert.equal(await decideComputerReview(database, other, request.id, request.digest, false), false)
-      await drain(); assert.equal(received.length, 0)
-      assert.deepEqual(deviceWakes, [], 'a refused decision wakes no device')
-      assert.equal(await decideComputerReview(database, actor, request.id, request.digest, false), true)
-      await drain(); assert.equal(received.length, 1)
-      for (let i = 0; i < 100 && !deviceWakes.length; i++) await new Promise(resolve => setTimeout(resolve, 10))
-      assert.deepEqual(deviceWakes, [deviceId], 'the decision wakes the daemon showing the review')
-      assert.equal((await store.state(actor, botId)).pendingApproval, undefined)
-      await clear()
-      assert.equal(await decideComputerReview(database, actor, request.id, request.digest, true), false)
-      await drain(); assert.equal(received.length, 0)
-      const next = snapshot()
-      await syncComputerReviews(database, deviceId, actor.userId, [next]); await clear()
-      await syncComputerReviews(database, deviceId, actor.userId, []); await drain()
-      assert.equal(received.length, 1)
-      assert.equal((await store.state(actor, botId)).pendingApproval, undefined)
-    })
-
-    await t.test('the earliest actual approval expiry and run lease bound the server projection', async () => {
-      await clear()
-      const request = snapshot()
-      await syncComputerReviews(database, deviceId, actor.userId, [request]); await clear()
-      const lease = new Date(Date.now() + 3_000)
-      await database.query('UPDATE agent_runs SET "leaseExpiresAt"=$2 WHERE id=$1', [runId, lease])
-      assert.equal((await store.state(actor, botId)).live?.deadline?.at, lease.toISOString())
-      await database.query('UPDATE agent_runs SET "leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1', [runId])
-      assert.equal((await store.state(actor, botId)).pendingApproval, undefined)
-      await database.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'1 hour\' WHERE id=$1', [runId])
-      await database.query('UPDATE local_computer_reviews SET "expiresAt"=$2 WHERE id=$1', [request.id, lease])
-      assert.equal((await store.state(actor, botId)).live?.deadline?.at, lease.toISOString())
-      await database.query('UPDATE local_computer_reviews SET "expiresAt"=now()-interval \'1 second\' WHERE id=$1', [request.id])
-      assert.equal((await store.state(actor, botId)).pendingApproval, undefined)
-      await syncComputerReviews(database, deviceId, actor.userId, []); await clear()
     })
 
     await t.test('handback and server-observed provider expiry refresh without guessing a local state', async () => {

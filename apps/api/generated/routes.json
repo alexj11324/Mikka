@@ -476,15 +476,6 @@
       "sourceHash": "1f98d08ebdecea2b287ebf94eaac8e636cfb1796c9c60e304721b8e70370d11a"
     },
     {
-      "path": "/mikka/api/computer/approvals/[id]",
-      "template": "/api/computer/approvals/[id]",
-      "source": "app/api/computer/approvals/[id]/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "sourceHash": "2d4d3fecb778bbf7bea538224d7c101dff8ebd9d4a89ccccc6ac7fb9b564ad30"
-    },
-    {
       "path": "/mikka/api/computer/events",
       "template": "/api/computer/events",
       "source": "app/api/computer/events/route.ts",
@@ -861,16 +852,6 @@
         "GET"
       ],
       "sourceHash": "519bb0a13a2fd3b7162660a1978ae9ed87b09afc18b9848e2d7b7b6fa2e1e569"
-    },
-    {
-      "path": "/mikka/api/devices/computer",
-      "template": "/api/devices/computer",
-      "source": "app/api/devices/computer/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "sourceHash": "8c97e5005ed40aa1b20d610191ce2d73c9d628cc43edde529049c74f455fea12"
     },
     {
       "path": "/mikka/api/devices/enrollment",
@@ -3497,15 +3478,6 @@
       "sourceHash": "dafbb74efa510268c4b70bce30e3420d24631783375f2b70265cd2d01d70d5cc"
     },
     {
-      "path": "/mikka/v1/devices/[deviceId]/computer",
-      "template": "/v1/devices/[deviceId]/computer",
-      "source": "app/v1/devices/[deviceId]/computer/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "sourceHash": "77e03c2358b3d9bb630c683a2bbdcb1e70fa48c2804868f655c3424bf8378bb0"
-    },
-    {
       "path": "/mikka/v1/devices/[deviceId]/coordinator",
       "template": "/v1/devices/[deviceId]/coordinator",
       "source": "app/v1/devices/[deviceId]/coordinator/route.ts",
@@ -3593,7 +3565,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "121fa3cfb05e49fef05589beea162a9dd61603a6b821f1ed187ac693a4c00354"
+      "sourceHash": "8e83f704f3bf1bdc9faa65ec92f4a4f754692dab169884b4491cfa660bf8b784"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -3716,15 +3688,6 @@
       ],
       "maxDuration": 120,
       "sourceHash": "e4e52f1210c9dcf543133f894bcbf8fe1175eb7c20bbe570bb9ba54223983b2a"
-    },
-    {
-      "path": "/mikka/v1/runs/[runId]/decision",
-      "template": "/v1/runs/[runId]/decision",
-      "source": "app/v1/runs/[runId]/decision/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "sourceHash": "931ec8e741091a080bae984862183b3d4788b0165c34b46765fb9d3f8d2b7d48"
     },
     {
       "path": "/mikka/v1/runs/[runId]/events",

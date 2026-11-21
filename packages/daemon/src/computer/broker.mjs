@@ -1,32 +1,13 @@
-import {
-  randomBytes,
-  randomUUID,
-  createHash,
-  timingSafeEqual,
-} from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { chmodSync } from "node:fs";
 import { createServer } from "node:net";
 import { actionStep, normalizeCall, normalizeCaptureCall, executeDriver } from "./driver.mjs";
-// The pending reviews, telling listeners whenever one is added or removed, so
-// the web sync uploads on a change instead of checking on a timer.
-class PendingRequests extends Map {
-  constructor(changed) { super(); this.changed = changed; }
-  set(key, value) { super.set(key, value); this.changed?.(); return this; }
-  delete(key) { const had = super.delete(key); if (had) this.changed?.(); return had; }
-}
 export class ComputerBroker {
   grants = new Map();
   // runId → when its screen recording stops by itself; only set while one runs.
   recordingUntil = new Map();
   recordingSteps = new Map();
   recordingTimingFailed = new Set();
-  pendingListeners = new Set();
-  pending = new PendingRequests(() => { for (const listener of [...this.pendingListeners]) listener(); });
-  /** Calls `listener` whenever a pending review appears or goes; returns the unsubscribe. */
-  onPendingChange(listener) {
-    this.pendingListeners.add(listener);
-    return () => { this.pendingListeners.delete(listener); };
-  }
   sockets = new Set();
   suspended = false;
   constructor({
@@ -38,19 +19,8 @@ export class ComputerBroker {
     capture,
     now = Date.now,
     ttl = 300000,
-    needsPerson,
   }) {
-    Object.assign(this, { driver, socketPath, permitted, execute, capture, now, ttl, transport, needsPerson });
-  }
-  // runId → the last few action kinds, evidence for the Decisions API.
-  recent = new Map();
-  noteKind(runId, call) {
-    const kinds = this.recent.get(runId) ?? [];
-    const before = [...kinds];
-    kinds.push(call.name);
-    if (kinds.length > 8) kinds.shift();
-    this.recent.set(runId, kinds);
-    return before;
+    Object.assign(this, { driver, socketPath, permitted, execute, capture, now, ttl, transport });
   }
   spec(runId, permission, { display } = {}) {
     // A new policy or session invalidates every previous grant for this run,
@@ -151,75 +121,12 @@ export class ComputerBroker {
           this.driver?.fingerprint !== grant.fingerprint || !this.permitted(grant.runId))
         throw new Error("Not permitted");
     };
-    if (grant.permission === "allow") {
-      // Recheck at execution admission. The trusted execute callback also
-      // enforces the live run, owner, display and policy-version fence.
-      return Promise.resolve().then(() => {
-        assertLive();
-        return this.executeRecorded(this.driver, call, grant.display, grant.runId, { actionId, assertLive }, step);
-      });
-    }
-    // Under `ask`, the Decisions API says whether this action needs the
-    // person; no goes ahead, yes is reviewed, no answer is reviewed as before (logged).
-    if (this.needsPerson) {
-      const recent = this.noteKind(grant.runId, call);
-      return Promise.resolve()
-        .then(() => {
-          assertLive();
-          return this.needsPerson(grant.runId, { call, recent }, signal);
-        })
-        .catch((error) => {
-          assertLive();
-          if (signal?.aborted) throw error;
-          return null;
-        })
-        .then((needsPerson) => {
-          if (needsPerson !== false) {
-            // Yes, or no answer: reviewed by the person, as every ask action was before the Decisions API.
-            if (needsPerson !== true) console.warn(`Decision fallback: computer action ${call.name} reviewed as before without a judgment`);
-            return this.review(token, grant, call, actionId, assertLive, signal, step);
-          }
-          assertLive();
-          return this.executeRecorded(this.driver, call, grant.display, grant.runId, { actionId, assertLive }, step);
-        });
-    }
-    return this.review(token, grant, call, actionId, assertLive, signal, step);
-  }
-  review(token, grant, call, actionId, assertLive, signal, step) {
-    if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
-    const request = {
-      id: actionId,
-      runId: grant.runId,
-      target: this.driver.fingerprint,
-      ...(grant.display === undefined ? {} : { display: grant.display }),
-      call,
-      expiresAt: this.now() + this.ttl,
-    };
-    const digest = createHash("sha256")
-      .update(JSON.stringify(request))
-      .digest("hex");
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(request.id);
-        signal?.removeEventListener("abort", cancel);
-        reject(new Error("Approval expired"));
-      }, this.ttl);
-      const cancel = () => {
-        clearTimeout(timer);
-        this.pending.delete(request.id);
-        reject(new Error("Model call cancelled; approval discarded"));
-      };
-      signal?.addEventListener("abort", cancel, { once: true });
-      this.pending.set(request.id, {
-        token,
-        step,
-        assertLive,
-        cleanup: () => signal?.removeEventListener("abort", cancel),
-        request: { ...request, digest },
-        resolve,
-        reject,
-        timer,
-      });
+    // Recheck at execution admission. The trusted execute callback also
+    // enforces the live run, owner, display and policy fence; a workspace
+    // deny is read again by `permitted` on every request.
+    return Promise.resolve().then(() => {
+      assertLive();
+      return this.executeRecorded(this.driver, call, grant.display, grant.runId, { actionId, assertLive }, step);
     });
   }
   // Captures keep evidence for the person and return no desktop content to
@@ -249,68 +156,14 @@ export class ComputerBroker {
       return { error: "Capture failed", ...(detail ? { detail } : {}) };
     }
   }
-  // Authenticated owner RPC or digest-bound web decisions call these methods.
-  // The model-facing request socket deliberately has no decision/list method.
-  list() {
-    return [...this.pending.values()].map((p) => structuredClone(p.request));
-  }
   revoke(token) {
-    const revoked = this.grants.get(token);
-    if (revoked) this.recent.delete(revoked.runId);
     this.grants.delete(token);
-    for (const [id, row] of this.pending) {
-      if (row.token !== token) continue;
-      this.pending.delete(id);
-      clearTimeout(row.timer);
-      row.cleanup();
-      row.reject(new Error("Run ended; approval discarded"));
-    }
-  }
-  async decide(id, digest, approve) {
-    const row = this.pending.get(id);
-    if (!row) throw new Error("Request expired or already consumed");
-    const left = Buffer.from(row.request.digest),
-      right = Buffer.from(digest);
-    if (left.length !== right.length || !timingSafeEqual(left, right))
-      throw new Error("Review changed");
-    this.pending.delete(id);
-    row.cleanup();
-    clearTimeout(row.timer); // Claim BEFORE I/O. Never refund.
-    const { runId, call, expiresAt, target, display } = row.request;
-    if (
-      !this.grants.has(row.token) ||
-      !approve ||
-      expiresAt <= this.now() ||
-      target !== this.driver.fingerprint ||
-      !this.permitted(runId)
-    ) {
-      row.reject(new Error("Not approved"));
-      return { ok: true };
-    }
-    try {
-      const assertLive = () => {
-        row.assertLive();
-        if (expiresAt <= this.now() || target !== this.driver?.fingerprint)
-          throw new Error("Not permitted");
-      };
-      assertLive();
-      row.resolve(await this.executeRecorded(this.driver, call, display, runId, { actionId: id, assertLive }, row.step));
-    } catch (error) {
-      row.reject(error);
-    }
-    return { ok: true };
   }
   // Revoke admission and pending reviews without deleting or closing resources.
   // An operation already handed to the driver cannot be undone here.
   suspend() {
     this.suspended = true;
     this.grants.clear();
-    for (const row of this.pending.values()) {
-      clearTimeout(row.timer);
-      row.cleanup();
-      row.reject(new Error("Daemon stopped; approval discarded"));
-    }
-    this.pending.clear();
   }
   async close() {
     this.suspend();

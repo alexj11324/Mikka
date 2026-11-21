@@ -477,14 +477,16 @@ export const runAssignmentSchema = z.object({
   /** Local host authority comes only from the server's owner-bound Bot run. */
   localComputer: z.object({
     botId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
-    policyVersion: z.number().int().nonnegative().max(2147483647),
+    /** Compat: released daemons still require the field; new code ignores it. */
+    policyVersion: z.number().int().nonnegative().max(2147483647).optional(),
     permission: z.enum(['allow', 'ask']),
   }).strict().optional(),
   /** Trusted server assignment; the model cannot choose a Bot or display. */
   computer: z.object({
     botId: z.uuid(), ownerId: z.string().min(1).max(128),
     display: z.string().regex(/^:[1-9][0-9]{0,2}$/),
-    policyVersion: z.number().int().nonnegative().max(2147483647),
+    /** Compat: released daemons still require the field; new code ignores it. */
+    policyVersion: z.number().int().nonnegative().max(2147483647).optional(),
   }).strict().optional(),
   /**
    * 4e3: the task's explicit user variables (workspace + matching repository secrets/env, NAME -> value).

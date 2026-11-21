@@ -4,7 +4,7 @@ import { withBasePath } from '@/lib/base-path'
 import { computerRequest as call } from '@/lib/computer/request'
 import { ComputerRequestError } from './request-error'
 import { MOCK_HOSTS, mockComputer, mockSetup } from './mock'
-import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
+import type { ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
 
 /** Explicit demo mode; real Bot IDs use the authenticated E2B routes by default. */
 export const computerMock = process.env.NEXT_PUBLIC_COMPUTER_MOCK === '1'
@@ -30,10 +30,6 @@ export const computerApi = {
   viewer: (botId: string, mode: ViewerMode) => isMockedComputer(botId) ? mockComputer.viewer(botId, mode) : call<ViewerGrant>(botPath(botId, '/viewer'), { method: 'POST', json: { mode } }).then(value => viewerGrantSchema.parse(value)),
   takeover: (botId: string, userId: string) => isMockedComputer(botId) ? mockComputer.takeover(botId, userId) : call<ViewerGrant>(botPath(botId, '/takeover'), { method: 'POST' }).then(value => viewerGrantSchema.parse(value)),
   handback: (botId: string) => isMockedComputer(botId) ? mockComputer.handback(botId) : call<null>(botPath(botId, '/handback'), { method: 'POST' }),
-  /** Answers "queued", never an invented success: the agent goes on when the daemon picks it up. */
-  decide: (approval: ApprovalView, decision: ApprovalDecision) => isMockedComputer(approval.botId)
-    ? mockComputer.decide(approval, decision)
-    : call<{ queued: true }>(`/api/computer/approvals/${encodeURIComponent(approval.id)}`, { method: 'POST', json: decision }),
 }
 
 /**

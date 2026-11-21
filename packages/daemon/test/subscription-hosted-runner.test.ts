@@ -183,7 +183,7 @@ it.each([
   f.assignment.subscriptionBinding!.ownerId = 'shared-subscription-payer'
   const binding = structuredClone(f.assignment.subscriptionBinding!)
   f.assignment.policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'allow' } }
-  f.assignment.computer = { botId: randomUUID(), ownerId: 'task-owner', display: ':2', policyVersion: 0 }
+  f.assignment.computer = { botId: randomUUID(), ownerId: 'task-owner', display: ':2' }
   if (source === 'api_key') {
     delete f.assignment.subscriptionBinding; delete f.assignment.subscriptionLease
     f.assignment.modelCredential = { kind: 'provider', protocol: harness === 'codex' ? 'openai' : 'anthropic',
@@ -224,7 +224,7 @@ it.each(['codex', 'claude_code'] as const)('%s refuses a shared-subscription des
   const f = await fixture(harness)
   f.assignment.subscriptionBinding!.ownerId = 'shared-subscription-payer'
   f.assignment.policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'allow' } }
-  f.assignment.computer = { botId: randomUUID(), ownerId: 'task-owner', display: ':2', policyVersion: 0 }
+  f.assignment.computer = { botId: randomUUID(), ownerId: 'task-owner', display: ':2' }
   await expect(f.runner.start(f.assignment, { ...f.options, policy: f.assignment.policy })).rejects.toMatchObject({
     code: 'subscription_hosted_runtime_unavailable', detail: 'computer_unavailable',
   })
@@ -314,17 +314,13 @@ it.each([
   await broker.listen()
   try {
     f.assignment.policy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: permission } }
-    f.assignment.computer = { botId: randomUUID(), ownerId: 'fixture-owner', display: ':2', policyVersion: 0 }
+    f.assignment.computer = { botId: randomUUID(), ownerId: 'fixture-owner', display: ':2' }
     const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { [harness]: f.binary }, computerBroker: broker })
     const started = runner.start(f.assignment, { ...f.options, policy: f.assignment.policy, prompt: 'COMPUTER' })
     if (permission === 'deny') {
       await expect(started).rejects.toThrow(); expect(executions).toBe(0); return
     }
     const finished = collect(await started)
-    if (permission === 'ask') {
-      const review = await waitFor(() => broker.list()[0]); expect(executions).toBe(0)
-      await broker.decide(review.id, review.digest, true)
-    }
     expect((await finished).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
     expect(executions).toBe(1)
     expect(f.never).not.toHaveBeenCalled()

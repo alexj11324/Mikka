@@ -9,8 +9,6 @@ workspace = os.environ['MIKKA_TEST_WORKSPACE']
 marker = '/tmp/mikka-worker-registration.json'
 run_file = '/tmp/mikka-worker-run.json'
 claimed_file = '/tmp/mikka-worker-claimed'
-review_file = '/tmp/mikka-worker-review.json'
-decision_file = '/tmp/mikka-worker-decisions.json'
 completion_file = '/tmp/mikka-worker-completion.json'
 renewal_file = '/tmp/mikka-worker-renewal.json'
 computer_event_file = '/tmp/mikka-worker-computer-event.json'
@@ -48,16 +46,6 @@ async def request_handler(request):
         except FileNotFoundError:
             pass
         return web.json_response(response)
-    if path.endswith('/computer'):
-        body = await request.json()
-        if body.get('requests'):
-            publish(review_file, body['requests'])
-        try:
-            with open(decision_file, encoding='utf8') as source:
-                decisions = json.load(source)
-        except FileNotFoundError:
-            decisions = []
-        return web.json_response({'decisions': decisions})
     if path.endswith('/repos'):
         return web.json_response({'repos': [{'repoId': config['repoId'], 'name': 'Synthetic', 'path': config['repoPath']}] if config else []})
     if path.endswith('/runs'):

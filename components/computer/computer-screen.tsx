@@ -87,11 +87,10 @@ function useScreenBox(rect: ScreenRect | null, pad = 0) {
   return ref
 }
 
-/** The ring around what the agent is about to touch: blue while it works, orange while it waits for you. */
-function TargetRing({ rect, tone }: { rect: ScreenRect; tone: 'agent' | 'approval' }) {
+/** The ring around what the agent is about to touch. */
+function TargetRing({ rect }: { rect: ScreenRect }) {
   const ref = useScreenBox(rect, 3)
-  return <span ref={ref} aria-hidden="true" className={cn('pointer-events-none absolute top-(--box-y) left-(--box-x) h-(--box-h) w-(--box-w) rounded-md ring-2 transition-[top,left,width,height] duration-(--motion-fast) ease-out motion-reduce:transition-none',
-    tone === 'agent' ? 'ring-sidebar-primary' : 'ring-attention')} />
+  return <span ref={ref} aria-hidden="true" className={cn('pointer-events-none absolute top-(--box-y) left-(--box-x) h-(--box-h) w-(--box-w) rounded-md ring-2 ring-sidebar-primary transition-[top,left,width,height] duration-(--motion-fast) ease-out motion-reduce:transition-none')} />
 }
 
 function Cursor({ x, y }: { x: number; y: number }) {
@@ -128,9 +127,8 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   const unauthorized = [error, grantError].some(failure => failure instanceof ComputerRequestError && [401, 403, 404].includes(failure.status))
   const [grantedBotId, setGrantedBotId] = useState<string | null>(null)
   useEffect(() => { if (grant) setGrantedBotId(botId) }, [botId, grant])
-  const approval = state?.pendingApproval
-  const target = approval?.action.rect ?? (state?.control === 'agent' ? state.lastAction?.rect : undefined)
-  const point = approval ? { x: approval.action.x, y: approval.action.y } : state?.control === 'agent' ? { x: state.lastAction?.x, y: state.lastAction?.y } : null
+  const target = state?.control === 'agent' ? state.lastAction?.rect : undefined
+  const point = state?.control === 'agent' ? { x: state.lastAction?.x, y: state.lastAction?.y } : null
   async function wake() {
     if (wakeInFlight.current) return
     wakeInFlight.current = true
@@ -147,7 +145,7 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
     {running && !unauthorized && (grant?.url === MOCK_SCREEN_URL
       ? <img src={withBasePath('/computer/mock-desktop.svg')} alt={label} draggable={false} className="absolute inset-0 size-full select-none" />
       : <NoVncView key={botId} url={grant?.url} mode={mode} label={label} disconnected={() => { void mutate() }} />)}
-    {running && live && showTarget && target && <TargetRing rect={target} tone={approval ? 'approval' : 'agent'} />}
+    {running && live && showTarget && target && <TargetRing rect={target} />}
     {running && live && showTarget && point?.x !== undefined && point.y !== undefined && <Cursor x={point.x} y={point.y} />}
     {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-screen/80 backdrop-blur-sm">
       {/* The caption under the screen names the state; asleep the cover only offers 唤醒 (Figma 188:3115). */}

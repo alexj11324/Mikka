@@ -8,9 +8,11 @@ import time
 from pathlib import Path
 
 def main():
-    if len(sys.argv) != 5:
+    # Older launchers pass a fourth policyVersion argument; ignore it while
+    # pre-upgrade workers exist in the wild.
+    if len(sys.argv) not in (4, 5):
         raise ValueError('invalid lease')
-    display, bot, owner, version = sys.argv[1:]
+    display, bot, owner = sys.argv[1:4]
     if not re.fullmatch(r':[1-9][0-9]{0,2}', display) or os.environ.get('DISPLAY') != display:
         raise ValueError('invalid display')
     if (Path('/run/mikka-viewer') / f'{display[1:]}.guard').exists():
@@ -20,8 +22,6 @@ def main():
         raise ValueError('desktop changed')
     if state.get('computerAllowed') is not True:
         raise ValueError('computer use denied by workspace')
-    if not re.fullmatch(r'(0|[1-9][0-9]{0,9})', version) or state.get('policyVersion') != int(version):
-        raise ValueError('workspace policy changed')
     if state.get('controlledBy') and state.get('controlUntil', 0) > time.time():
         raise ValueError('desktop is controlled by a person')
     os.execv('/opt/mikka/computer/cua-driver', ['/opt/mikka/computer/cua-driver', 'mcp', '--direct'])

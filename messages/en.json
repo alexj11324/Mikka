@@ -5116,19 +5116,6 @@
       "takeoverFailed": "Could not take control. Try again.",
       "handbackFailed": "Could not hand back control. Try again."
     },
-    "approval": {
-      "action": {
-        "click": "Click the screen",
-        "type": "Type text",
-        "key": "Press a key",
-        "scroll": "Scroll",
-        "screenshot": "View the screen"
-      },
-      "allowRun": "Allow for this task",
-      "deny": "Deny",
-      "allow": "Allow",
-      "failed": "Not delivered. Try again."
-    },
     "addE2BKey": "Add E2B API Key",
     "e2bKeyNeeded": "Mikka Cloud runs on your own E2B key",
     "loading": "Connecting to the computer"

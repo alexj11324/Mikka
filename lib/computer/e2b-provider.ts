@@ -9,7 +9,9 @@ import { bootstrapOfficialInstance, runtimeCommandOptions, runtimeRequestOptions
 import type { ProcessedCaptureVideo, RecordingStep } from '../../packages/daemon/src/agents/capture-video.mjs'
 
 const lifetime = 15 * 60_000
-export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
+export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean;
+  /** Compat: pre-upgrade lease drivers still compare the stored version. */
+  policyVersion: number }
 // A sandbox belongs to the E2B team whose key created it: its owner's own key (orchestration § 2).
 // Every call resolves the owner from the machine's record, never from whoever is asking.
 const options = async (ownerId: string) => ({ apiKey: await e2bApiKey(ownerId, 'Cloud computer is not configured'), timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })

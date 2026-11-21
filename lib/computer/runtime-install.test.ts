@@ -65,6 +65,6 @@ test('refresh bounds guard installation and desktop requests while leaving backg
   } as unknown as Parameters<typeof installComputerRuntime>[0]
   await installComputerRuntime(sandbox, budget)
   await startDesktop(sandbox, 1, true, budget)
-  await syncDesktopLease(sandbox, { botId: 'bot', ownerId: 'owner', display: 1, epoch: 1, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 1 }, budget)
+  await syncDesktopLease(sandbox, { botId: 'bot', ownerId: 'owner', display: 1, epoch: 1, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 0 }, budget)
   assert.deepEqual(limits, [9_000, 8_500, 8_000, 7_500, 7_000, 6_500, 6_000, 5_500, 5_000])
 })

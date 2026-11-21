@@ -27,8 +27,8 @@ const device=randomUUID(),repoId=randomUUID(),botId=randomUUID(),workspaceId=ran
 const server=new MemoryServer(device),repo=await makeRepo()
 console.info(`Retained local computer daemon repository: ${repo}`)
 server.addRepo(device,{repoId,name:'fixture',path:repo})
-const authority={botId,workspaceId,ownerId:'owner',permission:'allow' as const,policyVersion:1}
-const link=Object.assign(server.link(),{syncComputerReviews:async()=>[],localComputerAuthority:async()=>authority})
+const authority={botId,workspaceId,ownerId:'owner',permission:'allow' as const}
+const link=Object.assign(server.link(),{localComputerAuthority:async()=>authority})
 // This configuration-only fake CLI needs the same scoped admission contract
 // as production, without granting any real tool action or invoking a driver.
 link.prepareRunToolApproval=async(assignment,signal,check)=>{
