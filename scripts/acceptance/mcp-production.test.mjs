@@ -54,8 +54,8 @@ function fixture(options = {}) {
       }
       if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) return json({ workflow_runs: [{
         id: 51, run_attempt: 1, head_sha: APP, head_branch: 'main', event: 'push',
-        path: '.github/workflows/web-deploy.yml', repository: { full_name: 'alexj11324/Mikka' },
-        head_repository: { full_name: 'alexj11324/Mikka' }, status: 'completed', conclusion: 'success',
+        path: '.github/workflows/web-deploy.yml', repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } },
+        head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } }, status: 'completed', conclusion: 'success',
       }] })
       if (url.pathname.endsWith('/actions/runs/51/attempts/1/jobs')) return json({ total_count: 1, jobs: [{
         name: 'deploy', head_sha: APP, status: 'completed', conclusion: 'success',

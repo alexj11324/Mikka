@@ -4,6 +4,8 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { runInNewContext } from 'node:vm'
+import yaml from 'js-yaml'
 import { select, diffRange, area } from './select.mjs'
 import { buildGraph, dbId, sourceId, strictCommand } from './graph.mjs'
 import { selectScripts, shardScripts } from '../run-db-tests.mjs'
@@ -123,17 +125,17 @@ test('every heavy consumer uses the same trusted triage and required names remai
   assert.equal(area('apps/mobile/lib/theme.ts'),'mobile')
 })
 
-test('the actual required gate scripts reject unselected failures and selected skips', () => {
-  const workflow = readFileSync('.github/workflows/ui-policy.yml','utf8')
+test('the actual required gate scripts reject drafts, unselected failures and selected skips', () => {
+  const workflow = yaml.load(readFileSync('.github/workflows/ui-policy.yml','utf8'))
   const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
-    const block = workflow.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
-    const gateName = job === 'ui-policy' ? 'Require every selected source, unit and daemon job' : 'Require every selected database shard'
-    const gate = block.split(`      - name: ${gateName}\n`)[1]?.split('\n      - ')[0]
-    assert.ok(gate, `required ${job} check exists`)
-    const shell = gate.split('        run: |\n')[1]
-    assert.ok(shell, `required ${job} check has an executable shell contract`)
-    const script = shell.split('\n').map(line => line.slice(10)).join('\n')
+    const steps = workflow.jobs[job].steps
+    const draftGate = steps.find(step => step.name === 'Draft PR is not a validated merge candidate')
+    for (const draft of [true, false]) {
+      assert.equal(runInNewContext(draftGate.if, { github: { event_name: 'pull_request', event: { pull_request: { draft } } } }), draft)
+      if (draft) assert.equal(spawnSync('bash', ['-e', '-c', draftGate.run], { env: { PATH: process.env.PATH, GITHUB_STEP_SUMMARY: '/dev/null' } }).status, 1)
+    }
+    const script = steps.find(step => step.name?.startsWith('Require every selected ')).run
     const run = overrides => {
       const env = {
         PATH: process.env.PATH,

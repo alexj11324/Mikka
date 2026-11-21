@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os'
 import {join, resolve} from 'node:path'
 import {pathToFileURL} from 'node:url'
 
-const repository = 'alexj11324/Mikka'
+import { officialMikkaRepository, publicRepositoryId } from './cloudflare-source.mjs'
 const sha = /^[a-f0-9]{40}$/
 const number = /^[1-9][0-9]{0,15}$/
 const workflow = '.github/workflows/cloudflare-api-image.yml'
@@ -16,8 +16,7 @@ const steps = ['Compile and verify the API image offline','Verify the source che
  * a GitHub Secret. The runtime publisher independently validates its payload. */
 export function checkedApiPublication(run, jobs, artifact, archive, receipt, selection) {
   for (const field of ['repository','head_repository']) {
-    assert.equal(run[field]?.id,1427517699)
-    assert.equal(run[field].full_name,repository)
+    assert.ok(officialMikkaRepository(run[field]?.full_name, String(run[field]?.id)))
     assert.equal(run[field].private,false)
     assert.equal(run[field].fork,false)
   }
@@ -65,7 +64,7 @@ async function load(env) {
   assert.match(env.OVERLAY_SHA??'',sha)
   assert.ok(env.GH_TOKEN && env.GITHUB_ENV)
   const headers={authorization:'Bearer '+env.GH_TOKEN,accept:'application/vnd.github+json','user-agent':'mikka-original-api-receipt'}
-  const endpoint = path=>'https://api.github.com/repos/'+repository+'/'+path
+  const endpoint = path=>'https://api.github.com/repositories/'+publicRepositoryId+'/'+path
   const json = async path=>{
     const r=await fetch(endpoint(path),{headers,redirect:'error',signal:AbortSignal.timeout(30000)})
     assert.equal(r.status,200,'Original API build metadata unavailable')

@@ -87,7 +87,6 @@ test('Analytics reports its real build and browser result without a second queue
 
 test('the protected parent requires success from selected Analytics work', () => {
   const gate = workflow('ui-policy').jobs['ui-policy'].steps.find(step => step.name === 'Require every selected source, unit and daemon job')
-  assert.ok(gate?.env && gate.run, 'required source/unit/daemon gate remains executable')
   for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
     const context = { github: { event_name: 'pull_request' }, needs: {
       changes: { result: 'success', outputs: { core: 'false', integration: 'false', source: 'false', daemon: 'false', analytics: 'true', db: 'false' } },
