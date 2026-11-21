@@ -262,6 +262,28 @@ describe("claimed runs without an adapter", () => {
 })
 
 describe("data dir lock", () => {
+  it("acquires without a lock dir when a leftover PID belongs to a live process", async () => {
+    const dataDir = tempDir()
+    const paths = daemonPaths(dataDir)
+    const unrelated = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"])
+    await once(unrelated, "spawn")
+    let release: (() => Promise<void>) | undefined
+    try {
+      writeFileSync(join(dataDir, "daemon.pid"), `${unrelated.pid}\n`)
+      expect(existsSync(paths.lock)).toBe(false)
+      release = await acquireLock(dataDir, paths.lock, undefined, {
+        socketPath: paths.socket,
+        takeoverMs: 0,
+      })
+      expect(readFileSync(join(dataDir, "daemon.pid"), "utf8")).toBe(`${process.pid}\n`)
+      expect(existsSync(paths.lock)).toBe(true)
+    } finally {
+      await release?.()
+      unrelated.kill()
+      await once(unrelated, "exit")
+    }
+  })
+
   it("refuses a stale lock with a live holder without overwriting its PID", async () => {
     const dataDir = tempDir()
     const paths = daemonPaths(dataDir)

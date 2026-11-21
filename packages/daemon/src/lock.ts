@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { createConnection } from "node:net"
 import { join } from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
@@ -109,7 +109,7 @@ export async function acquireLock(
     }
     const pid = holderPid(dataDir)
     const crashed = pid !== null && pid !== process.pid && !processAlive(pid)
-    if (pid === null || crashed) {
+    if (pid === null || crashed || !existsSync(lockfilePath)) {
       try {
         return await lock()
       } catch (error) {
