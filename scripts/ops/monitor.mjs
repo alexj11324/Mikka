@@ -57,6 +57,7 @@ export async function databaseSignals(pool, now = new Date()) {
       (SELECT count(*)::int FROM agent_runs WHERE status IN ('preparing','running','finishing') AND "leaseExpiresAt" < $1::timestamptz-interval '2 minutes') AS "expiredRunLease",
       (SELECT count(*)::int FROM operation_ledger WHERE status='uncertain') AS "uncertainEffect",
       (SELECT count(*)::int FROM operation_ledger WHERE status='executing' AND "updatedAt" < $1::timestamptz-interval '5 minutes') AS "staleEffect",
+      (SELECT count(*)::int FROM account_deletion_jobs WHERE stage NOT IN ('completed','cancelled') AND "requestedAt" < $1::timestamptz-interval '24 hours') AS "overdueAccountDeletion",
       (SELECT count(*)::int FROM byos_secret_artifacts a WHERE a."deletedAt" IS NULL AND a."notBefore" < $1::timestamptz-interval '5 minutes'
         AND NOT EXISTS (SELECT 1 FROM byos_connections c WHERE a.name IN (c."secretName",c."accessSecretName",c."stagedSecretName",c."stagedAccessName"))) AS "overdueSecretCleanup",
       (SELECT count(*)::int FROM schedule_occurrences WHERE due_at >= $1::timestamptz-interval '15 minutes' AND due_at <= $1::timestamptz-interval '2 minutes' AND execution_decision='execute') AS "dueTotal",
@@ -101,6 +102,10 @@ export function operationalAlertAssessment({ requests, database }) {
   const add = (id, value, action) => alerts.push(alertRecord(id, value, action))
   if (database.databaseAvailable !== 1) add('database-unavailable', 1, 'Check database connectivity and pool saturation; keep uncertain actions quarantined.')
   else {
+    if (Number.isFinite(database.overdueAccountDeletion)) {
+      assessed.push('overdueAccountDeletion')
+      if (database.overdueAccountDeletion > 0) add('overdueAccountDeletion', database.overdueAccountDeletion, 'Inspect account deletion blockedReasons and sanitized blockerErrors; resume the existing deletion job after resolving its cleanup blocker.')
+    }
     for (const key of ['staleWake', 'expiredRunLease', 'uncertainEffect', 'staleEffect', 'overdueSecretCleanup']) {
       if (!Number.isFinite(database[key])) continue
       assessed.push(key)

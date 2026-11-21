@@ -9,7 +9,7 @@ import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
 import { DRIVE_STORAGE_PREFIX, driveStorageKey } from '@/lib/drive/blobs'
 import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeProjectRetention, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
-import type { AccountCleanupReport } from './cleanup-result'
+import { cleanupErrorIdentifier, type AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
 import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock } from './deletion-lock'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
@@ -21,7 +21,7 @@ export type DeletionStage = 'preparing' | 'requested' | 'external_pending' | 'ma
 export interface AccountDeletionJob {
   id: string; subjectUserId: string; subjectEmailHash: string; requestedAt: Date; stage: DeletionStage
   plan: Plan | null; pendingObjects: string[]; storageNotBefore: Date | null
-  blockedReasons: string[]; warnings: string[]; completedAt: Date | null; retentionUntil: Date | null; updatedAt: Date
+  blockedReasons: string[]; blockerErrors?: Record<string, string>; warnings: string[]; completedAt: Date | null; retentionUntil: Date | null; updatedAt: Date
 }
 export interface AccountDeletionOptions {
   mainPool?: Pool; workspacePool?: Pool
@@ -180,12 +180,13 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
           ? options.externalCleanup(job.subjectUserId, main)
           : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }, job.plan?.solo ?? []))
         report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
-      } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
+      } catch (error) { report = { blockedReasons: ['external_cleanup_failed'], warnings: [], blockerErrors: { external_cleanup_failed: cleanupErrorIdentifier(error) } } }
       assertHeld()
       const blocked = report.blockedReasons
-      await lease.query('UPDATE account_deletion_jobs SET warnings=$2 WHERE id=$1', [id, JSON.stringify([...new Set([...job.warnings, ...report.warnings])])])
+      const blockerErrors = Object.fromEntries(Object.entries(report.blockerErrors ?? {}).filter(([reason]) => blocked.includes(reason)))
+      await lease.query('UPDATE account_deletion_jobs SET warnings=$2,"blockedReasons"=$3,"blockerErrors"=$4,"updatedAt"=now() WHERE id=$1',
+        [id, JSON.stringify([...new Set([...job.warnings, ...report.warnings])]), JSON.stringify([...new Set(blocked)]), JSON.stringify(blockerErrors)])
       if (blocked.length) {
-        await lease.query('UPDATE account_deletion_jobs SET "blockedReasons"=$2,"updatedAt"=now() WHERE id=$1', [id, JSON.stringify([...new Set(blocked)])])
         return await load(lease, id)
       }
       // Freeze every solo workspace before removing any main-store content. New membership writes

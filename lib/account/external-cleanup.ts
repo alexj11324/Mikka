@@ -32,6 +32,7 @@ export async function cleanupAccountConnections(ownerId: string, database: Pool,
   }
   const subscription = await cleanupAccountSubscriptions(ownerId, database, undefined, job)
   blocked.push(...subscription.blockedReasons); warnings.push(...subscription.warnings)
-  blocked.push(...await cleanupAccountRuntimes(ownerId, database))
-  return { blockedReasons: [...new Set(blocked)], warnings: [...new Set(warnings)] }
+  const blockerErrors = { ...subscription.blockerErrors }
+  blocked.push(...await cleanupAccountRuntimes(ownerId, database, undefined, undefined, undefined, job, blockerErrors))
+  return { blockedReasons: [...new Set(blocked)], warnings: [...new Set(warnings)], ...(Object.keys(blockerErrors).length ? { blockerErrors } : {}) }
 }

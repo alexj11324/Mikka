@@ -22,6 +22,17 @@ test('durable deletion stages preserve data until authorization/cleanup and resu
     tracked.add(requested.id)
     return requested.id
   }
+  await t.test('blocker identifiers persist privately and clear when external cleanup recovers', async () => {
+    const subject = await seedUser(main, 'delete-diagnostics'), id = await request(subject)
+    const failed = await resumeAccountDeletion(id, { ...options, externalCleanup: async () => { throw Object.assign(new Error('private token and provider body'), { code: '55000' }) } })
+    assert.deepEqual(failed.blockerErrors, { external_cleanup_failed: 'Error:55000' })
+    assert.ok(!('blockerErrors' in await readAccountDeletion(subject, id, options)))
+    const sanitized = await resumeAccountDeletion(id, { ...options, externalCleanup: async () => { throw Object.assign(new Error('private body'), { name: 'private name', code: 'private/code' }) } })
+    assert.deepEqual(sanitized.blockerErrors, { external_cleanup_failed: 'Error' })
+    const completed = await resumeAccountDeletion(id, options)
+    assert.equal(completed.stage, 'completed')
+    assert.deepEqual(completed.blockerErrors, {})
+  })
   await t.test('a requested deletion starts on the account-deletions due timer, not at the next sweep (#1371)', async () => {
     const started: string[] = []
     wakeTransport.resume = async () => { throw new Error('no timer holds the token') }

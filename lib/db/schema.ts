@@ -15,6 +15,23 @@ import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
 })
+
+export const accountDeletionJobs = pgTable('account_deletion_jobs', {
+  id: uuid('id').primaryKey(),
+  subjectUserId: text('subjectUserId').notNull(),
+  subjectEmailHash: text('subjectEmailHash').notNull(),
+  requestedAt: timestamp('requestedAt', { withTimezone: true }).notNull().defaultNow(),
+  stage: text('stage').notNull(),
+  plan: jsonb('plan'),
+  pendingObjects: jsonb('pendingObjects').$type<string[]>().notNull().default([]),
+  storageNotBefore: timestamp('storageNotBefore', { withTimezone: true }),
+  blockedReasons: jsonb('blockedReasons').$type<string[]>().notNull().default([]),
+  blockerErrors: jsonb('blockerErrors').$type<Record<string, string>>().notNull().default({}),
+  warnings: jsonb('warnings').$type<string[]>().notNull().default([]),
+  completedAt: timestamp('completedAt', { withTimezone: true }),
+  retentionUntil: timestamp('retentionUntil', { withTimezone: true }),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
 /** A finished or skipped first-run guide; no row means not yet. */
 export const userOnboarding = pgTable('user_onboarding', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
