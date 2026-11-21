@@ -20,18 +20,17 @@ function exitWith(body: string) {
 
 describe("daemon lifecycle record", () => {
   it("names an uncaught exception and keeps Node's crash exit", () => {
-    const { child, record } = exitWith(`setTimeout(() => { throw new Error("gateway socket handler failed") }, 0)`)
+    const { child, record } = exitWith(`setTimeout(() => { throw Object.assign(new TypeError("token orv_secret rejected"), { code: "ERR_SOCKET" }) }, 0)`)
     expect(child.status).toBe(1)
-    expect(child.stderr).toContain("gateway socket handler failed")
-    expect(record).toMatchObject({ phase: "exited", reason: "uncaughtException", code: 1 })
-    expect(record.error).toContain("Error: gateway socket handler failed")
+    expect(child.stderr).toContain("token orv_secret rejected")
+    expect(record).toMatchObject({ phase: "exited", reason: "uncaughtException", code: 1, error: { name: "TypeError", code: "ERR_SOCKET" } })
+    expect(JSON.stringify(record)).not.toContain("orv_secret")
   })
 
   it("names an unhandled rejection", () => {
     const { child, record } = exitWith(`void Promise.reject(new Error("claim stream rejected"))`)
     expect(child.status).toBe(1)
-    expect(record).toMatchObject({ phase: "exited", reason: "unhandledRejection", code: 1 })
-    expect(record.error).toContain("claim stream rejected")
+    expect(record).toMatchObject({ phase: "exited", reason: "unhandledRejection", code: 1, error: { name: "Error" } })
   })
 
   it("keeps the first stop reason through the exit", () => {
