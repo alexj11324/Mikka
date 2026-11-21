@@ -112,7 +112,7 @@ export async function billingManagementView(actorId: string, target: BillingScop
         coalesce(sum(coalesce("costMicroUsd","holdMicroUsd")) filter(where state in ('pending','unknown')),0)::float8 held,
         count(*) filter(where state='unknown' or (state='settled' and "costMicroUsd" is null))::int unknown
         from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and state<>'failed'
-        and ${payerFilter}
+        and COALESCE("billingSource",'credits')='credits' and ${payerFilter}
         group by ${usageGrouping}
         order by cost desc, id asc nulls last`,
         usageParams),
@@ -127,6 +127,7 @@ export async function billingManagementView(actorId: string, target: BillingScop
           coalesce(sum("inputTokens"),0)::text as "inputTokens", coalesce(sum("outputTokens"),0)::text as "outputTokens",
           count(*) filter (where "costMicroUsd" is null)::int as "unknownCalls"
           from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and ${payerFilter} and "actorId"=$6 and state='settled'
+          and COALESCE("billingSource",'credits')='credits'
           group by model order by "costMicroUsd" desc, model`, [...usageParams, usageMemberId])
         : null,
     ])

@@ -38,6 +38,9 @@ it.each(['known', 'missing_fresh', 'missing_reused'] as const)(
     const receipt = JSON.parse(readFileSync(join(stateDir, 'runs', runId, 'codex-home', 'fixture-process.json'), 'utf8'))
     expect(() => process.kill(receipt.pid, 0)).toThrow()
     expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+    expect(events.find(event => event.type === 'chunk' && event.chunk.type === 'data-usage')).toMatchObject({
+      chunk: { data: { model: 'gpt-6-luna', turnUsage: scenario === 'missing_fresh' ? undefined : { inputTokens: 50, outputTokens: 20 } } },
+    })
     const collection = await waitFor(async () => { await daemonTracer.flush(); return spans.getFinishedSpans().find(span => span.name === 'daemon.ai.collection') }, 5000)
     const expected = scenario === 'missing_reused' ? 2 : 1
     expect(receipt).toMatchObject({ rawCompleted: expected, usageNotifications: scenario === 'missing_fresh' ? 0 : expected })

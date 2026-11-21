@@ -12,6 +12,7 @@ export const hostedBillingScope = new AsyncLocalStorage<{
   projectId?: string | null
   threadId?: string | null
   runId?: string | null
+  billingSource?: 'credits'
   /** True only after server authorization established each resource binding. */
   attributionComplete?: boolean
 }>()

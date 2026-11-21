@@ -182,7 +182,7 @@ export function claudeSettings(
 }
 
 /** Claude Code SDK messages as UI message chunks. */
-export function claudeChunks(message: SDKMessage): RunChunk[] {
+export function claudeChunks(message: SDKMessage, turnModel?: string): RunChunk[] {
   const chunks: RunChunk[] = []
   if (message.type === "assistant") {
     message.message.content.forEach((block, index) => {
@@ -229,11 +229,15 @@ export function claudeChunks(message: SDKMessage): RunChunk[] {
       )
     }
   } else if (message.type === "result") {
+    const usedModels = Object.keys(message.modelUsage ?? {})
     chunks.push({
       type: "data-usage",
       data: {
         inputTokens: message.usage.input_tokens ?? 0,
         outputTokens: message.usage.output_tokens ?? 0,
+        model: turnModel ?? (usedModels.length === 1 ? usedModels[0] : undefined),
+        cacheReadTokens: message.usage.cache_read_input_tokens ?? null,
+        cacheWriteTokens: message.usage.cache_creation_input_tokens ?? null,
         costUsd: message.total_cost_usd ?? null,
         source: "claude agent sdk result",
       },
@@ -629,6 +633,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let written = 0
     let results = 0
     let runtimeModel: string | null = null
+    let turnModel: string | undefined
     let ending = false
     let failureDetails: RunFailure | undefined
     let lastError: string | undefined
@@ -887,8 +892,10 @@ export class ClaudeAdapter implements AgentAdapter {
             runRuntimeTimings.agentAccepted(options.runId, 'claude_user_ack')
           if (message.type === "system" && message.subtype === "init" && typeof message.model === "string")
             runtimeModel = message.model || null
-          if (message.type === "assistant" && message.parent_tool_use_id == null && typeof message.message.model === "string")
+          if (message.type === "assistant" && message.parent_tool_use_id == null && typeof message.message.model === "string") {
             runtimeModel = message.message.model || null
+            if (!message.error && runtimeModel) turnModel = runtimeModel
+          }
           if (runtimeModel && ((message.type === "system" && message.subtype === "init") ||
             (message.type === "assistant" && message.parent_tool_use_id == null)))
             options.onRuntimeModel?.(sessionId, runtimeModel)
@@ -906,8 +913,9 @@ export class ClaudeAdapter implements AgentAdapter {
           // CLI API errors can contain provider diagnostics or credentials;
           // they are not assistant output, on either API keys or subscriptions.
           if (!(message.type === "assistant" && message.error))
-            for (const chunk of claudeChunks(message)) queue.chunk(chunk)
+            for (const chunk of claudeChunks(message, turnModel)) queue.chunk(chunk)
           if (message.type !== "result") continue
+          turnModel = undefined
           results++
           failureDetails = message.is_error ? capture(message) : undefined
           providerFailure = claudeProviderFailure(message, assistantError)

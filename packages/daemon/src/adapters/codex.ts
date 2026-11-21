@@ -595,9 +595,15 @@ export class CodexAdapter implements AgentAdapter {
     let quota: QuotaSignal | undefined
     let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
-    const generations = new CodexGenerationMetrics(metrics => nativeGenerations
-      ? nativeGenerations.collector.observeFallback(metrics, sessionId)
-      : daemonTracer.generation({ ...metrics, nativeUnavailableReason }, traceContext))
+    let turnUsage: typeof usage | undefined
+    const generations = new CodexGenerationMetrics(metrics => {
+      turnUsage = {
+        inputTokens: (turnUsage?.inputTokens ?? 0) + (metrics.inputTokens ?? 0),
+        outputTokens: (turnUsage?.outputTokens ?? 0) + (metrics.outputTokens ?? 0),
+      }
+      if (nativeGenerations) nativeGenerations.collector.observeFallback(metrics, sessionId)
+      else daemonTracer.generation({ ...metrics, nativeUnavailableReason }, traceContext)
+    })
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     // Match the host-created MCP server's advertised capabilities. A fixed
     // check may inspect its artifact, but cannot select another repository.
@@ -805,11 +811,14 @@ export class CodexAdapter implements AgentAdapter {
         type: "data-usage",
         data: {
           ...usage,
+          turnUsage,
+          model: runtimeModel ?? undefined,
           // Priced later with the LiteLLM table (ADR 0003).
           costUsd: null,
           source: "codex app-server thread/tokenUsage",
         },
       })
+      turnUsage = undefined
       if (ending) return
       if (cancelling) return finish({ outcome: "cancelled" })
       const handoff = ctx.readHandoff(log)
@@ -858,6 +867,7 @@ export class CodexAdapter implements AgentAdapter {
       if (verify) {
         try { await daemonTracer.span("daemon.adapter.account_check", { "mikka.harness": "codex", "mikka.run.id_hash": runIdHash(options.runId) }, () => verify()) } catch (error) { throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error }) }
       }
+      turnUsage = undefined
       generations.startTurn()
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
@@ -1054,4 +1064,3 @@ export class CodexAdapter implements AgentAdapter {
     }
   }
 }
-

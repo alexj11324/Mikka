@@ -150,7 +150,8 @@ export class HostedUsageStore {
     const { rows } = await tx.query<{ workspaceId: string; limit: number; spent: number }>(`SELECT s."workspaceId",s."monthlyCreditLimit"*$3::float8 AS "limit",
       COALESCE((SELECT sum(CASE WHEN u.state IN ('pending','unknown') THEN COALESCE(u."costMicroUsd",u."holdMicroUsd") ELSE COALESCE(u."costMicroUsd",0) END)
         FROM hosted_usage u WHERE (CASE WHEN s."workspaceId"=$1 THEN u."workspaceId"=s."workspaceId" ELSE COALESCE(u."usageWorkspaceId",u."workspaceId")=s."workspaceId" END)
-          AND u.state<>'failed' AND u."createdAt">=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),0)::float8 AS spent
+          AND u.state<>'failed' AND COALESCE(u."billingSource",'credits')='credits'
+          AND u."createdAt">=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),0)::float8 AS spent
       FROM workspace_settings s WHERE s."workspaceId"=ANY($2::uuid[]) AND s."monthlyCreditLimit" IS NOT NULL`,
     [workspaceId, [...new Set([workspaceId, sourceWorkspaceId])], MICRO_USD_PER_POINT])
     return rows.every(row => row.limit - row.spent > 0 && row.limit - row.spent >= estimate)
@@ -239,10 +240,10 @@ export class HostedUsageStore {
         throw new PaidResourceError('platform_paused')
       // The hold only gates admission; settlement charges the actual cost.
       await tx.query(
-        `INSERT INTO hosted_usage (id,"workspaceId",model,state,"holdMicroUsd","usageWorkspaceId","billingOrganizationId","executionOwnerId","actorId","usageProjectId","usageThreadId","usageRunId","attributionComplete")
-          VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO hosted_usage (id,"workspaceId",model,state,"holdMicroUsd","usageWorkspaceId","billingOrganizationId","executionOwnerId","actorId","usageProjectId","usageThreadId","usageRunId","attributionComplete","billingSource")
+          VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [id, workspaceId, model, estimate, attribution.workspaceId, attribution.billingOrganizationId ?? null, attribution.ownerId ?? null,
-          attribution.actorId ?? attribution.ownerId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
+          attribution.actorId ?? attribution.ownerId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false, attribution.billingSource ?? null],
       )
       return { id, workspaceId }
     }) } finally { await quota?.close() }
@@ -273,6 +274,7 @@ export class HostedUsageStore {
     outputTokens = 0,
     generationId?: string,
     cache?: { read: number | null; write: number | null } | null,
+    messageId?: string | null,
   ) {
     if (!this.metered) return
     return this.transaction(async (tx) => {
@@ -288,12 +290,20 @@ export class HostedUsageStore {
       await this.lock(tx, row.workspaceId)
       if (generationId && row.generationId && generationId !== row.generationId)
         throw new Error('usage_generation_mismatch')
+      if (messageId) {
+        await tx.query('UPDATE hosted_usage SET "usageMessageId"=COALESCE("usageMessageId",$2) WHERE id=$1', [id, messageId])
+      }
+      const cacheValue = (value: number | null) =>
+        typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+      const cacheColumns = [cacheValue(cache?.read ?? null), cacheValue(cache?.write ?? null)]
       // Unknown cost never means free. Retain the receipt record and keep its hold
       // until the receipt is reconciled using this same method.
       if (cost === null) {
         await tx.query(
-          'UPDATE hosted_usage SET state=\'unknown\',"generationId"=COALESCE($2,"generationId") WHERE id=$1',
-          [id, generationId ?? null],
+          `UPDATE hosted_usage SET state='unknown',"generationId"=COALESCE($2,"generationId"),
+           "inputTokens"=GREATEST("inputTokens",$3),"outputTokens"=GREATEST("outputTokens",$4),
+           "cacheReadTokens"=COALESCE($5,"cacheReadTokens"),"cacheWriteTokens"=COALESCE($6,"cacheWriteTokens") WHERE id=$1`,
+          [id, generationId ?? null, inputTokens, outputTokens, ...cacheColumns],
         )
         return
       }
@@ -301,11 +311,6 @@ export class HostedUsageStore {
         throw new Error('invalid_usage_cost')
       // Never invent cache figures. Only finite nonnegative integers reach the
       // ledger; anything else is "not collected" and stays NULL.
-      const cacheRead = cache?.read ?? null
-      const cacheWrite = cache?.write ?? null
-      const cacheValue = (value: number | null) =>
-        typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
-      const cacheColumns = [cacheValue(cacheRead), cacheValue(cacheWrite)]
       // A call admitted just before the period ended keeps access to that paid
       // period's remaining grant; it never consumes a future period's allowance.
       const available = await this.balance(row.workspaceId, tx, row.createdAt)
@@ -415,6 +420,7 @@ export class HostedUsageStore {
     return (
       await this.pool.query(
         `SELECT id,model,state,"costMicroUsd","freeMicroUsd","planMicroUsd","purchasedMicroUsd","inputTokens","outputTokens","createdAt","usageWorkspaceId","billingOrganizationId" FROM hosted_usage WHERE "workspaceId"=$1
+          AND COALESCE("billingSource",'credits')='credits'
           AND ($2::uuid IS NULL OR COALESCE("usageWorkspaceId","workspaceId")=$2::uuid) ORDER BY "createdAt" DESC LIMIT 50`,
         [workspaceId, sourceWorkspaceId ?? null],
       )

@@ -16,7 +16,8 @@ export async function readResourceBudgets(query: Pick<Pool | PoolClient, 'query'
       FROM hosted_usage u WHERE ((b.scope='workspace' AND u."workspaceId"=b."workspaceId") OR COALESCE(u."usageWorkspaceId",u."workspaceId")=b."workspaceId")
       AND (b.scope='workspace' OR (b.scope='member' AND u."actorId"=b."scopeId") OR (b.scope='project' AND u."usageProjectId"::text=b."scopeId")
         OR (b.scope='thread' AND u."usageThreadId"::text=b."scopeId") OR (b.scope='run' AND u."usageRunId"::text=b."scopeId"))
-      AND u.state<>'failed' AND u."createdAt">=CASE b.period WHEN 'month' THEN date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+      AND u.state<>'failed' AND COALESCE(u."billingSource",'credits')='credits'
+      AND u."createdAt">=CASE b.period WHEN 'month' THEN date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
         WHEN 'day' THEN date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' ELSE 'epoch'::timestamptz END) usage ON true
     WHERE b."workspaceId"=ANY($1::uuid[]) ORDER BY b.scope,b."scopeId",b.period`, [workspaceIds])
   return rows.map(({ spent, held, ...row }) => { const spentPoints = spent / MICRO_USD_PER_POINT, reservedPoints = held / MICRO_USD_PER_POINT, committedPoints = spentPoints + reservedPoints

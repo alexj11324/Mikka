@@ -19,6 +19,10 @@ export type MikkaDataTypes = {
     outputTokens: number
     costUsd: number | null
     source: string
+    model?: string
+    cacheReadTokens?: number | null
+    cacheWriteTokens?: number | null
+    turnUsage?: { inputTokens: number; outputTokens: number }
   }
   /** The daemon's commit (and push) of a verified hand-in. */
   publish: RunPublish
