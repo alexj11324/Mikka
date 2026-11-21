@@ -29,6 +29,20 @@ test('non-documentation plans keep the suite that actually exercises the docs cl
   assert.deepEqual(owners, ['ci-core-7'])
 })
 
+test('approved-write policy, provider and UI regressions have one selected primary owner', async () => {
+  for (const [input, proof] of [
+    ['lib/operations/write-feature.ts', 'lib/operations/write-feature.test.ts'],
+    ['lib/operations/policy-authorization.ts', 'lib/operations/policy-authorization.test.ts'],
+    ['scripts/approved-write-actions.live.test.tsx', 'scripts/approved-write-actions.live.test.tsx'],
+  ]) {
+    const result = await pick(input)
+    const owners = result.units.filter(unit =>
+      plan.graph.dependencies[unit]?.some(edge => edge.target === sourceId(proof)))
+    assert.deepEqual(owners, ['ci-core-30'], input)
+    assert.equal(result.source, true, 'source and security checks remain required')
+  }
+})
+
 test('web component edits select their consumers without server DB or Docker', async () => {
   const result = await pick('components/settings/settings-view.tsx')
   assert.equal(result.full, false)
