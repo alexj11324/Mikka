@@ -117,8 +117,6 @@ import { runDiagnosticsEnabled, runRuntimeTimings, type RunRuntimeObservation, t
 import { baseReport, finishRun, fixedCandidateCheck, verifyAndPublish, type PublicationDeps } from './publication'
 import type { WorkspaceControl } from './workspace-control'
 
-export { baseReport, type VerifyResult } from './publication'
-
 export interface SupervisorDeps extends PublicationDeps {
   acquireWorkspaceControl?(assignment: RunAssignment, signal: AbortSignal, onLost: () => void): Promise<WorkspaceControl>
   /** Trusted candidate launcher opt-in, shared with the official CLI collector. */
@@ -926,10 +924,12 @@ export class RunSupervisor {
     report?: HandoffReport,
     failureDetails?: RunFailure,
   ) {
+    this.active.get(runId)?.toolApproval?.revoke()
+    const active = this.active.get(runId)
     finishRun({
       runId,
       journal: this.deps.journal,
-      getRun: () => this.active.get(runId),
+      active,
       closeOutput: (report, planning) => {
         this.emitPlanCards(runId, report, planning)
         this.endMessage(runId, this.active.get(runId)?.runtimeTiming?.finish())
@@ -938,8 +938,8 @@ export class RunSupervisor {
       },
       setState: (state, extra) => this.setState(runId, state, extra),
       complete: (completion) => this.push(runId, { kind: "complete", completion }),
-      cleanup: () => this.cleanupFinishedRun(runId),
     }, stopReason, error, report, failureDetails)
+    this.cleanupFinishedRun(runId)
   }
 
   private cleanupFinishedRun(runId: string) {
@@ -1681,7 +1681,7 @@ export class RunSupervisor {
           githubEnvironment: () => this.active.get(runId)?.github?.env,
           getStopReason: () => stopReasonOf(event, run, assignment),
           isStopping: () => this.stopping,
-          isCancelled: () => run.cancelRequested,
+          cancelRequested: run.cancelRequested,
           logPublishError: (error) => this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "publish failed"),
           emitPublish: (data) => this.emit(runId, { type: "data-publish", data }),
         }, event)

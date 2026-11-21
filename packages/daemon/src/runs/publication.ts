@@ -10,7 +10,7 @@ import { execa } from "execa"
 import type { AgentReport, AgentSession, ExitEvent } from "../adapters/types"
 import { retainDeliverable } from "../agents/publish"
 import { runPaths } from "../agents/run-context"
-import type { ToolApprovalGate } from "../agents/tool-approval"
+import type { VerifyResult } from "../agents/verify"
 import { buildChildEnv } from "../env"
 import { DAEMON_VERSION } from "../paths"
 import { pushDecision, runPolicy } from "../permissions"
@@ -59,13 +59,6 @@ export interface PublicationDeps {
   }
 }
 
-export interface VerifyResult {
-  exitCode: number | null
-  signal: string | null
-  timedOut: boolean
-  output: string
-}
-
 interface PublicationContext {
   deps: PublicationDeps & {
     journal: Pick<RunJournal, "get" | "update">
@@ -81,7 +74,7 @@ interface PublicationContext {
   githubEnvironment(): Record<string, string> | undefined
   getStopReason(): StopReason
   isStopping(): boolean
-  isCancelled(): boolean
+  cancelRequested: boolean
   logPublishError(error: unknown): void
   emitPublish(data: RunPublish): void
 }
@@ -89,18 +82,16 @@ interface PublicationContext {
 interface FinishContext {
   runId: string
   journal: Pick<RunJournal, "get" | "update">
-  getRun(): {
-    toolApproval?: ToolApprovalGate
+  active?: {
     cancelRequested: boolean
     forcedStop?: StopReason
     span?: SpanHandle
     safePoint?: HandoffReport["safePoint"]
     session: Pick<AgentSession, "runtimeModel"> | null
-  } | undefined
+  }
   closeOutput(report: HandoffReport, planning: boolean): void
   setState(state: RunState, extra?: { error?: string; stopReason?: StopReason }): void
   complete(completion: RunCompletion): void
-  cleanup(): void
 }
 
 const VERIFY_TIMEOUT_MS = 30 * 60_000
@@ -126,7 +117,7 @@ export async function verifyAndPublish(context: PublicationContext, event: ExitE
           : undefined)
   let outcome: Awaited<ReturnType<typeof collectReport>>
   try {
-    if (assignment.benchmark && !context.isCancelled()) {
+    if (assignment.benchmark && !context.cancelRequested) {
       const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.benchmark.sourceCommit, signal)
       if (createHash('sha256').update(fixed.sha).digest('hex') !== assignment.benchmark.fixtureDigest)
         throw new Error("Benchmark fixture changed during model execution")
@@ -173,11 +164,9 @@ export function finishRun(
   report: HandoffReport = baseReport(error),
   failureDetails?: RunFailure,
 ) {
-  const { runId, journal } = context
-  context.getRun()?.toolApproval?.revoke()
+  const { runId, journal, active } = context
   // Report collection and capture uploads can await after the provider's
   // terminal event. A stop received in that interval still owns completion.
-  const active = context.getRun()
   if (active?.cancelRequested || active?.forcedStop) {
     stopReason = active.forcedStop ?? "cancelled"
     error = undefined
@@ -217,11 +206,11 @@ export function finishRun(
       entry.skillMount.sha256 === entry.assignment.skillReceipt?.artifact.sha256
       ? { skillMount: entry.skillMount,
         ...(entry.runtime ? { runtime: { ...entry.runtime,
-          observedModel: context.getRun()?.session?.runtimeModel ?? entry.runtime.observedModel,
+          observedModel: active?.session?.runtimeModel ?? entry.runtime.observedModel,
         } } : {}),
         ...(entry.execution && entry.assignment.benchmark ? { execution: {
           ...entry.execution,
-          observedModel: context.getRun()?.session?.runtimeModel ?? entry.execution.observedModel,
+          observedModel: active?.session?.runtimeModel ?? entry.execution.observedModel,
         } } : {}),
       } : {}),
   }
@@ -260,7 +249,6 @@ export function finishRun(
       runId, appVersion: DAEMON_VERSION, sensitiveText: [entry?.assignment.prompt ?? ""],
     }) : undefined
   context.complete({ stopReason, report, ...(terminalFailure ? { failureDetails: terminalFailure } : {}) })
-  context.cleanup()
 }
 
 /**
