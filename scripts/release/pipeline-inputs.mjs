@@ -185,7 +185,7 @@ export async function priorDeployment(api, currentRun, selectedRun, target = 'st
     for (let attempt = latest.run_attempt - Number(isCurrent); attempt >= 1; attempt--) {
       const run = attempt === latest.run_attempt ? latest
         : await api(`${repository}/actions/runs/${latest.id}/attempts/${attempt}`)
-      checkedRun(run, deployment, { successful: false, automaticDeployment: target === 'staging' })
+      checkedRun(run, deployment, { successful: false, automaticDeployment: true })
       assert.equal(run.run_attempt, attempt)
       assert.ok(['workflow_run', 'workflow_dispatch'].includes(run.event))
       const jobs = await pages(api, `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs')
