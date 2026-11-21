@@ -353,7 +353,7 @@ test('desktop tabs restore once at launch without overwriting later Settings nav
       name: 'desktop-tabs-renderer-fixtures',
       setup(build) {
         build.onResolve({ filter: /^mikka:platform$/ }, () => ({ path: 'platform', namespace: 'desktop-tabs-fixture' }))
-        build.onResolve({ filter: /^next-intl$/ }, () => ({ path: 'next-intl', namespace: 'desktop-tabs-fixture' }))
+        build.onResolve({ filter: /^(?:next-intl|@\/lib\/intl\/i18n-client)$/ }, () => ({ path: 'next-intl', namespace: 'desktop-tabs-fixture' }))
         build.onResolve({ filter: /^\.\/location$/ }, args => args.importer.endsWith('/desktop-tabs.tsx') ? ({ path: 'location', namespace: 'desktop-tabs-fixture' }) : undefined)
         build.onLoad({ filter: /.*/, namespace: 'desktop-tabs-fixture' }, args => ({
           loader: 'js',

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowLeft, ArrowRight, Plus, X } from 'lucide-react'
 import { platform } from 'mikka:platform'
 import { activeHref, activateTab, addTab, closeTab, createSavedTabs, moveHistory, nextTabIndex, persistableHref, readSavedTabs, recordHistoryLocation, recordNavigation, tabLabel, writeSavedTabs } from './saved-tabs'
