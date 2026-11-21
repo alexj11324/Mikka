@@ -8,13 +8,66 @@ import { Pool } from 'pg'
 import { dbUrl } from '../../tests/support/workspace-admin-db'
 import { collectOperationalSignals } from './monitor'
 import { repairDrillFaults } from '../../scripts/ops/drill-state.mjs'
+import { CLEANUP_DUE_SQL } from '../subscription-acquire-expiry'
+import { databaseSignals } from '../../scripts/ops/monitor.mjs'
+
+test('overdue secret cleanup follows ordinary worker ownership and connection references with a five-minute grace', { skip: !dbUrl }, async t => {
+  const admin = new Pool({ connectionString: dbUrl }), schema = `ops_cleanup_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  const pool = new Pool({ connectionString: dbUrl, options: `-c search_path=${schema}`, max: 5 })
+  t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
+  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences', 'account_deletion_jobs', 'byos_enrollment_sources', 'byos_enrollment_transfers'])
+    await pool.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
+  const at = new Date()
+  const count = async (expected: number, workerCount = expected) => {
+    const signals = await databaseSignals(pool, at)
+    assert.equal(signals.databaseAvailable, 1)
+    assert.equal(signals.overdueSecretCleanup, expected)
+    assert.equal((await pool.query(CLEANUP_DUE_SQL)).rowCount, workerCount)
+  }
+  const artifact = async (owner: string, workspace = 'fixture', minutes = 10, publishedMinutes: number | null = null) => {
+    const connection = randomUUID(), name = `orphan-${randomUUID()}`
+    await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state) VALUES($1,$2,$3,'codex','disconnected')`, [connection, owner, workspace])
+    await pool.query(`INSERT INTO byos_secret_artifacts(name,"connectionId","ownerId","workspaceId",provider,kind,"notBefore","publishedAt")
+      VALUES($1,$2,$3,$4,'codex','oauth',$5,$6)`, [name, connection, owner, workspace, new Date(at.getTime() - minutes * 60_000), publishedMinutes === null ? null : new Date(at.getTime() - publishedMinutes * 60_000)])
+    return { connection, name }
+  }
+  await count(0)
+  await artifact('deleting')
+  const job = randomUUID()
+  await pool.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,plan)
+    VALUES($1,'deleting',$2,'external_pending',$3)`, [job, 'a'.repeat(64), JSON.stringify({ solo: ['solo-workspace'] })])
+  await count(0)
+  const ordinary = await artifact('ordinary')
+  await count(1)
+  await artifact('other-owner', 'SOLO-WORKSPACE')
+  await count(1)
+  const otherConnection = randomUUID()
+  await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,"secretName","secretDigest") VALUES($1,'other','fixture','codex','disconnected',$2,$3)`, [otherConnection, ordinary.name, 'a'.repeat(64)])
+  await count(1)
+  await pool.query(`UPDATE byos_connections SET "stagedSecretName"=$2,"stagedDigest"=$3 WHERE id=$1`, [ordinary.connection, ordinary.name, 'a'.repeat(64)])
+  await count(0)
+  await pool.query(`UPDATE byos_connections SET "stagedSecretName"=NULL,"stagedDigest"=NULL WHERE id=$1`, [ordinary.connection])
+  await artifact('recent', 'fixture', 2)
+  await artifact('future', 'fixture', -10)
+  await count(1, 2)
+  await artifact('published-overdue', 'fixture', -10, 10)
+  await artifact('published-recent', 'fixture', -10, 2)
+  await count(2, 4)
+  await pool.query(`UPDATE account_deletion_jobs SET stage='completed' WHERE id=$1`, [job])
+  await count(4, 6)
+  await pool.query(`UPDATE account_deletion_jobs SET stage='cancelled' WHERE id=$1`, [job])
+  await count(4, 6)
+  await pool.query(`UPDATE byos_secret_artifacts SET "deletedAt"=$1`, [at])
+  await count(0)
+})
 
 test('minute collector persists real SQL signals without a sink and keeps delivery retries separate from incident deduplication', { skip: !dbUrl }, async t => {
   const admin = new Pool({ connectionString: dbUrl }), schema = `ops_${randomUUID().replaceAll('-', '')}`
   await admin.query(`CREATE SCHEMA "${schema}"`)
   const pool = new Pool({ connectionString: dbUrl, options: `-c search_path=${schema},public`, max: 5 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
-  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences'])
+  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences', 'account_deletion_jobs'])
     await pool.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
   await pool.query(await readFile(new URL('../../drizzle/20261031050736_ops_monitor_observations.sql', import.meta.url), 'utf8'))
   let result = await collectOperationalSignals(pool)
@@ -54,7 +107,7 @@ test('fault matrix preserves failed SLO history while live wake, lease, uncertai
   await admin.query(`CREATE SCHEMA "${schema}"`)
   const pool = new Pool({ connectionString: dbUrl, options: `-c search_path=${schema},public`, max: 5 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
-  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences'])
+  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences', 'account_deletion_jobs'])
     await pool.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
   await pool.query(await readFile(new URL('../../drizzle/20261031050736_ops_monitor_observations.sql', import.meta.url), 'utf8'))
   const at = new Date(), privateMarker = `private-${randomUUID()}`, run = randomUUID(), failedRun = randomUUID(), connection = randomUUID()
