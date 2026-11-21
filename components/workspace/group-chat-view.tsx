@@ -5,7 +5,7 @@ import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { listAgents } from '@/app/actions/agents'
-import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { ChatComposer, ChatComposerAttachment } from '@/components/coordinator/chat-composer'
 import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadGroupRow, ThreadTranscriptMessage } from '@/components/slots/thread-contract'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
@@ -264,7 +264,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
       end: namedChat && readRevision !== undefined && !blockingCode && !accessRejected && <VisibleReadEnd onSeen={acknowledge} />,
     }}
       beforeComposer={referenceWorkspace && <ThreadReferencePicker key={group.id} draft={draft} workspaceId={referenceWorkspace} input={composerInput} onChange={setDraft} />}
-      composer={<ChatComposer ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
+      composer={<ChatComposer leadingControls={<ChatComposerAttachment />} ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
         model={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />} />
   </section>

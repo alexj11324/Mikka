@@ -49,7 +49,7 @@ import { ThreadCard } from './thread-card'
 import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coordinator/chat-dedupe'
 import { ActivityExpansionContext, ReplyActivity, useActivityExpansion, useThreadToolRows } from './reply-activity'
 import { CHAT_SURFACE, ChatWaiting } from '@ui-slot/chat-message'
-import { ChatComposer } from './chat-composer'
+import { ChatComposer, ChatComposerAttachment } from './chat-composer'
 import { ThreadScreen } from '@ui-slot/thread'
 import { useConversationPanels, useWorkTabs } from '@/components/coordinator/conversation-panels'
 import type { ThreadEntry, ThreadEntryPart, ThreadScrolledRow } from '@/components/slots/thread-contract'
@@ -651,7 +651,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
           loadingLabel={!data && !loadError ? tCommon('loading') : undefined}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
-          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: resuming, editableWhileSending: resuming, onSubmit: () => { void send() },
+          composer={{ ref: inputRef, leadingControls: <ChatComposerAttachment />, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: resuming, editableWhileSending: resuming, onSubmit: () => { void send() },
             attachmentScope: data?.botId ? { kind: 'bot', id: data.botId } : undefined, running: working && !stopping }}
           pending={[
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
@@ -787,9 +787,9 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       </p>}
       <PendingActions />
       {turnOptions}{queuedNotice}</>}
-        composer={<ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={resuming} editableWhileSending={resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
+        composer={<ChatComposer leadingControls={<ChatComposerAttachment />} ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={resuming} editableWhileSending={resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
-        model={<div className="flex min-w-0 items-center gap-1">
+        leftControls={<div className="flex min-w-0 items-center gap-1">
           <BotModelPicker botId={botId ?? null} running={working || sending} />
           {/* How near the next fold is (lib/coordinator/context-usage.ts). Beside the model chip,
               because both describe the next turn rather than anything already in the list. */}
