@@ -20,9 +20,30 @@ async function independent(f: Fixture) {
         assert.deepEqual(values, [f.task.id]);
         return { rows: f.attempts.filter((a) => a.taskId === values[0]) };
       }
-      assert.match(sql, /FROM factory_questions WHERE "continuationRunId"=\$1/);
+      if (sql.includes("FROM factory_questions")) {
+        assert.match(
+          sql,
+          /FROM factory_questions WHERE "continuationRunId"=\$1/,
+        );
+        return {
+          rows: f.questions.filter(
+            (q) =>
+              q.continuationRunId === values[0] ||
+              q.result.continuationRunId === values[0],
+          ),
+        };
+      }
+      assert.match(sql, /FROM factory_events e/);
+      assert.equal(values[0], f.task.id);
+      const events = (
+        f as unknown as {
+          events?: { result?: { continuationRunId?: string } }[];
+        }
+      ).events ?? [];
       return {
-        rows: f.questions.filter((q) => q.continuationRunId === values[0]),
+        rows: events.filter(
+          (e) => e.result?.continuationRunId === values[1],
+        ),
       };
     },
   } as unknown as Parameters<typeof factoryCheckIndependent>[0];
@@ -113,6 +134,7 @@ const corruptions: Record<string, (f: Fixture) => void> = {
   },
   "durable continuation link missing": (f) => {
     f.questions[0].continuationRunId = uuid(90);
+    f.questions[0].result.continuationRunId = uuid(90);
   },
   "run continuation metadata missing": (f) => {
     f.attempts.at(-1)!.run.questionContinuation = null;

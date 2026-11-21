@@ -87,6 +87,7 @@ test(
       CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,kind text,"retryOf" uuid,status text,"stopReason" text,"stopRequestedAt" timestamptz,"agentId" uuid,"deviceId" uuid,"deviceRepoId" uuid,"baseBranch" text,"questionContinuation" jsonb);
       CREATE TABLE factory_attempts(id uuid PRIMARY KEY,"taskId" uuid,stage text,ordinal int,position int,status text,"candidateId" uuid,"runId" uuid UNIQUE,"sessionId" text,output jsonb);
       CREATE TABLE factory_questions(id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"taskId" uuid,"attemptId" uuid,"candidateId" uuid,stage text,"originRunId" uuid,"originSessionId" text,"originRevision" int,"waitingBinding" jsonb,status text,"answerId" uuid,"answerSource" text,"answerFingerprint" text,"answeredAt" timestamptz,"continuationRunId" uuid UNIQUE,result jsonb);
+      CREATE TABLE factory_events("taskId" uuid,request jsonb,result jsonb);
     `);
       async function seed(f: Graph) {
         const tx = await pool.connect();

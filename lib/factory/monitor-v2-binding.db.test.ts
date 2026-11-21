@@ -65,7 +65,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
       // Synthetic current monitor assignment; actual ancestry predicate and
       // publication reader are both executed. No #192 runtime is substituted.
       await tx.query(await readFile(new URL("../../drizzle/20261029044005_factory_195_monitor.sql", import.meta.url), "utf8"));
-      await tx.query('CREATE TABLE factory_questions ("continuationRunId" uuid)');
+      await tx.query('CREATE TABLE factory_questions (id uuid,"taskId" uuid,"continuationRunId" uuid,result jsonb)');
       const monitorRun = randomUUID(), monitorAttempt = randomUUID();
       await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","workspaceId","sessionId",status,kind) VALUES($1,$2,$3,$5,$4,'succeeded','acceptance')`, [monitorRun,f.actor.userId,r.issueId,"synthetic-monitor",f.workspaceId]);
       await tx.query(`INSERT INTO factory_attempts(id,"taskId","candidateId",stage,position,"runId","sessionId",status) VALUES($1,$2,$3,'monitor',5,$4,$5,'running')`, [monitorAttempt,x.task.id,r.candidateId,monitorRun,"synthetic-monitor"]);
