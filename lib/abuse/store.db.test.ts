@@ -156,6 +156,25 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [id])
     return id
   }
+  await t.test('owner-only Decisions reservations attribute member spend and enforce the member budget', async () => {
+    const { hostedBillingScope } = await import('./context')
+    const { readResourceBudgets, resourceBudgetAdmission } = await import('../billing/resource-budgets')
+    const workspaceId = await verified(), ownerId = `owner-${randomUUID()}`, call = randomUUID()
+    const attribution = { workspaceId, billingAccountWorkspaceId: workspaceId, ownerId, attributionComplete: true }
+    await pool.query(`insert into billing_resource_budgets (id,"workspaceId",scope,"scopeId",period,"limitPoints","warningPercent","updatedBy") values($1,$2,'member',$3,'month',10,50,$3)`, [randomUUID(), workspaceId, ownerId])
+    await hostedBillingScope.run(attribution, () => store.reserve(workspaceId, 'mikka-decision', call))
+    assert.equal((await pool.query('select "actorId" from hosted_usage where id=$1', [call])).rows[0].actorId, ownerId)
+    await store.settle(call, 100_000)
+    const [budget] = await readResourceBudgets(pool, [workspaceId])
+    assert.equal(budget.spentPoints, 10)
+    assert.equal(await resourceBudgetAdmission(pool, workspaceId, attribution, 1), false)
+    await hostedBillingScope.run(attribution, () => assert.rejects(store.reserve(workspaceId, 'Decisions', randomUUID()), /usage_budget_exhausted/))
+    const other = { ...attribution, actorId: `other-${randomUUID()}` }
+    const otherCall = randomUUID()
+    await hostedBillingScope.run(other, () => store.reserve(workspaceId, 'Decisions', otherCall))
+    assert.equal((await pool.query('select "actorId" from hosted_usage where id=$1', [otherCall])).rows[0].actorId, other.actorId)
+    await store.settle(otherCall, 0)
+  })
   await t.test('plan points are usable, settle once across an expiry boundary, and leave purchased balances intact', async () => {
     const id = await verified(), grant = randomUUID(), call = randomUUID()
     await pool.query('update hosted_allowances set remaining=0 where "workspaceId"=$1', [id])

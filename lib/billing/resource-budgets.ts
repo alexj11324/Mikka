@@ -28,7 +28,7 @@ export async function readResourceBudgets(query: Pick<Pool | PoolClient, 'query'
 
 export async function resourceBudgetAdmission(query: Pick<Pool | PoolClient, 'query'>, accountWorkspaceId: string, attribution: BillingAttribution, estimate: number, requireCompleteAttribution = true): Promise<boolean> {
   const budgets = await readResourceBudgets(query, [...new Set([accountWorkspaceId, attribution.workspaceId])])
-  const scopeIds: Record<BudgetScope, string | null | undefined> = { workspace: attribution.workspaceId, member: attribution.actorId,
+  const scopeIds: Record<BudgetScope, string | null | undefined> = { workspace: attribution.workspaceId, member: attribution.actorId ?? attribution.ownerId,
     project: attribution.projectId, thread: attribution.threadId, run: attribution.runId }
   for (const budget of budgets) {
     if (budget.scope !== 'workspace') {
