@@ -83,11 +83,37 @@ export class ObjectStorageReadError extends Error {
   }
 }
 
-/** The object's bytes, for binary files such as run captures. */
-export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<ArrayBuffer>> {
+/** What the bucket says about an object, learned without reading its bytes. */
+export interface ArtifactObjectHead {
+  /** The stored byte length, or null when the provider reports none. */
+  size: number | null
+}
+
+/** An object's own metadata, without downloading it; null when the key holds nothing. */
+export async function headArtifactObject(key: string): Promise<ArtifactObjectHead | null> {
   const config = objectStorageConfig()
   if (!config) throw new Error('Object storage is not configured')
-  const response = await config.client.fetch(objectUrl(config, key), { redirect: 'error' })
+  const response = await config.client.fetch(objectUrl(config, key), { method: 'HEAD', redirect: 'error' })
+  if (response.status === 404) return null
+  if (!response.ok) throw new ObjectStorageReadError(response.status)
+  const length = response.headers.get('content-length')
+  const size = length === null ? Number.NaN : Number(length)
+  return { size: Number.isSafeInteger(size) && size >= 0 ? size : null }
+}
+
+/**
+ * The object's bytes, for binary files such as run captures. `maxBytes` bounds
+ * what is buffered: the bucket returns at most one byte past it, so an object
+ * that grew after its metadata was read still cannot be loaded whole.
+ */
+export async function getArtifactObjectBytes(key: string, maxBytes?: number): Promise<Uint8Array<ArrayBuffer>> {
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
+  const response = await config.client.fetch(objectUrl(config, key), {
+    redirect: 'error', ...(maxBytes === undefined ? {} : { headers: { range: `bytes=0-${maxBytes}` } }),
+  })
+  // A range the object cannot satisfy means it holds nothing at all.
+  if (maxBytes !== undefined && response.status === 416) return new Uint8Array()
   if (!response.ok) throw new ObjectStorageReadError(response.status)
   return new Uint8Array(await response.arrayBuffer())
 }
@@ -103,13 +129,18 @@ export async function deleteArtifactObject(key: string, signal?: AbortSignal): P
  * A URL that lets its holder repeatedly PUT the same object key, with these
  * headers, for `seconds`. Callers must not expose this key as immutable
  * evidence: the holder can overwrite it until the signature expires.
+ *
+ * `contentLength` is signed along with the type, so the bucket itself refuses
+ * a body of any other size with a signature mismatch. aws4fetch would drop
+ * both headers on its own (`UNSIGNABLE_HEADERS`); `allHeaders` keeps them in
+ * `X-Amz-SignedHeaders`, which R2 and S3 both verify.
  */
-export async function presignArtifactPut(key: string, contentType: string, seconds: number): Promise<{ url: string; headers: Record<string, string> }> {
+export async function presignArtifactPut(key: string, contentType: string, seconds: number, contentLength: number): Promise<{ url: string; headers: Record<string, string> }> {
   const config = objectStorageConfig()
   if (!config) throw new Error('Object storage is not configured')
   const url = new URL(objectUrl(config, key))
   url.searchParams.set('X-Amz-Expires', String(seconds))
-  const headers = { 'content-type': contentType }
+  const headers = { 'content-type': contentType, 'content-length': String(contentLength) }
   const signed = await config.client.sign(url.toString(), { method: 'PUT', headers, aws: { signQuery: true, allHeaders: true } })
   return { url: signed.url, headers }
 }

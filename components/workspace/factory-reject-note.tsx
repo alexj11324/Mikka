@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -32,7 +32,7 @@ export function RejectNoteBody({ flow, onEdit, onSubmit, onCancel, mobile }: Rej
   const failed = flow.phase === 'failed'
   const Footer = mobile ? DrawerFooter : DialogFooter
   const fields = <div className="flex flex-col gap-3">
-    {failed && <div className="animate-in fade-in-0 slide-in-from-top-1 duration-150 motion-reduce:slide-in-from-top-0"><Alert variant="destructive"><AlertTitle>{t('rejectFailed')}</AlertTitle></Alert></div>}
+    {failed && <div className="animate-in fade-in-0 slide-in-from-top-1 duration-(--motion-fast) motion-reduce:slide-in-from-top-0"><Alert variant="destructive"><AlertTitle>{t('rejectFailed')}</AlertTitle></Alert></div>}
     <Textarea aria-label={t('rejectNote')} value={flow.note} readOnly={submitting} onChange={event => onEdit(event.target.value)} />
   </div>
   return <>

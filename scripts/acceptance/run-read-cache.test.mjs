@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { channel } from 'node:diagnostics_channel'
 import { readFile } from 'node:fs/promises'
 import { mock, test } from 'node:test'
-import { NextRequest } from 'next/server.js'
+import { NextRequest } from '../../lib/server-runtime/server.ts'
 import { TestAccountError } from '../test-accounts/pool.mjs'
 import { ReadCacheDiagnosticError } from './read-cache.mjs'
 import { createOwnedRuntimeObserver, loadOwnedDiagnosticSources, observeOwnedRequests, prepareAttestationRoute, prepareLandingRoute, publicOwnedFailure } from './run-read-cache.mjs'
@@ -225,9 +225,10 @@ test('the workflow binds the canonical NextRequest origin before signing the env
   assert.ok(authOrigin); assert.equal(authOrigin, baseOrigin)
   const route = new NextRequest(`${authOrigin}/mikka/api/test-environment?challenge=${'a'.repeat(64)}`)
   assert.equal(new URL(route.url).origin, authOrigin, 'the route checks an exact origin before it reads the HMAC key')
-  // NextRequest normalizes IPv4 loopback even when Next's listener was bound
-  // to it explicitly. Keep database identity separate from the HTTP origin.
-  assert.equal(new URL(new NextRequest('http://127.0.0.1:3137/mikka/api/test-environment').url).hostname, 'localhost')
+  // Next's NextRequest rewrote IPv4 loopback to `localhost`; the runtime this
+  // repository owns keeps the host it was handed. Database identity therefore
+  // stays separate from the HTTP origin by configuration, not by URL rewriting.
+  assert.equal(new URL(new NextRequest('http://127.0.0.1:3137/mikka/api/test-environment').url).hostname, '127.0.0.1')
   for (const name of ['E2E_DATABASE_URL', 'MIKKA_DATABASE_URL', 'DATABASE_URL']) {
     const value = new RegExp(`^\\s+${name}: (\\S+)$`, 'm').exec(workflow)?.[1]
     assert.ok(value); assert.equal(new URL(value).hostname, '127.0.0.1')

@@ -16,7 +16,11 @@ import { readBoundary, readFresh } from '@/lib/swr/read-observer'
 const LiveContext = createContext<{ channels: LiveChannelRegistry; ownerId: string; workspaceId?: string; namespace: string | null; share?: (scope: string | null) => TabShare | null } | null>(null)
 
 /** Live reads opt in to taking another tab's result (lib/live/tab-share.ts). */
-export type LiveKeyOptions = LiveSubscriptionOptions & { shareAcrossTabs?: boolean }
+export type LiveKeyOptions = LiveSubscriptionOptions & {
+  shareAcrossTabs?: boolean
+  /** Bound SWR Infinite mutation refreshes the loaded cursor pages of this aggregate. */
+  revalidate?: () => Promise<unknown>
+}
 
 /** The cache namespace includes the authorized owner, selected workspace,
  * build and role. The live transport's personal home alone is not a tenant:
@@ -65,6 +69,7 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
   const channels = context?.channels
   const scope = workspaceId === undefined ? context?.workspaceId ?? null : workspaceId
   const { cache, mutate } = useSWRConfig()
+  const revalidate = options?.revalidate
   const share = options?.shareAcrossTabs ? context?.share : undefined
   const ownerId = context?.ownerId
   const namespace = context?.namespace
@@ -84,7 +89,7 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
   const deadlineObservation = options?.deadline?.observation
   const presenceKey = JSON.stringify(options?.presence)
   const active = useRef<LiveSubscription[]>([])
-  const lifetime = useMemo(() => ({}), [channels, scope, references, serialized, cache, mutate, share, ownerId, namespace])
+  const lifetime = useMemo(() => ({}), [channels, scope, references, serialized, cache, mutate, revalidate, share, ownerId, namespace])
   const currentLifetime = useRef(lifetime)
   currentLifetime.current = lifetime
   useEffect(() => {
@@ -101,7 +106,7 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
         const accepts = (data: unknown) => coversLiveRevisions(data, requiredRevisions)
           && coversLiveRevisions(data, heldAtStart)
           && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
-        const read = () => readFresh(cache, key, after, () => mutate(key), accepts, current)
+        const read = () => readFresh(cache, key, after, revalidate ?? (() => mutate(key)), accepts, current)
         if (!share || !authorized()) return read()
         const tabs = share(channelScope)
         if (!tabs) return read()
@@ -125,7 +130,7 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
     }
     // Timing options update the existing handles below. Only an actual scope,
     // entity, cache key or refresh owner change needs a new initial read.
-  }, [channels, scope, references, serialized, cache, mutate, share, ownerId, namespace, lifetime])
+  }, [channels, scope, references, serialized, cache, mutate, revalidate, share, ownerId, namespace, lifetime])
   useEffect(() => {
     active.current.forEach((subscription, index) => subscription.update(optionsFor(index)))
     // optionsFor reads the refs set above.

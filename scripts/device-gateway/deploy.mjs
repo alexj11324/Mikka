@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 import { affectsWorker } from './select-release.mjs'
 import { parsePromotionRecord, readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 
@@ -39,8 +40,21 @@ export function validateConfig(text) {
 }
 
 /** API settings contain binding metadata; the secret's value is neither needed nor read back. */
+export function sessionReportURLValid(text) {
+  try {
+    const url = new URL(text)
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash
+      && url.pathname.endsWith('/v1/internal/device-sessions')
+  } catch { return false }
+}
+
+/** The session report URL (decision 2026-11-17-2215) is a plain var kept by
+ * --keep-vars; without it no device would come online, so the release stops. */
 export function existingWorker(settings, service) {
-  if (!Array.isArray(settings?.bindings) || settings.bindings.length !== 2) fail('gateway_bindings_mismatch')
+  if (!Array.isArray(settings?.bindings)) fail('gateway_bindings_mismatch')
+  const report = settings.bindings.find(binding => binding.name === 'DEVICE_SESSION_REPORT_URL')
+  if (report?.type !== 'plain_text' || !sessionReportURLValid(report.text)) fail('gateway_session_report_url_required')
+  if (settings.bindings.length !== 3) fail('gateway_bindings_mismatch')
   const session = settings.bindings.find(binding => binding.name === 'DEVICE_SESSION')
   const secret = settings.bindings.find(binding => binding.name === 'GATEWAY_PUSH_SECRET')
   if (session?.type !== 'durable_object_namespace' || session.class_name !== 'DeviceSession'
@@ -112,7 +126,7 @@ export function gitRepository(cwd = ROOT) {
   return {
     async refreshMain() {
       // Public repo, no stored Git credential. Fetch only the reviewed main ref.
-      await git(['fetch', '--quiet', '--no-tags', 'https://github.com/alexj11324/Mikka.git', 'refs/heads/main'])
+      await git(['fetch', '--quiet', '--no-tags', 'https://github.com/' + (actionsMikkaRepository(process.env) || 'alexj11324/Mikka') + '.git', 'refs/heads/main'])
       return git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'])
     },
     async contains(ancestor, descendant) {
@@ -200,7 +214,7 @@ async function wranglerDeploy(sourceCommit, { accountId, cloudflareToken }) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'
+    if (process.env.GITHUB_ACTIONS !== 'true' || !actionsMikkaRepository(process.env)
       || process.env.GITHUB_REF !== 'refs/heads/main' || !['push', 'workflow_dispatch'].includes(process.env.GITHUB_EVENT_NAME)) fail('reviewed_main_workflow_required')
     const report = await deployGateway({ sourceCommit: process.env.GITHUB_SHA, accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
       cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN })

@@ -1,7 +1,9 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { apiKeyAfterQuota, botApiKeyChoice, usableApiKeys } from '@/lib/model-api-keys'
-import { apiKeyHarnesses, type ApiKeyView } from '@/lib/model-api-key-providers'
+import { apiKeyChatBaseUrl, apiKeyHarnesses, type ApiKeyView } from '@/lib/model-api-key-providers'
+import { isCatalogId, vendorOf } from '@/lib/model-catalog'
+import { gatewayLiteLlm } from '@/lib/model-gateway/config'
 import { subscriptionAvailability } from './subscription-quota'
 
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -12,19 +14,46 @@ export interface RunApiKey { keyId: string; model: string }
 interface Binding { id: string; ownerId: string; connectionId: string; connectionRevision: number; modelId?: string }
 
 /**
- * The keys a run may use, as `apiKeyForRun` checks them at claim: in a bot's
+ * The keys a run may use, as `validateRunApiKey` checks them at claim: in a bot's
  * workspace its owner's own keys, then teammates' shared ones; with no bot
  * (the Coordinator), the owner's own keys only.
  */
-async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[]> {
+type RunKey = Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models' | 'baseUrl'>
+async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<RunKey[]> {
   if (botWorkspaceId) return usableApiKeys(query, ownerId, botWorkspaceId)
-  return (await query.query<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>>('SELECT id,provider,protocol,"responsesApi",models FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
+  return (await query.query<RunKey>('SELECT id,provider,protocol,"responsesApi",models,"baseUrl" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
+}
+
+/**
+ * The Agents a key can run through the Mikka model gateway: with LiteLLM
+ * converting protocols (decision 2026-11-15-2000), any key whose provider
+ * speaks Chat Completions serves both Claude Code and Codex.
+ */
+export function runKeyHarnesses(key: Pick<ApiKeyView, 'provider' | 'protocol' | 'responsesApi' | 'baseUrl'>, env: Record<string, string | undefined> = process.env): string[] {
+  const native = apiKeyHarnesses(key)
+  return gatewayLiteLlm(env) && apiKeyChatBaseUrl(key) ? Array.from(new Set([...native, 'claude_code', 'codex'])) : native
+}
+
+/** The presets that sell a catalogue vendor's models under their own ids. */
+const VENDOR_PRESET: Record<string, ApiKeyView['provider']> = { anthropic: 'anthropic', openai: 'openai', deepseek: 'deepseek', moonshotai: 'kimi' }
+
+/**
+ * The person's key for a catalogue model (`vendor/model`): a preset key of that
+ * vendor listing the model under its own id. "Same model, another source"
+ * (decision 2026-11-15-1900): a key the person pays for comes before Mikka 额度.
+ */
+function keyForCatalogModel(keys: RunKey[], harness: string, model: string): RunApiKey | undefined {
+  const vendor = vendorOf(model), preset = VENDOR_PRESET[vendor]
+  if (!preset) return
+  const native = model.slice(model.indexOf('/') + 1)
+  const key = keys.find(item => item.provider === preset && item.models.includes(native) && runKeyHarnesses(item).includes(harness))
+  return key ? { keyId: key.id, model: native } : undefined
 }
 
 /** The first compatible key serving the asked model; a default is chosen only with no model. */
-function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[], harness: string, model?: string): RunApiKey | undefined {
+function firstKey(keys: RunKey[], harness: string, model?: string): RunApiKey | undefined {
   for (const key of keys) {
-    if (!apiKeyHarnesses(key).includes(harness as never)) continue
+    if (!runKeyHarnesses(key).includes(harness)) continue
     const chosen = model ? key.models.includes(model) ? model : undefined : key.models[0]
     if (chosen) return { keyId: key.id, model: chosen }
   }
@@ -37,8 +66,8 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'respo
  * An entry of 优先使用的模型 that names its key (`keyId`) runs on that key when
  * the run may use it and it serves the model, whatever other key lists the model too.
  */
-async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[], harness: string, model: string, keyId?: string, subscription?: Binding | null): Promise<RunApiKey | undefined> {
-  const serves = (item: Pick<ApiKeyView, 'provider' | 'protocol' | 'responsesApi' | 'models'>) => apiKeyHarnesses(item).includes(harness as never) && item.models.includes(model)
+async function keyOnlyModel(query: Query, ownerId: string, keys: RunKey[], harness: string, model: string, keyId?: string, subscription?: Binding | null): Promise<RunApiKey | undefined> {
+  const serves = (item: RunKey) => runKeyHarnesses(item).includes(harness) && item.models.includes(model)
   if (keyId) {
     const named = keys.find(item => item.id === keyId)
     if (named && serves(named)) return { keyId: named.id, model }
@@ -81,7 +110,7 @@ async function subscriptionState(query: Query, binding: Binding, harness: string
  * kept as found, so nothing changes for a person without one. On a device
  * the CLI's own login counts as a subscription: only the bot's saved key
  * choice runs on a key there. The key is
- * not opened here: only `apiKeyForRun` does, at claim.
+ * not opened here: the model gateway opens it for each authorized request.
  */
 export async function runCredentialSource<S extends Binding>(query: Query, input: {
   ownerId: string; botId: string | null; harness: string; model?: string
@@ -92,10 +121,17 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   subscription: S | null
   /** A device run: the device's own CLI login is a subscription too, so only the bot's saved key choice uses a key. */
   localLogin?: boolean
-}): Promise<{ subscription: S | null; apiKey?: RunApiKey }> {
+}): Promise<{ subscription: S | null; apiKey?: RunApiKey; credits?: { model: string } }> {
   const kept = { subscription: input.subscription }
   if (input.harness !== 'codex' && input.harness !== 'claude_code') return kept
   const keys = await runKeys(query, input.ownerId, input.botWorkspaceId)
+  // A catalogue model with no subscription named runs on the person's key for
+  // that same model, else on Mikka 额度 through the model gateway (decision 2026-11-15-2000).
+  if (input.model && !input.subscription && isCatalogId(input.model) && !keys.some(key => key.models.includes(input.model!))) {
+    const named = input.keyId ? keys.find(key => key.id === input.keyId) : undefined
+    const keyed = named ? keyForCatalogModel([named], input.harness, input.model) : keyForCatalogModel(keys, input.harness, input.model)
+    return keyed ? { subscription: null, apiKey: keyed } : { subscription: null, credits: { model: input.model } }
+  }
   if (!keys.length) return kept
   // A thread's explicit model/key is independent of the Bot chat preference.
   const choiceWorkspaceId = !input.model && !input.keyId ? typeof input.choiceWorkspaceId === 'function' ? await input.choiceWorkspaceId() : input.choiceWorkspaceId : null

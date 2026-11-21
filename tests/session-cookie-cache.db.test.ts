@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
-import test, { mock } from 'node:test'
+import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Pool, type PoolClient } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -27,13 +27,12 @@ test('a session read uses the 5-minute cookie cache; money, permission and crede
   database.connect = ((callback?: (error: Error | undefined, client: PoolClient | undefined, done: () => void) => void) => callback
     ? connect((error, client, done) => callback(error, client ? count(client) : client, done))
     : connect().then(count)) as typeof database.connect
-  mock.module('next/headers.js', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set: () => {}, get: () => undefined }) } })
-  const [{ betterAuth }, { nextCookies }, fresh] = await Promise.all([import('better-auth'), import('better-auth/next-js'), import('../lib/fresh-session')])
+  const [{ betterAuth }, { mikkaCookies }, fresh] = await Promise.all([import('better-auth'), import('../lib/auth-cookies'), import('../lib/fresh-session')])
   assert.equal(fresh.SESSION_OPTIONS.cookieCache.maxAge, 300)
   const origin = 'http://localhost:3188', password = `fixture-${randomBytes(20).toString('hex')}`, email = `cookie-cache-${randomUUID()}@example.invalid`
   const make = (maxAge: number) => {
     const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
-      emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [nextCookies()],
+      emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [mikkaCookies()],
       session: { ...fresh.SESSION_OPTIONS, cookieCache: { ...fresh.SESSION_OPTIONS.cookieCache, maxAge } } })
     fresh.readFreshSessionsInScope(auth.api)
     return auth

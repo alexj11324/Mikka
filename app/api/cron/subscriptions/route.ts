@@ -5,7 +5,6 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { subscriptionCleanupDue } from '@/lib/subscription-acquire-expiry'
 import { byosEnabled, byosEnrollmentEnabled } from '@/lib/cloud-computer-flag'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /** BYOS-only durable deletion queue, called hourly by the minute Worker (#1371): abandoned sign-ins past their

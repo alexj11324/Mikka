@@ -235,7 +235,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               if(command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')){
                 assert.ok(bootstrap);assert.equal(bootstrap.deviceId,f.prior.device);
                 await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`,[bootstrap.deviceId,createHash('sha256').update(bootstrap.credential).digest('hex')]);
-                await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`,[bootstrap.deviceId]);
+                await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`,[bootstrap.deviceId]);
               }
               return {stdout:command.includes(REGISTRATION_COMPLETE)?REGISTRATION_COMPLETE+'\n':'',stderr:'',exitCode:0};
             }}} as never;
@@ -412,7 +412,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
             } else if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap); assert.equal(bootstrap.deviceId, f.prior.device);
               await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
-              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
+              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`, [bootstrap.deviceId]);
               steps.push('registered');
               stdout = REGISTRATION_COMPLETE + '\n';
             } else if (command.includes('mikka-runtime-process-verified')) {
@@ -461,7 +461,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const definition = retryWorkerDefinition(originDefinition, 'Fixture\nOwner answer')!;
       await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.prior.runId, originDefinition]);
       await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.next, definition]);
-      await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true}]',"lastSeenAt"=clock_timestamp() WHERE id=$1`, [f.prior.device]);
+      await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true}]',"lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`, [f.prior.device]);
       return { ...f, eventId, definition, candidateId, originAttemptId, answerId, taskBot };
     };
 
@@ -1244,7 +1244,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
-              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
+              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1`, [bootstrap.deviceId]);
               authenticated++;
               // Make the historical late floor observably later than this real authentication.
               await pool.query('SELECT pg_sleep(0.02)');
@@ -1287,7 +1287,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
           const used = await pool.query('UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id',
             [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
           assert.equal(used.rowCount, 1, 'the credential transaction is committed before provider publication');
-          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1', [bootstrap.deviceId]);
+          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1', [bootstrap.deviceId]);
           if (mode === 'revoked_before_finish') await pool.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp() WHERE "boundDeviceId"=$1', [bootstrap.deviceId]);
           return { stdout: REGISTRATION_COMPLETE + '\n', stderr: '', exitCode: 0 };
         };
@@ -1725,6 +1725,17 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.deepEqual((await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0], original, blocked);
         assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt, null, blocked);
       }
+    });
+
+    await t.test('a manual pause reports a conflict if the machine binding changed before parking', async () => {
+      const before = await parked(await task());
+      const { epoch } = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+      await pool.query(`UPDATE thread_machines SET state='running',epoch=epoch+1 WHERE "runId"=$1`, [before.runId]);
+      await assert.rejects(
+        threadMachineAction(pool, actor, before.runId, 'pause', { epoch, sandboxId: before.sandboxId }),
+        { status: 409 },
+      );
+      assert.equal((await machine(before.runId)).state, 'running');
     });
 
     await t.test('an admitted adjacent stage keeps the same live VM and fences old lifecycle callbacks', async () => {

@@ -9,8 +9,9 @@ import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
 import { threadUnread } from './thread-reads'
 import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
+import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { threadName } from './issue-threads'
-import { pullRequestSchema, type IssuePullRequest } from './issue-metadata'
+import { directoryPullSchema, type DirectoryPull } from './conversation-directory-input'
 import { threadTitle } from './short-title'
 
 type Row = {
@@ -40,7 +41,8 @@ function conversationQuery() {
     SELECT 'run'::text AS kind,delivered.pulls,root.id,EXISTS (SELECT 1 FROM assigned receipt JOIN agent_runs ON agent_runs.id=receipt.id
       LEFT JOIN conversation_reads ON conversation_reads."userId"=${owner} AND conversation_reads."conversationId"='run:' || agent_runs.id::text
       WHERE receipt.root=root.id AND NOT receipt."depthExceeded" AND (${unread.sql})) AS unread, coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
-      root."issueId",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
+      root."issueId",root.kind AS "runKind",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
+      agent_runs."deviceId" AS "currentDeviceId", root."threadReplacedBy" IS NOT NULL AS replaced,
       root."conversationPinnedAt" IS NOT NULL AS pinned,root."conversationArchivedAt" AS manual,
       root."conversationRestoredAt" AS restored,latest.touched,root.source,
       CASE WHEN root."promptTaskStart">=0 AND root."promptTaskLength" BETWEEN 0 AND length(root.prompt)-root."promptTaskStart"::bigint
@@ -67,10 +69,12 @@ function conversationQuery() {
       WHERE agent_runs.id=root.id LIMIT 1) bot ON true
       CROSS JOIN LATERAL (
         SELECT coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
-          'url',pr->'url','title',pr->'title','state',pr->'state','additions',pr->'additions','deletions',pr->'deletions'
+          'url',pr->'url','title',pr->'title','state',pr->'state','additions',pr->'additions','deletions',pr->'deletions',
+          'head',pr->'branch','headSha',pr->'headSha','author',pr->'author',
+          'createdAt',coalesce(pr->'createdAt',to_jsonb(to_char(published AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')))
         )) ORDER BY pr->>'url'), '[]'::jsonb) AS pulls
         FROM (
-          SELECT DISTINCT ON (p."pullRequest"->>'url') p."pullRequest" AS pr
+          SELECT DISTINCT ON (p."pullRequest"->>'url') p."pullRequest" AS pr,p."createdAt" AS published
           FROM assigned a JOIN run_publications p ON p."runId"=a.id
           WHERE a.root=root.id AND NOT a."depthExceeded" AND p."userId"=${owner}
             AND p."issueId"=root."issueId" AND p.status='published'
@@ -107,6 +111,30 @@ function conversationQuery() {
   )`
 }
 
+/** Human device view over the same first-class roots and Task ACL as the thread directory. */
+export async function activeThreadsOnOwnedDevice(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, deviceId: string, after?: string) {
+  const { userId } = taskReaderScope(reader)
+  return withConversationWorkspace(reader, workspaceId, async () => {
+    const values = [...facts.params, userId, workspaceId, RUN_CHAIN_MAX_DEPTH]
+    const device = '$' + values.push(deviceId)
+    const statuses = '$' + values.push([...UNFINISHED_RUN_STATUSES])
+    const cursor = '$' + values.push(after ?? null)
+    const result = await database.query(conversationQuery() + `
+      SELECT v.id, v."runStatus" AS status FROM devices d
+      LEFT JOIN LATERAL (
+        SELECT id,"runStatus" FROM roots WHERE "currentDeviceId"=d.id
+          AND NOT replaced AND "runStatus"=ANY(${statuses}::text[])
+          AND (${cursor}::uuid IS NULL OR id>${cursor}::uuid)
+        ORDER BY id LIMIT 101
+      ) v ON true
+      WHERE d.id=${device} AND d."ownerId"=$${facts.params.length + 1}
+        AND d.kind='local' AND d."removedAt" IS NULL ORDER BY v.id`, values)
+    if (!result.rows.length) return null
+    const threads = result.rows.slice(0, 100).flatMap(row => row.id ? [{ id: String(row.id), status: String(row.status) }] : [])
+    return { threads, cursor: result.rows.length > 100 ? threads.at(-1)!.id : null }
+  })
+}
+
 export async function effectiveStandaloneOrganization(database: RunChainQueryable, owner: string, workspace: string, id: string) {
   requireTaskWorkspaceLease(owner, workspace)
   const result = await database.query(conversationQuery() + ' SELECT archived,pinned FROM named_chats WHERE id=$' + (facts.params.length+4),
@@ -126,8 +154,8 @@ function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
   const first = linkedTasks?.[0]
   return {
     ...(linkedTasks?.length ? { linkedTasks } : {}),
-    pulls: row.pulls.flatMap((raw): IssuePullRequest[] => {
-      const parsed = pullRequestSchema.safeParse(raw)
+    pulls: row.pulls.flatMap((raw): DirectoryPull[] => {
+      const parsed = directoryPullSchema.safeParse(raw)
       return parsed.success ? [parsed.data] : []
     }),
     kind: row.kind, id: row.id, issueId: first?.id ?? row.issueId,
@@ -139,15 +167,19 @@ function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
   }
 }
 
-export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+/** `projectIssueIds` is the caller's authorized read of `input.projectId` (projects live in the workspace database). */
+export type DirectoryScope = { projectIssueIds?: string[] }
+
+export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput, scope?: DirectoryScope): Promise<ConversationDirectoryPage> {
   const { userId } = taskReaderScope(reader)
-  return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw)) ?? { items: [], cursor: null }
+  return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw, scope)) ?? { items: [], cursor: null }
 }
 
-async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput, scope?: DirectoryScope): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
+  if (input.projectId && !scope?.projectIssueIds) throw new Error('conversationDirectoryProjectUnresolved')
   const param = (i: number) => '$' + (facts.params.length + i)
-  const [archived,bot,search,state,id,pinned,at,pullState,kind] = Array.from({length:9}, (_,i) => param(4+i))
+  const [archived,bot,search,state,id,pinned,at,pullState,kind,project,since,automation] = Array.from({length:12}, (_,i) => param(4+i))
   const statement = conversationQuery() + `, candidates AS (
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,pinned,touched,asked,state,at,archived,"botId" FROM visible
     UNION ALL
@@ -157,11 +189,15 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   ) SELECT * FROM candidates WHERE (${archived}::boolean IS NULL OR archived=${archived})
     AND (${pullState}='all' OR (${pullState}='linked' AND jsonb_array_length(pulls)>0) OR pulls @> jsonb_build_array(jsonb_build_object('state',${pullState}::text)))
     AND (${bot}::uuid IS NULL OR "botId"=${bot}) AND (${state}='all' OR state=${state})
+    AND (${project}::uuid[] IS NULL OR "issueId"=ANY(${project}::uuid[]))
+    AND (${since}::timestamptz IS NULL OR EXISTS (SELECT 1 FROM jsonb_array_elements(pulls) pull WHERE (pull->>'createdAt')::timestamptz>=${since}::timestamptz))
+    AND (${automation}::uuid IS NULL OR (kind='run' AND EXISTS (SELECT 1 FROM issues made WHERE made.id=candidates."issueId" AND made.source_schedule_id=${automation}::uuid)))
     AND (${search}='' OR strpos(lower(coalesce(title,nullif(trim(asked),''),"taskTitle","agentName")),lower(${search}))>0)
     AND (${id}::uuid IS NULL OR (pinned,touched,candidates.id,kind)<(${pinned}::boolean,${at}::timestamptz,${id}::uuid,coalesce(${kind}::text,'')))
     ORDER BY pinned DESC,touched DESC,candidates.id DESC,kind DESC LIMIT 101`
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
-    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null])).rows as Row[]
+    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null,
+    scope?.projectIssueIds ?? null,input.since ?? null,input.automationId ?? null])).rows as Row[]
   const page = rows.slice(0,100), last = page.at(-1)
   const linked = await linkedTasksForChats(database, userId, workspaceId, page.filter(row => row.kind === 'chat').map(row => row.id))
   return { items: page.map(row => item(row, row.kind === 'chat' ? linked.get(row.id) : undefined)).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),
@@ -169,16 +205,21 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
 }
 
 /** A single bounded result per visible Bot, independent of thread-list paging. */
-export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, botId?: string) {
+export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, botId?: string, options?: { nestChecks?: boolean }) {
   const { userId } = taskReaderScope(reader)
-  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId, botId)) ?? {}
+  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId, botId, options?.nestChecks)) ?? {}
 }
 
-async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string, botId?: string) {
+async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string, botId?: string, nestChecks?: boolean) {
   const values = [...facts.params, userId, workspaceId, RUN_CHAIN_MAX_DEPTH]
   const botFilter = botId ? `AND "botId"=$${values.push(botId)}::uuid` : ''
+  const parentFilter = nestChecks ? `WHERE v."issueId" IS NULL OR v."runKind" IN ('implement','plan') OR NOT EXISTS (
+      SELECT 1 FROM visible parent WHERE parent."issueId"=v."issueId" AND parent."botId"=v."botId"
+        AND parent."runKind" IN ('implement','plan') AND NOT parent.archived AND parent.source IS DISTINCT FROM 'mcp'
+    )` : ''
   const statement = conversationQuery() + `, bot_rows AS (
-    SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId" FROM visible
+    SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId"
+    FROM visible v ${parentFilter}
     UNION ALL
     SELECT n.*,b.id AS "botId" FROM named_chats n JOIN conversation_members cm ON cm."conversationId"=n.id AND cm."memberType"='bot' AND cm."leftAt" IS NULL
       JOIN bots b ON b.id::text=cm."memberId" AND b."workspaceId"=$${facts.params.length+2} AND b."ownerId"=$${facts.params.length+1}

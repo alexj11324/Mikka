@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useThreadReadEnd } from '@/features/chat/model/use-thread-read-end'
 import { MobileReplyVersions } from '@/features/chat/components/thread-reply-versions'
 import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
@@ -28,6 +29,8 @@ import type { ThreadDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
+import { ThreadArtifactsList, ThreadSegments } from '@/features/tasks/components/thread-artifacts'
+import { hasThreadArtifacts, threadArtifactsPath, type ThreadArtifacts, type ThreadSegment } from '@/features/tasks/model/thread-artifacts'
 
 const { MobileCore, Coordinator, IssueThreads } = mobileMessages
 const STATUS_WORD = {
@@ -52,6 +55,11 @@ export default function ThreadScreen() {
     [...(data?.confirmedSubmissionIds ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])], reload)
   const readEnd = useThreadReadEnd(id, error ? undefined : data?.readReceipts, bar.onScroll)
   const thread = data?.thread
+  // 线程 | Artifact (Alex, 2026-11-15): the toggle replaces the title only once the thread produced something.
+  const artifacts = useLiveApi<ThreadArtifacts>(threadArtifactsPath(id), () => threadLive(data ?? null, id))
+  const [segment, setSegment] = useState<ThreadSegment>('thread')
+  const toggled = hasThreadArtifacts(artifacts.data)
+  const viewingArtifacts = toggled && segment === 'artifacts' && artifacts.data
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
   const stopper = useStop(() => api(`/api/mobile/threads/${liveRunId}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
@@ -62,7 +70,7 @@ export default function ThreadScreen() {
       <NavBar
         scrolled={bar.scrolled}
         back={() => (router.canGoBack() ? router.back() : router.replace('/tasks'))}
-        titleView={thread ? (
+        titleView={thread && toggled ? <ThreadSegments value={segment} onChange={setSegment} /> : thread ? (
           <View style={styles.titleRow}>
             <StatusIcon status={thread.status} size={18} />
             <View style={{ flexShrink: 1 }}>
@@ -78,7 +86,7 @@ export default function ThreadScreen() {
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
         right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: IssueThreads.stop, web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
-      <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      {viewingArtifacts ? <ThreadArtifactsList data={viewingArtifacts} /> : <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={IssueThreads.hidden} onRetry={reload} />
         {data?.items.map((item, index) => {
@@ -94,11 +102,11 @@ export default function ThreadScreen() {
         {data?.paused ? <ThreadQuotaPaused key={data.paused.runId} paused={data.paused} onContinued={async runId => { if (runId !== id) router.replace(`/thread/${runId}`); await reload() }} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
-      </KeyboardChatScrollView>
+      </KeyboardChatScrollView>}
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {controls.controls}
-      {data ? <ThreadComposer detail={data} runId={liveRunId} placeholder={MobileCore.messageThread} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: liveRunId }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {viewingArtifacts ? null : controls.controls}
+      {data && !viewingArtifacts ? <ThreadComposer detail={data} runId={liveRunId} placeholder={MobileCore.messageThread} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: liveRunId }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

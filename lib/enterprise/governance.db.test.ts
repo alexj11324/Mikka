@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { verifyAuditExport } from '../audit/integrity'
-import { identityTokenHash } from './scim-store'
+import { identityTokenHash, type DirectoryUser } from './scim-store'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) { assertE2eTarget(target); assert.equal(process.env.MIKKA_DATABASE_URL, target); assert.equal(process.env.DATABASE_URL, target) }
@@ -37,12 +37,158 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
   const organization = await org.createOrganization(owner, { name: 'Enterprise governance fixture' })
   const organizationId = organization.id
   await org.addOrganizationMember(organizationId, owner.id, { userId: admin.id, role: 'admin' })
-  await org.addOrganizationMember(organizationId, owner.id, { userId: member.id })
+  const admission = await org.addOrganizationMember(organizationId, owner.id, { userId: member.id })
+  assert.deepEqual(await org.addOrganizationMember(organizationId, owner.id, { userId: member.id, role: 'member' }), admission)
+  await assert.rejects(org.addOrganizationMember(organizationId, owner.id, { userId: member.id, role: 'admin' }),
+    (error: unknown) => (error as { detail?: string }).detail === 'invalid_request')
   const wsA = randomUUID(), wsB = randomUUID(), unrelated = randomUUID()
   for (const id of [wsA, wsB, unrelated]) {
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('the Organization creation receipt and active directory use the stored lifecycle dates', async t => {
+    const created = await org.createOrganization(owner, { name: 'Directory dates' })
+    t.after(async () => { await pool.query('delete from mikka_organizations where id=$1', [created.id]) })
+    const dates = async () => (await pool.query<{ createdAt: Date; updatedAt: Date }>(
+      'select "createdAt", "updatedAt" from mikka_organizations where id=$1', [created.id],
+    )).rows[0]
+    const initial = await dates()
+    assert.deepEqual({ createdAt: created.createdAt, updatedAt: created.updatedAt }, initial)
+    assert.deepEqual(await org.listOrganizations(owner.id, created.id), [created])
+
+    const rename = (input: unknown) => org.renameOrganization(created.id, owner.id, input)
+    const updated = await rename({ name: 'Changed name' })
+    assert.deepEqual(await rename({ name: ' Changed name ' }), updated)
+    await assert.rejects(rename({ name: 'Other name', icon: null }))
+    await assert.rejects(rename({ name: 'x'.repeat(121) }))
+    const audit = await pool.query("select count(*)::int n from mikka_organization_audit_events where \"organizationId\"=$1 and action='organization.renamed'", [created.id])
+    assert.equal(audit.rows[0].n, 1)
+    const changed = await dates()
+    const [entry] = await org.listOrganizations(owner.id, created.id)
+    assert.equal(entry.name, 'Changed name')
+    assert.deepEqual(entry.createdAt, initial.createdAt)
+    assert.deepEqual(entry.updatedAt, changed.updatedAt)
+    assert.deepEqual(await org.listOrganizations(outsider.id, created.id), [])
+  })
+
+  await t.test('restore requires prior removal in the same Organization and leaves directory, Workspace and ownership authority intact', async t => {
+    const restorationOrg = await org.createOrganization(owner, { name: 'Former membership' })
+    const id = restorationOrg.id
+    const workspaceId = randomUUID()
+    const connection = randomUUID(), provider = 'enterprise-' + randomUUID()
+    t.after(async () => {
+      await pool.query('delete from enterprise_scim_user where "connectionId"=$1', [connection])
+      await pool.query('delete from enterprise_scim_connection where id=$1', [connection])
+      await pool.query('delete from enterprise_sso_provider where "providerId"=$1', [provider])
+      await pool.query('delete from mikka_organizations where id=$1', [id])
+      await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    })
+    await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Former Workspace','team')`, [workspaceId, owner.id])
+    await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,'member')`, [workspaceId, member.id, member.name, member.email])
+    await pool.query('insert into mikka_organization_workspaces("organizationId","workspaceId") values ($1,$2)', [id, workspaceId])
+    await org.addOrganizationMember(id, owner.id, { userId: member.id, role: 'admin' })
+    const restore = (actor: string, accessLevel: string) => org.restoreOrganizationMember(id, actor, member.id, { accessLevel })
+    await assert.rejects(restore(owner.id, 'member'), { detail: 'invalid_request' })
+    await org.removeOrganizationMember(id, owner.id, member.id)
+    await assert.rejects(restore(member.id, 'member'), { detail: 'access_denied' })
+    await assert.rejects(restore(owner.id, 'owner'), { detail: 'access_denied' })
+    await assert.rejects(org.restoreOrganizationMember(organizationId, owner.id, member.id, { accessLevel: 'member' }), { detail: 'invalid_request' })
+    const [restored, replay] = await Promise.all([restore(owner.id, 'member'), restore(owner.id, 'member')])
+    assert.deepEqual(restored, replay)
+    assert.equal(restored.userId, member.id)
+    assert.equal(restored.email, member.email)
+    assert.equal(restored.accessLevel, 'member')
+    assert.equal(restored.disabled, false)
+    await assert.rejects(restore(owner.id, 'admin'), { detail: 'invalid_request' })
+    const readState = async () => (await pool.query(`select
+      (select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2) as workspace,
+      (select count(*)::int from mikka_organization_invitations where "organizationId"=$3) as invitations,
+      (select count(*)::int from mikka_organization_audit_events where "organizationId"=$3 and "targetId"=$2 and action='organization.member_changed') as changes`, [workspaceId, member.id, id])).rows[0]
+    assert.deepEqual(await readState(), { workspace: 'suspended', invitations: 0, changes: 2 })
+    await org.removeOrganizationMember(id, owner.id, member.id)
+    await pool.query(`insert into enterprise_sso_provider(id,"providerId","organizationScopeId",issuer,domain,"domainVerified","domainTokenHash","oidcConfig")
+      values($1,$1,$2,'https://fixture.example.invalid',$3,true,$4,'{}')`, [provider, id, provider + '.example.invalid', identityTokenHash(randomUUID())])
+    await pool.query('insert into enterprise_scim_connection(id,"organizationId","providerId","tokenHash") values($1,$2,$3,$4)', [connection, id, provider, identityTokenHash(randomUUID())])
+    // The identity store commits independently of Workspace delivery. Hold its
+    // new directory link open while another connection restores the removed row.
+    const identity = await pool.connect()
+    try {
+      await identity.query('begin')
+      const { rows: [directoryUser] } = await identity.query<DirectoryUser>(`insert into enterprise_scim_user(id,"connectionId","organizationId","externalId","userName","userId",active,document)
+        values($1,$2,$3,$4,$5,$4,false,$6::jsonb) returning *`, [randomUUID(), connection, id, member.id, member.email,
+        JSON.stringify({ userName: member.email, displayName: member.name, active: false })])
+      assert.equal((await restore(owner.id, 'member')).disabled, false)
+      await identity.query('commit')
+      const { requireEnterpriseOrganization } = await import('./access')
+      await assert.rejects(requireEnterpriseOrganization(member.id, id, randomUUID()), { code: 'workspaceAccessDenied' })
+      await assert.rejects(restore(owner.id, 'member'), { detail: 'access_denied' })
+      await org.removeOrganizationMember(id, owner.id, member.id)
+      await assert.rejects(restore(owner.id, 'member'), { detail: 'access_denied' })
+      assert.equal((await pool.query('select 1 from mikka_organization_members where "organizationId"=$1 and "userId"=$2', [id, member.id])).rowCount, 0)
+      const { synchronizeDirectoryUser } = await import('./lifecycle')
+      await synchronizeDirectoryUser({ connection: { id: connection, organizationId: id, providerId: provider }, user: directoryUser, action: 'suspended' })
+      assert.deepEqual((await pool.query('select status,role from mikka_organization_members where "organizationId"=$1 and "userId"=$2', [id, member.id])).rows[0],
+        { status: 'suspended', role: 'member' })
+      assert.deepEqual(await readState(), { workspace: 'suspended', invitations: 0, changes: 3 })
+    } finally {
+      await identity.query('rollback')
+      identity.release()
+    }
+  })
+  await t.test('the Organization directory filters suspended members and retains the full administrative summary', async () => {
+    const directory = (userId: string, includeDisabled: boolean) => org.listOrganizationMembers(organizationId, userId, includeDisabled)
+    for (const actor of [member, outsider]) await assert.rejects(directory(actor.id, true), /access_denied/)
+    await pool.query("update mikka_organization_members set status='suspended' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    await pool.query('update "user" set image=$2 where id=$1', [owner.id, '/avatars/green.webp'])
+    try {
+      const active = await directory(admin.id, false)
+      assert.deepEqual(active.members.map(row => row.userId).sort(), [owner.id, admin.id].sort())
+      assert.equal(active.members.find(row => row.userId === owner.id)?.image, '/avatars/green.webp')
+      assert.equal(active.members.find(row => row.userId === admin.id)?.image, null)
+      const all = await directory(owner.id, true)
+      assert.equal(all.members.find(row => row.userId === member.id)?.status, 'suspended')
+      assert.deepEqual(all.members, (await org.organizationSummary(organizationId, owner.id)).members)
+    } finally {
+      await pool.query("update mikka_organization_members set status='active' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    }
+  })
+  await t.test('concurrent and repeated role saves only audit effective changes after checking authority', async () => {
+    const setRole = (actorId: string, role: 'admin' | 'member') =>
+      org.updateOrganizationMember(organizationId, actorId, { userId: member.id, role })
+    const read = async () => {
+      const { rows } = await pool.query<{ role: string; stamp: string; changes: number }>(
+        `select m.role, m."updatedAt"::text as stamp,
+            (select count(*)::int from mikka_organization_audit_events a where a."organizationId"=m."organizationId"
+              and a."targetId"=m."userId" and a.action='organization.member_changed') as changes
+          from mikka_organization_members m where m."organizationId"=$1 and m."userId"=$2`, [organizationId, member.id])
+      return rows[0]!
+    }
+    const before = await read()
+    await assert.rejects(setRole(member.id, 'member'), /access_denied/)
+    await Promise.all([setRole(owner.id, 'admin'), setRole(owner.id, 'admin')])
+    const changed = await read()
+    assert.equal(changed.role, 'admin')
+    assert.equal(changed.changes, before.changes + 1)
+    await setRole(owner.id, 'admin')
+    assert.deepEqual(await read(), changed)
+    await setRole(owner.id, 'member')
+  })
+  await t.test('Organization administrators can set and clear a bounded icon without changing Workspace identity or adding duplicate audits', async () => {
+    const icon = 'data:image/png;base64,iVBORw0KGgo='
+    const profile = (actor: string, input: unknown) => org.updateOrganizationProfile(organizationId, actor, input)
+    assert.equal((await org.organizationSummary(organizationId, owner.id)).organization.icon, null)
+    for (const denied of [member, outsider]) await assert.rejects(profile(denied.id, { icon }), /access_denied/)
+    await assert.rejects(profile(owner.id, { icon: 'https://example.invalid/image.png' }), /invalid_request/)
+    await assert.rejects(profile(owner.id, { icon: 'data:image/png;base64,AA==' }), /invalid_request/)
+    assert.equal((await profile(admin.id, { icon })).organization.icon, icon)
+    assert.equal((await profile(owner.id, { icon })).organization.icon, icon)
+    assert.equal((await org.organizationSummary(organizationId, admin.id)).organization.icon, icon)
+    assert.equal((await profile(owner.id, { icon: null })).organization.icon, null)
+    assert.equal((await profile(owner.id, { icon: null })).organization.icon, null)
+    const audits = await pool.query('SELECT metadata FROM mikka_organization_audit_events WHERE "organizationId"=$1 AND action=$2', [organizationId, 'organization.icon_changed'])
+    assert.deepEqual(audits.rows, [{ metadata: {} }, { metadata: {} }])
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM mikka_workspaces WHERE id=ANY($1::uuid[]) AND icon IS NOT NULL', [[wsA,wsB,unrelated]])).rows[0].n, 0)
+  })
   await t.test('Org roles cannot grant Workspace access or elevate other owners', async () => {
     await assert.rejects(org.renameOrganization(organizationId, member.id, { name: 'Unauthorized' }))
     await assert.rejects(org.addOrganizationMember(organizationId, admin.id, { userId: outsider.id, role: 'owner' }))
@@ -60,6 +206,12 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(org.archiveOrganization(organizationId, owner.id), error => (error as { detail?: string }).detail === 'workspace_attached')
   })
   const policy = { modelCredentialSharing: 'approval_required', mcpSharing: 'approval_required', allowedModelProviders: null, auditRetentionDays: null, legalHold: false } as const
+  await t.test('the organization machine catalog membership filter admits active members only for a named live organization', async () => {
+    assert.deepEqual((await org.listOrganizations(member.id, organizationId)).map(row => row.id), [organizationId])
+    assert.deepEqual(await org.listOrganizations(outsider.id, organizationId), [])
+    assert.deepEqual(await org.listOrganizations(member.id, randomUUID()), [])
+  })
+
   await t.test('operator Enterprise grants serialize expected-plan changes and preserve historical seat metadata without payments', async () => {
     const grant = { organizationId, expectedPlan: 'free', plan: 'enterprise', source: 'cloud', seatLimit: 2,
       expiresAt: new Date(Date.now() + 3600_000).toISOString(), reason: 'evaluation', operator: 'enterprise-fixture' }
@@ -190,8 +342,19 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(workspaceDb.transaction(tx => requireWorkspace(tx, wsA, admin.id)))
     await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'denied' })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false)
+    const prior = (await pool.query('select "updatedAt", "decidedBy" from mikka_organization_resource_approvals where id=$1', [approval.id])).rows[0]
+    const outboxCount = async () => (await pool.query('select count(*)::int as count from mikka_organization_policy_outbox where "organizationId"=$1', [organizationId])).rows[0].count
+    const before = await outboxCount()
+    await Promise.all([admin, owner].map(actor => decideOrganizationResourceApproval(organizationId, actor.id, { id: approval.id, status: 'denied' })))
+    assert.equal(await outboxCount(), before)
+    assert.deepEqual((await pool.query('select "updatedAt", "decidedBy" from mikka_organization_resource_approvals where id=$1', [approval.id])).rows[0], prior)
     await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false, 'replay cannot erase a denial')
+    const events = await pool.query('select action,count(*)::int as count from mikka_organization_audit_events where "targetId"=$1 group by action order by action', [approval.id])
+    assert.deepEqual(events.rows, [
+      { action: 'organization.resource_decided', count: 2 },
+      { action: 'organization.resource_requested', count: 1 },
+    ])
   })
   await t.test('a member can request approval for their own installed Skill and an administrator can decide it', async () => {
     const skillId = randomUUID()

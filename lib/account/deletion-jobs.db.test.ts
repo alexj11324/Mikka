@@ -6,6 +6,7 @@ import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from '../../tests/
 import { cancelAccountDeletion, exportAccountDeletionManifest, readAccountDeletion, requestAccountDeletion, resumeAccountDeletion } from './deletion-jobs'
 import { dueTimerTransport } from '../due-timer'
 import { wakeTransport } from '../workflow-wake'
+import { driveStorageKey } from '../drive/blobs'
 
 // Only disposable, matching loopback targets pass the shared fixture's guard.
 test('durable deletion stages preserve data until authorization/cleanup and resume after real DB/object failures', { skip: !dbUrl }, async t => {
@@ -72,6 +73,34 @@ test('durable deletion stages preserve data until authorization/cleanup and resu
     const complete = await resumeAccountDeletion(id, { ...options, deleteObject: async name => { seen.push(name) } })
     assert.equal(complete.stage, 'completed'); assert.deepEqual(complete.pendingObjects, [])
     assert.deepEqual(seen, [key, key])
+  })
+  await t.test('Drive retirement and retries are limited to the subject’s own objects', async () => {
+    const subject = await seedUser(main, 'drive-retirement')
+    const other = await seedUser(main, 'drive-retained')
+    const digest = 'b'.repeat(64)
+    const subjectKey = driveStorageKey(subject, digest)
+    const otherKey = driveStorageKey(other, digest)
+    await main.query('INSERT INTO drive_blobs("ownerId",sha256,"sizeBytes","storageKey") VALUES ($1,$3,1,$4),($2,$3,1,$5)',
+      [subject, other, digest, subjectKey, otherKey])
+    try {
+      const id = await request(subject)
+      const pending = await resumeAccountDeletion(id, { ...options, deleteObject: async () => { throw new Error('offline') } })
+      assert.equal(pending.stage, 'storage_pending')
+      assert.deepEqual(pending.pendingObjects, [subjectKey])
+      // Simulate an existing durable job from an earlier deployment.
+      await main.query('UPDATE account_deletion_jobs SET "pendingObjects"=$2 WHERE id=$1',
+        [id, JSON.stringify([otherKey, subjectKey])])
+      const removed: string[] = []
+      const complete = await resumeAccountDeletion(id, { ...options, deleteObject: async key => { removed.push(key) } })
+      assert.equal(complete.stage, 'completed')
+      assert.deepEqual(complete.pendingObjects, [])
+      assert.deepEqual(removed, [subjectKey])
+      const remaining = await main.query('SELECT "ownerId" FROM drive_blobs WHERE sha256=$1 AND "ownerId" IN ($2,$3)',
+        [digest, subject, other])
+      assert.deepEqual(remaining.rows, [{ ownerId: other }])
+    } finally {
+      await main.query('DELETE FROM drive_blobs WHERE "ownerId" IN ($1,$2)', [subject, other])
+    }
   })
   await t.test('outstanding capture upload grants delay final object deletion and staging keys are retained', async () => {
     const user = await seedUser(main, 'delete-upload'), agent = await seedAgent(main, user), run = await seedRun(main, { userId: user, agentId: agent })

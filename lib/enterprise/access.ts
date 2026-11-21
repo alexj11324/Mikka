@@ -88,8 +88,8 @@ async function organizationAccess(userId: string, workspaceId: string, organizat
 }
 
 /** Organization administration has its own role check; this only enforces its authentication policy. */
-export async function requireEnterpriseOrganization(userId: string, organizationId: string, sessionId: string) {
-  if (!await organizationAccess(userId, '', organizationId, { kind: 'session', sessionId })) throw new WorkspaceError('workspaceAccessDenied')
+export async function requireEnterpriseOrganization(userId: string, organizationId: string, sessionId: string, appExecutor: EnterpriseAuthExecutor = pool) {
+  if (!await organizationAccess(userId, '', organizationId, { kind: 'session', sessionId }, appExecutor)) throw new WorkspaceError('workspaceAccessDenied')
 }
 
 export async function requireEnterpriseWorkspace(userId: string, workspaceId: string, principal?: EnterprisePrincipal, executor?: WorkspaceLinkExecutor, appExecutor?: EnterpriseAuthExecutor) {

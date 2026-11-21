@@ -1,20 +1,16 @@
-// A service binding belongs to one immutable API release. Store only public
-// values read from that backend. Never retain a Response or request-scoped I/O.
+// The service binding can receive an API update independently of these Web
+// assets. Read its public identity afresh, including after an API rollback.
 import { versionPath } from './route-path.mjs'
 
-const versions = new WeakMap()
 const fields = ['build', 'overlaySha', 'minMobileBuild', 'mobileUpdateUrl', 'minDesktopVersion']
+const sha = /^[a-f0-9]{40}$/
 const headers = { 'cache-control': 'no-store, max-age=0', 'content-type': 'application/json' }
 
-export async function publicVersion(request, env) {
+export async function publicVersion(request, env, ctx) {
   const head = request.method === 'HEAD'
   const failure = (error, status = 503) => new Response(head ? null : JSON.stringify({ error }), {
     status, headers: { ...headers, 'cache-control': 'no-store' },
   })
-  const saved = versions.get(env.API)
-  if (saved && saved.build === env.RELEASE_SHA && saved.overlaySha === env.OVERLAY_SHA) {
-    return new Response(head ? null : saved.json, { headers })
-  }
   // This pre-login route never needs client authority. Read the exact private
   // backend even for HEAD, so no client cookies or request headers enter state.
   const url = new URL(versionPath, request.url)
@@ -24,8 +20,10 @@ export async function publicVersion(request, env) {
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(5_000)])
     const upstream = await env.API.fetch(new Request(url, { redirect: 'manual', signal }))
     if (upstream.status !== 200 || !upstream.headers.get('content-type')?.includes('application/json')) {
-      // A broken error body does not change an already observed HTTP status.
-      await upstream.body?.cancel().catch(() => {})
+      if (upstream.body) {
+        const cleanup = upstream.body.cancel().catch(() => {})
+        ctx?.waitUntil(cleanup)
+      }
       return failure('deploymentVersionUnavailable', upstream.status >= 400 ? upstream.status : 503)
     }
     value = await upstream.json()
@@ -33,15 +31,19 @@ export async function publicVersion(request, env) {
     if (request.signal.aborted) throw cause
     return failure('deploymentVersionUnavailable')
   }
-  if (!value || value.build !== env.RELEASE_SHA || value.overlaySha !== env.OVERLAY_SHA) {
-    return failure('deploymentVersionMismatch')
+  if (!value || ![value.build, value.overlaySha, env.RELEASE_SHA, env.OVERLAY_SHA]
+    .every(value => typeof value === 'string' && sha.test(value))) {
+    return failure('deploymentVersionInvalid')
   }
   if (Object.keys(value).length !== fields.length || !fields.every(key => Object.hasOwn(value, key))
     || !Number.isSafeInteger(value.minMobileBuild) || value.minMobileBuild < 0 || typeof value.mobileUpdateUrl !== 'string'
     || !(value.minDesktopVersion === null || typeof value.minDesktopVersion === 'string')) {
     return failure('deploymentVersionInvalid')
   }
-  const json = JSON.stringify(value)
-  versions.set(env.API, { build: value.build, overlaySha: value.overlaySha, json })
+  // Existing tabs compare build with their compiled Web source. Keep that
+  // identity, and separately expose the API pins read through this binding so
+  // the publisher can check both services against their original artifacts.
+  const json = JSON.stringify({ ...value, build: env.RELEASE_SHA, overlaySha: env.OVERLAY_SHA,
+    apiBuild: value.build, apiOverlaySha: value.overlaySha })
   return new Response(head ? null : json, { headers })
 }

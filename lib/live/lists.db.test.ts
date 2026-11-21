@@ -21,7 +21,7 @@ const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'actual isolated PostgreSQL required')
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 const scheduled: (() => Promise<void>)[] = []
-mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
 // The same writers also wake task/thread detail panels with their run, thread
 // or document IDs, bot chats with their bot IDs and group pages with their group
 // IDs; panels.db.test.ts, chats.db.test.ts and groups.db.test.ts cover those keys.
@@ -142,18 +142,10 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.deepEqual((await groupListTargets(database, database, groupId, 'foreign')).map(value => value.scope.ownerId), ['owner'], 'a caller cannot invent prior group membership')
     })
 
-    await t.test('模型与订阅 pushes model_settings to the account in its workspaces, and to teammates only where it shares', async () => {
+    await t.test('模型与订阅 pushes model_settings to the account alone, in each workspace it is an active member of', async () => {
       const audience = async () => (await ownerSettingsTargets(database, database, 'owner')).map(value => `${value.scope.ownerId}@${value.scope.workspaceId === home ? 'home' : 'team'}:${value.events.map(event => event.kind).join(',')}`).sort()
-      // Not shared: only the account itself, in each workspace it is an active member of; never the app-wide workspace_settings.
+      // Subscriptions serve their owner only (decision 2026-11-17): teammates never receive these settings; never the app-wide workspace_settings.
       assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
-      // 分享我的订阅给团队成员 on in the team: its active members too, excluding the suspended member.
-      await database.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ('owner',$1,true)`, [team])
-      assert.deepEqual(await audience(), ['foreign@team:model_settings', 'no-home@team:model_settings', 'owner@home:model_settings', 'owner@team:model_settings', 'peer@team:model_settings'])
-      // An admin who does not allow sharing subscriptions: back to the account alone.
-      await database.query(`INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)`, [team])
-      assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
-      await database.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [team])
-      await database.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=\'owner\'')
       assert.deepEqual(await ownerSettingsTargets(database, database, 'no-such-account'), [])
     })
 

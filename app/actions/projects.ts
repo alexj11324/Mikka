@@ -1,5 +1,5 @@
 'use server'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { and, asc, desc, eq, getTableColumns, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
@@ -106,7 +106,7 @@ async function persistProject(input: unknown, partial: boolean) {
       }
       const parsed = projectInput.safeParse(merged)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? i18nText('Errors.projectCheckFields') }
-      const { id, revision, workspaceId: _workspaceId, leadUserId: _leadUserId, memberIds: _memberIds, ...values } = parsed.data
+      const { id, revision, expectedVisibility, workspaceId: _workspaceId, leadUserId: _leadUserId, memberIds: _memberIds, ...values } = parsed.data
       if (parsed.data.workspaceId && parsed.data.workspaceId !== context.workspaceId) throw new ActionFailureError('workspaceAccessDenied')
       const people = projectPeople(parsed.data, context.user.id)
       await lockPeople(tx, context.workspaceId, people)
@@ -134,7 +134,7 @@ async function persistProject(input: unknown, partial: boolean) {
         // A new Project becomes a content resource only after its canonical row
         // exists. The nested APP commit can leave an unreachable policy if this
         // Workspace transaction later fails, never an unguarded Project.
-        if (!existing) await registerProjectAccess(context.user, nextId, context.workspaceId)
+        if (!existing) await registerProjectAccess(context.user, nextId, context.workspaceId, expectedVisibility)
         await tx.delete(projectMembers).where(eq(projectMembers.projectId, nextId))
         for (let offset = 0; offset < people.memberIds.length; offset += batchSize) {
           await tx.insert(projectMembers).values(people.memberIds.slice(offset, offset + batchSize).map(userId => ({ projectId: nextId, workspaceId: context.workspaceId, userId })))

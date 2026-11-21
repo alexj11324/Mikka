@@ -1,6 +1,4 @@
-import { NextResponse } from "next/server";
-
-export const dynamic = "force-dynamic";
+import { NextResponse } from "@/lib/server-runtime/server";
 
 /** Read-only process liveness. It discloses no session, secrets or claimed SHA.
  * Database/business readiness still requires the independent verification and

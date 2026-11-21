@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { useViewScroll } from '@/lib/hooks/view-state'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 import useSWR, { useSWRConfig } from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
-import { Lightbulb, RotateCw } from 'lucide-react'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
+import { Lightbulb, RotateCw } from '@/components/icons'
 import { toast } from 'sonner'
 import { sendSuggestion } from '@/app/actions/coordinator'
 import { coordinatorChatKey } from '@/components/coordinator/coordinator-chat'
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { WorkspaceContentLoading } from '@/components/workspace/workspace-loading'
+import { ConversationPageLoading } from '@/components/workspace/workspace-loading'
 import { withBasePath } from '@/lib/base-path'
 import type { SuggestionCard } from '@/lib/suggestions/card'
 import { useActionError } from '@/lib/use-action-error'
@@ -25,7 +25,7 @@ import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
-const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
+const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: ConversationPageLoading })
 
 type SuggestionItem = SuggestionCard & { id: string }
 type SuggestionsView = { groups: { items: SuggestionItem[] }[] }

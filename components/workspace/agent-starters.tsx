@@ -1,5 +1,5 @@
 import type { AgentCopy } from '@/lib/agent-copy'
-import { ClipboardList, FileText, GitCompareArrows, Layers } from 'lucide-react'
+import { ClipboardList, FileText, GitCompareArrows, Layers } from '@/components/icons'
 
 export const getAgentStarters = (agentCopy: AgentCopy) => [
   { title: agentCopy.breakDownAProject, description: agentCopy.turnAnIdeaIntoClearPhasesAnd, icon: Layers, prompt: agentCopy.helpMeBreakANewProjectInto },

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { PAGE_META } from "./data"
 import { TOAST_ERROR_ICON, TOAST_SUCCESS_ICON } from "./icons"
-import { MoreHorizontalIcon, ArrowLeftRightIcon, TypeIcon, LockIcon, CheckIcon, CodeIcon, CopyIcon, Trash2Icon } from "lucide-react"
+import { MoreHorizontal, ArrowLeftRight, Type, Lock, Check, Code, Copy, Trash2 } from "@/components/icons"
 
 type CopyFormat = "html" | "text"
 
@@ -112,7 +112,7 @@ export function PageActions({
             <Button variant="ghost" size="icon-sm" aria-label="Page actions" />
           }
         >
-          <MoreHorizontalIcon aria-hidden="true" />
+          <MoreHorizontal aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuGroup>
@@ -121,14 +121,14 @@ export function PageActions({
               checked={fullWidth}
               onCheckedChange={onFullWidthChange}
             >
-              <ArrowLeftRightIcon aria-hidden="true" />
+              <ArrowLeftRight aria-hidden="true" />
               Full Width
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={smallText}
               onCheckedChange={onSmallTextChange}
             >
-              <TypeIcon aria-hidden="true" />
+              <Type aria-hidden="true" />
               Small Text
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
@@ -136,7 +136,7 @@ export function PageActions({
               disabled={!editor}
               onCheckedChange={onLockedChange}
             >
-              <LockIcon aria-hidden="true" />
+              <Lock aria-hidden="true" />
               Lock Page
             </DropdownMenuCheckboxItem>
           </DropdownMenuGroup>
@@ -150,9 +150,9 @@ export function PageActions({
               onClick={() => copyAs("html")}
             >
               {copied === "html" ? (
-                <CheckIcon aria-hidden="true" />
+                <Check aria-hidden="true" />
               ) : (
-                <CodeIcon aria-hidden="true" />
+                <Code aria-hidden="true" />
               )}
               {copied === "html" ? "Copied" : "Copy HTML"}
             </DropdownMenuItem>
@@ -162,9 +162,9 @@ export function PageActions({
               onClick={() => copyAs("text")}
             >
               {copied === "text" ? (
-                <CheckIcon aria-hidden="true" />
+                <Check aria-hidden="true" />
               ) : (
-                <CopyIcon aria-hidden="true" />
+                <Copy aria-hidden="true" />
               )}
               {copied === "text" ? "Copied" : "Copy Text"}
             </DropdownMenuItem>
@@ -175,7 +175,7 @@ export function PageActions({
             disabled={!editor || !editable}
             onClick={() => setConfirmOpen(true)}
           >
-            <Trash2Icon aria-hidden="true" />
+            <Trash2 aria-hidden="true" />
             Clear Page
           </DropdownMenuItem>
         </DropdownMenuContent>

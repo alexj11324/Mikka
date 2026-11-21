@@ -17,11 +17,15 @@ const env = {
   EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
   EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
   EVE_ENV_BETTER_AUTH_SECRET: 'private-fixture-auth-key-at-least-thirty-two',
-  EVE_RUNTIME: {},
+  EVE_RUNTIME: { getByName(id) {
+    calls++
+    assert.equal(id, env.EVE_RELEASE_ID)
+    return { fetch: request => { forwarded = request; return selected } }
+  } },
 }
 let selected, forwarded, calls = 0
 class NativeContainer {
-  constructor(ctx) { this.ctx = ctx; this.pending = []; this.stops = 0; this.failedStarts = 0; this.started = false }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.pending = []; this.stops = 0; this.failedStarts = 0; this.started = false }
   async fetch(request) { this.calls = (this.calls ?? 0) + 1; return this.respond ? this.respond(request) : new Response('fixture') }
   renewActivityTimeout() { this.renewed = (this.renewed ?? 0) + 1 }
   async getState() { return { status: this.started ? 'running' : 'stopped' } }
@@ -39,10 +43,6 @@ class NativeContainer {
 }
 mock.module('@cloudflare/containers', { namedExports: {
   Container: NativeContainer,
-  getContainer: (_binding, id) => {
-    calls++; assert.equal(id, env.EVE_RELEASE_ID)
-    return { fetch: request => { forwarded = request; return selected } }
-  },
 } })
 const { default: ingress, EveRuntime } = await import('../src/index.mjs')
 
@@ -66,6 +66,16 @@ test('the Worker forwards only the native mount and returns the original streami
   assert.equal(calls, 1)
   assert.equal((await ingress.fetch(new Request('https://app.example.test/mikka/api/auth/session'), env)).status, 404)
   assert.equal(calls, 1)
+})
+
+test('an unconfigured release resolves the same legacy singleton as a native named stub', async () => {
+  let seen
+  const bindings = { ...env, EVE_RELEASE_ID: undefined, EVE_RUNTIME: {
+    getByName(name) { seen = name; return { fetch: () => selected } },
+  } }
+  const response = await ingress.fetch(new Request('https://app.example.test/mikka/api/agents/eve/v1/health'), bindings)
+  assert.equal(response, selected)
+  assert.equal(seen, 'cf-singleton-container')
 })
 
 test('native WebSocket upgrade responses are returned without reconstruction', async () => {
@@ -111,4 +121,27 @@ test('SDK error bodies and thrown messages never become public configuration dis
     assert.deepEqual(await response.json(), { ok: false, error: 'coordinatorUnavailable' })
   }
   assert.ok(errors.every(value => !value.includes('private-token')))
+})
+
+test('an unavailable host replies before its private error body finishes cancelling', async () => {
+  const { host } = fixture()
+  const started = Promise.withResolvers()
+  const releaseBody = Promise.withResolvers()
+  const work = []
+  host.ctx.waitUntil = task => work.push(task)
+  host.respond = () => new Response(new ReadableStream({
+    cancel() { started.resolve(); return releaseBody.promise },
+  }), { status: 500, headers: { 'content-type': 'text/plain' } })
+  const pending = host.fetch(new Request('https://app.example.test/eve/v1/health'))
+  try {
+    await started.promise
+    const result = await Promise.race([pending, new Promise(resolve => setImmediate(resolve))])
+    assert.equal(result?.status, 503)
+    assert.deepEqual(await result.json(), { ok: false, error: 'coordinatorUnavailable' })
+    assert.equal(work.length, 1)
+  } finally {
+    releaseBody.resolve()
+    await pending
+    await Promise.all(work)
+  }
 })

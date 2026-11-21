@@ -1,4 +1,4 @@
-import { pushSettingsHistory } from '@/lib/settings-navigation'
+import { pushSettingsHistory } from '../../lib/settings-navigation'
 
 /**
  * The workspace's address. One URL describes what is on screen, and every
@@ -9,7 +9,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
  * Nothing outside this file and lib/settings-navigation.ts writes the
  * browser history; scripts/navigation-policy.mjs enforces that.
  */
-export type WorkspaceSection = 'pulls' | 'conversations' | 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory'
+export type WorkspaceSection = 'pulls' | 'conversations' | 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory' | 'automations'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   conversations: 'Nav.conversations',
@@ -29,14 +29,15 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   suggestions: 'Nav.suggestions',
   artifacts: 'Nav.artifacts',
   memory: 'HostedSettings.memory.title',
+  automations: 'Automations.title',
 }
 
 /** Sections a reload or a shared link reopens; the others start from their parent page. The Coordinator's chat is the default and needs none. */
-const URL_SECTIONS = ['pulls', 'conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
+const URL_SECTIONS = ['pulls', 'conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'automations', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-/** Query keys that belong to a page inside a section (the plugins page's app and category); a new place drops them. */
-const PAGE_KEYS = ['app', 'category'] as const
+/** Query keys that belong to a page inside a section (the plugins page's app and category, an open automation, a PR's own page); a new place drops them. */
+const PAGE_KEYS = ['app', 'category', 'automation', 'pull'] as const
 
 /** The retired 任务 page's address. Tasks have one entry, the board (2026-11-13-1405): an old link opens it in its list view. */
 export const LEGACY_TASKS_SECTION = 'tasks'
@@ -58,6 +59,8 @@ export type WorkspaceLocation = {
   bot: string | null
   /** Optional Bot filter for the conversation directory. */
   directoryBot?: string | null
+  /** 查看运行: the thread directory filtered to one automation's runs (`directoryAutomation=<id>`; `automation` is the editor's). */
+  directoryAutomation?: string | null
   /** The group chat in the centre (`group=<id>`; its section is implied). */
   group: string | null
   /** The saved chat in the centre (`section=agent&session=<id>`); null opens the latest. */
@@ -68,6 +71,8 @@ export type WorkspaceLocation = {
   project: string | null
   /** The task open in the centre. */
   issue: string | null
+  /** The run open as the main conversation from the Bot sidebar. */
+  mainThread?: string | null
   /** The task open in the right column, beside whatever is in the centre (decision 2026-11-07-2045): a thread opened from it sits over it, and ← comes back to it. */
   task: string | null
   /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
@@ -83,9 +88,9 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot','directoryBot', 'directoryAutomation', 'group', 'session', 'team', 'project', 'issue', 'mainThread', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
-const CENTRE_KEYS = ['section', 'bot','directoryBot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const CENTRE_KEYS = ['section', 'bot','directoryBot', 'directoryAutomation', 'group', 'session', 'team', 'project', 'issue', 'mainThread'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
 /** A team page without a team is the workspace-wide page it would scope. */
 export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
@@ -103,12 +108,14 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
   return {
     section,
     ...(section === 'conversations' && id('directoryBot') ? {directoryBot:id('directoryBot')} : {}),
+    ...(section === 'conversations' && id('directoryAutomation') ? {directoryAutomation:id('directoryAutomation')} : {}),
     bot: section === 'coordinator' ? id('bot') : null,
     group: section === 'group' ? id('group') : null,
     session: section === 'agent' ? id('session') : null,
     team: TEAM_SECTIONS.includes(section) ? team : null,
     project: PROJECT_SECTIONS.includes(section) ? id('project') : null,
     issue: id('issue'),
+    ...(section === 'coordinator' && !id('issue') && id('mainThread') ? { mainThread: id('mainThread') } : {}),
     task: id('task'),
     thread: id('thread'),
     artifact: id('artifact'),
@@ -140,12 +147,13 @@ function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordin
   const named = params.get('section') === 'coordinator'
   const next = { ...before, ...change }
   next.section = sectionFor(next.section, next.team)
-  if (next.section !== 'conversations') delete next.directoryBot
+  if (next.section !== 'conversations') { delete next.directoryBot; delete next.directoryAutomation }
   if (next.section !== 'coordinator') next.bot = null
   if (next.section !== 'group') next.group = null
   if (next.section !== 'agent') next.session = null
   if (!TEAM_SECTIONS.includes(next.section)) next.team = null
   if (!PROJECT_SECTIONS.includes(next.section)) next.project = null
+  if (next.section !== 'coordinator' || next.issue || (next.bot !== before.bot && !('mainThread' in change))) next.mainThread = null
   const centreMoved = CENTRE_KEYS.some(key => next[key] !== before[key])
   // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
   if (centreMoved && !('thread' in change)) next.thread = null
@@ -185,6 +193,13 @@ export function openGroupConversation(id: string) {
 /** An app-root link to a place, e.g. `/?issue=<id>`; prefix the base path and locale where the caller needs them. */
 export function workspaceLink(place: Partial<WorkspaceLocation>): string {
   return `/${workspaceSearch(place)}`
+}
+
+/** Open one existing rail destination in an explicitly selected tenant. */
+export function workspaceSectionLink(section: WorkspaceSection, workspaceId: string): string {
+  const link = new URL(workspaceLink({ section }), 'https://mikka.invalid')
+  link.searchParams.set('workspace', workspaceId)
+  return link.pathname + link.search
 }
 
 /**
@@ -367,11 +382,19 @@ export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'rep
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
+/** A section's own page from a menu: its first page, even when the address already names that section and one of its pages (an open automation). */
+export function openSectionPage(section: WorkspaceSection) {
+  const url = new URL(workspaceHref(new URL(window.location.href), { section }), window.location.href)
+  for (const key of PAGE_KEYS) url.searchParams.delete(key)
+  write(`${url.pathname}${url.search}${url.hash}`, 'push')
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
 /**
  * A chat's work area (the hosted chat, FRAME_OWNS_PANEL; decision 2026-11-10), while that chat is on screen: a task or
  * a thread opened from anywhere on the page opens as one of its tabs instead of a right column beside the chat.
  */
-export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string) => void }
+export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string, issueId?: string | null, name?: string) => void }
 let workArea: WorkAreaOpener | null = null
 
 /** The chat on screen hands over its work area; the returned function takes it back (on unmount). */
@@ -399,8 +422,13 @@ export function rememberMobileTask(task: { server: string; ref: string; target: 
 }
 
 /** Opens a thread in the right column beside what is in the centre (R-82), or in the chat's work area (setWorkAreaOpener). */
-export function openThread(runId: string) {
-  if (toWorkArea({ thread: runId })) return
+export function openThread(runId: string, issueId?: string | null, name?: string) {
+  const current = readLocation(new URL(window.location.href).searchParams)
+  if (current.mainThread === runId) {
+    if (current.thread) closeThread()
+    return
+  }
+  if (workArea) { workArea.thread(runId, issueId, name); return }
   const from = here()
   goTo({ thread: runId })
   // Remembers where it came from, so ← steps back to that list as the browser's back does.

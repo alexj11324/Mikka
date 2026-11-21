@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { slackUserId } from './user-id'
 import { withBasePath } from '../base-path'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 
@@ -8,6 +9,7 @@ export const SLACK_CALLBACK_PATH = withBasePath('/api/integrations/slack/callbac
 export const SLACK_SCOPES = [
   'app_mentions:read',
   'chat:write',
+  'chat:write.customize',
   'users:read',
   'channels:read',
   'channels:history',
@@ -17,7 +19,7 @@ export const SLACK_SCOPES = [
   'im:history',
 ] as const
 export const slackTeamId = (v: unknown): v is string => typeof v === 'string' && /^T[A-Z0-9]{1,40}$/.test(v)
-export const slackUserId = (v: unknown): v is string => typeof v === 'string' && /^[UW][A-Z0-9]{1,40}$/.test(v)
+export { slackUserId } from './user-id'
 export const selectableSlackChannel = (v: unknown): v is string =>
   typeof v === 'string' && /^[CG][A-Z0-9]{1,40}$/.test(v)
 export const stateHash = (value: string) => createHash('sha256').update(value).digest('hex')

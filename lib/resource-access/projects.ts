@@ -8,17 +8,24 @@ import { lockResourceAccess, lockResourcesAccess, type ResourceExecutor } from '
 import { observeAudienceChanges } from './confirm-access'
 import { withAccessConfirmation } from './confirm-gate'
 import type { ResourceReference } from './contract'
+import { resolveProjectVisibilityDefault } from './project-creation-default'
+import type { ProjectVisibilityDefault } from '../project-input'
 
 /** Call from the existing Workspace Project creation transaction, after its
  * Workspace/member/source locks. An APP commit followed by a failed WS commit
  * can leave only an unreachable policy; never an unguarded content row. */
-export async function registerProjectAccess(reader: IssueReader, projectId: string, workspaceId: string) {
-  return withTaskWorkspace(reader, workspaceId, workspace => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+export async function registerProjectAccess(reader: IssueReader, projectId: string, workspaceId: string, expected?: ProjectVisibilityDefault) {
+  return withTaskWorkspace(reader, workspaceId, async (workspace, directory) => {
     const ownerId = taskReaderScope(reader).userId
-    await tx.execute(sql`select set_config('mikka.acl_actor',${ownerId},true),set_config('mikka.acl_source','project_created',true)`)
-    await tx.execute(sql`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
-      values('project',${projectId}::uuid,${workspaceId}::uuid,${ownerId},${workspace.kind === 'team' ? 'shared' : 'private'},'created')`)
-  })))
+    const actual = await resolveProjectVisibilityDefault(directory, workspace, ownerId)
+    if (expected && (actual.organizationId !== expected.organizationId || actual.visibility !== expected.visibility))
+      throw new ActionFailureError('projectVisibilityChanged')
+    return db.transaction(tx => withDatabaseTransaction(tx, async () => {
+      await tx.execute(sql`select set_config('mikka.acl_actor',${ownerId},true),set_config('mikka.acl_source','project_created',true)`)
+      await tx.execute(sql`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
+      values('project',${projectId}::uuid,${workspaceId}::uuid,${ownerId},${actual.visibility},'created')`)
+    }))
+  })
 }
 
 /**

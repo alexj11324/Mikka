@@ -19,7 +19,7 @@ import { openChat } from '@/lib/navigate'
 import { colors, font } from '@/lib/theme'
 
 /**
- * 新建群聊 (Comma design 07), a form sheet from 对话's 新建: a name and the bots in it, ticked. In the group each
+ * 新建群聊 (Comma design 07), a form sheet from 线程's 新建: a name and the bots in it, ticked. In the group each
  * message goes to the bot it @mentions, else to the ones Mikka judges should
  * answer (lib/coordinator/group-judgment.ts).
  */

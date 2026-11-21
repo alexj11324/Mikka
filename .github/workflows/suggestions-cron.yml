@@ -46,7 +46,7 @@ jobs:
         run: node scripts/device-gateway/select-release.mjs cron
   deploy:
     needs: test
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && needs.test.outputs.publish == 'true'
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main' && needs.test.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -101,7 +101,5 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
-      - name: Wait for Web deploy and the matching public build, then update the existing minute Worker
+      - name: Wait for the matching public build, then update the existing minute Worker
         run: node scripts/suggestions-cron/deploy.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}

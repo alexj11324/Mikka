@@ -18,7 +18,7 @@ test('team import inventory retains late imports and aliases rather than samplin
 // guard against a hung child, not a performance budget, so it is set well clear of the spread.
 test('all real team dependencies and auth export/session metadata load before the denied native SQL boundary',{timeout:120000},async t=>{
   const result=await promisify(execFile)(process.execPath,['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/team-import-contract.mjs'],{
-    timeout:90000,maxBuffer:1<<20,env:{PATH:process.env.PATH,HOME:'/workspace',NODE_DISABLE_COMPILE_CACHE:'1',TSX_DISABLE_CACHE:'1',NODE_ENV:'development',MIGRATE:'0',VERCEL_ENV:'',BETTER_AUTH_URL:'http://127.0.0.1:3100',NEXT_TELEMETRY_DISABLED:'1'},
+    timeout:90000,maxBuffer:1<<20,env:{PATH:process.env.PATH,HOME:'/workspace',NODE_DISABLE_COMPILE_CACHE:'1',TSX_DISABLE_CACHE:'1',NODE_ENV:'development',MIGRATE:'0',VERCEL_ENV:'',BETTER_AUTH_URL:'http://127.0.0.1:3100'},
   })
   const report=result.stdout.split('\n').find(line=>line.startsWith('{"teamImportContract":true'))
   assert.ok(report);t.diagnostic(report)

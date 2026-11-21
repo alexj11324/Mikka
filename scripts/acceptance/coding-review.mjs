@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { submitEveMessage } from './eve-session.mjs'
 /** #1723/#1724: normal product tasks, normal owner HTTP APIs and native PTYs.
  * Explicit manual workspace-review mode only. No provider SDK, database, model
  * order changes, extra identity, task repair, retry, acceptance merge or polling.
@@ -8,7 +9,7 @@ import { lstat, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace,
-  chooseSharedChatModel, subscriptionProof, cleanupCase } from './cloud-startup.mjs'
+  chooseOwnChatModel, subscriptionProof, cleanupCase } from './cloud-startup.mjs'
 import { CASES, openLive, assertAttemptBudget } from './run-observability.mjs'
 import { verifyExistingTaskTerminal, verifyTerminalRefusal } from './task-review-terminal.mjs'
 import { verifyExistingTaskPreview, verifyPreviewRefusal } from './task-review-preview.mjs'
@@ -208,14 +209,11 @@ async function executeCase(client, record, scope, profile, options, { checkpoint
     const message = `Execute existing task ${issue.identifier} (issueId ${issue.id}) now in ${REPOSITORY}. Read the exact existing description, do not create another task. `
       + `Use normal dispatch_run with repo ${REPOSITORY}, target cloud, model harness ${record.harness}, selected Profile ${profile.id}, needsSpec false. `
       + 'Follow the task criteria and injected delivery instructions, submit the tested candidate and leave the task PR open for human review. Do not merge.'
-    // Preserve the public RPC's undefined sentinel, including the distinct
-    // existing-issue message contract (no task-dialog destination override).
-    const undefinedWire = { $mikka: 'undefined' }
-    const dispatched = await write('dispatch', () => client.rpc('coordinator.sendCoordinatorMessage',
-      [message, null, record.botId, record.submissionId, undefinedWire, null, [], undefinedWire, profile.id]), value => {
-      check(value?.queued === true, 'dispatch_uncertain'); record.dispatched = true
+    const dispatched = await write('dispatch', () => submitEveMessage(client, record.botId, message, record.submissionId,
+      { profileId: profile.id, expectedWorkspaceId: scope.workspaceId, expectedOwnerId: scope.ownerId }), value => {
+      check(value?.ok === true, 'dispatch_uncertain'); record.dispatched = true
     })
-    check(dispatched.queued === true, 'dispatch')
+    check(dispatched.ok === true, 'dispatch')
     const deadline = now() + options.timeoutMs
     const readDispatch = async () => {
       const found = await client.json(`/api/factory/tasks?issueId=${record.issueId}`)
@@ -301,7 +299,7 @@ async function executeCase(client, record, scope, profile, options, { checkpoint
 export async function runCodingWorkspace(options, { env = process.env, fetchImpl = fetch, now = Date.now, signal,
   attest = attestCodingWorkspace, clientFactory = createSessionClient, execute = executeCase,
   cleanup = cleanupWorkspaceCase, writeCheckpoint = writeWorkspaceCheckpoint, selectTeam = selectAcceptanceTeam,
-  quiet = quietAccount, chooseModel = chooseSharedChatModel } = {}) {
+  quiet = quietAccount, chooseModel = chooseOwnChatModel } = {}) {
   const report = { version: 1, kind: 'coding-workspace-product-acceptance', issues: [1723, 1724], fixtureId: randomUUID(),
     driver: options.driver, sourceCommit: options.sourceCommit, origin: ORIGIN, repository: REPOSITORY,
     startedAt: new Date(now()).toISOString(), status: 'running', cases: [], cleanup: { errors: [] },
@@ -337,7 +335,7 @@ export async function runCodingWorkspace(options, { env = process.env, fetchImpl
     const candidates = new Map()
     for (const item of CASES) {
       const matches = preflight.order.candidates?.filter(candidate => candidate.harness === item.harness && candidate.model === item.model
-        && candidate.source?.kind === 'subscription' && UUID.test(candidate.source.connectionId ?? '') && candidate.credentialOwnerId === scope.adminId) ?? []
+        && candidate.source?.kind === 'subscription' && UUID.test(candidate.source.connectionId ?? '') && candidate.credentialOwnerId === scope.ownerId) ?? []
       if (matches.length === 1) candidates.set(item.harness, matches[0])
     }
     const visible = await client.rpc('issues.listWorkspaceIssues', [scope.workspaceId])

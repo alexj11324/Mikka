@@ -10,7 +10,7 @@ import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
 import { instructionsWithPersonal, cachedContextLines, promptWithCachedContext } from './context'
-import { SCHEDULE_INSTRUCTIONS } from '../schedules/contract'
+import { SCHEDULE_INSTRUCTIONS } from '../schedules/instructions'
 
 const owner = 'synthetic-prompt-owner', peer = 'synthetic-prompt-peer'
 const bot = '10000000-0000-4000-8000-000000000001'
@@ -119,7 +119,7 @@ stub('../github/user-access.ts', { readAuthorizedIssue: forbidden })
 stub('../pending-action-store.ts', { proposeAction: forbidden, writeAccountAction: forbidden, proposeRepositoryPush: forbidden })
 stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
-mock.module('next/server', { namedExports: { NextResponse: Response, after: () => {} } })
+mock.module('@/lib/server-runtime/server', { namedExports: { NextResponse: Response, after: () => {} } })
 
 let composer: typeof import('./product-instructions'), store: typeof import('./store'), personal: typeof import('./personal-instructions')
 before(async () => {

@@ -1,3 +1,5 @@
+import { isLiteLlmRoute } from '../../litellm/request.mjs'
+import { decodeHostedCallId } from '../../../lib/model-gateway/hosted-call-id.mjs'
 import { timingSafeEqual } from 'node:crypto'
 import { apiRequest } from './request.mjs'
 
@@ -22,6 +24,20 @@ export function businessWorldRequest(request, binding, capability) {
   const headers = new Headers()
   for (const name of ['accept', 'content-type']) if (request.headers.has(name)) headers.set(name, request.headers.get(name))
   if (request.headers.get('accept-encoding') === 'identity') headers.set('accept-encoding', 'identity')
+  return binding.fetch(new Request(request, { headers, redirect: 'manual' }))
+}
+
+export function liteLlmRequest(request, binding) {
+  const url = new URL(request.url)
+  if (url.origin !== 'https://litellm.internal' || url.username || url.password || url.hash || url.search
+      || !isLiteLlmRoute(request.method, url.pathname)) return no(404)
+  if (!binding) return no(503)
+  const callId = request.headers.get('x-litellm-call-id')
+  if (callId !== null && !decodeHostedCallId(callId)) return no(400)
+  const headers = new Headers()
+  for (const name of ['accept', 'content-type', 'authorization', 'x-litellm-api-key', 'x-litellm-call-id', 'anthropic-version', 'anthropic-beta', 'openai-beta', 'x-litellm-num-retries']) {
+    if (request.headers.has(name)) headers.set(name, request.headers.get(name))
+  }
   return binding.fetch(new Request(request, { headers, redirect: 'manual' }))
 }
 

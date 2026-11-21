@@ -30,8 +30,8 @@ async function load() {
 
 before(async () => {
   if (!databaseUrl) return
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   mock.module('@/lib/auth', { namedExports: {
     auth: { api: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } },
     authBaseURL: 'https://memory-rpc.example.invalid', googleEnabled: false, githubSignInEnabled: async () => false,
@@ -85,7 +85,7 @@ dbTest('preferences read both optional owner rows in one statement without losin
   }
   const stored = {
     archiveIdleAfterDays: 30,
-    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false,
+    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false, organizationInvitationEmails: false,
     pushWhen: schema.PUSH_WHEN.find(value => value !== 'always')!,
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
     dailySuggestions: true,

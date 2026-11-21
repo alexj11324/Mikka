@@ -6,7 +6,7 @@ import { optionName, type ModelMenu } from './model-menu-view'
 import { apiCache } from './api-cache'
 import { ModelMenuRead } from './model-menu-read'
 import { ModelMenuWrite } from './model-menu-write'
-export { HOSTED_CHOICE, groupTitle, groupTag, optionName, modelMenuLabel, modelSourceLabel, modelMenuReadLabel, modelStatusLine, type ModelOption, type ModelGroup, type ModelMenu } from './model-menu-view'
+export { HOSTED_CHOICE, groupTitle, groupTag, optionName, shownOptions, modelMenuLabel, modelSourceLabel, modelMenuReadLabel, modelStatusLine, type ModelOption, type ModelGroup, type ModelMenu } from './model-menu-view'
 
 export interface ChoiceFailure { id: string; line: string }
 

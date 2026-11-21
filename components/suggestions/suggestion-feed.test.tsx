@@ -9,7 +9,7 @@ const refreshRelated = mock.fn(async (_key: unknown) => {})
 mock.module('@/app/actions/coordinator', { namedExports: { sendSuggestion: (id: string) => submit(id) } })
 mock.module('@/components/coordinator/coordinator-chat', { namedExports: { coordinatorChatKey: () => ['coordinator-chat'] } })
 mock.module('swr', { defaultExport: () => ({ mutate: refresh }), namedExports: { useSWRConfig: () => ({ mutate: refreshRelated }) } })
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
 
 let useSuggestions: typeof import('./suggestion-feed')['useSuggestions']
 let send: ReturnType<typeof useSuggestions>['send']

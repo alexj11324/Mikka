@@ -36,7 +36,7 @@ async function createTask(page: Page, title: string, team?: string) {
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
 }
 async function showAllTasks(page: Page) {
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   // The board mounts after the section switch settles; check its filters only once it is there.
   await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
   // The board opens filtered to 负责人 = 我; teammates' public tasks need it off.

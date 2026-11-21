@@ -6,11 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
-import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
+import { RECOVERY_WORKTREE_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER } from "@mikka/protocol/device"
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 
 import {
   DaemonError,
+  DaemonUpgradeRequiredError,
+  DeviceSessionRequiredError,
   RunNotPinnedHereError,
   ServerUnreachableError,
 } from "../src/errors"
@@ -157,25 +159,35 @@ describe("HttpServerLink", () => {
       expect(new Headers(init?.headers).get(RUN_CREDENTIALS_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(MODEL_GATEWAY_LOOPBACK_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TASK_SECRETS_HEADER)).toBe(TASK_SECRETS_VERSION)
       return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
     }) as typeof fetch
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
     expect(result.requireWorktreeContinuation).toBe(true)
   })
-  it('renews task grants through the existing authenticated heartbeat without extra requests', async () => {
+  it('accepts a loopback gateway assignment only for the configured server origin', async () => {
+    const key = 'mkg_' + 'a'.repeat(43)
+    for (const origin of ['http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://localhost:3000']) {
+      const modelCredential = { kind: 'provider', protocol: 'openai', baseUrl: origin + '/mikka/api/model-gateway/openai/v1', key }
+      const { fetch } = scripted(() => json({ ...assignment('run-1'), harness: 'codex', modelCredential }))
+      const claimed = new HttpServerLink('http://127.0.0.1:3000/mikka', fetch).claimRun('dev-1', 'run-1')
+      if (origin === 'http://127.0.0.1:3000') expect((await claimed).modelCredential).toEqual(modelCredential)
+      else await expect(claimed).rejects.toThrow('Loopback model gateway unavailable')
+    }
+  })
+  it('a claim delivers task grants for the whole run; the report renews nothing', async () => {
     const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-initial', expiresAt: SOON(), origin: 'https://api.example.com' }
     const access = { version: 1, endpoint: 'http://server.test/v1/task-secrets/run-1', grants: [grant], unavailable: ['SIGNING_KEY'] }
-    const renewed = { ...access, grants: [{ ...grant, capability: 'synthetic-opaque-renewal' }] }
     const github = { endpoint: 'http://server.test/api/runs/github-token', repository: 'owner/repo', token: 'synthetic-native-github', expiresAt: null }
     const modelCredential = { kind: 'provider', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', key: 'synthetic-native-model' }
     const { fetch, calls } = scripted(call => {
       if (call.path.endsWith('/register')) return json({ deviceId: 'dev-1', workspaceId: crypto.randomUUID() }, 201)
       expect(call.auth).toBe('Bearer fixture-task-device-session')
       if (call.path.endsWith('/claim')) return json({ ...assignment('run-1'), harness: 'codex', taskSecrets: access, github, modelCredential })
-      expect(call.path).toBe('/v1/devices/dev-1/heartbeat')
-      expect(call.body).toMatchObject({ runs: [{ runId: 'run-1', secretCapabilities: [grant.capability] }] })
-      return json({ leases: { 'run-1': grant.expiresAt }, taskSecrets: { 'run-1': renewed } })
+      expect(call.path).toBe('/v1/devices/dev-1/report')
+      expect(call.body).toEqual({ harnesses: [], worktreeDiskBytes: 0 })
+      return json({})
     })
     const link = new HttpServerLink('http://server.test', fetch)
     await link.registerDevice('fixture-task-device-session', INFO)
@@ -183,9 +195,7 @@ describe("HttpServerLink", () => {
     expect(claimed.taskSecrets).toEqual(access)
     expect(claimed.github).toEqual(github)
     expect(claimed.modelCredential).toEqual(modelCredential)
-    const result = await link.heartbeat('dev-1', { harnesses: [], worktreeDiskBytes: 0,
-      runs: [{ runId: 'run-1', lastProgressAt: new Date().toISOString(), secretCapabilities: claimed.taskSecrets!.grants.map(item => item.capability) }] })
-    expect(result.taskSecrets).toEqual({ 'run-1': renewed })
+    expect(await link.report('dev-1', { harnesses: [], worktreeDiskBytes: 0 })).toEqual({})
     expect(calls).toHaveLength(3)
   })
   it('preserves negotiated catalogue evidence in the natural-expiry lease response', async () => {
@@ -272,8 +282,8 @@ describe("HttpServerLink", () => {
     const { fetch, calls } = scripted((call) => {
       if (call.path.endsWith("/claim")) return json(assignment("run-1"))
       if (call.path.endsWith("/events")) return json({ offset: "3" })
-      if (call.path.endsWith("/heartbeat"))
-        return json({ leases: { "run-1": SOON() } })
+      if (call.path.endsWith("/report"))
+        return json({})
       return new Response(null, { status: 204 })
     })
     const link = new HttpServerLink("http://server.test", fetch)
@@ -284,9 +294,8 @@ describe("HttpServerLink", () => {
       fromSeq: 1,
       chunks: [{ type: "start" }],
     })
-    await link.heartbeat("dev-1", {
+    await link.report("dev-1", {
       harnesses: [],
-      runs: [],
       worktreeDiskBytes: 0,
     })
     await link.updateRun("run-1", { state: "running" })
@@ -297,7 +306,7 @@ describe("HttpServerLink", () => {
     expect(calls.map((c) => [c.method, c.path, c.auth])).toEqual([
       ["POST", "/v1/devices/dev-1/runs/run-1/claim", "Bearer session-1"],
       ["POST", "/v1/runs/run-1/events", "Bearer session-1"],
-      ["POST", "/v1/devices/dev-1/heartbeat", "Bearer session-1"],
+      ["POST", "/v1/devices/dev-1/report", "Bearer session-1"],
       ["PATCH", "/v1/runs/run-1", "Bearer session-1"],
       ["POST", "/v1/runs/run-1/complete", "Bearer session-1"],
     ])
@@ -322,18 +331,18 @@ describe("HttpServerLink", () => {
     expect(updates).toHaveBeenCalledOnce() // nothing named, or nothing valid: no call, no failure
   })
 
-  it("passes on the release a server names when it refuses a claim from a daemon too old", async () => {
-    const { fetch } = scripted(() => json({ error: "x", code: "daemonUpgradeRequired", daemonVersions: { min: "0.0.299", latest: "0.0.401" } }, 409))
+  it("426 from a claim is the update-required refusal, with the release the server names", async () => {
+    const { fetch } = scripted(() => json({ error: "daemonUpgradeRequired", daemonVersions: { min: "0.0.299", latest: "0.0.401" } }, 426))
     const error = await new HttpServerLink("http://server.test", fetch).claimRun("d", "r").catch((e: unknown) => e)
-    expect((error as RunNotPinnedHereError).latest).toBe("0.0.401")
+    expect(error).toBeInstanceOf(DaemonUpgradeRequiredError)
+    expect((error as DaemonUpgradeRequiredError).latest).toBe("0.0.401")
   })
 
-  it("marks a claim refused because the daemon is too old", async () => {
-    for (const [body, upgradeRequired] of [[{ error: "x", code: "daemonUpgradeRequired" }, true], [{ error: "Run is not queued for this device." }, false]] as const) {
+  it("409 on a claim: no open session means redial; anything else is another device's run", async () => {
+    for (const [body, kind] of [[{ error: "deviceSessionRequired" }, DeviceSessionRequiredError], [{ error: "Run is not queued for this device." }, RunNotPinnedHereError]] as const) {
       const { fetch } = scripted(() => json(body, 409))
       const error = await new HttpServerLink("http://server.test", fetch).claimRun("d", "r").catch((e: unknown) => e)
-      expect(error).toBeInstanceOf(RunNotPinnedHereError)
-      expect((error as RunNotPinnedHereError).upgradeRequired).toBe(upgradeRequired)
+      expect(error).toBeInstanceOf(kind)
     }
   })
 
@@ -445,18 +454,17 @@ describe("HttpServerLink", () => {
 
 describe('machine run control without remote permission checks (#1505)', () => {
   afterEach(() => vi.useRealTimers())
-  it.each(['legacy', 'push', 'fallback'] as const)('makes no auth request on idle, hint or mode switch: %s', async mode => {
+  it('makes no auth request on idle or on a push; a gate has no timer', async () => {
     vi.useFakeTimers()
     const fetcher = vi.fn(async () => { throw new Error('no per-operation or idle HTTP') })
     const link = new HttpServerLink('http://server.test', fetcher)
-    link.setRunControlMode(mode)
     const controller = new AbortController()
     const gate = await link.prepareRunToolApproval({ ...assignment('run-1'), harness: 'codex', policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) }, controller.signal, () => {})
     try {
       await vi.advanceTimersByTimeAsync(600_000)
       link.invalidateRunControls()
-      link.setRunControlMode(mode === 'push' ? 'fallback' : 'push')
       await vi.advanceTimersByTimeAsync(60_000)
+      expect(vi.getTimerCount()).toBe(0)
       expect(await gate.checkLive()).toBe(true)
       controller.abort()
       expect(gate.revoked).toBe(true)
@@ -503,6 +511,7 @@ describe("mikka daemon login (device authorization)", () => {
       client_id: "mikka-daemon",
       device_name: "build-box",
       device_platform: process.platform,
+      device_arch: process.arch,
       client_version: DAEMON_VERSION,
     })
     expect(calls[1]?.body).toEqual({

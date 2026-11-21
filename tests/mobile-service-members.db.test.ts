@@ -35,7 +35,7 @@ test('mobile Settings and confirmed browser handoff require a current team admin
   const address = listener.address()
   assert.ok(address && typeof address !== 'string')
   const origin = 'http://127.0.0.1:' + address.port
-  const previous = { BETTER_AUTH_URL: process.env.BETTER_AUTH_URL, MIKKA_EDITION: process.env.MIKKA_EDITION, MIKKA_BASE_PATH: process.env.MIKKA_BASE_PATH }
+  const previous = { BETTER_AUTH_URL: process.env.BETTER_AUTH_URL, MIKKA_EDITION: process.env.MIKKA_EDITION, MIKKA_BASE_PATH: process.env.MIKKA_BASE_PATH, MIKKA_UI_OVERLAY_SHA: process.env.MIKKA_UI_OVERLAY_SHA }
   Object.assign(process.env, { BETTER_AUTH_URL: origin, MIKKA_BASE_PATH: '/mikka' })
   t.after(() => {
     for (const [key, value] of Object.entries(previous)) {
@@ -113,12 +113,12 @@ test('mobile Settings and confirmed browser handoff require a current team admin
     }
   })
   const members = (id: string) => '/settings/members?workspace=' + id
-  const open = async (credentials: string, workspaceId: string) => {
+  const open = async (credentials: string, workspaceId: string, to = members(workspaceId)) => {
     const generated = await fetch(api + 'auth/one-time-token/generate', { headers: { cookie: credentials } })
     assert.equal(generated.status, 200)
     const { token } = await generated.json()
     assert.ok(token)
-    return fetch(api + 'mobile/open?' + new URLSearchParams({ to: members(workspaceId), token }), { redirect: 'manual' })
+    return fetch(api + 'mobile/open?' + new URLSearchParams({ to, token }), { redirect: 'manual' })
   }
   const confirm = async (response: Response, browserCookie = '') => {
     assert.equal(response.status, 200)
@@ -139,6 +139,49 @@ test('mobile Settings and confirmed browser handoff require a current team admin
   assert.equal((await settings(memberCookie, first.id)).serviceIdentityManagementPath, undefined)
   const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
   const pat = await createLegacyPersonalAccessToken(owner, first.id, { name: 'Mobile handoff fixture' })
+  await t.test('personal Files is advertised by paired cloud settings and confirms the member workspace', async () => {
+    const target = `/?section=artifacts&workspace=${first.id}`
+    const available = async (headers: Record<string, string>) => {
+      const r = await fetch(api + 'mobile/settings?view=profile', { headers: { ...headers, 'x-mikka-workspace-id': first.id } })
+      assert.equal(r.status, 200)
+      return (await r.json()).personalFilesAvailable
+    }
+    delete process.env.MIKKA_UI_OVERLAY_SHA
+    assert.equal(await available({ cookie: memberCookie }), false)
+    process.env.MIKKA_UI_OVERLAY_SHA = 'a'.repeat(40)
+    assert.equal(await available({ cookie: memberCookie }), true)
+    assert.equal(await available({ authorization: 'Bearer ' + pat.token }), false)
+    const bare = await fetch(api + 'mobile/open?' + new URLSearchParams({ to: target }), { redirect: 'manual' })
+    assert.equal(bare.status, 403)
+    const accepted = await confirm(await open(memberCookie, first.id, target))
+    assert.equal(accepted.status, 303)
+    assert.equal(accepted.headers.get('location'), origin + '/mikka' + target.slice(1))
+    const foreign = await open(memberCookie, second.id, `/?section=artifacts&workspace=${second.id}`)
+    assert.equal(foreign.status, 403)
+    process.env.MIKKA_EDITION = 'community'
+    assert.equal(await available({ cookie: memberCookie }), false)
+    process.env.MIKKA_EDITION = 'cloud'
+  })
+  await t.test('Organization settings requires the paired human session and confirms the selected workspace', async () => {
+    const target = `/settings?section=organization&workspace=${first.id}`
+    const available = async (headers: Record<string, string>) => {
+      const response = await fetch(api + 'mobile/settings?view=profile', { headers: { ...headers, 'x-mikka-workspace-id': first.id } })
+      assert.equal(response.status, 200)
+      return (await response.json()).organizationSettingsAvailable
+    }
+    process.env.MIKKA_UI_OVERLAY_SHA = 'a'.repeat(40)
+    assert.equal(await available({ cookie: memberCookie }), true)
+    assert.equal(await available({ authorization: 'Bearer ' + pat.token }), false)
+    const bare = await fetch(api + 'mobile/open?' + new URLSearchParams({ to: target }), { redirect: 'manual' })
+    assert.equal(bare.status, 403)
+    const accepted = await confirm(await open(memberCookie, first.id, target))
+    assert.equal(accepted.status, 303)
+    assert.equal(accepted.headers.get('location'), origin + withBasePath(target))
+    assert.equal((await open(memberCookie, second.id, `/settings?section=organization&workspace=${second.id}`)).status, 403)
+    delete process.env.MIKKA_UI_OVERLAY_SHA
+    assert.equal(await available({ cookie: memberCookie }), false)
+    assert.equal((await open(memberCookie, first.id, target)).status, 403)
+  })
   const patSettings = await fetch(api + 'mobile/settings', { headers: { authorization: 'Bearer ' + pat.token, 'x-mikka-workspace-id': first.id } })
   assert.equal(patSettings.status, 200)
   assert.equal((await patSettings.json()).workspace.serviceIdentityManagementPath, undefined)

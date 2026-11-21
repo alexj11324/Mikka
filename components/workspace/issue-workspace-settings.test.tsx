@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { ComputerThread } from '@/components/computer/computer-agents'
 import type { SettingsFrameProps } from '@/components/slots/settings-frame-contract'
 import { browserAddressRequest, consumeBrowserAddress, openBrowserAddress } from '@/lib/browser/navigation'
+import { useConversationPanels as useThreadPanelContext } from '@/components/coordinator/conversation-panels-context'
 
 const nothing = () => {}
 const empty = () => null
@@ -20,6 +21,7 @@ const browser = new Window({ url: 'https://fixture.example/?workspace=workspace-
 let user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
 let workspaceId = 'workspace-one'
 let workspaceReady = true
+let switcherReady = true
 let workspaceError: Error | undefined
 let groupList: { id: string; title: string; workspaceId: string }[] = []
 let groupListError: Error | undefined
@@ -51,13 +53,13 @@ let rosterError: Error | undefined
 let rosterRetries = 0
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
-  data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
+  data: key === '/api/workspace/switcher' ? (switcherReady ? { ...workspace(), live: { ownerId: user.id } } : undefined)
     : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
     : Array.isArray(key) && key[0] === 'team-home' ? { members: [], taskCount: 0 }
     : Array.isArray(key) && key[0] === 'projects' ? [{ id: 'known-project', name: 'Known project', summary: '' }]
@@ -97,7 +99,7 @@ mock.module('@/hooks/use-live-lists', { namedExports: {
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
+  ['../../app/actions/bots.ts', ['listBots', 'listBotsForWorkspace', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['listAgents', 'getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately
@@ -105,20 +107,34 @@ for (const [file, names] of [
 let chunkReady: Promise<void>
 let releaseChunk: () => void
 const delayedDynamic: typeof dynamic = (loader, options) => dynamic(async () => { await chunkReady; return loader() }, options)
-mock.module('next/dynamic', { defaultExport: delayedDynamic })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']],
   ['./issue-list.tsx', ['IssueList']],
-  ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']],
-  ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']],
+  ['./task-column.tsx', ['TaskColumn']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+// 概览 is the right column this page owns; it renders a marker so a test can see the column is there at all,
+// which is what #2835 broke by gating it on `isConversation`.
+mock.module(new URL('../nav/context-panel.tsx', import.meta.url).href, { namedExports: {
+  ContextPanel: ({ conversation }: { conversation?: { name: string } }) => <aside data-context-panel={conversation?.name ?? 'coordinator'} />,
+} })
+// A thread opened in the centre (#2835) is still a conversation: it must keep the same right column, and hand its
+// work area up when the frame owns the panel. The hook is read from its own leaf module, so this stub does not
+// depend on the dynamically imported conversation-panels.tsx below.
+let reportedPanels: import('@/components/slots/thread-contract').ThreadScreenProps['panels']
+mock.module(new URL('./thread-column.tsx', import.meta.url).href, { namedExports: {
+  ThreadColumn: ({ main }: { main?: boolean }) => {
+    reportedPanels = useThreadPanelContext()
+    return <section data-main-thread={main ? '' : undefined} />
+  },
+} })
 mock.module(new URL('./board-page.tsx', import.meta.url).href, { namedExports: {
   BoardPage: ({ onUpdated, onBusyChange }: { onUpdated: () => Promise<unknown>; onBusyChange: (busy: boolean) => void }) => <section data-team-board-visible="">
     {probeEmbeddedAck && <EmbeddedSaveProbe />}
@@ -237,6 +253,7 @@ beforeEach(() => {
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
   workspaceReady = true
+  switcherReady = true
   rosterPending = false; rosterError = undefined; rosterRetries = 0
   workspaceError = undefined
   refreshGlobalTasks = refreshed
@@ -283,6 +300,28 @@ test('a narrow board opens an explicitly requested preview in the existing brows
   await act(async () => assert.equal(openBrowserAddress('/preview'), true))
   assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
   assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
+})
+
+test('a thread opened in the centre keeps the right column', async () => {
+  // #2835 made a Bot's sidebar thread open in the centre (`?mainThread=`), and gated `isConversation` on the
+  // absence of one: every column below is gated on that single value, so the thread lost 概览 entirely.
+  // The open-source frame draws that column itself (FRAME_OWNS_PANEL false), which is what this asserts.
+  const runId = '00000000-0000-4000-8000-000000000031'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&mainThread=${runId}`)
+  await act(async () => root.render(<IssueWorkspace user={user} />))
+  assert.ok(container.querySelector('[data-main-thread]'), 'the thread is the centre page')
+  assert.ok(container.querySelector('[data-context-panel]'), 'and the right column is still beside it')
+})
+
+test('a thread opened in the centre hands its work area to a frame that owns the panel', async () => {
+  // The hosted shell draws the Overview as a tab of the conversation's own work area (FRAME_OWNS_PANEL). That tab
+  // reaches the thread through the panels context, so the thread's branch has to provide it too.
+  const runId = '00000000-0000-4000-8000-000000000032'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&mainThread=${runId}`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.ok(container.querySelector('[data-main-thread]'), 'the thread is the centre page')
+  assert.ok(reportedPanels, 'and the frame was handed the Overview tab')
+  assert.deepEqual(reportedPanels?.tabs.map(tab => tab.id), ['overview', 'browser'])
 })
 
 test('an explicit Bot mounts only its own composer after its roster resolves', async () => {
@@ -467,12 +506,13 @@ test('Team Issues first-page readiness is independent of the unrelated workspace
   browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
   await render({ initialSection: 'team-issues' })
   assert.ok(container.querySelector('[data-team-board-visible]'), 'the ready Team list must be reachable without waiting for global pagination')
-  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'), null)
+  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loading"]'), null)
 
   scopedTasksPending = true // The Team-scoped read itself remains a real loading gate.
   await render({ initialSection: 'team-issues' })
   assert.equal(container.querySelector('[data-team-board-visible]'), null)
-  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'))
+  // The board's own frame stands while its first page reads; it is a page placeholder, not a task editor.
+  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
 })
 
 test('a Team board write refreshes its visible page while the workspace refresh is pending', async () => {
@@ -559,12 +599,14 @@ test('a group absent from stale rows offers retry until a successful membership 
 
 test('a cached conversation cannot accept a draft before its authenticated workspace scope resolves', async () => {
   workspaceReady = false
+  switcherReady = false
   await render()
   assert.equal(Boolean(container.querySelector('textarea')), false, 'a cached transcript must not expose an editable loading-scope draft')
   assert.ok(container.querySelector('[data-loading-placeholder]'))
   assert.equal(composerMounts, 0)
 
   workspaceReady = true
+  switcherReady = true
   await render()
   assert.ok(container.textContent?.includes('Cached conversation'))
   await act(async () => editDraft('Lifecycle readiness draft'))
@@ -586,6 +628,7 @@ test('a cached conversation cannot accept a draft before its authenticated works
 
 test('a failed workspace read keeps editing unavailable and offers the normal read retry', async () => {
   workspaceReady = false
+  switcherReady = false
   workspaceError = new Error('unavailable fixture workspace')
   await render()
   assert.equal(Boolean(container.querySelector('textarea')), false)
@@ -599,6 +642,25 @@ test('a failed workspace read keeps editing unavailable and offers the normal re
   await act(async () => editDraft('draft after retry'))
   await render()
   assert.equal(container.querySelector('textarea')?.value, 'draft after retry')
+})
+
+test('a confirmed workspace opens its composer while the full settings read is pending', async () => {
+  workspaceReady = false
+  await render()
+  assert.ok(container.querySelector('textarea'))
+  assert.equal(container.querySelector('[data-loading-placeholder]'), null)
+  await act(async () => editDraft('Draft while settings load'))
+
+  workspaceReady = true
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Draft while settings load')
+  assert.equal(composerMounts, 1)
+
+  workspaceReady = false
+  workspaceError = Object.assign(new Error('Access denied'), { status: 403 })
+  await render()
+  assert.equal(container.querySelector('textarea'), null)
+  assert.ok(container.querySelector('[role="alert"]'))
 })
 
 test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft', async () => {

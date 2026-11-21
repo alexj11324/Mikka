@@ -13,7 +13,7 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 const noop = () => {}
 const unexpected = () => { throw new Error('this read-only render must not call a server action') }
 const translate = Object.assign((key: string, values?: Record<string, unknown>) => `${key}${values ? ` ${Object.values(values).join(' ')}` : ''}`, { has: () => true })
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: {
   useTranslations: () => translate, useLocale: () => 'en', useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }),
   useFormatter: () => ({ dateTime: () => '08:00', relativeTime: () => 'now' }), useNow: () => new Date('2026-11-10T08:00:00Z'),
 } })
@@ -31,6 +31,8 @@ mock.module(at('components/workspace/issue-scope-control.tsx'), { namedExports: 
 mock.module(at('components/workspace/issue-assignee-menu.tsx'), { namedExports: { AgentSphere: ({ name }: { name: string }) => <i data-agent={name} /> } })
 mock.module(at('components/workspace/issue-activity.tsx'), { namedExports: { useActivityDrafts: () => ({ body: '', setBody: noop, replyTo: null, setReplyTo: noop, reply: '', setReply: noop, submit: noop, sendReply: noop }) } })
 mock.module(at('components/workspace/issue-pull-request-link.tsx'), { namedExports: { PullRequestStatus: () => null } })
+mock.module(at('hooks/use-issue-states.ts'), { namedExports: { useIssueStates: () => ({ states: null, canEdit: false, error: null, mutate: noop }) } })
+mock.module(at('hooks/use-task-unread.ts'), { namedExports: { useTaskUnread: () => ({ unread: new Set<string>(), loaded: true, set: async () => true }) } })
 
 const { FramedTask } = await import('../components/workspace/task-detail-frame')
 const human = { kind: 'member' as const, id: 'fixture-owner', name: 'Owner', image: null }
@@ -55,11 +57,11 @@ function render(metadata: Record<string, unknown>, threads: IssueThread[] = [], 
   }
   const content = { type: 'doc', attrs: { mikka: metadata } }
   const task: IssueView = { id: '10000000-0000-4000-8000-000000000001', userId: human.id, title: 'Task', content,
-    metadata: readIssueMetadata(content), status: 'todo', priority: 'normal', scope: 'workspace', scopeSetBy: 'user',
+    metadata: readIssueMetadata(content), status: 'todo', stateId: null, priority: 'normal', scope: 'workspace', scopeSetBy: 'user',
     workspaceId: '20000000-0000-4000-8000-000000000001', ownershipState: 'bound', scopeVersion: 1, scopeConfidence: null,
     linearSyncPolicy: 'disabled', linearSyncBlocked: false, linearTargetVerified: false,
     shortTitle: null, shortTitleFrom: null, issuedIdentifier: 'TEAM-1', projectId: null,
-    revision: 1, identifier: 'TEAM-1', createdAt: new Date('2026-11-10T08:00:00Z'), updatedAt: new Date('2026-11-10T08:00:00Z') }
+    revision: 1, sourceScheduleId: null, identifier: 'TEAM-1', createdAt: new Date('2026-11-10T08:00:00Z'), updatedAt: new Date('2026-11-10T08:00:00Z') }
   const props: FramedTaskProps = {
     Frame, rootRef: { current: null }, onKeyDown: noop, label: 'Task', preview: false, locked, origin: 'Tasks',
     earlierActivity: { hasMore: false, loading: false, failed: false, load: noop },

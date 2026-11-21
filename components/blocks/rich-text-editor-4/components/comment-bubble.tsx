@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { RichTextBubbleBar } from "./rich-text-bubble-bar"
 import { canAnchorComment } from "./rich-text-comments"
 import { keepEditorFocus } from "./rich-text-toolbar"
-import { MessageSquareTextIcon } from "lucide-react"
+import { MessageSquareText } from "@/components/icons"
 
 const COMMENT_BUBBLE_KEY = "specCommentBubble"
 
@@ -66,7 +66,7 @@ export function CommentBubble({
           onMouseDown={keepEditorFocus}
           onClick={onComment}
         >
-          <MessageSquareTextIcon aria-hidden="true" />
+          <MessageSquareText aria-hidden="true" />
           Comment
         </Button>
       </RichTextBubbleBar>

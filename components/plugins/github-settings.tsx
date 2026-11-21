@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
-import { ArrowUpRight, ChevronRight, TriangleAlert } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowUpRight, ChevronRight, TriangleAlert } from '@/components/icons'
 import { toast } from 'sonner'
 import { AppTile, ToolGroup } from '@/components/plugins/connected-apps'
 import { SettingsSection } from '@/components/settings/primitives'
@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InlineLoadError } from '@/components/load-error'
@@ -53,17 +54,25 @@ async function readIntent(token: string): Promise<IntentView> {
 const VERIFICATION_PATH = withBasePath('/api/integrations/github/repositories/verification')
 const INSTALL_URL = GITHUB_APP_INSTALL_URL
 
+/** One tool GitHub's hosted MCP server lists for the person, as the tools route returns it. */
+type GitHubTool = { name: string; displayName: string; readOnly: boolean; description?: string }
+/** The abilities section: GitHub's live list, or why it cannot be shown. */
+export type GitHubToolsState = 'loading' | 'notConnected' | 'reconnect' | 'unavailable' | 'ready'
+class GitHubToolsError extends Error {}
+const githubToolsKey = (userId: string) => ['integrations:github:tools', userId] as const
+
 /**
- * What an Agent does through this plugin, from the code that does it. Every
- * ability runs directly with the person's own GitHub credential (R-77,
- * decision 2026-11-02-1600), so none has a control: pushing the branch, the
- * pull request (lib/github/run-pull-request.ts), cloning, and the readbacks in
- * lib/github/user-access.ts and the run's checks/actions read.
- * A new ability lands here with its code.
+ * What an Agent can do through this plugin is GitHub's own list, read live from its hosted MCP server with the
+ * person's credential (app/api/integrations/github/tools, the runtime `github_tools` uses), split by GitHub's
+ * `readOnlyHint`. Nothing here is written by hand.
  */
-const ABILITIES = {
-  write: ['push', 'pullRequest'] as const,
-  read: ['readCode', 'readPullRequest', 'readIssue', 'readChecks'] as const,
+async function readGitHubTools([, userId]: ReturnType<typeof githubToolsKey>): Promise<GitHubTool[]> {
+  const response = await fetch(withBasePath('/api/integrations/github/tools'), { cache: 'no-store' })
+  const body = await response.json().catch(() => ({})) as { viewerId?: string; error?: string; tools?: unknown }
+  if (body.viewerId !== userId) throw new Error('viewer')
+  if (!response.ok) throw new GitHubToolsError(body.error === 'githubNotConnected' || body.error === 'githubReconnectRequired' ? body.error : 'githubUnavailable')
+  if (!Array.isArray(body.tools) || body.tools.some(tool => !tool || typeof tool.name !== 'string' || typeof tool.displayName !== 'string' || typeof tool.readOnly !== 'boolean' || (tool.description !== undefined && typeof tool.description !== 'string'))) throw new Error('shape')
+  return body.tools as GitHubTool[]
 }
 
 async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<GitHubRead> {
@@ -227,11 +236,23 @@ export function useGitHubPlugin({ userId, email, isPending }: { userId: string |
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
   const login = githubState?.source === 'cloud' ? t('githubCloudConnection') : githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
   const errors = [githubError, githubLinkError, browserView?.state === 'expired' ? t('githubLinkExpired') : ''].filter(Boolean)
-  const writes = ABILITIES.write.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
-  const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
+  // GitHub's tools are listed once the connection is known; each visit reads them again, focus never does.
+  const tools = useSWR(userId && connected ? githubToolsKey(userId) : null, readGitHubTools, { revalidateOnFocus: false, shouldRetryOnError: false })
+  const toolsError = tools.error instanceof GitHubToolsError ? tools.error.message : tools.error ? 'githubUnavailable' : null
+  const toolsState: GitHubToolsState = githubLoading ? 'loading'
+    : githubReconnect || toolsError === 'githubReconnectRequired' ? 'reconnect'
+    : error ? 'unavailable'
+    : !connected || toolsError === 'githubNotConnected' ? 'notConnected'
+    : toolsError ? 'unavailable'
+    : tools.data ? 'ready' : 'loading'
+  const listed = toolsState === 'ready' ? tools.data ?? [] : []
+  const asRow = (tool: GitHubTool) => ({ slug: tool.name, name: tool.displayName, description: tool.description ?? '' })
+  const writes = listed.filter(tool => !tool.readOnly).map(asRow)
+  const reads = listed.filter(tool => tool.readOnly).map(asRow)
+  const retryTools = () => { void tools.mutate() }
 
   return {
-    userId, email, githubState, githubLoading, githubLinking, linking, browserAccount, browserIntent, browserView, connected, canLink, status, login, errors, writes, reads,
+    userId, email, githubState, githubLoading, githubLinking, linking, browserAccount, browserIntent, browserView, connected, canLink, status, login, errors, writes, reads, toolsState, retryTools,
     linkGitHub, disconnectGitHub, switchAccount, checkOnReturn,
     confirming, setConfirming, browsing, setBrowsing, clearLinkError: () => setGithubLinkError(''),
     /** Where 继续关联 goes in the browser, once it is signed in as the app's account. */
@@ -243,7 +264,7 @@ export function useGitHubPlugin({ userId, email, isPending }: { userId: string |
 function ViewerGitHubSettings(viewer: { userId: string | undefined; email: string; isPending: boolean }) {
   const t = useTranslations('Settings.integrations')
   const common = useTranslations('Common')
-  const { userId, email, githubState, githubLoading, githubLinking, linking, browserAccount, browserIntent, browserView, connected, canLink, status, login, errors, writes, reads,
+  const { userId, email, githubState, githubLoading, githubLinking, linking, browserAccount, browserIntent, browserView, connected, canLink, status, login, errors, writes, reads, toolsState, retryTools,
     linkGitHub, disconnectGitHub, switchAccount, checkOnReturn, confirming, setConfirming, browsing, setBrowsing, clearLinkError } = useGitHubPlugin(viewer)
   return <div className="flex flex-col gap-8">
     <header className="flex flex-wrap items-center gap-4">
@@ -292,6 +313,7 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
     </SettingsSection></PageSection>}
 
     {connected && githubState && <PageSection id="github-repositories-heading" title={t('githubRepositoryAccess')}><SettingsSection>
+      {/* control-size-exempt: the row's main target is a stretched link button, and the trailing link is a row action, not a toolbar peer. */}
       <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors has-[[data-repositories]:hover]:bg-muted/50">
         {githubState.installed
           // The whole row opens the list (its hover covers the row); the GitHub link sits above it.
@@ -304,12 +326,16 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
       </div>
     </SettingsSection></PageSection>}
 
-    <PageSection id="github-abilities-heading" title={t('githubAbilitiesHeading')} summary={t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length })}>
-      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows />
-      <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
+    <PageSection id="github-abilities-heading" title={t('githubAbilitiesHeading')} summary={toolsState === 'ready' ? t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length }) : undefined}>
+      {toolsState === 'ready' ? <>
+        <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows />
+        <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
+      </>
+        : toolsState === 'unavailable' ? <InlineLoadError message={t('githubToolsUnavailable')} retryLabel={common('retry')} onRetry={retryTools} />
+        : <p role="status" className="text-xs text-muted-foreground">{t(toolsState === 'loading' ? 'githubToolsLoading' : toolsState === 'reconnect' ? 'githubToolsReconnect' : 'githubToolsNotConnected')}</p>}
     </PageSection>
 
-    {userId && githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} userId={userId} />}
+    {userId && githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} userId={userId} installed={githubState.installed} onReturnFromInstall={checkOnReturn} />}
 
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !githubLinking) setConfirming(false) }}>
       <AlertDialogContent size="sm">
@@ -327,7 +353,7 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
 }
 
 /** 已授权的仓库: search, open GitHub or configure the owner's verification command. */
-export function RepositoriesDialog({ open, onOpenChange, repositories, userId }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string }) {
+export function RepositoriesDialog({ open, onOpenChange, repositories, userId, installed, onReturnFromInstall }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string; installed: boolean; onReturnFromInstall: () => void }) {
   const t = useTranslations('Settings.integrations')
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<GitHubRepository | null>(null)
@@ -340,7 +366,20 @@ export function RepositoriesDialog({ open, onOpenChange, repositories, userId }:
       <DialogHeader><DialogTitle className="pr-6 break-words">{editing?.fullName ?? t('githubRepositoriesDialog')}</DialogTitle></DialogHeader>
       {editing ? <RepositoryVerificationForm key={editing.fullName} repository={editing.fullName} userId={userId} onBack={() => setEditing(null)} /> : <>
       <SearchInput aria-label={t('githubRepositorySearch')} placeholder={t('githubRepositorySearch')} value={query} onChange={event => setQuery(event.target.value)} />
-      <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* An empty list and a search with no hits are different states; without
+          this the dialog shows only a search box and blank space. Each carries
+          the one action that resolves it (R-41, R-96): clear the search, or open
+          the App installation the page's own row opens. */}
+      {shown.length === 0
+        ? <Empty>
+            <EmptyHeader><EmptyTitle>{repositories.length ? t('githubNoMatch') : t('githubNoRepository')}</EmptyTitle></EmptyHeader>
+            {repositories.length
+              ? <Button type="button" variant="outline" onClick={() => setQuery('')}>{t('githubClearSearch')}</Button>
+              : <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<a href={INSTALL_URL} target="_blank" rel="noopener noreferrer" onClick={onReturnFromInstall} />}>
+                  {installed ? t('githubManage') : t('githubAuthorize')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
+                </Button>}
+          </Empty>
+        : <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
         {shown.map(repository => <li key={repository.id} className="flex items-center gap-2">
           <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-muted/50">
             <span className="min-w-0 truncate">{repository.fullName}</span>
@@ -348,7 +387,7 @@ export function RepositoriesDialog({ open, onOpenChange, repositories, userId }:
           </a>
           <Button type="button" variant="ghost" size="sm" aria-label={t('githubVerificationFor', { repository: repository.fullName })} onClick={() => setEditing(repository)}>{t('githubVerification')}</Button>
         </li>)}
-      </ul>
+      </ul>}
       </>}
     </DialogContent>
   </Dialog>

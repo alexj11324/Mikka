@@ -202,6 +202,8 @@ export async function deleteAccount(userId: string, email: string, options: impo
   const requested = await requestAccountDeletion(userId, email, undefined, options)
   if (!requested.ok) return requested
   const job = await resumeAccountDeletion(requested.id, options)
+  // Runs the account requested stop once its memberships are gone (decision 2026-11-17-2215).
+  if (job.stage === 'completed') await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ userId })
   if (job.stage === 'cancelled' && job.blockedReasons.includes('last_owner')) throw new GovernanceError('last_owner')
   if (job.stage === 'completed') return job.warnings.length ? { ok: true, receipt: { id: job.id, warnings: job.warnings } } : { ok: true }
   return { ok: false, pending: true, id: job.id, stage: job.stage }
@@ -346,9 +348,7 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
     `select v."storageKey" as key,NULL::timestamptz as "expiresAt" from artifact_versions v join artifacts a on a.id=v."artifactId" where a."userId"=$1 and v."storageKey" is not null and not (a.id = any($3::uuid[]))
      union all select "storageKey","expiresAt" from run_captures where "userId"=$1 and "storageKey" is not null and not ("runId" is not null and "runId" = any($2::uuid[]))
      union all select p."storageKey",NULL from run_capture_posters p join run_captures c on c.id=p."captureId" where c."userId"=$1 and not (c."runId" = any($2::uuid[]))
-     union all select b."storageKey",NULL from drive_blobs b where b."storageKey" is not null
-       and not exists (select 1 from drive_volume_entries e join drive_volumes v on v.id=e."volumeId"
-         where e.sha256=b.sha256 and v."ownerId" <> $1)
+     union all select b."storageKey",NULL from drive_blobs b where b."ownerId"=$1 and b."storageKey" is not null
      union all select 'capture-uploads/' || "userId" || '/runs/' || "runId" || '/captures/' || id || '.' ||
        CASE "contentType" WHEN 'image/png' THEN 'png' WHEN 'image/jpeg' THEN 'jpg' WHEN 'image/webp' THEN 'webp' WHEN 'video/mp4' THEN 'mp4' WHEN 'video/webm' THEN 'webm' END,"expiresAt"
        from run_captures where "userId"=$1 AND source='local' AND "expiresAt" IS NOT NULL and not ("runId" is not null and "runId" = any($2::uuid[]))

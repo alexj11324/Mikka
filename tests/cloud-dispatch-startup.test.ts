@@ -71,6 +71,8 @@ async function query(sql: string, values: unknown[] = []) {
   if (sql.includes('EXISTS (SELECT 1 FROM computer_run_bindings')) return { rows: [{ cloud: true }], rowCount: 1 }
   if (sql.includes('FROM agent_runs')) return { rows: previous ? [{ ...previous, remoteUrl: null, harness: 'codex', cloudWorkspaceId: workspaceId, cloudBotId: botId }] : [], rowCount: Number(Boolean(previous)) }
   if (sql.includes('FROM factory_tasks')) { factoryReadCalls++; return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) } }
+  // The dispatching chat saved no model, so the task keeps its own placement (decision 2026-11-15-1630).
+  if (sql.includes('FROM bot_model_choices')) return { rows: [], rowCount: 0 }
   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
@@ -180,6 +182,8 @@ stub('../lib/run-leases.ts', { failUnclaimedCloudStart: async (actor: unknown, i
 } })
 mock.module('workflow/api', { namedExports: { start: async () => { calls.push('lifecycle'); if (failure === 'lifecycle') throw new Error('Synthetic workflow launch failure'); return { runId: 'workflow' } } } })
 stub('../workflows/thread-machine/workflow.ts', { threadMachineLifecycle: async () => {} })
+let followedModel: { harness: 'codex' | 'claude_code'; model: string } | null = null
+stub('../lib/main-thread-model.ts', { mainThreadModel: async () => followedModel })
 let dispatch: typeof import('../workflows/coordinator/steps')['dispatchComputerTask']
 let dispatchThread: typeof import('../workflows/coordinator/steps')['dispatchComputerThread']
 let dispatchRun: typeof import('../workflows/coordinator/steps')['dispatchRun']
@@ -188,14 +192,14 @@ beforeEach(() => {
   calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
-  previous = null; pendingSpec = false; requestSource = null; preferLocal = false
+  previous = null; pendingSpec = false; requestSource = null; preferLocal = false; followedModel = null
   selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = profileSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = factoryReadCalls = 0; queued.clear()
 })
 
 const cloudTaskSource = (): RequestSource => ({ userId: owner, botId, issueId, kind: 'user_message', deliveredAt: new Date(),
   payload: { taskDestination: { kind: 'cloud' }, profileId } })
 const dispatchRepository = (target?: 'cloud', eventId: string | undefined = sourceEventId) => dispatchRun(owner,
-  { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', ...(target ? { target } : {}) }, undefined, botId, undefined, eventId)
+  { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex' }, ...(target ? { target } : {}) }, undefined, botId, undefined, eventId)
 
 for (const target of ['cloud', undefined] as const) test(`a bound task-form source keeps the selected cloud placement with ${target ?? 'omitted'} model target`, async () => {
   requestSource = cloudTaskSource()
@@ -244,6 +248,20 @@ test('ordinary existing-issue chat retains automatic placement and its selected 
   const input = queued.get('coordinator:rule:cloud-form-call')
   assert.equal((input?.modelDispatch as { location?: string })?.location, undefined)
   assert.equal(input?.allowLocalRecovery, true)
+})
+
+test('a new thread without an Agent is refused with agentRequired; the chat\'s own model is never a default', async () => {
+  // Decision 2026-11-17-1800 (superseding 2026-11-15-1630's 「跟随主线程」): every dispatch names its Agent.
+  requestSource = { ...cloudTaskSource(), issueId: null, payload: {} }
+  followedModel = { harness: 'codex', model }
+  assert.deepEqual(await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call' }, undefined, botId, undefined, sourceEventId),
+    { error: 'agentRequired', issueId })
+  assert.equal(queued.size, 0)
+  assert.deepEqual(calls, [], 'nothing is prepared or queued')
+  assert.deepEqual(await dispatchThread(owner, { botId, issueId }, 'no-agent-call'), { error: 'agentRequired', issueId })
+  assert.equal(queued.size, 0)
+  assert.ok('runId' in await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex', model } }, undefined, botId, undefined, sourceEventId))
+  assert.equal((queued.get('coordinator:rule:cloud-form-call')?.modelDispatch as { followed?: true })?.followed, undefined)
 })
 
 test('a cloud task-form choice overrides local preferences before selection when the model omits target', async () => {

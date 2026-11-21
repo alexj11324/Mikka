@@ -1,27 +1,25 @@
-import { workersAiRequest } from '../../workers-ai/binding.mjs'
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import { getContainer } from '@cloudflare/containers'
+import { liteLlmRequest } from '../../api/ingress/services.mjs'
 import { productRequest } from '../runtime/product.mjs'
-import { hostConfiguration } from '../runtime/config.mjs'
+import { singletonContainerName } from '../runtime/config.mjs'
 export { EveRuntime } from './index.mjs'
 export { ContainerProxy } from '@cloudflare/containers'
 
 const missing = () => new Response(null, { status: 404 })
 
-export class WorkersAiOutbound extends WorkerEntrypoint {
-  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability) }
+export class LiteLlmOutbound extends WorkerEntrypoint {
+  fetch(request) { return liteLlmRequest(request, this.env.LITELLM) }
 }
 
 export class EveProductOutbound extends WorkerEntrypoint {
   fetch(request) {
-    return productRequest(request, this.env.BUSINESS_API, this.env.EVE_PUBLIC_ORIGIN, this.ctx.props.capability)
+    return productRequest(request, this.env.BUSINESS_API, this.env.EVE_PUBLIC_ORIGIN, this.ctx.props.capability, this.ctx)
   }
 }
 
 function forward(request, env, headers) {
-  const config = hostConfiguration(env)
   const source = new URL(request.url)
-  const target = new URL(config.publicOrigin)
+  const target = new URL(env.EVE_PUBLIC_ORIGIN)
   target.pathname = source.pathname
   target.search = source.search
   headers.set('x-forwarded-host', target.host)
@@ -30,7 +28,8 @@ function forward(request, env, headers) {
     method: request.method, headers, signal: request.signal, redirect: 'manual',
     ...(request.body ? { body: request.body, duplex: 'half' } : {}),
   })
-  return getContainer(env.EVE_RUNTIME, config.releaseId).fetch(forwarded)
+  const { EVE_RELEASE_ID: name = singletonContainerName } = env
+  return env.EVE_RUNTIME.getByName(name).fetch(forwarded)
 }
 
 export class EveService extends WorkerEntrypoint {

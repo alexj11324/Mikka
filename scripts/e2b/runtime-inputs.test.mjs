@@ -4,16 +4,18 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runtimeInputsDigest, pushRuntimeInputs, releaseDecision, findFailedInputs, rememberFailure } from './runtime-inputs.mjs'
+import { runtimeInputsDigest, pushRuntimeInputs, releaseDecision, findFailedInputs, rememberFailure, lastPublishedSource } from './runtime-inputs.mjs'
 
 const digest = 'a'.repeat(40)
 const sha = 'b'.repeat(40)
+const repository = { full_name: 'alexj11324/Mikka', id: 1427517699, owner: { id: 183887963 } }
+const transferredRepository = { ...repository, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
 const options = { digest, token: 'test', currentRunId: 99 }
 const artifact = { name: `e2b-runtime-inputs-${digest}`, expired: false, created_at: '2026-11-09T20:01:00Z',
-  workflow_run: { id: 10, head_branch: 'main', head_sha: sha } }
+  workflow_run: { id: 10, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: sha } }
 const run = { id: 10, run_attempt: 2, head_sha: sha, head_branch: 'main', event: 'push',
   path: '.github/workflows/e2b-official-runtime.yml', status: 'completed', conclusion: 'failure',
-  run_started_at: '2026-11-09T20:00:00Z', repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' } }
+  run_started_at: '2026-11-09T20:00:00Z', repository, head_repository: repository }
 const buildStep = 'Build private versioned candidates and require official file conservation'
 const gateStep = 'Require real Claude Code and Codex subscriptions on the private candidates'
 function api({ artifacts = [artifact], previousRun = run, steps = [{ name: buildStep, conclusion: 'failure' }], pages = 1 } = {}) {
@@ -168,10 +170,9 @@ test('the workflow checks history before secrets and holds one queue across all 
   assert.match(check, /changed: \$\{\{ steps.history.outputs.changed \|\| 'false' \}\}/)
   assert.match(child, /run: node scripts\/e2b\/runtime-inputs.mjs recheck/)
   assert.match(caller, /reason:\n        description: [^\n]+\n        type: string\n        required: true/)
-  assert.match(caller, /release:\n    needs: \[test, check, web-ready\]\n    if: needs.check.outputs.changed == 'true'\n    concurrency:\n      group: e2b-official-runtime-release\n      cancel-in-progress: false\n      queue: max/)
+  assert.match(caller, /release:\n    needs: \[test, check, web-ready\]\n    if: needs.check.outputs.changed == 'true' && github.event_name != 'push'\n    concurrency:\n      group: e2b-official-runtime-release\n      cancel-in-progress: false\n      queue: max/)
   assert.match(child, /validate:\n    needs: recheck\n    if: needs.recheck.outputs.skip != 'true'/)
-  assert.match(child, /cleanup:\n    needs: \[recheck, validate, await-web, subscriptions, publish\]/)
-  assert.match(child, /group: production-smoke-owner-acceptance\n      cancel-in-progress: false\n      queue: max/)
+  assert.match(child, /cleanup:\n    needs: \[recheck, validate, await-web, templates\]/)
 })
 
 
@@ -209,4 +210,79 @@ test('manual dispatch needs no history API and records its reason as escaped tex
 
 test('the queue recheck recognizes a just-recorded failure before the overall run finishes', async () => {
   assert.equal(await findFailedInputs({ ...options, ...api({ previousRun: { ...run, status: 'in_progress', conclusion: null } }) }), 10)
+})
+
+test('a Cloudflare promotion compares against the last published release, not the previous push', () => {
+  const promotion = { eventName: 'workflow_run', workerHash: sha, beforeWorkerHash: 'c'.repeat(40) }
+  assert.deepEqual(releaseDecision(promotion), { changed: true, reason: 'installed worker or template inputs changed since the last published release' })
+  assert.equal(releaseDecision({ ...promotion, beforeWorkerHash: sha }).changed, false)
+  assert.deepEqual(releaseDecision({ ...promotion, beforeWorkerHash: null }), { changed: true, reason: 'no published release found' })
+  assert.deepEqual(releaseDecision({ ...promotion, failedRunId: 10 }), { changed: false, reason: 'skipped: same inputs as failed run 10' })
+  assert.throws(() => releaseDecision({ ...promotion, workerHash: undefined }), /workerHashRequired/)
+})
+
+test('the last published source is the newest successful release whose templates were made public', async () => {
+  const published = 'd'.repeat(40), publish = 'Make only fully accepted candidates public'
+  const releaseRun = (id, headSha, extra = {}) => ({ id, run_attempt: 1, head_sha: headSha, head_branch: 'main', event: 'workflow_run',
+    path: '.github/workflows/e2b-official-runtime.yml', repository, ...extra })
+  const runs = [releaseRun(30, 'e'.repeat(40), { event: 'push' }), releaseRun(29, 'f'.repeat(40)),
+    releaseRun(28, 'c'.repeat(40), { path: '.github/workflows/other.yml' }), releaseRun(27, published, { event: 'workflow_dispatch' })]
+  const jobs = { 29: [{ name: 'check', head_sha: 'f'.repeat(40), steps: [] }],
+    27: [{ name: 'release / subscriptions', head_sha: published, steps: [{ name: publish, conclusion: 'success' }] }] }
+  const calls = []
+  const fetchImpl = async input => {
+    const url = new URL(input); calls.push(url.pathname)
+    if (url.pathname.endsWith('/actions/workflows/e2b-official-runtime.yml/runs')) {
+      assert.equal(url.searchParams.get('branch'), 'main')
+      assert.equal(url.searchParams.get('status'), 'success')
+      return Response.json({ total_count: runs.length, workflow_runs: runs })
+    }
+    const id = /\/actions\/runs\/(\d+)\/attempts\/1\/jobs$/.exec(url.pathname)?.[1]
+    assert.ok(id, url.pathname)
+    return Response.json({ total_count: jobs[id].length, jobs: jobs[id] })
+  }
+  assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), published)
+  assert.ok(!calls.some(path => /\/runs\/(30|28)\//.test(path)), 'a push or foreign run is never a publication')
+  jobs[27][0].steps[0].conclusion = 'skipped'
+  assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), null)
+  assert.equal(await lastPublishedSource({ token: 'test', fetchImpl, maxRuns: 1 }), null)
+})
+
+
+test('historical old and transferred failures are recognized through the immutable repository endpoint', async () => {
+  for (const recorded of [repository, transferredRepository]) {
+    const previousRun = { ...run, repository: recorded, head_repository: recorded }
+    const mock = api({ previousRun })
+    assert.equal(await findFailedInputs({ ...options, ...mock }), 10)
+    assert.ok(mock.calls.every(url => url.pathname.startsWith('/repositories/1427517699/')))
+    assert.equal(previousRun.repository.full_name, recorded.owner.id === 183887963 ? 'alexj11324/Mikka' : 'aspectly-labs/Mikka')
+  }
+})
+
+test('mixed and foreign historical identities cannot suppress a runtime retry', async () => {
+  for (const recorded of [
+    { ...repository, id: 1 }, { ...repository, full_name: 'foreign/Mikka' },
+    { ...repository, owner: { id: 359279274 } },
+    { ...repository, full_name: transferredRepository.full_name },
+  ]) {
+    for (const field of ['repository', 'head_repository'])
+      assert.equal(await findFailedInputs({ ...options, ...api({ previousRun: { ...run, [field]: recorded } }) }), null)
+  }
+})
+
+test('published source accepts official historical names and rejects incoherent repository claims', async () => {
+  for (const [recorded, expected] of [[repository, sha], [transferredRepository, sha],
+    [{ full_name: repository.full_name, id: repository.id }, sha],
+    [{ ...repository, id: 1 }, null], [{ ...repository, owner: { id: 359279274 } }, null],
+    [{ ...repository, full_name: 'foreign/Mikka' }, null]]) {
+    const fetchImpl = async input => {
+      const url = new URL(input)
+      assert.ok(url.pathname.startsWith('/repositories/1427517699/'))
+      return url.pathname.endsWith('/runs')
+        ? Response.json({ total_count: 1, workflow_runs: [{ ...run, event: 'workflow_run', repository: recorded }] })
+        : Response.json({ total_count: 1, jobs: [{ name: 'subscriptions', head_sha: sha,
+          steps: [{ name: 'Make only fully accepted candidates public', conclusion: 'success' }] }] })
+    }
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), expected)
+  }
 })

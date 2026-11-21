@@ -4,7 +4,7 @@ import { digest } from './definition'
  * Prompt/retry metadata and parent references have their own separate checks. */
 export function workerDefinitionDigest(value: {
   harness: string; instructions: string; model?: unknown; modelDispatch?: unknown; agentProfile?: unknown; profileOriginRunId?: unknown; pinnedDeviceId?: unknown; allowLocalRecovery?: unknown;
-  subscription?: unknown; apiKey?: unknown; mailbox?: unknown; customMcp?: unknown; readOnly?: unknown; policyCeiling?: unknown; projectExecution?: unknown; taskMachine?: unknown;
+  subscription?: unknown; apiKey?: unknown; credits?: unknown; mailbox?: unknown; customMcp?: unknown; readOnly?: unknown; policyCeiling?: unknown; projectExecution?: unknown; taskMachine?: unknown;
 }) {
   return digest({ harness: value.harness, instructions: value.instructions,
     ...(value.taskMachine ? {taskMachine:value.taskMachine} : {}),
@@ -16,6 +16,7 @@ export function workerDefinitionDigest(value: {
     ...(value.allowLocalRecovery === true ? { allowLocalRecovery: true } : {}),
     ...(value.subscription ? { subscription: value.subscription } : {}),
     ...(value.apiKey ? { apiKey: value.apiKey } : {}),
+    ...(value.credits ? { credits: value.credits } : {}),
     ...(value.mailbox ? { mailbox: value.mailbox } : {}),
     ...(value.customMcp ? { customMcp: value.customMcp } : {}),
     ...(value.readOnly ? { readOnly: true } : {}),

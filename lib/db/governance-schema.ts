@@ -1,5 +1,6 @@
-import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
 import { workspaces } from './workspace-schema'
+import { projects } from './project-schema'
 import type { GovernancePlan } from './team-entitlements-schema'
 import type { AuditExportRecord } from '@/lib/audit/integrity'
 import type { OrganizationAuditManifest } from '@/lib/governance/audit-export'
@@ -11,6 +12,7 @@ export type OrganizationRole = 'owner' | 'admin' | 'member'
 export const organizations = pgTable('mikka_organizations', {
   id: uuid('id').primaryKey(),
   name: varchar('name', { length: 120 }).notNull(),
+  icon: text('icon'),
   createdBy: text('createdBy').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -29,11 +31,24 @@ export const organizationMembers = pgTable('mikka_organization_members', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.organizationId, table.userId] }), index('mikka_org_members_user_idx').on(table.userId)])
 
+export const organizationMemberProjectDefaults = pgTable('mikka_organization_member_project_defaults', {
+  organizationId: uuid('organizationId').notNull(),
+  userId: text('userId').notNull(),
+  visibility: text('visibility').$type<'private' | 'shared'>().notNull(),
+  defaultProjectId: uuid('defaultProjectId').references(() => projects.id, { onDelete: 'set null' }),
+  selectionRevision: integer('selectionRevision').notNull().default(0),
+}, table => [
+  primaryKey({ columns: [table.organizationId, table.userId] }),
+  foreignKey({ columns: [table.organizationId, table.userId], foreignColumns: [organizationMembers.organizationId, organizationMembers.userId] }).onDelete('cascade'),
+])
+
 /** Multiple organizations may independently allow the same email domain. */
 export const organizationJoinDomains = pgTable('mikka_organization_join_domains', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   domain: varchar('domain', { length: 253 }).notNull(),
+  createdByUserId: text('createdByUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }),
 }, table => [
   unique('mikka_org_join_domain_unique').on(table.organizationId, table.domain),
   index('mikka_org_join_domain_idx').on(table.domain),

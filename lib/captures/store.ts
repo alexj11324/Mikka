@@ -13,8 +13,8 @@ import {
 } from '@mikka/protocol/capture'
 import { withAccountWrite } from '@/lib/account/write-guard'
 import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
-import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
-import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, ObjectStorageReadError, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
+import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures, users } from '@/lib/db/schema'
+import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, headArtifactObject, ObjectStorageReadError, presignArtifactPut, putArtifactObject, type ArtifactObjectHead } from '@/lib/artifacts/storage'
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
@@ -134,7 +134,7 @@ async function writableBeginUpload(owner: CaptureOwner, input: CaptureUploadRequ
   if (storage === 'inline') return { captureId: id, upload: { target: 'server' } }
   const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
   if (seconds < 1) return { error: 'unavailable', message: 'Upload expired.' }
-  const signed = await presignArtifactPut(key, input.contentType, seconds)
+  const signed = await presignArtifactPut(key, input.contentType, seconds, input.size)
   return { captureId: id, upload: { target: 'storage', ...signed } }
 }
 
@@ -152,11 +152,12 @@ export async function resumeUpload(owner: CaptureOwner, captureId: string): Prom
 
 async function writableResumeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureUploadResponse | CaptureError> {
   const row = await openUpload(owner, captureId)
-  if (!row || row.source !== 'local' || !row.storageKey || !row.expiresAt) return { error: 'not_found', message: 'No open upload with that id for this run.' }
+  // A reservation without an announced size could never be checked at completion.
+  if (!row || row.source !== 'local' || !row.storageKey || !row.expiresAt || !row.size) return { error: 'not_found', message: 'No open upload with that id for this run.' }
   if (artifactStorage() === 'inline') return { captureId, upload: { target: 'server' } }
   const seconds = Math.floor((row.expiresAt.getTime() - Date.now()) / 1000)
   if (seconds < 1) return { error: 'not_found', message: 'Upload expired.' }
-  return { captureId, upload: { target: 'storage', ...await presignArtifactPut(row.storageKey, row.contentType, seconds) } }
+  return { captureId, upload: { target: 'storage', ...await presignArtifactPut(row.storageKey, row.contentType, seconds, row.size) } }
 }
 
 /** The bytes of an upload sent to the server (no bucket configured). */
@@ -190,16 +191,45 @@ async function writableCompleteUpload(owner: CaptureOwner, captureId: string): P
   if (!row?.storageKey || !row.expiresAt || row.expiresAt.getTime() <= Date.now()) {
     return { error: 'not_found', message: 'No open upload with that id for this run.' }
   }
+  // A reservation without an announced size could never be checked.
+  if (!row.size) return { error: 'not_found', message: 'No open upload with that id for this run.' }
+  const stagingKey = row.storageKey
 
   // Only a lost conditional update needs a fresh read of the other writer's result.
   const readyUpload = async () => (await db.select().from(runCaptures).where(and(
     ownedUpload, unexpired, eq(runCaptures.status, 'ready'),
   )).limit(1))[0]
   const storage = artifactStorage()
+  /** Ends the upload over a file that cannot be a capture; a concurrent winner still answers. */
+  const failUpload = async (problem: string): Promise<CaptureView | CaptureError> => {
+    const failed = await db.update(runCaptures).set({ status: 'failed', error: problem, inlineContent: null, updatedAt: new Date() })
+      .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'uploading'))).returning({ id: runCaptures.id })
+    if (storage === 'r2' && failed.length) await deleteArtifactObject(stagingKey).catch(() => undefined)
+    if (!failed.length) {
+      const winner = await readyUpload()
+      if (winner) return captureView(winner)
+    }
+    return { error: 'invalid', message: problem }
+  }
   let bytes = row.inlineContent ? new Uint8Array(row.inlineContent) : null
   if (!bytes && storage === 'r2') {
+    // The bucket's own metadata is read before any byte of the file: a replayed
+    // signed PUT may have stored more than the announcement allowed, and such a
+    // file is refused without ever being loaded into memory.
+    let head: ArtifactObjectHead | null = null
     try {
-      bytes = await getArtifactObjectBytes(row.storageKey)
+      head = await headArtifactObject(stagingKey)
+    } catch (error) {
+      console.warn('[capture upload] object metadata unavailable', { causes: causeFields(error) })
+      return { error: 'unavailable', message: 'Capture storage is unavailable. Retry the upload completion.' }
+    }
+    if (!head) return { error: 'not_found', message: 'The file has not arrived.' }
+    // A provider that reports no length still has its bytes checked below.
+    if (head.size !== null && head.size !== row.size) return failUpload(`Expected ${row.size} bytes, got ${head.size}.`)
+    try {
+      // Bounded by the announcement: the uploader may still grow its staging
+      // object until the signature expires, and only one byte more is read.
+      bytes = await getArtifactObjectBytes(stagingKey, row.size)
     } catch (error) {
       if (!(error instanceof ObjectStorageReadError && error.code === 404)) {
         console.warn('[capture upload] object read unavailable', { causes: causeFields(error) })
@@ -211,16 +241,7 @@ async function writableCompleteUpload(owner: CaptureOwner, captureId: string): P
   const problem = bytes.length !== row.size ? `Expected ${row.size} bytes, got ${bytes.length}.`
     : sha256(bytes) !== row.sha256 ? 'The file does not match its sha256.'
       : captureProblem(bytes, row.contentType)
-  if (problem) {
-    const failed = await db.update(runCaptures).set({ status: 'failed', error: problem, inlineContent: null, updatedAt: new Date() })
-      .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'uploading'))).returning({ id: runCaptures.id })
-    if (storage === 'r2' && failed.length) await deleteArtifactObject(row.storageKey).catch(() => undefined)
-    if (!failed.length) {
-      const winner = await readyUpload()
-      if (winner) return captureView(winner)
-    }
-    return { error: 'invalid', message: problem }
-  }
+  if (problem) return failUpload(problem)
   // A presigned PUT remains usable until expiry. Publish the verified bytes
   // under a fresh key the uploader cannot overwrite; also persist the exact
   // checked bytes for inline uploads in case a second PUT races completion.
@@ -231,7 +252,7 @@ async function writableCompleteUpload(owner: CaptureOwner, captureId: string): P
   if (storage === 'r2') {
     // The upload URL may still recreate its staging object until it expires.
     // Its eventual cleanup requires an object-storage lifecycle rule.
-    await deleteArtifactObject(ready ? row.storageKey : verifiedKey).catch(() => undefined)
+    await deleteArtifactObject(ready ? stagingKey : verifiedKey).catch(() => undefined)
   }
   if (ready) { taskActivityChanged(db, owner.runId); return captureView(ready) }
   const winner = await readyUpload()
@@ -386,6 +407,8 @@ export async function runEvidence(userId: string, runId: string) {
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
+    // The model followed the dispatching chat's own (decision 2026-11-15-1630); null when someone named it or on older runs.
+    modelFollowed: sql<boolean | null>`(${agentRuns.agentDefinition}->'modelDispatch'->>'followed')::boolean`,
     // What the prompt carried of the run's skills; a body it only deferred is
     // shown beside the run so the person knows a skill waited on a file read.
     skillPrompt: sql<unknown>`${agentRuns.report}->'skillPrompt'`,
@@ -507,9 +530,21 @@ export async function revokeCaptureShares(userId: string, captureId: string): Pr
 /** The capture a live share token opens. */
 export async function sharedCapture(token: string) {
   if (!token.startsWith(SHARE_PREFIX)) return null
+  // A deleted account cannot leave an anonymous back door: the same rule
+  // artifacts apply (lib/artifacts/store.ts). Captures are owned by the person,
+  // not by a workspace — `run_captures` has no workspaceId and its userId has
+  // no foreign key — so the owner signal is the account row itself, not
+  // workspace membership (a Personal-workspace owner has no membership row at
+  // all). The deletion guard is checked too: it exists from the moment a
+  // deletion is requested, before the `user` row goes. Both ride in this
+  // statement so share authority and ready media stay one read.
   const [row] = await db.select(getTableColumns(runCaptures)).from(runCaptureShares)
     .innerJoin(runCaptures, eq(runCaptures.id, runCaptureShares.captureId))
-    .where(and(eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt), eq(runCaptures.status, 'ready'))).limit(1)
+    .where(and(
+      eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt), eq(runCaptures.status, 'ready'),
+      sql`exists (select 1 from ${users} where ${users.id} = ${runCaptures.userId})`,
+      sql`not exists (select 1 from "account_deletion_guards" where "subjectId" = ${runCaptures.userId})`,
+    )).limit(1)
   if (!row) return null
   const bytes = await fileOf(row)
   return bytes ? { ...captureView(row), bytes } : null

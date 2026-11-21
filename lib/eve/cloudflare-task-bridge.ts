@@ -117,6 +117,14 @@ export async function releaseOwnedCloudflareTaskMachine(db:Pick<PoolClient,'quer
   return {instanceId:receipt.instanceId as string,id:receipt.checkpoint.id as string,sha256:receipt.checkpoint.sha256 as string}
 }
 
+/** Re-opens the same grant with its later, paid deadline: the DO extends the lease and its alarm. */
+export function extendOwnedTaskMachine(pool:Pool,actor:TaskMachineActor,runId:string) {
+  return withSponsoredTaskGrant(pool, actor, runId, async grant=>{
+    const opened=await (await post('open',{grant})).json()
+    if(opened.state!=='running') throw Error('Cloudflare task is no longer running')
+  })
+}
+
 export function confirmOwnedTaskMachine(pool:Pool,actor:TaskMachineActor,runId:string) {
   return withSponsoredTaskGrant(pool, actor, runId, async grant=>{
     const status=await (await post('status',{grant})).json()

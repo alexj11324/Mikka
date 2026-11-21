@@ -59,7 +59,7 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
           const { deviceId, credential } = handoff
           const used = await pool.query('UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id', [deviceId, createHash('sha256').update(credential).digest('hex')])
           if (used.rowCount !== 1) throw new Error('Fixture worker credential unavailable')
-          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp(),enabled=true,harnesses=$2 WHERE id=$1', [deviceId, JSON.stringify(harnesses)])
+          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL,enabled=true,harnesses=$2 WHERE id=$1', [deviceId, JSON.stringify(harnesses)])
         }
         return { stdout: registering ? REGISTRATION_COMPLETE + '\n' : '', stderr: '', exitCode: 0 }
       } },

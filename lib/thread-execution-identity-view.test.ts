@@ -59,3 +59,9 @@ test('an invalid or future routing snapshot stays absent without breaking the re
   }
   assert.equal(threadExecutionEvidence({ run: { ...host().run, modelRouting: null } }, runId).modelRouting, null)
 })
+
+test('a followed model survives the allowlist and a malformed value reads as unknown', () => {
+  const run = { id: '00000000-0000-4000-8000-000000000001', harness: 'claude_code', model: 'claude-sonnet', credentialType: 'subscription', subscriptionRoute: null, executionIdentity: null }
+  assert.equal(threadExecutionEvidence({ run: { ...run, modelFollowed: true } }, run.id).modelFollowed, true)
+  assert.equal(threadExecutionEvidence({ run: { ...run, modelFollowed: 'yes' } }, run.id).modelFollowed, null)
+})

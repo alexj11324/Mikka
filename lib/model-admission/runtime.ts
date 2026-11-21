@@ -17,11 +17,18 @@ export async function assertSubscriptionModelTransport(scope: { workspaceId: str
     await modelAdmission.subscription({ workspaceId, ownerId: scope.ownerId }, model, route, { signal, auditAllowed })
 }
 
-/** Existing native/Decision transports do not attest an exact controlled
+/** Existing unmanaged native transports do not attest an exact controlled
  * provider route. A configured organization rule cannot silently bypass it.
  * This does not disable ordinary unmanaged model use. */
 export async function assertUnmanagedModelTransport(scope: { workspaceId: string; ownerId?: string; workspaceIds?: string[] }, model: string,
   signal?: AbortSignal) {
   for (const workspaceId of new Set([scope.workspaceId,...scope.workspaceIds??[]]))
-    await modelAdmission.gateway({ workspaceId, ownerId:scope.ownerId }, model, 'unsupported-model-transport', { signal })
+    await modelAdmission.litellm({ workspaceId, ownerId:scope.ownerId }, model, 'unsupported-model-transport', { signal })
+}
+
+/** All affected workspaces must admit the same server-owned LiteLLM route. */
+export async function assertLiteLLMModelTransport(scope: { workspaceId: string; ownerId?: string; workspaceIds?: string[] }, model: string,
+  endpoint: string, signal?: AbortSignal) {
+  for (const workspaceId of new Set([scope.workspaceId, ...scope.workspaceIds ?? []]))
+    await modelAdmission.litellm({ workspaceId, ownerId: scope.ownerId }, model, endpoint, { signal })
 }

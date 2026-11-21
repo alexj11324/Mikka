@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { SharedResourceKind } from '@/lib/db/governance-schema'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
@@ -22,7 +22,7 @@ export type OrganizationRole = 'owner' | 'admin' | 'member'
 export type OrganizationListItem = { id: string; name: string; role: OrganizationRole }
 export type JoinableOrganization = Pick<OrganizationListItem, 'id' | 'name'>
 export type OrganizationDomain = { id: string; domain: string }
-export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; createdAt: string; updatedAt: string }
+export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; image?: string | null; createdAt: string; updatedAt: string }
 /** Organization membership only; invitations never confer Workspace/Project access. */
 export type OrganizationInvitation = {
   id: string; email: string; createdBy: string; status: 'pending' | 'accepted' | 'revoked'
@@ -244,6 +244,12 @@ export const organizationApi = {
 
   setPolicy: (id: string, policy: Omit<ResourcePolicy, 'revision'>) => send<ResourcePolicyState>(org(id, '/policy'), 'PATCH', policy),
   decide: (id: string, approvalId: string, status: 'approved' | 'denied') => send<{ decided: true }>(org(id, '/approvals'), 'PATCH', { id: approvalId, status }),
+
+  listAuditEvents: (id: string, filters: { cursor?: string; order?: 'asc' | 'desc'; actor?: string; userId?: string; family?: string; from?: string; to?: string; q?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams({ view: 'events' })
+    for (const [name, value] of Object.entries(filters)) if (value !== undefined) query.set(name, String(value))
+    return request<{ events: OrganizationAuditEvent[]; nextCursor: string | null }>(`${org(id, '/audit-log')}?${query}`)
+  },
 
   /** Freezes the events in range for fifteen minutes; each page rechecks admin access and integrity. */
   createAuditExport: (id: string, range: { from?: string; until?: string }) => send<{ manifest: AuditManifest; events: OrganizationAuditEvent[] }>(org(id, '/audit-log'), 'POST', range),

@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { fetchMessageReactions, reactionUrls, type MessageReaction, type MessageReactions as Reactions } from '@/lib/message-reactions'
 import { cn } from '@/lib/utils'
 

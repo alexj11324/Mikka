@@ -18,6 +18,7 @@ const otherHome = '10000000-0000-4000-8000-000000000002'
 type Kind = 'issues' | 'threads' | 'tasks' | 'bots' | 'groups' | 'roster'
 type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number }; revisions?: Record<string, number>; presence?: PresenceProof | null }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
 const replies = new Map<Kind, () => Promise<Read>>()
+let rosterWorkspace: string | undefined
 let reads: Kind[]
 let cursors: { kind: Kind; known?: string; positions?: unknown }[]
 let scopeError: string | null = null
@@ -29,9 +30,9 @@ const sync = async (kind: Kind, known?: string, positions?: unknown) => {
 mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: { syncIssueList: (known?: string, positions?: unknown) => sync('issues', known, positions) } })
 mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { syncThreadList: (known?: string, positions?: unknown) => sync('threads', known, positions), pollTaskRuns: () => read('tasks') } })
 mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { pollBotChatSummaries: () => read('bots') } })
-mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: () => read('roster') } })
+mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: (workspace?: string) => { rosterWorkspace = workspace; return read('roster') } } })
 
-mock.module('next/navigation', { namedExports: { useSearchParams: () => ({ get: () => null }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => ({ get: () => null }) } })
 mock.module(new URL('../i18n/navigation.ts', import.meta.url).href, { namedExports: { useRouter: () => ({ refresh() {} }) } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
@@ -102,6 +103,7 @@ before(async () => {
   ;({ useListExpiry } = await import('../hooks/use-list-expiry'))
 })
 beforeEach(() => {
+  rosterWorkspace = undefined
   reads = []; cursors = []; scopeError = null; automaticReadiness = true; automaticOpen = true; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   for (const kind of ['issues', 'threads', 'tasks', 'bots', 'groups', 'roster'] as const) replies.set(kind, async () => snapshot(kind))
@@ -749,6 +751,7 @@ test('group list GET results are bound to both the authenticated owner and the r
 
 for (const moved of ['owner', 'workspace'] as const) test(`a delayed Bot roster cannot populate another ${moved}'s list key`, async () => {
   await render(['roster']); await settled()
+  assert.equal(rosterWorkspace, team, 'the live lookup uses the workspace displayed in this window')
   const held = deferred<Read>(); replies.set('roster', () => held.promise)
   let pending!: Promise<unknown>
   await act(async () => { pending = refresh.roster!().catch(() => undefined) })

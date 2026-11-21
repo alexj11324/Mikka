@@ -241,6 +241,23 @@ test('a stored reply carries the stream it was first shown from, so the chat kee
   ])
 })
 
+test('a welcome settling after the first question keeps its Eve turn separate from the answer', () => {
+  const welcome = 'eve:wrun_1:turn_0'
+  const answer = 'eve:wrun_1:turn_1'
+  const rows = [
+    { role: 'user', content: 'What is next?' },
+    { role: 'assistant', content: 'Welcome.', mikkaStreamId: welcome },
+    { role: 'assistant', content: 'First words.', mikkaStreamId: answer },
+    { role: 'assistant', content: 'Final words.', mikkaStreamId: answer },
+  ] as ModelMessage[]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: new Date(0) })))
+  assert.deepEqual(items.map(item => [item.position, item.text, item.streamId]), [
+    [1, 'What is next?', undefined],
+    [2, 'Welcome.', welcome],
+    [3, 'First words.\n\nFinal words.', answer],
+  ])
+})
+
 test('a stored reply keeps its tools, how each ended and their previews, and whether it thought', () => {
   const at = new Date('2026-10-22T00:00:00Z')
   const compact = [

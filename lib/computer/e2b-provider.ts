@@ -32,6 +32,14 @@ export function computerGone(error: unknown) {
   return error instanceof SandboxNotFoundError
 }
 
+/** Static provider observation. Unlike connect(), this cannot resume a paused machine. */
+export async function readComputerMetrics(ownerId: string, sandboxId: string, start: Date, end: Date, signal: AbortSignal) {
+  const base = await options(ownerId)
+  return withE2BErrors(ownerId, false, () => Sandbox.getMetrics(sandboxId, {
+    ...base, start, end, signal, retries: 0, requestTimeoutMs: 10_000,
+  }))
+}
+
 /** The worker commit baked into the sandbox's template. */
 export async function computerWorkerSha(sandbox: Sandbox) {
   return (await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim()

@@ -84,7 +84,14 @@ mock.module(new URL('./scheduled-read.ts', import.meta.url).href, { namedExports
   },
 } })
 mock.module(new URL('./projection.ts', import.meta.url).href, { namedExports: {
-  async projectTurnState() {}, projectEveTurn: () => [],
+  async projectTurnState() {},
+  projectEveTurn: (_view: unknown, _session: string, _turn: string, _outcome: string, stoppedText?: string) => stoppedText ? [stoppedText] : [],
+  stoppedTurnDisplay: async (reader: { id: string }, turnId: string, startIndex: number) => {
+    assert.equal(reader.id, 'fixture-session')
+    assert.equal(turnId, 'turn_1')
+    assert.equal(startIndex, 7)
+    return 'Interrupted words.'
+  },
 } })
 mock.module(new URL('./evaluation-runtime.ts', import.meta.url).href, { namedExports: {
   evaluationForSession: async () => evaluation,
@@ -119,7 +126,7 @@ function context({ turnId = 'turn_1', parent = false, evaluated = false, surface
     session: { id: 'fixture-session', auth: { current: {
       authenticator: 'mikka', attributes: { ...scope, surface, ...parent ? {} : { sourceEventId: 'fixture-source' }, ...evaluated ? { evaluationBindingId: 'fixture-evaluation' } : {} },
     } }, ...parent ? { parent: { sessionId: 'fixture-parent', turn: { id: 'parent-turn' } } } : {} },
-    turn: { id: turnId },
+    turn: { id: turnId }, position: { line: 7, index: 0 },
   } as unknown as DynamicModelContext
 }
 
@@ -130,6 +137,21 @@ beforeEach(() => {
   runtime = { harness: 'ai_sdk', model: 'fixture-model' }
   definition = { ...DEFAULT_AGENT_DEFINITION, instructions: 'Bot guidance', tools: ['web_search'] }
   instructionCalls.length = rpcCalls.length = modelCalls.length = 0
+})
+
+test('the native settlement hook reads interrupted display text only for a cancelled root web turn', async () => {
+  const settled = productHook.events['turn.settled']!
+  await contextStorage.run(new ContextContainer(), async () => {
+    const ctx = context()
+    await started({ data: { turnId: 'turn_1' } }, ctx)
+    for (const outcome of ['completed', 'cancelled'] as const) {
+      await settled({data:{turnId:'turn_1',outcome}} as never, ctx as never)
+    }
+    await settled({data:{turnId:'turn_1',outcome:'cancelled'}} as never, context({evaluated:true}) as never)
+    assert.deepEqual(rpcCalls, ['completed','cancelled'].map(outcome=>({
+      scope, operation:{operation:'finish', sessionId:'fixture-session', turnId:'turn_1', outcome, messages:outcome==='cancelled'?['Interrupted words.']:[]},
+    })))
+  })
 })
 
 test('the native turn hook chooses business capabilities once and definitions allocate no action execution', async () => {

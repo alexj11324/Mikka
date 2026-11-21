@@ -1,7 +1,7 @@
 'use server'
 
 import { withFreshSession } from '@/lib/fresh-session'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import type { ActionResult } from '@/lib/action-result'
 import type { AppAccess, PolicyApp } from '@/lib/app-policy/apps'
 import { getAppPolicies, setAppPolicy, type AppPolicyView } from '@/lib/app-policy/store'

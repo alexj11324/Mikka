@@ -138,7 +138,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     : newest?.location === 'cloud' ? { kind: 'cloud' as const, name: 'Cloud' } : null
   return {
     task: {
-      id, identifier: identifiers.get(id) ?? null, title: issue.title, description: issueContentToMarkdown(issue.content).trim() || null,
+      id, identifier: identifiers.get(id) ?? null, title: issue.title, description: issueContentToMarkdown(issue.content, { mentionLabels: true }).trim() || null,
       workOwner: owner ? { kind: owner.kind, name: owner.name } : null,
       status: issue.status, priority: issue.priority, ...taskStateOf(task, newest, { block, schedule }), bot: newest?.bot ?? null,
       replyRunId: latestConversationRun(runs),

@@ -21,9 +21,14 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.equal(selected.runtimeEnv.ANOTHER_SECRET, undefined)
   assert.equal(selected.runtimeEnv.SOME_OTHER_BINDING, undefined)
   assert.equal(selected.runtimeEnv.WORKFLOW_TARGET_WORLD, '@workflow/world-postgres')
-  assert.equal(selected.runtimeEnv.MIKKA_HOSTED_MODEL_FALLBACK, 'cloudflare-workers-ai')
   assert.equal(selected.runtimeEnv.MIKKA_EVE_PUBLIC_ORIGIN, 'https://eve.example.test')
   assert.equal(selected.runtimeEnv.BETTER_AUTH_URL, 'https://app.example.test')
+})
+
+test('idle queue polling stays slow unless the deployment sets its own interval', () => {
+  assert.equal(hostConfiguration(environment()).runtimeEnv.WORKFLOW_POSTGRES_POLL_INTERVAL_MS, '5000')
+  const tuned = hostConfiguration({ ...environment(), EVE_ENV_WORKFLOW_POSTGRES_POLL_INTERVAL_MS: '2000' })
+  assert.equal(tuned.runtimeEnv.WORKFLOW_POSTGRES_POLL_INTERVAL_MS, '2000')
 })
 
 test('native routing preserves protocol, cookies, body and origin while replacing forged forwarding fields', async () => {

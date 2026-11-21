@@ -1,5 +1,5 @@
 // Expo Web screenshots for the iOS chat batch (Alex 2026-11-08): the glass title pill, time separators, ⋯ under each
-// message, a long press selecting words with 「添加到对话」, and ⋯'s actions. Our own labelled fixtures.
+// message, a long press selecting words with 「添加到线程」, and ⋯'s actions. Our own labelled fixtures.
 //
 //   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out [SCREENSHOT_SET=before] node apps/mobile/scripts/chat-screenshots.mjs
 //
@@ -158,11 +158,11 @@ async function run() {
       await page.mouse.move(196, 400); await page.mouse.wheel(0, -3000); await settle(page)
       await shot(page, theme, 'chat-top')
       await page.mouse.wheel(0, 3000); await settle(page)
-      // A long press on the bot's latest reply selects its words; 「添加到对话」 leads the capsules above the composer.
+      // A long press on the bot's latest reply selects its words; 「添加到线程」 leads the capsules above the composer.
       await longPress(page, page.getByText('构建排上了').first())
-      await page.getByRole('button', { name: '添加到对话' }).waitFor({ timeout: 20_000 }); await settle(page)
+      await page.getByRole('button', { name: '添加到线程' }).waitFor({ timeout: 20_000 }); await settle(page)
       await shot(page, theme, 'select')
-      await page.getByRole('button', { name: '添加到对话' }).click(); await settle(page)
+      await page.getByRole('button', { name: '添加到线程' }).click(); await settle(page)
       await shot(page, theme, 'quoted')
       // ⋯ under a message: its reactions, 回复, 复制 and 选择文本 (the system menu on iOS, this sheet on the web build).
       await page.getByRole('button', { name: '更多', exact: true }).nth(1).click()

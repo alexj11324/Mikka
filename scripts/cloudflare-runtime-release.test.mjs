@@ -24,6 +24,7 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
     apiIngress: { path: 'ingress.mjs', sha256: '1'.repeat(64), bytes: 120 },
     eveRuntime: { path: 'workers/eve-runtime.mjs', sha256: '3'.repeat(64), bytes: 220 },
     taskSandbox: { path: 'workers/task-sandbox.mjs', sha256: '4'.repeat(64), bytes: 320 },
+    liteLlm: { path: 'workers/litellm.mjs', sha256: '4'.repeat(64), bytes: 320 },
     web: { path: 'workers/web.mjs', sha256: '5'.repeat(64), bytes: 420 },
     credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '6'.repeat(64), bytes: 520 },
     credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '7'.repeat(64), bytes: 620 },
@@ -33,7 +34,7 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
 api.publicBuildSettings = { publicSha, privateSha: overlaySha, publication: 'registry-only', NEXT_PUBLIC_POSTHOG_KEY: 'public-analytics',
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_public', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'public-turnstile', NEXT_PUBLIC_COMPUTER_ENABLED: '1' }
 api.publicBuildSettingsSha256 = createHash('sha256').update(JSON.stringify(api.publicBuildSettings)).digest('hex')
-const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: publicSha,
   GITHUB_WORKFLOW_SHA: publicSha, GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-eve-image.yml@refs/heads/main',
   GITHUB_ACTOR: 'alexj11324', GITHUB_ACTOR_ID: '183887963', GITHUB_TRIGGERING_ACTOR: 'alexj11324',
@@ -190,7 +191,7 @@ test('prebuilt packaging carries accepted API resource bytes into the official E
 
 
 test('runtime workflow callers pass genuine API run identity and keep the Registry username unmasked', async () => {
-  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
     const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
     assert.ok(workflow.includes('api_run_id:'))
     assert.ok(workflow.includes('api_run_attempt:'))
@@ -285,7 +286,7 @@ set -euo pipefail
 [[ "$1" == 'scripts/cloudflare-runtime-release.mjs' && "$2" == 'publish' ]]
 [[ "$(cat "$DOCKER_CONFIG/auth")" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
 `, { mode: 0o700 })
-    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
       const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
       const step = workflow.split('      - name: Publish the verified runtime image\n')[1]?.split('\n      - ')[0]
       assert.ok(step)
@@ -302,4 +303,183 @@ set -euo pipefail
       assert.equal(child.stdout, '')
     }
   } finally { await rm(work, { recursive: true, force: true }) }
+})
+
+test('maintenance patch is captured from the genuine driver and changes only installed Eve World Postgres 5.2.0', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
+  const steps = workflow.split('\n  publish:\n')[1]
+  const step = name => steps.split('      - name: ' + name + '\n')[1].split('\n      - ')[0]
+  const script = name => step(name).split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const captureName = 'Preserve the verified Workflow Postgres patch from the main driver'
+  const applyName = 'Apply the verified Workflow Postgres patch'
+  for (const name of [captureName, applyName]) assert.ok(step(name).includes("if: inputs.maintenance_workflow_postgres_patch != ''"))
+  assert.ok(steps.indexOf(captureName) < steps.indexOf('Check out the original API product source'))
+  assert.ok(steps.indexOf(applyName) > steps.indexOf('uses: ./.github/actions/pnpm-install'))
+  assert.ok(steps.indexOf(applyName) < steps.indexOf('Compile the official Eve runtime'))
+  const work = await mkdtemp(join(tmpdir(), 'mikka-eve-postgres-backport-'))
+  try {
+    const run = (command, args, env = {}) => spawnSync(command, args, { cwd: work, env: { ...process.env, ...env }, encoding: 'utf8' })
+    const git = (...args) => {
+      const child = run('git', args)
+      assert.equal(child.status, 0, child.stderr)
+      return child.stdout.trim()
+    }
+    const commit = message => git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', message)
+    git('init', '-q')
+    await mkdir(join(work, 'apps/eve'), { recursive: true })
+    await writeFile(join(work, 'apps/eve/package.json'), '{}\n')
+    await writeFile(join(work, '.gitignore'), 'node_modules/\n')
+    git('add', '.')
+    commit('accepted API source')
+    const original = git('rev-parse', 'HEAD')
+    const patch = 'diff --git a/dist/storage.js b/dist/storage.js\n--- a/dist/storage.js\n+++ b/dist/storage.js\n@@ -1,3 +1,3 @@\n before\n-old\n+patched\n after\n'
+    const sha = createHash('sha256').update(patch).digest('hex')
+    await mkdir(join(work, 'patches'))
+    await writeFile(join(work, 'patches/@workflow__world-postgres@5.2.0.patch'), patch)
+    git('add', 'patches')
+    commit('reviewed startup patch on current main')
+    const driver = git('rev-parse', 'HEAD')
+    const runnerTemp = join(work, 'node_modules/runner-temp')
+    await mkdir(runnerTemp, { recursive: true })
+    const environment = { GITHUB_SHA: driver, RUNNER_TEMP: runnerTemp, WORKFLOW_POSTGRES_PATCH_SHA256: sha, MAINTENANCE_OWNER_RELEASE: ownerRelease }
+    const invoke = (name, extra = {}) => run('bash', ['--noprofile', '--norc', '-c', script(name)], { ...environment, ...extra })
+    for (const invalid of [{ MAINTENANCE_OWNER_RELEASE: '' }, { WORKFLOW_POSTGRES_PATCH_SHA256: sha.toUpperCase() },
+      { WORKFLOW_POSTGRES_PATCH_SHA256: 'a'.repeat(64) }, { WORKFLOW_POSTGRES_PATCH_SHA256: sha.slice(1) }, { GITHUB_SHA: original }]) {
+      const child = invoke(captureName, invalid)
+      assert.notEqual(child.status, 0, 'invalid maintenance request must stop before checkout')
+      assert.ok(!child.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
+    }
+    const capturedResult = invoke(captureName)
+    assert.equal(capturedResult.status, 0, capturedResult.stderr)
+    git('checkout', '--detach', '-q', original)
+    const world = join(work, 'node_modules/.pnpm/fixture/node_modules/@workflow/world-postgres')
+    await mkdir(join(world, 'dist'), { recursive: true })
+    const packageJson = version => JSON.stringify({ name: '@workflow/world-postgres', version, main: 'dist/index.js' })
+    await writeFile(join(world, 'package.json'), packageJson('5.2.0'))
+    await writeFile(join(world, 'dist/index.js'), '')
+    const storage = join(world, 'dist/storage.js')
+    await writeFile(storage, 'before\nold\nafter\n')
+    await mkdir(join(work, 'apps/eve/node_modules/@workflow'), { recursive: true })
+    await symlink(world, join(work, 'apps/eve/node_modules/@workflow/world-postgres'))
+    const captured = join(runnerTemp, 'eve-workflow-postgres.patch')
+    assert.equal(await readFile(captured, 'utf8'), patch, 'the old API checkout cannot replace the reviewed driver patch')
+    await writeFile(captured, patch + '\n')
+    assert.notEqual(invoke(applyName).status, 0, 'installer-time changes to the captured patch are rejected')
+    await writeFile(captured, patch)
+    await writeFile(join(world, 'package.json'), packageJson('5.1.0'))
+    assert.notEqual(invoke(applyName).status, 0, 'the patch is only valid for the pinned package version')
+    await writeFile(join(world, 'package.json'), packageJson('5.2.0'))
+    await writeFile(storage, 'changed-context\nold\nafter\n')
+    const fuzz = invoke(applyName)
+    assert.notEqual(fuzz.status, 0, 'context mismatch must not be accepted with patch fuzz')
+    assert.ok(!fuzz.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
+    await writeFile(storage, 'before\nold\nafter\n')
+    const child = invoke(applyName)
+    assert.equal(child.status, 0, child.stderr)
+    assert.equal(child.stdout.split('\n').filter(line => line.startsWith('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=')).join('\n'), 'MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=' + sha)
+    assert.equal(await readFile(storage, 'utf8'), 'before\npatched\nafter\n')
+    assert.equal(git('rev-parse', 'HEAD'), original)
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+    const repeated = invoke(applyName)
+    assert.notEqual(repeated.status, 0, 'already applied patches stop instead of reporting a fresh success')
+    assert.ok(!repeated.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
+  } finally { await rm(work, { recursive: true, force: true }) }
+})
+
+test('hosted model budget backport admits only the reviewed constant and restores frozen source on compiler failure', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
+  const steps = workflow.split('\n  publish:\n')[1]
+  const step = name => {
+    const value = steps.split('      - name: ' + name + '\n')[1]
+    assert.ok(value, 'missing protected budget step: ' + name)
+    return value.split('\n      - ')[0]
+  }
+  const script = name => step(name).split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const captureName = 'Preserve the reviewed hosted model call budget from the main driver'
+  const checkName = 'Check the reviewed hosted model call budget against the accepted API source'
+  const compileName = 'Compile the official Eve runtime and shared product resources offline'
+  const verifyName = 'Verify the reviewed hosted model call budget'
+  const captureScript = script(captureName)
+  assert.ok(steps.indexOf(captureName) < steps.indexOf('Check out the original API product source'))
+  assert.ok(steps.indexOf(checkName) > steps.indexOf('uses: ./.github/actions/pnpm-install'))
+  assert.ok(steps.indexOf(verifyName) > steps.indexOf(compileName))
+  assert.ok(steps.indexOf(verifyName) < steps.indexOf('Publish the verified runtime image'))
+  assert.ok(step(verifyName).includes("if: inputs.maintenance_hosted_call_budget_sha != ''"))
+  const work = await mkdtemp(join(tmpdir(), 'mikka-hosted-budget-backport-'))
+  try {
+    const run = (command, args, env = {}) => spawnSync(command, args, { cwd: work, env: { ...process.env, ...env }, encoding: 'utf8' })
+    const git = (...args) => {
+      const child = run('git', args)
+      assert.equal(child.status, 0, child.stderr)
+      return child.stdout.trim()
+    }
+    const commit = message => git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', message)
+    const policy = join(work, 'lib/abuse/policy.ts')
+    const original = 'export const HOSTED_CALL_TIMEOUT_MS = 60_000\nexport const OTHER_LIMIT = 1\n'
+    const reviewed = 'export const HOSTED_CALL_TIMEOUT_MS = 120_000\nexport const OTHER_LIMIT = 1\n'
+    const sha = value => createHash('sha256').update(value).digest('hex')
+    git('init', '-q')
+    await mkdir(join(work, 'lib/abuse'), { recursive: true })
+    await mkdir(join(work, 'scripts'))
+    await writeFile(policy, original)
+    await writeFile(join(work, '.gitignore'), 'node_modules/\n')
+    await writeFile(join(work, 'scripts/build-cloudflare-eve-image.sh'), '#!/usr/bin/env bash\nset -euo pipefail\n[[ "$1" == --prebuilt-api ]]\nsha256sum lib/abuse/policy.ts > "$COMPILED_POLICY_OBSERVATION"\nexit "${TEST_COMPILE_STATUS:-0}"\n')
+    git('add', '.')
+    commit('accepted frozen API source')
+    const accepted = git('rev-parse', 'HEAD')
+    const runnerTemp = join(work, 'node_modules/runner-temp')
+    await mkdir(runnerTemp, { recursive: true })
+    const environment = { RUNNER_TEMP: runnerTemp, MAINTENANCE_OWNER_RELEASE: ownerRelease,
+      COMPILED_POLICY_OBSERVATION: join(runnerTemp, 'compiled-policy') }
+    const invoke = (name, extra = {}) => run('bash', ['--noprofile', '--norc', '-c', name === captureName ? captureScript : script(name)], { ...environment, ...extra })
+    const selectDriver = async value => {
+      git('checkout', '--detach', '-q', accepted)
+      await writeFile(policy, value)
+      git('add', 'lib/abuse/policy.ts')
+      commit('reviewed main policy')
+      return { GITHUB_SHA: git('rev-parse', 'HEAD'), HOSTED_CALL_BUDGET_SHA256: sha(value) }
+    }
+    const forbidden = await selectDriver(reviewed.replace('OTHER_LIMIT = 1', 'OTHER_LIMIT = 2'))
+    assert.equal(invoke(captureName, forbidden).status, 0)
+    git('checkout', '--detach', '-q', accepted)
+    assert.notEqual(invoke(checkName, forbidden).status, 0, 'an unrelated reviewed policy edit cannot ride the maintenance override')
+    assert.equal(await readFile(policy, 'utf8'), original)
+    const selected = await selectDriver(reviewed)
+    for (const invalid of [{ MAINTENANCE_OWNER_RELEASE: '' }, { HOSTED_CALL_BUDGET_SHA256: selected.HOSTED_CALL_BUDGET_SHA256.toUpperCase() },
+      { HOSTED_CALL_BUDGET_SHA256: 'a'.repeat(64) }, { HOSTED_CALL_BUDGET_SHA256: selected.HOSTED_CALL_BUDGET_SHA256.slice(1) }, { GITHUB_SHA: accepted }]) {
+      assert.notEqual(invoke(captureName, { ...selected, ...invalid }).status, 0)
+    }
+    assert.equal(invoke(captureName, selected).status, 0)
+    git('checkout', '--detach', '-q', accepted)
+    const checked = invoke(checkName, selected)
+    assert.equal(checked.status, 0, checked.stderr)
+    const failed = invoke(compileName, { ...selected, TEST_COMPILE_STATUS: '23' })
+    assert.equal(failed.status, 23, failed.stderr)
+    assert.equal(await readFile(policy, 'utf8'), original, 'compiler failure restores the accepted source before a later publication step')
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+    assert.notEqual(invoke(verifyName, selected).status, 0, 'failed compilation cannot emit an authenticated budget marker')
+    const completed = invoke(compileName, selected)
+    assert.equal(completed.status, 0, completed.stderr)
+    assert.equal((await readFile(environment.COMPILED_POLICY_OBSERVATION, 'utf8')).split(' ')[0], selected.HOSTED_CALL_BUDGET_SHA256)
+    assert.equal(await readFile(policy, 'utf8'), original)
+    const verified = invoke(verifyName, selected)
+    assert.equal(verified.status, 0, verified.stderr)
+    assert.equal(verified.stdout.trim(), 'MIKKA_EVE_HOSTED_CALL_BUDGET_SHA256=' + selected.HOSTED_CALL_BUDGET_SHA256)
+    assert.equal(git('rev-parse', 'HEAD'), accepted)
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+    const normal = invoke(compileName, { HOSTED_CALL_BUDGET_SHA256: '' })
+    assert.equal(normal.status, 0, normal.stderr)
+    assert.equal((await readFile(environment.COMPILED_POLICY_OBSERVATION, 'utf8')).split(' ')[0], sha(original), 'absent input keeps the original compiler path')
+  } finally { await rm(work, { recursive: true, force: true }) }
+})
+
+
+test('an organization runtime publisher accepts an unchanged protected API receipt from before transfer', () => {
+  const repository = 'aspectly-labs/Mikka'
+  const transferred = { ...env, GITHUB_REPOSITORY: repository, GITHUB_REPOSITORY_OWNER_ID: '359279274',
+    GITHUB_WORKFLOW_REF: repository + '/.github/workflows/cloudflare-eve-image.yml@refs/heads/main' }
+  const original = JSON.stringify(api)
+  assert.equal(releaseIdentity(transferred, 'eve', api).repository, repository)
+  assert.equal(JSON.stringify(api), original)
+  assert.throws(() => releaseIdentity(transferred, 'eve', { ...api, repository }), /cloudflare-api-image/)
 })

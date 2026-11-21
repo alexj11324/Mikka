@@ -1,10 +1,9 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
-import { createOrganizationAuditExport, readOrganizationAuditExport } from '@/lib/governance/audit-export'
+import { createOrganizationAuditExport, listOrganizationAuditEvents, readOrganizationAuditExport } from '@/lib/governance/audit-export'
 import { AuditExportError } from '@/lib/audit/export'
 import { organizationSession } from '@/lib/enterprise/http'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 async function exported(work: () => Promise<unknown>) {
   try { return await work() }
@@ -21,7 +20,12 @@ export const POST = freshSessionRoute(async (request: Request, context: Context)
 }))
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const { organizationId } = await context.params
-  const session = await organizationSession(request, organizationId, true)
   const query = new URL(request.url).searchParams
+  if (query.get('view') === 'events') {
+    const session = await organizationSession(request, organizationId)
+    query.delete('view')
+    return exported(() => listOrganizationAuditEvents(organizationId, session.user.id, Object.fromEntries(query)))
+  }
+  const session = await organizationSession(request, organizationId, true)
   return exported(() => readOrganizationAuditExport(organizationId, session.user.id, query.get('exportId') ?? '', Number(query.get('offset') ?? 0), Number(query.get('limit') ?? 100)))
 }))

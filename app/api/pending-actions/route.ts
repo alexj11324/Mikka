@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/api-auth'
 import { listPendingActions } from '@/lib/pending-action-store'
 import { pendingActionsOutsideToken } from '@/lib/tokens/scope'

@@ -1,11 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { ComputerError } from '@/lib/computer/store'
 import { threadMachineAction } from '@/lib/cloud-computer/thread-machines'
-export const runtime = 'nodejs'
 export const maxDuration = 300
 export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const respond = (body: unknown, status: number) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })

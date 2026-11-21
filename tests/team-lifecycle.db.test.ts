@@ -4,8 +4,8 @@ import test, { mock } from 'node:test'
 import { count, dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('Team lifecycle preserves canonical workspace objects and their history', { skip: !dbUrl }, async t => {
-  const intl = await import('next-intl/server')
-  mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+  const intl = await import('@/lib/intl/i18n-server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   t.after(() => mock.restoreAll())
   const { Pool } = await import('pg')

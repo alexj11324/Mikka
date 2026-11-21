@@ -51,13 +51,13 @@ test('Project v2: split database migration, canonical relationships and live ten
   globals.mikkaPool = application; globals.workspacePool = workspace
   let workspaceModule: Pool | undefined
   let selectedWorkspace: string | undefined
-  const framework = await import('next/headers')
-  const headersMock = mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  const headersMock = mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }),
     headers: async () => new Headers(),
   } })
-  const localization = await import('next-intl/server')
-  const localeMock = mock.module('next-intl/server', { namedExports: { ...localization, getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
+  const localization = await import('@/lib/intl/i18n-server')
+  const localeMock = mock.module('@/lib/intl/i18n-server', { namedExports: { ...localization, getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))
@@ -199,6 +199,24 @@ test('Project v2: split database migration, canonical relationships and live ten
     const created = await actAs(member, () => actions.saveProject({ ...draft, leadUserId: owner, memberIds: [owner, member] }))
     assert.ok('project' in created, JSON.stringify(created))
     const createdId = created.project.id
+
+    await t.test('Task label suggestions stay in the Task workspace for a reader who belongs to both', async () => {
+      const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')
+      const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+      for (const [id, name] of [[initialTasks[0], 'Alpha only'], [foreignTask, 'Beta only']]) {
+        const document = { type: 'doc' }
+        const metadata = readIssueMetadata(document)
+        metadata.labels = [{ name, color: 'blue' }]
+        await application.query('UPDATE issues SET content=$2 WHERE id=$1', [id, withIssueMetadata(document, metadata)])
+      }
+      try {
+        for (const [workspaceId, id, name] of [[alpha, initialTasks[0], 'Alpha only'], [beta, foreignTask, 'Beta only']]) {
+          selectedWorkspace = workspaceId
+          const options = await actAs(owner, () => getIssuePropertyOptions(id))
+          assert.deepEqual(options.labels, [{ name, color: 'blue' }])
+        }
+      } finally { selectedWorkspace = alpha }
+    })
 
     await t.test('task Project options retain every visible project UUID and the selected tenant', async () => {
       const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')

@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
@@ -9,7 +9,6 @@ import { maskFor, maskForRun } from '@/lib/secrets/runtime'
 import { runChanged } from '@/lib/live/panels'
 import { runListChanged } from '@/lib/live/lists'
 
-export const dynamic = 'force-dynamic'
 
 /** States the daemon may report mid-run; the end comes through `/complete`. */
 const LIVE_STATES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const

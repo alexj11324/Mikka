@@ -5,8 +5,8 @@ import { ActionFailureError } from "./action-error";
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { othersMayUse, pooledOwners, runMayUseCredentialSql } from "./personal-policy";
-import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { HOSTED_CHOICE, creditsOptionId, parseCreditsOption } from "./bot-model-menu-view";
+import { creditsModelOffered } from "./credits-models";
 import { subscriptionRouteReady } from "./subscription-routes";
 import { executionBinding, executionModelOptions } from "./execution-model-options";
 
@@ -44,79 +44,6 @@ export class ExecutionSettings {
     return executionModelOptions(query, scope, true);
   }
 
-  /**
-   * Other members' subscriptions shared with 分享给团队成员 (Alex, 「B」),
-   * Claude first, then by the oldest share. They can be chosen explicitly and
-   * default only after own subscriptions; the menu exposes public model identities and member names.
-   */
-  async pooledBindings(scope: ExecutionSettingsScope) {
-    const rows = [];
-    for (const ownerId of await this.sharedOwners(scope))
-      rows.push(...(await chatReady(await this.bindingsOf(ownerId, scope.workspaceId))));
-    return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
-  }
-  /** Sharing never grants membership to either participant. */
-  private async sharedOwners(scope: ExecutionSettingsScope) {
-    const owners = await pooledOwners(this.pool, scope.ownerId, scope.workspaceId);
-    if (!owners.length) return [];
-    const { authorizeSubscriptionWorkspace } = await import("./subscription-runtime");
-    await authorizeSubscriptionWorkspace(scope.ownerId, scope.workspaceId);
-    const active: string[] = [];
-    for (const ownerId of owners) {
-      try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId); }
-      catch (error) {
-        if (error && typeof error === "object" && "code" in error && error.code === "workspaceAccessDenied") continue;
-        throw error;
-      }
-      active.push(ownerId);
-    }
-    return active;
-  }
-  private async sharedBinding(scope: ExecutionSettingsScope, bindingId: string) {
-    for (const ownerId of await this.sharedOwners(scope)) {
-      const [binding] = await chatReady(await this.bindingsOf(ownerId, scope.workspaceId, bindingId));
-      if (binding) return binding;
-    }
-    return undefined;
-  }
-  /** A saved per-bot copy is independent of which copy currently wins catalogue deduplication. */
-  async sharedChatBinding(scope: ExecutionSettingsScope, botId: string, bindingId: string) {
-    const binding = await this.sharedBinding(scope, bindingId);
-    if (!binding || binding.workspaceId !== scope.workspaceId || binding.consumerId !== botId) return undefined;
-    const bot = await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL',
-      [botId, scope.ownerId, scope.workspaceId]);
-    return bot.rowCount ? binding : undefined;
-  }
-  /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
-  async bindingForOthersBot(scope: ExecutionSettingsScope, botId: string, subscriptionOwnerId: string, bindingId: string) {
-    if (subscriptionOwnerId === scope.ownerId || !(await othersMayUse(this.pool, subscriptionOwnerId, scope.workspaceId)))
-      throw new ActionFailureError("executionModelUnknown");
-    const { authorizeSubscriptionWorkspace } = await import("./subscription-runtime");
-    await authorizeSubscriptionWorkspace(scope.ownerId, scope.workspaceId);
-    await authorizeSubscriptionWorkspace(subscriptionOwnerId, scope.workspaceId);
-    const [source] = await this.bindingsOf(subscriptionOwnerId, scope.workspaceId, bindingId);
-    if (!source) throw new ActionFailureError("executionModelUnknown");
-    if (source.workspaceId === scope.workspaceId && source.consumerId === botId) {
-      const bot = await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL',
-        [botId, scope.ownerId, scope.workspaceId]);
-      if (!bot.rowCount) throw new ActionFailureError("executionModelUnknown");
-      return source.bindingId as string;
-    }
-    const hash = createHash("sha256").update(JSON.stringify([subscriptionOwnerId, scope.workspaceId, botId, bindingId])).digest("hex");
-    const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-    const result = await this.pool.query(
-      `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
-      SELECT $1,b."ownerId",$4::text,$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
-      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false AND c."removedAt" IS NULL
-      JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid AND bot."archivedAt" IS NULL
-      WHERE b.id=$5 AND b."ownerId"=$6 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
-        AND ${runMayUseCredentialSql('b."ownerId"', '$3', '$4')}
-      ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
-      [id, botId, scope.ownerId, scope.workspaceId, bindingId, subscriptionOwnerId],
-    );
-    if (!result.rows[0]) throw new ActionFailureError("executionModelUnknown");
-    return result.rows[0].id as string;
-  }
   /** False once the owner left or was suspended and the bot was archived (§8.3), or when it is not theirs. */
   async botActive(ownerId: string, botId: string) {
     return Boolean((await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [botId, ownerId])).rowCount);
@@ -126,8 +53,8 @@ export class ExecutionSettings {
     return (await this.connectedBindings(scope, bindingId))[0];
   }
   /** A bot chat's subscription options: `botModels` on a route that answers chats for its owner (`subscriptionRouteReady`). */
-  async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool) {
-    return chatReady(await this.botModels(scope, query));
+  async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool, rows?: Awaited<ReturnType<ExecutionSettings["botModels"]>>) {
+    return chatReady(rows ?? await this.botModels(scope, query));
   }
   /** A saved chat choice, while its route answers chats. */
   async chatBinding(scope: ExecutionSettingsScope, bindingId: string) {
@@ -222,12 +149,14 @@ export class ExecutionSettings {
         throw new ActionFailureError("botNotFound");
     }
     const key = botId ?? "coordinator";
-    // Mikka 默认 picked on purpose: no binding behind it (decision 2026-10-31-2330).
-    if (bindingId === HOSTED_CHOICE) {
+    // A model run on Mikka 额度 (decision 2026-11-15-1900): `credits:<vendor/model>`, no binding or key behind it.
+    const credits = parseCreditsOption(bindingId ?? "");
+    if (credits) {
+      if (!(await creditsModelOffered(credits, scope.ownerId))) throw new ActionFailureError("executionModelUnknown");
       await this.pool.query(
-        // The pick replaces an API key model saved before, as a subscription pick does; else the key choice wins on read.
-        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
-        [scope.ownerId, scope.workspaceId, key, null],
+        // The pick replaces a subscription or API key model saved before.
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","creditsModel") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=NULL,"apiKeyModel"=NULL,"creditsModel"=EXCLUDED."creditsModel"',
+        [scope.ownerId, scope.workspaceId, key, credits],
       );
       return;
     }
@@ -238,14 +167,11 @@ export class ExecutionSettings {
     const choice = (await this.connectedBindings(scope, bindingId)).find(
       (row) => row.bindingId === bindingId,
     );
-    if (choice) bindingId = await this.bindingForBot(scope, botId, bindingId);
-    else {
-      const shared = botId ? await this.sharedBinding(scope, bindingId) : undefined;
-      if (!shared || !botId) throw new ActionFailureError("executionModelUnknown");
-      bindingId = await this.bindingForOthersBot(scope, botId, shared.ownerId, bindingId);
-    }
+    // A subscription serves its owner only (decision 2026-11-17): only this person's own binding is a choice.
+    if (!choice) throw new ActionFailureError("executionModelUnknown");
+    bindingId = await this.bindingForBot(scope, botId, bindingId);
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL,"creditsModel"=NULL',
       [scope.ownerId, scope.workspaceId, key, bindingId],
     );
   }
@@ -321,22 +247,23 @@ export class ExecutionSettings {
   ): Promise<string | undefined> {
     const row = (
       await this.pool.query(
-        'SELECT "bindingId","apiKeyId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        'SELECT "bindingId","apiKeyId","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
     ).rows[0];
     if (row?.bindingId) return row.bindingId;
     // The saved choice is an API key's model (lib/model-api-keys.ts botApiKeyChoice), not a binding.
     if (row?.apiKeyId) return undefined;
-    // A saved row without either is Mikka 默认, picked on purpose.
-    if (row) return HOSTED_CHOICE;
+    if (row?.creditsModel) return creditsOptionId(row.creditsModel);
+    // A row with none of the three was 「Mikka 默认」 (gone, decision 2026-11-15-1900): no choice,
+    // so the usual order below fills it in when a subscription exists.
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
     const models = await this.chatModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];
     if (!first) return undefined;
     const bindingId = await this.bindingForBot(scope, botId, first.bindingId);
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO NOTHING',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId" WHERE bot_model_choices."bindingId" IS NULL AND bot_model_choices."apiKeyId" IS NULL AND bot_model_choices."creditsModel" IS NULL',
       [scope.ownerId, scope.workspaceId, botId ?? "coordinator", bindingId],
     );
     return this.botModel(scope, botId);

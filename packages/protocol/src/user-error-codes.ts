@@ -56,9 +56,10 @@ export const USER_ERROR_CODES = {
   run_network_error: [],
   run_provider_error: [],
   run_failed: [],
+  run_credentials_unavailable: ['device_unavailable', 'native_credentials', 'credential_missing', 'credential_expired', 'quota_exhausted', 'github_credentials'],
   task_secret_unavailable: ['invalid_capability', 'expired_capability', 'binding_mismatch', 'invalid_request', 'destination_denied', 'upstream_unavailable', 'response_blocked', 'limit_exceeded', 'configuration'],
 
-  governance_denied: ["access_denied", "seat_limit", "feature_unavailable", "last_owner", "workspace_attached", "billing_account_attached", "personal_workspace", "invalid_request", "template_limit", "not_found", "plan_changed", "service_identity_changed", "service_identity_request_reused", "service_projects_changed", "service_identity_disabled", "service_projects_confirmation"],
+  governance_denied: ["access_denied", "seat_limit", "feature_unavailable", "last_owner", "workspace_attached", "billing_account_attached", "personal_workspace", "invalid_request", "template_limit", "not_found", "plan_changed", "service_identity_changed", "service_identity_request_reused", "service_projects_changed", "service_identity_disabled", "service_projects_confirmation", "project_visibility_changed", "project_selection_changed"],
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],
   cloud_not_connected: [],
@@ -154,6 +155,15 @@ export const USER_ERROR_CODES = {
     "adapter_start_failed",
     "cleanup_failed",
   ],
+  /** Agent/Bot interop: reads, sends and Drive across threads and Bots (decision 2026-11-19-2200). */
+  interop_not_found: [],
+  interop_invalid_request: [],
+  interop_scope_required: [],
+  interop_send_unavailable: ["run_not_active", "thread_replaced", "thread_cannot_continue", "delivery_unavailable", "delivery_uncertain", "bot_unavailable", "continuation_requires_grant"],
+  interop_diff_unavailable: ["no_checkpoint", "masked"],
+  interop_drive_conflict: [],
+  interop_drive_unavailable: ["file_too_large"],
+  cloud_machine_unfunded: [],
 } as const satisfies Record<string, readonly string[]>
 
 export type UserErrorCode = keyof typeof USER_ERROR_CODES

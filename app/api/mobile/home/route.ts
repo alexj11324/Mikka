@@ -13,9 +13,8 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { ownerListRead } from '@/lib/live/list-read-server'
 
-export const dynamic = 'force-dynamic'
 
-/** A chat's latest message as the one plain line the 对话 list shows; never OpenUI source. */
+/** A chat's latest message as the one plain line the 线程 list shows; never OpenUI source. */
 const homeLine = (text: string | null | undefined) => text ? chatPreview(text) ?? '' : null
 
 const RUNNING = ['queued', 'preparing', 'running', 'finishing'] as const

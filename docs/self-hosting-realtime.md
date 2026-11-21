@@ -45,12 +45,42 @@ sockets: normal client reconnection obtains a fresh snapshot and resumes push.
 The next connection, event or scheduled job reconnects the database session;
 there is no database reconnect poll.
 
+## Device sessions
+
+A daemon works only while it holds its device socket; there is no heartbeat
+and no fallback poll ([decision 2026-11-17-2215](design/decisions/2026-11-17-2215-device-session-no-heartbeat.md)).
+The daemon pings every 10 seconds and the gateway answers in memory. A device
+is online while its socket is open and it connected or pinged within the last
+40 seconds: the daemon's 30-second silence limit plus one ping.
+
+The replica holding a device socket reports the device's session to the
+application in its own process, without an HTTP request:
+
+- `connected`, once PostgreSQL has ordered the socket's claim.
+- `disconnected`, 30 seconds after the socket closes, unless any replica
+  claimed a newer socket for the device in the meantime. A socket replaced by
+  a newer one (close code `4000`) is never reported closed.
+
+A failed report is retried in that process with backoff from 1 to 60 seconds,
+in order per device. After a lost database listener the replica still reports
+the closed sockets after the grace; the application ignores a report for an
+older socket. A replica that shuts down reports nothing more: its daemons
+reconnect to another replica, which reports `connected`, and the application's
+run-recovery backstop asks the gateway's status endpoint about any device that
+does not return.
+
+Device sockets close with `4000` when replaced, `1012` when the gateway
+restarts or loses its database listener, and `4001` only when the daemon must
+update. Browser live sockets keep `4001` for an expired ticket or a revoked
+session.
+
 Device-dependent live reads negotiate `presence=1`, then register the short-lived
 grant issued by the ordinary authenticated read. The gateway acknowledges only
 that grant's device ids and home channel, until the earlier of its expiry and the
 socket ticket's expiry. Online/offline transitions push the existing device-list
-and thread-list keys; pings perform no SQL. A known legacy heartbeat has one
-in-memory deadline. Closing, replacing or expiring a watch releases its observers.
+and thread-list keys; pings perform no SQL. Presence is the device session
+described above, not a heartbeat. Closing, replacing or expiring a watch
+releases its observers.
 
 Cross-replica observers also watch the publishing PostgreSQL session's advisory
 lock. In addition to its one `LISTEN` session, each app replica uses at most 32
@@ -95,7 +125,8 @@ explicitly; the checked-in Worker configuration has no hard-coded destination.
 ## Verification
 
 - `pnpm test:device-gateway`: built-in and Worker protocol, tenant scoping,
-  ticket expiry, revision compatibility, device wakes and presence.
+  ticket expiry, revision compatibility, device wakes, presence and device
+  session reports.
 - `pnpm test:api`: real loopback WebSocket upgrade using Nitro's installed Node
   adapter and the HTTP security-header wrapper.
 - `pnpm test:idle-budget`: existing idle-screen request budget.

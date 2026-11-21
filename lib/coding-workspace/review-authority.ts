@@ -34,7 +34,7 @@ export type TaskReviewAuthority = {
   /** device_repos.repoPath is a repository identity, not necessarily a path. */
   repoPath: string; worktreePath: string; machineKind: 'cloud' | 'local'
   sandboxId: string | null; machineEpoch: number | null; machineOperationId: string | null
-  machineStatus: string; runStatus: string; pauseReason: string | null
+  machineStatus: string; runStatus: string; runStartedAt: string | null; pauseReason: string | null
   leaseExpiresAt: string | null; nativeExitedProof: boolean; bindingId: string
   /** A parked completed run keeps its old claim only as provenance. */
   sponsoredPlacement?: { operationId:string; repositoryKey:string; checkpoint?:ReviewCheckpoint }
@@ -233,7 +233,7 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
       deviceId: device.id, repoId: repo.id, deviceTokenId: token.id, remoteKey: repo.repoPath, repoPath: repo.repoPath,
       worktreePath: run.worktreePath, machineKind: device.kind, sandboxId: machine?.sandboxId ?? null,
       machineEpoch: machine?.epoch ?? null, machineOperationId: machine?.operationId ?? null,
-      machineStatus: machine?.state ?? 'running', runStatus: run.status, pauseReason: run.pauseReason,
+      machineStatus: machine?.state ?? 'running', runStatus: run.status, runStartedAt: run.startedAt?.toISOString() ?? null, pauseReason: run.pauseReason,
       leaseExpiresAt: run.leaseExpiresAt?.toISOString() ?? null, nativeExitedProof, deviceTokenActive, bindingId, credential, credentialExpiresAt, ...(sponsoredPlacement ? {sponsoredPlacement} : {}) }
     // Only bounded database work belongs here (e.g. recording a lease).
     // Provider installation and other network IO happen before authorization.

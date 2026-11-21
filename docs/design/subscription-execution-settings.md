@@ -58,10 +58,10 @@ already configured key.
 | Task | Before | Intended result |
 | --- | --- | --- |
 | Connect a subscription and chat | Extra usage could disable a working account | Both subscription providers remain usable within their actual allowance |
-| Distinguish two same-plan subscriptions | Same labels | Model plus account or shared owner identifies the source |
+| Distinguish two same-plan subscriptions | Same labels | Model plus account identifies the source |
 | Dispatch after choosing a chat API key | Chat preference could replace the task source | The selected thread model and credential stay frozen |
 | Create a task | Independent cloud-first default overwrote run location | Unchanged placement inherits thread defaults; only explicit choices pin a destination |
-| Use a shared subscription for an Agent | Candidate, queue and claim disagreed | All stages use authorized access to the real credential owner |
+| Use a teammate's subscription for an Agent | Candidate, queue and claim disagreed | Refused at every stage: a subscription serves its owner only (decision 2026-11-17-1400) |
 | Resolve unknown model quota | Available or generic unavailable, sometimes no way forward | Checking, bounded refresh and a usable retry path |
 | Repair a blocked row | A general page or wrong credential group | Matching subscription, key, device or existing E2B dialog |
 | Inspect subscription usage | Historical bindings called current use | Current workspace's explicit chat choices, with workspace identity |

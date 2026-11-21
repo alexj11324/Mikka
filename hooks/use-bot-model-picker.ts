@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
 import { previewBotModelChoice } from '@/lib/bot-model-optimistic'
-import { HOSTED_CHOICE, withChosenModel, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { withChosenModel, type BotModelCurrent, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { modelVendorName } from '@/components/labels/model-vendor-mark'
 
 export type ModelPickerT = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
 
@@ -24,11 +25,11 @@ function providerName(provider: string | undefined) {
   return provider === 'claude' ? 'Claude' : 'ChatGPT'
 }
 
-/** A menu group's heading: Mikka, the subscription's plan, or the key it bills. */
+/** A menu group's heading: Mikka 额度, the subscription's plan, or the key it bills. */
 export function modelGroupHeading(t: ModelPickerT, group: BotModelMenuGroup) {
   const credential = group.credentialLabel ? ` · ${group.credentialLabel}` : ''
   switch (group.kind) {
-    case 'hosted': return 'Mikka'
+    case 'hosted': return t('creditsGroup')
     // The plan names it (Claude Max, ChatGPT Pro): everything but a share is the person's own (decision 2026-10-31-2330).
     case 'subscription': return `${group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)}${credential}`
     case 'apiKey': return `${t('apiKey')}${credential}`
@@ -39,15 +40,50 @@ export function modelGroupHeading(t: ModelPickerT, group: BotModelMenuGroup) {
 /** What sits at the right of an item: who pays for it. A subscription item has none. */
 export function modelGroupTag(t: ModelPickerT, group: BotModelMenuGroup) {
   switch (group.kind) {
-    // The points it can spend in this chat's workspace, not the person's elsewhere (decision 2026-11-02-1450).
-    case 'hosted': return group.hostedSource === 'cloud' ? t('cloudCredits') : group.hostedSource === 'self-hosted' ? t('ownProvider') : group.trialLeft !== undefined ? t('trialLeft', { count: group.trialLeft }) : group.points === undefined ? t('credits') : t('points', { points: group.points })
+    // The picker shows no balance (decision 2026-11-15-1900); each Mikka 额度 row carries its own list price.
+    case 'hosted': return group.hostedSource === 'cloud' ? t('cloudCredits') : group.hostedSource === 'self-hosted' ? t('ownProvider') : null
     case 'apiKey': return t('metered')
     case 'shared': return group.owner ? t('sharedKey', { name: group.owner }) : null
     default: return null
   }
 }
 
-export type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'>
+/** A Mikka 额度 row's list price, USD per million tokens in and out: 「$3 / $15」. */
+export function modelPriceTag(option: Pick<BotModelMenuOption, 'price'>) {
+  if (!option.price) return null
+  const usd = (value: number) => `$${Number(value.toFixed(value < 1 ? 3 : 2))}`
+  return `${usd(option.price.input)} / ${usd(option.price.output)}`
+}
+
+const SERVICE_NAMES: Record<string, string> = { claude: 'Claude', codex: 'ChatGPT' }
+
+/**
+ * What pays for a model, in one line (decision 2026-11-15-1900): 用你的 Claude 订阅,
+ * 用 DeepSeek API Key（尾号 1234），不扣 Mikka 额度, 用 Mikka 额度，按厂商原价.
+ * `current` adds a used-up subscription's state.
+ */
+export function modelSourceLabel(t: ModelPickerT, group: Pick<BotModelMenuGroup, 'kind' | 'provider' | 'owner' | 'credentialLabel' | 'hostedSource'>,
+  option: Pick<BotModelMenuOption, 'provider' | 'modelId'>, current?: Pick<BotModelCurrent, 'availability' | 'quota'>): string {
+  const service = SERVICE_NAMES[group.provider ?? option.provider] ?? providerName(group.provider ?? option.provider)
+  const vendor = option.provider && option.provider !== 'custom' ? modelVendorName(`${option.provider}/model`) : ''
+  switch (group.kind) {
+    case 'hosted': return group.hostedSource === 'self-hosted' ? t('source.ownProvider') : t('source.credits')
+    case 'subscription': {
+      if (current?.availability === 'exhausted' && current.quota) return current.quota.resetsAt
+        ? t('source.usedUntil', { service, time: new Date(current.quota.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })
+        : t('source.usedUp', { service })
+      return t('source.subscription', { service })
+    }
+    case 'apiKey': {
+      const last4 = /····(\S+)$/.exec(group.credentialLabel ?? '')?.[1]
+      const name = vendor || group.credentialLabel || t('apiKey')
+      return last4 ? t('source.apiKey', { vendor: name, last4 }) : t('source.apiKeyPlain', { vendor: name })
+    }
+    case 'shared': return t('source.sharedKey', { name: group.owner ?? '', vendor: vendor || t('apiKey') })
+  }
+}
+
+export type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'> & Partial<Pick<BotModelMenuOption, 'name'>>
 
 /** A scope is available only on the active authenticated cache. The ordinary memory cache has none. */
 function chipNamespace(cache: object): string | null {
@@ -184,10 +220,15 @@ export function useBotModelPicker(botId: string | null, thread?: import('@/compo
     return true
   }
 
-  /** What a person reads for an option: the hosted model's name, or the provider's id (callers format it). */
-  const optionName = (option: ChipModel) => option.id === HOSTED_CHOICE ? t('hosted') : option.modelId || t('unknownModel')
+  /** What a person reads for an option: the catalogue's name on Mikka 额度, else the provider's id (callers format it); 选择模型 when nothing is chosen. */
+  const optionName = (option: ChipModel) => !option.id ? t('choose') : option.name || option.modelId || t('unknownModel')
 
   const current = data?.current
+  const currentGroup = current && data ? data.groups.find(group => group.options.some(option => option.id === current.id)) : undefined
+  /** The chip's source line: what the next message runs on. */
+  const sourceLabel = current && current.kind !== 'none'
+    ? modelSourceLabel(t, currentGroup ?? { kind: current.kind, provider: current.provider, credentialLabel: current.credentialLabel, hostedSource: current.hostedSource }, current, current)
+    : null
   const checking = current?.availability === 'checking'
   const chipLabel = current ? [optionName(current), current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ') : null
 
@@ -216,7 +257,12 @@ export function useBotModelPicker(botId: string | null, thread?: import('@/compo
     checking,
     unavailable: !!current && !current.available && !checking,
     chipLabel,
+    sourceLabel,
     optionName,
+    source: (group: BotModelMenuGroup, option: BotModelMenuOption) => modelSourceLabel(t, group, option),
+    price: modelPriceTag,
+    /** Nothing is chosen: the chip asks for a model. */
+    unchosen: current?.kind === 'none',
     heading: (group: BotModelMenuGroup) => modelGroupHeading(t, group),
     tag: (group: BotModelMenuGroup) => modelGroupTag(t, group),
   }

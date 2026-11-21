@@ -1,9 +1,8 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { readUnderDeviceAuthority } from '@/lib/db'
 import { authenticateDevice } from '@/lib/device-link'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /v1/devices/:deviceId/runs?state=queued`: runs waiting for this device. */
 async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {

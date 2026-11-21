@@ -3,7 +3,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { Children, createContext, isValidElement, memo, use, useMemo, type ComponentProps, type ReactNode } from 'react'
 import { AgentCodeBlock } from './agent-code-block'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
@@ -93,7 +93,7 @@ export function AgentMarkdownContent({ text, isStreaming = false, size = 'defaul
 
   return <div data-agent-markdown data-size={size} className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-5.25 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex_.cjk_fallback]:font-sans', {
     'text-xs': size === 'small' || size === 'small-heavy',
-    'text-base': size === 'large' || size === 'large-heavy',
+    'text-md': size === 'large' || size === 'large-heavy',
     'font-semibold': size === 'small-heavy' || size === 'large-heavy',
   })}>
     <MarkdownStreaming value={isStreaming}>

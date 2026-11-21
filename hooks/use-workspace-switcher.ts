@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'

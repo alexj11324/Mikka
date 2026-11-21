@@ -8,7 +8,7 @@ import { ownerLiveScope } from './owner-scope'
 
 type Database = Pick<PoolClient, 'query'>
 export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list' | 'device_list'
-export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings'
+export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings' | 'schedule_list'
 type ListKind = OwnerListKind | WorkspaceListKind | 'model_settings'
 type Target = { scope: LiveScope; events: LiveInvalidation[] }
 
@@ -137,12 +137,21 @@ export const issueListChanged = async (executor: object, issueId: string, titleC
   await (await import('./project-map')).projectMapIssueChanged(executor, issueId)
 }
 export const botListChanged = (executor: object, botId: string) => changed(executor, `bot:${botId}`, (db, workspace) => botListTargets(db, workspace, botId))
+/** A deleted bot has no row to read its scope from: the same lists as botListChanged, from its owner and workspace. */
+export const botRemovedChanged = (executor: object, ownerId: string, workspaceId: string) => changed(executor, `bot-removed:${ownerId}:${workspaceId}`, async (_db, workspace) => mergeTargets([
+  ...(await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, ['bot_list', 'thread_list', 'task_run_list'])),
+  ...await ownerListTargets(workspace, ownerId, ['bot_chat_list']),
+]))
 export const groupListChanged = (executor: object, conversationId: string, removedUserId: string | null = null) => changed(executor, `group:${conversationId}:${removedUserId ?? ''}`, (db, workspace) => groupListTargets(db, workspace, conversationId, removedUserId))
 export const groupListReadChanged = (executor: object, conversationId: string, ownerId: string) => changed(executor, `group-read:${conversationId}:${ownerId}`, async (db, workspace) => (await groupListTargets(db, workspace, conversationId)).filter(value => value.scope.ownerId === ownerId))
 /** Only the reader's channel in the selected workspace consumes this receipt. */
 export const threadReadChanged = (executor: object, ownerId: string, workspaceId: string, kind: 'thread_list' | 'group_list' = 'thread_list') =>
   changed(executor, `thread-read:${workspaceId}:${ownerId}:${kind}`, async (_db, workspace) =>
     (await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, [kind])))
+/** Wake only this person's device list in the Project's Workspace. Paths never enter the event. */
+export const deviceCheckoutsChanged = (executor: object, ownerId: string, workspaceId: string) =>
+  changed(executor, `device-checkouts:${workspaceId}:${ownerId}`, async (_db, workspace) =>
+    (await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, ['device_list'])))
 /** A personal archive interval affects this reader's directories in each active workspace. */
 export const archivePreferenceChanged = (executor: object, ownerId: string) => changed(executor, `archive-preference:${ownerId}`, async (_db, workspace) => {
   const { rows } = await workspace.query<LiveScope>(`SELECT m."userId" AS "ownerId", w.id AS "workspaceId"
@@ -151,6 +160,8 @@ export const archivePreferenceChanged = (executor: object, ownerId: string) => c
   return rows.map(scope => target(scope, ['thread_list', 'group_list']))
 })
 export const ownerListChanged = (executor: object, ownerId: string, kinds: readonly OwnerListKind[]) => changed(executor, `owner:${ownerId}:${[...kinds].sort().join(',')}`, (_db, workspace) => ownerListTargets(workspace, ownerId, kinds))
+/** 自动化: a workspace's schedules, their next run and their history. */
+export const scheduleListChanged = (executor: object, workspaceId: string) => workspaceListChanged(executor, workspaceId, ['schedule_list'])
 export const workspaceListChanged = (executor: object, workspaceId: string, kinds: readonly WorkspaceListKind[]) => changed(executor, `workspace:${workspaceId}:${[...kinds].sort().join(',')}`, (_db, workspace) => workspaceListTargets(workspace, workspaceId, kinds))
 
 /** Personal prefixes and owner profile labels are resolved while reading the
@@ -179,18 +190,12 @@ export const ownerProfileListsChanged = (executor: object, ownerId: string) => c
 /**
  * 模型与订阅 changed for an account: a subscription connected, paused or removed, its allowance or model list read
  * again, its order changed. Only the two settings sections listen (`model_settings`), never the app-wide preloader.
- * The account itself re-reads in every workspace it is an active member of (its subscriptions are its own there);
- * teammates only where it shares them with other members (othersMayUse). No connection, model or quota crosses.
+ * The account itself re-reads in every workspace it is an active member of (its subscriptions are its own there).
+ * Subscriptions serve their owner only (decision 2026-11-17), so no teammate re-reads. No connection, model or quota crosses.
  */
-export async function ownerSettingsTargets(database: Database, workspaceDatabase: Database, ownerId: string): Promise<Target[]> {
+export async function ownerSettingsTargets(_database: Database, workspaceDatabase: Database, ownerId: string): Promise<Target[]> {
   const { rows: memberships } = await workspaceDatabase.query<{ workspaceId: string }>(`SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId"=$1 AND status='active'`, [ownerId])
-  const { othersMayUse } = await import('../personal-policy')
-  const shared: string[] = []
-  for (const { workspaceId } of memberships) if (await othersMayUse(database, ownerId, workspaceId)) shared.push(workspaceId)
-  const { rows: teammates } = shared.length
-    ? await workspaceDatabase.query<LiveScope>(`SELECT "userId" AS "ownerId","workspaceId" FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[]) AND status='active' AND "userId"<>$2`, [shared, ownerId])
-    : { rows: [] as LiveScope[] }
-  return mergeTargets([...memberships.map(({ workspaceId }) => ({ ownerId, workspaceId })), ...teammates].map(scope => target(scope, ['model_settings'])))
+  return mergeTargets(memberships.map(({ workspaceId }) => target({ ownerId, workspaceId }, ['model_settings'])))
 }
 /** Best effort: an action that already succeeded never fails on its invalidation (the page's own response updates it). */
 export const ownerSettingsChanged = (executor: object, ownerId: string) => changed(executor, `owner-settings:${ownerId}`, (database, workspace) => ownerSettingsTargets(database, workspace, ownerId))

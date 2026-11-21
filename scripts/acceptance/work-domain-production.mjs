@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { observeEveSession } from './eve-session.mjs'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
+import { observeEveSession, submitEveMessage } from './eve-session.mjs'
 /** Epic #1687. Ordinary shared-account APIs, only inside the existing OIDC job.
  * Preflight sends no model prompt. Active retains useful Tasks and reports.
  * No database/provider credentials, startup timing, settings preparation or UI.
@@ -63,7 +64,7 @@ export function publicFailure(error) {
 export function domainOptions(env = process.env) {
   check(!env.DOMAIN_OTHER_AUDIT_SHA && (!env.DOMAIN_OTHER_AUDIT_LEASE || env.DOMAIN_OTHER_AUDIT_LEASE === 'false')
     && (!env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN || env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN === 'none'), 'inputs_conflict')
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env)
     && env.GITHUB_REF === 'refs/heads/main' && env.GITHUB_EVENT_NAME === 'workflow_dispatch'
     && SHA.test(env.DOMAIN_MODEL_SHA ?? '') && env.GITHUB_SHA === env.DOMAIN_MODEL_SHA, 'target_refused')
   const mode = env.DOMAIN_MODEL_MODE ?? 'preflight'
@@ -135,7 +136,7 @@ async function inventory(client, shared) {
   chatFallback(keys)
   check(management.profiles.length < 101, 'profile_inventory_truncated')
   const sources = order.candidates.filter(row => row.source?.kind === 'subscription' && uuid(row.source.connectionId)
-    && row.credentialOwnerId === shared.adminId && CASES.some(item => row.harness === item.harness && row.model === item.model))
+    && row.credentialOwnerId === shared.ownerId && CASES.some(item => row.harness === item.harness && row.model === item.model))
   return { projects, bots, resources, github, management, sources, keys }
 }
 const sameSource = (row, item, connectionId) => row?.harness === item.harness && row?.model === item.model
@@ -368,8 +369,8 @@ async function dispatch(client, record, scope, item, timeoutMs) {
   const text = '执行已有 Task ' + record.issueId + '，保留其 Project 关联。只调用一次 dispatch_run，参数：'
     + JSON.stringify(input) + '。不创建新 Task、不换 Profile、模型、订阅或运行位置；派发后仅确认已派发。'
   record.submitted = true
-  await client.rpc('coordinator.sendCoordinatorMessage', [text, null, scope.botId, record.submissionId,
-    { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, record.profileId])
+  await submitEveMessage(client, scope.botId, text, record.submissionId,
+    { taskDestination: { kind: 'cloud' }, profileId: record.profileId, expectedWorkspaceId: scope.workspaceId })
   let call, completed = false
   await observeEveSession(client, scope.botId, { timeoutMs, fail: () => { throw new DomainError('stream_invalid') },
     onEvent: event => {
@@ -438,8 +439,8 @@ export function runReceipt(evidence, shared, scope, issueId) {
     && identity.executionPrincipal === shared.ownerId && identity.outputOwner === shared.ownerId
     && identity.botOwner === shared.ownerId && identity.botId === shared.botId
     && identity.personalResourcePolicy === 'requester_only' && uuid(device?.id) && device.ownerId === shared.ownerId && device.access === 'owner'
-    && subscriptions.length === 1 && subscriptions[0].ownerId === shared.adminId && subscriptions[0].access === 'workspace_share'
-    && identity.billingAccount?.model?.kind === 'subscription' && identity.billingAccount.model.ownerId === shared.adminId
+    && subscriptions.length === 1 && subscriptions[0].ownerId === shared.ownerId && subscriptions[0].access === 'owner'
+    && identity.billingAccount?.model?.kind === 'subscription' && identity.billingAccount.model.ownerId === shared.ownerId
     && identity.billingAccount.model.resourceId === subscriptions[0].id && identity.billingAccount?.runtime?.kind === 'e2b'
     && identity.billingAccount.runtime.ownerId === shared.ownerId, 'run_scope_mismatch')
   return { runId: run.id, harness: run.harness, model: run.model, credentialType: run.credentialType,

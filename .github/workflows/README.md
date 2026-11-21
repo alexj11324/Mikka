@@ -12,14 +12,13 @@ bindings. Current workflow files define the triggers and selected coverage.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
   successful for non-documentation PRs; the latter gates the selected isolated PostgreSQL suites across 1–4 dynamic
   shards. Full inventory validation runs even when DB execution is skipped. Despite its name, CI
-  does not build the production Web release artifact. The legacy `web-deploy.yml`
-  workflow (currently disabled for new Vercel publication) describes the original
-  **public-root** official build and its private read-only Overlay checkout.
+  does not build the production Web release artifact. The retired Vercel
+  `web-deploy.yml` workflow was removed on 2026-11-17.
   Current Cloudflare native CI and the transitionary private-triggered OCI issuer
   are **different** operations; neither changes long-term public build ownership.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
-  Targeted Desktop, Analytics and self-hosted jobs retain their selected browser
+  Targeted Desktop and Analytics jobs retain their selected browser
   checks. `browser-gate.yml` only keeps the protected check name
   `Browser tests (before merge)` and passes at once; delete it once that name
   is removed from the required checks in the repository settings.
@@ -27,6 +26,11 @@ bindings. Current workflow files define the triggers and selected coverage.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
   have been migrated and verified.
+
+`local-device-node22.yml` now runs an actual app/Eve build and startup smoke
+on Node 22 and 24, retaining the daemon and installer tests. The core,
+integration and PG17 database jobs above also run the selected suites on both
+majors; the original Node 24 protected-check names stay unchanged.
 
 ## Focused governance acceptance and superseded PR runs
 
@@ -53,10 +57,16 @@ adding or duplicating regression suites.
 
 There are two intentionally different classes of PR checks:
 
-- **Required checks always run**, even on drafts: `UI policy (strict)`,
-  `Production build and browser interactions`, `Browser tests (before merge)`
-  and external GitGuardian. A skipped required job can be reported as
-  successful by GitHub, so draft status must never authorize a bypass.
+- **Required check names never become false green on drafts**: in the main `CI`
+  workflow, the lightweight selector and required aggregators (`UI policy
+  (strict)`, `Production build and browser interactions`) run on Draft PRs;
+  those aggregators explicitly **fail** until the PR is Ready. Core, Integration,
+  Source, Daemon, Analytics, Governance and DB runner-heavy jobs are deferred.
+  `ready_for_review` re-runs the complete applicable protected verification
+  even if the commit SHA has not changed. `Browser tests (before merge)` and
+  external GitGuardian retain their original workflows. A skipped required
+  job can be reported successful by GitHub; these named aggregators must never
+  skip or accept the draft as complete.
 - **Non-required specialized acceptances** (`E2B additive runtime release`
   offline PR test, E2B subscription custody, Read cache API acceptance,
   SSH device backend, Site search read contract and Unattended sandbox
@@ -70,8 +80,10 @@ There are two intentionally different classes of PR checks:
   and TestFlight-oriented review. Other specialized evidence may have its
   own intentional manual or source-version trigger.
 
-This reduces runner allocation without mistaking a draft-only skipped result
-for proof that a ready PR is safe to merge.
+This reduces runner allocation during the local red→green cycle without
+mistaking a draft-only skipped result for proof that a Ready PR is safe to
+merge. Draft check failure means "not yet a merge candidate," not an ordinary
+product regression. Main pushes and merge groups continue normal full coverage.
 
 ## Main pushes: postmerge checks
 
@@ -82,11 +94,14 @@ for proof that a ready PR is safe to merge.
 - The special suites (`analytics-ssr`, `cloud-computer`, `desktop`,
   `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
   pull requests only, selected by trusted dependencies or their existing path filters; each can still be run
-  by hand (`workflow_dispatch`). The Web release workflow builds and deploys
-  `main` through Vercel.
+  by hand (`workflow_dispatch`). Production Web is promoted through the
+  Cloudflare deployment workflow; Vercel publication was removed on 2026-11-17.
 - `publish-daemon.yml` uses daemon/package-input path filters.
-  `desktop-release.yml` also watches the shared frontend, UI and API inputs, so
-  a Web UI change can trigger a desktop release. A Markdown file under a
+  `desktop-release.yml` also watches the shared frontend, UI and API inputs.
+  On a push it builds nothing and leaves a note in the run summary. The
+  installer is built when the Cloudflare deployment workflow's serving-release
+  observation shows current main, or from a dispatch carrying
+  `cloudflare_receipt`. A Markdown file under a
   watched directory still matches those release filters. Read the exact
   workflow paths before predicting release work.
 - The run-dispatch and Controlled Skill improvement suites run in the CI
@@ -136,30 +151,44 @@ entering the release queue or creating E2B machines. The queue checks again afte
 entry to suppress already-queued duplicates. Obsolete sources, cancellations,
 Web failures and cleanup-only failures do not create failure fingerprints.
 
-To retry after an external service recovers, dispatch **E2B additive runtime
-release** on current main and fill in `reason`; the Actions dispatch event records
-it. Manual dispatch always runs validation, even for a matching worker. Changed
+A push only compares the worker inputs and builds no candidate. When they
+changed, its run summary says so. The release starts by itself when the
+Cloudflare deployment workflow's serving-release observation shows current main
+and the worker differs from the last release that made templates public. A
+dispatch of **E2B additive runtime release** on current main with `reason` and
+`cloudflare_receipt` also starts it; a dispatch without a receipt fails before
+any template builder starts. Every gate rechecks the receipt against the live
+gateway and current main.
+
+The Coding Workspace, Task VM and Task Secret consumers accept this official
+producer's `workflow_run` event alongside its retained push/manual events. The
+event is only a pointer: their pre-checkout and shared guards confirm the fixed
+workflow identity, repository, exact main source and latest attempt through the
+GitHub API. Existing source selection, publication evidence and pre-credential
+checks still apply. A successful run with skipped publication does not prove a
+validated and published runtime. The finite Factory visual-evidence window
+below keeps its separate selection rules. The source-bound counterexample and
+retained refusal cases are recorded in the [#2984 evidence](../../docs/ci/2984-runtime-consumers.json).
+
+To retry after an external service recovers, dispatch the same way; the Actions
+dispatch event records the reason. Manual dispatch always runs validation, even for a matching worker. Changed
 runtime inputs produce a new fingerprint. Missing or expired failure artifacts
 permit the normal worker comparison; history API errors fail the check. Do not
 retry only failed candidate/gate jobs: cleanup has removed their candidates.
 
-After both gates pass, the workflow makes the candidates public and publishes
-all three IDs, their official base kinds, worker digest, source commit and
-measured models in one verified Vercel upsert inside Web deploy's production
-queue. `MIKKA_CLOUD_RUNTIME_PREVIOUS` retains the previous paired configuration;
-old template IDs and aliases are never updated or deleted. A failure before
-publication leaves the selected release unchanged. Exact-main and exact-serving
-source checks reject stale jobs. Per-variable readback detects a partial upsert;
-an inconsistent tuple requires revalidation and cannot overwrite the last valid
-previous configuration. A rollback uses the normal rollback PR and matched
-application/worker release, preserving these gates.
+After both gates pass, the workflow makes the candidates public and keeps the
+release report (all three IDs, their official base kinds, worker digest, source
+commit and measured models) as an immutable artifact for the private Cloudflare
+API deployment. Old template IDs and aliases are never updated or deleted. A
+failure before publication leaves the selected release unchanged. Exact-main and
+exact-serving source checks reject stale jobs. A rollback uses the normal
+rollback PR and matched application/worker release, preserving these gates.
 
 PR runs use no release credentials. Main builds read the existing `E2B_API_KEY`
 from Infisical `prod:/vercel`. The subscription gate reads the authorized
 `SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` from `prod:/`, signs in normally, uses
 tasks titled “测试” in `alexj11324/Mikka-handoff`, then removes its own fixtures.
-Publication uses `VERCEL_TEAM_TOKEN` from `prod:/platform`. Delivery uses the
-existing GitHub OIDC identity; credential values never enter reports or logs.
+Delivery uses the existing GitHub OIDC identity; credential values never enter reports or logs.
 
 The worker digest excludes unrelated Web lock entries and package scripts.
 Every main push compares that wanted digest with the published production
@@ -244,15 +273,10 @@ Public and fork PRs build without the private repository, and that build only
 has to compile; no workflow screenshots it. (`community-settings-ui.yml`,
 which captured that build's settings pages, was removed on 2026-11-08.)
 
-`web-deploy.yml` and `desktop-release.yml` alone read the private UI through
-Infisical OIDC and `HOSTED_UI_READ_KEY` (`prod:/platform`, GitHub read-only deploy key on
-`alexj11324/mikka-hosted-ui` only). They set `MIKKA_UI_OVERLAY_DIR` and record
-`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build with the default slots
-without either variable or any private secret. The production Web job checks
-public main plus private main on each main update, including docs-only pushes. Private main pushes dispatch
-the official Web job again with `overlay-refresh: true`, so docs-only changes
-cannot skip an overlay rebuild; bundled UI/release input changes also dispatch desktop with the expected
-overlay SHA, while private documentation-only pushes refresh Web only. No schedule is involved.
+`cloudflare-api-image.yml` and `desktop-release.yml` alone read the private UI, with the
+GitHub read-only deploy key `HOSTED_UI_READ_KEY` on `alexj11324/mikka-hosted-ui` only. They set
+`MIKKA_UI_OVERLAY_DIR` and record `MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build with the
+default slots without either variable or any private secret.
 
 Web verifies `/mikka/api/version`'s `build` and `overlaySha`. Desktop uses the
 existing matching-Web source gate and checks out **that Web overlay SHA**, then
@@ -272,7 +296,7 @@ for identities, rollout, source exposure boundaries and recovery.
 ## Dependency-aware selection
 
 `ci-selection.yml` supplies the same trusted decision to CI, Analytics SSR,
-Desktop and Self-hosted image. Nx Core follows explicit root-file, workspace,
+and Desktop. Nx Core follows explicit root-file, workspace,
 source-contract and DB feature-marker edges; candidate code is parsed, not
 executed during classification. Source/security policies stay enabled, and
 unmapped/unsafe/global inputs expand coverage. Core/integration commands are
@@ -283,12 +307,13 @@ and Monday 03:23 UTC run complete CI. No Nx Cloud, remote test cache, browser E2
 or release credentials are added. See [policy and commands](../../docs/ci/incremental.md)
 and [measured results](../../docs/ci/1699-results.md).
 
-Selected Desktop, Analytics and Docker PR checks now run as reusable jobs of CI;
-their conclusions are included in `UI policy (strict)`. Main image publication
-remains independent, and source-SHA release gates are unchanged.
-
-Selected reusable calls consume CI's trusted decision without running another
-selector. Independent dispatches and Image pushes still classify their changes.
+Selected reusable jobs consume CI's trusted decision without running another
+selector. The Analytics conclusion contributes to `UI policy (strict)`.
+The actual Analytics build, SSR checks and browser run own the `analytics-ssr`
+check name; no second runner summarizes that job. An absent or invalid trusted
+selection fails before setup, and the parent gate rejects selected runs that
+fail, cancel or skip. See the [measured queue samples](../../docs/ci/2984-analytics-baseline.json).
+Independent dispatches still classify their changes.
 Desktop checks and Electron acceptance run on Linux. Mac packaged acceptance,
 local-driver permission probes and installer acceptance are removed from CI;
 the standalone acceptance drivers remain available for explicit local runs.

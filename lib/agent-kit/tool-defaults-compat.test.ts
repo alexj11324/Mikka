@@ -285,7 +285,7 @@ test('Factory dispatch and ordinary dispatch keep separate host entry points and
   for (const key of factoryGateKeys) process.env[key] = '1'
   calls.length = 0
   const tools = registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { coordinator: true, execution: execution()})
-  const ordinary = {agentId: bot, repo: 'https://github.com/synthetic-owner/synthetic-repository.git', issueId: bot}
+  const ordinary = {agentId: bot, repo: 'https://github.com/synthetic-owner/synthetic-repository.git', issueId: bot, model: {harness: 'codex' as const}}
   const factory = {agentId: bot, deviceRepoId: bot, binding: {taskId: bot, issueId: bot, attemptId: bot, revision: 1, candidateId: null}}
   assert.equal((await asSchema(tools.dispatch_run.inputSchema).validate!(ordinary)).success, true)
   assert.equal((await asSchema(tools.dispatch_run.inputSchema).validate!({agentId: bot, deviceRepoId: bot, issueId: bot})).success, false)
@@ -419,6 +419,6 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
     t.diagnostic(JSON.stringify({ surface: item.name, beforeBytes, afterBytes, deltaBytes: afterBytes - beforeBytes }))
 
     assert.deepEqual(await asSchema(item.tools.get_issue.inputSchema).validate!({ issueId }), { success: true, value: { issueId } })
-    assert.equal((await asSchema(item.tools.dispatch_run.inputSchema).validate!({ issueId, readOnly: true })).success, true)
+    assert.equal((await asSchema(item.tools.dispatch_run.inputSchema).validate!({ issueId, readOnly: true, model: { harness: 'codex' } })).success, true)
   })
 })

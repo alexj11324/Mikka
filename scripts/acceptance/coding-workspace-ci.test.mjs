@@ -53,6 +53,22 @@ test('actual pre-checkout workflow script accepts only the confirmed main releas
   assert.equal(result.status, 0, result.stderr)
   assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
 })
+test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
+  const automatic = mutate => authenticate(t, value => {
+    value.event.workflow_run.event = 'workflow_run'; value.run.event = 'workflow_run'
+    mutate?.(value)
+  })
+  const result = automatic()
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
+  for (const mutate of [value => { value.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
+    value => { value.workflow.path = '.github/workflows/other.yml' }, value => { value.run.event = 'push' },
+    value => { value.run.run_attempt++ }, value => { value.main.object.sha = OTHER }]) {
+    const refused = automatic(mutate)
+    assert.equal(refused.status, 1); assert.equal(refused.output, '')
+    assert.equal(refused.stderr.trim(), 'coding_workspace_source_refused')
+  }
+})
 for (const [name, mutate] of Object.entries({
   'fork receiver': value => { value.env.GITHUB_REPOSITORY = 'fork/Mikka' },
   'non-main receiver': value => { value.env.GITHUB_REF = 'refs/pull/123/merge' },

@@ -5,6 +5,7 @@ import { HostedWorkflowModel } from '../abuse/workflow-model'
 import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
 import { scopeFromAuth } from './scope'
 import { streamingModel } from './streaming-model'
+import { withModelEffort } from '../model-effort'
 import type { DefinitionSnapshot } from '../agent-kit/definition'
 import type { HostedRuntimeSnapshot } from '../subscription-model-snapshot'
 import type { ScheduledRead } from '../schedules/contract'
@@ -13,7 +14,7 @@ import type { ScheduledRead } from '../schedules/contract'
 // Eve persists these business choices before evaluating the turn's definitions.
 export const turnModel = defineState<HostedRuntimeSnapshot | null>('mikka.model', () => null)
 export const turnPolicy = defineState<Pick<DefinitionSnapshot, 'definition' | 'effectiveTools' | 'personalPlugins'> | null>('mikka.policy', () => null)
-export const turnRequest = defineState<{ sourceEventId?: string; scheduledRead: ScheduledRead | null }>('mikka.request', () => ({ scheduledRead: null }))
+export const turnRequest = defineState<{ sourceEventId?: string; scheduledRead: ScheduledRead | null; startIndex?: number }>('mikka.request', () => ({ scheduledRead: null }))
 
 export async function modelForSession(ctx: DynamicModelContext) {
   const evaluation=await evaluationForSession(ctx)
@@ -21,9 +22,9 @@ export async function modelForSession(ctx: DynamicModelContext) {
   const scope = scopeFromAuth(ctx.session.auth.current)
   const runtime = turnModel.get()
   if (!runtime || runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
-  if (!runtime.modelSelection) return new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model)
+  if (!runtime.modelSelection) return withModelEffort(new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model), runtime.effort)
   const requestPolicy = ctx.session.parent || turnRequest.get().scheduledRead ? undefined : { codexServiceTier: 'priority' as const }
-  return streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection, requestPolicy))
+  return withModelEffort(streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection, requestPolicy)), runtime.effort)
 }
 
 export async function instructionsForSession(ctx: DynamicModelContext) {

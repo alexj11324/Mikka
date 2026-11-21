@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
+import { acceptReceivedOrganizationInvitation } from './self-hosted-organization.mjs'
+import { enableOrganizationDomain, joinDiscoveredOrganization, prepareRevokedInvitation, removeOrganizationDomain } from './self-hosted-organization-domain.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 
 const english = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
@@ -18,10 +20,10 @@ async function api(page, path, body) {
   }, { path, body })
 }
 
-async function signIn(page, email, password, id) {
+export async function signInDesktopAccount(page, account, id) {
   await page.evaluate(() => window.mikka.bundled.signOut())
   assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
-  assert.equal(await page.evaluate(account => window.mikka.bundled.signInEmail(account), { email, password }), null)
+  assert.equal(await page.evaluate(credentials => window.mikka.bundled.signInEmail(credentials), { email: account.email, password: account.password }), null)
   await waitForBundledSession(page, id)
 }
 
@@ -36,7 +38,7 @@ async function selectWorkspace(page, rpc, workspaceId, userId, role) {
 }
 
 export async function verifyConversationOrganization({ page, fixture, rpc, passed, setPhase,
-  baseUrl = 'mikka://app/mikka/en/', signInAs = (account, id) => signIn(page, account.email, account.password, id) }) {
+  baseUrl = 'mikka://app/mikka/en/', signInAs = (account, id) => signInDesktopAccount(page, account, id) }) {
   setPhase('conversation_owner_setup')
   const suffix = randomUUID()
   const created = await rpc('workspace.createWorkspace', [{ name: 'Desktop conversation QA', slug: 'desktop-' + suffix }])
@@ -179,8 +181,19 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   await page.reload()
   await expect(row.getByRole('img', { name: words.unread })).toBeVisible()
   passed('owner_manual_unread_persisted_in_directory_across_reload')
+  setPhase('organization_owner_configures_verified_domain')
+  const joinDomain = fixture.member.invitation ? await enableOrganizationDomain(page, fixture.email) : null
+  const revokedInvitation = joinDomain ? await prepareRevokedInvitation(page, joinDomain.organizationId, fixture.member.email) : null
   setPhase('conversation_member_authorization')
   await signInAs(fixture.member, fixture.member.id)
+  if (fixture.member.invitation) {
+    setPhase('organization_verified_recipient_accepts_received_invitation')
+    await acceptReceivedOrganizationInvitation(page, fixture.member.invitation, revokedInvitation, english.Organization, passed)
+    setPhase('organization_member_discovers_and_joins_matching_domain')
+    await joinDiscoveredOrganization(page, joinDomain)
+    passed('packaged_verified_member_discovers_and_joins_organization_by_domain')
+    setPhase('conversation_member_authorization')
+  }
   assert.ok((await rpc('workspace.acceptWorkspaceInvitation', [invitation])).ok)
   await selectWorkspace(page, rpc, workspaceId, fixture.member.id, 'member')
   assert.equal(await directory(title), undefined)
@@ -191,6 +204,12 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   passed('independently_signed_in_same_workspace_member_cannot_discover_read_or_organize_owner_chat')
   setPhase('conversation_owner_readback')
   await signInAs(fixture, fixture.ownerId)
+  if (joinDomain) {
+    setPhase('organization_owner_removes_domain_and_retains_member')
+    await removeOrganizationDomain(page, joinDomain, fixture.member.id)
+    passed('packaged_owner_removes_join_domain_and_preserves_existing_member')
+    setPhase('conversation_owner_readback')
+  }
   await selectWorkspace(page, rpc, workspaceId, fixture.ownerId, 'admin')
   assert.deepEqual(await flags(), { archived: false, pinned: false })
   assert.equal((await directory(title))?.unread, true)
@@ -200,4 +219,5 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   await page.reload()
   await expect(row.getByRole('button', { name: words.markUnread, exact: true })).toBeVisible()
   passed('returned_owner_preserves_title_and_clears_unread_with_durable_readback')
+  return workspaceId
 }

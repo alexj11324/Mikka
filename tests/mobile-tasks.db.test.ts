@@ -1,12 +1,13 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
+import { SpanKind, context as traceContext, trace } from '@opentelemetry/api'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { measured, readMetrics } from './helpers/read-metrics'
 
-type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string }
+type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string; headers?: Record<string, string> }
 
 const sqlState = (error: unknown): string | undefined => {
   if (!error || typeof error !== 'object') return undefined
@@ -55,9 +56,9 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const context = await import('../apps/api/src/context')
   // The ordinary API framework adapters supply request-local headers, cookies,
   // translations and after-work. Authentication and authorization stay real.
-  mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') })
-  mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') })
-  mock.module('next/server', { namedExports: await import('../apps/api/compat/server') })
+  mock.module('@/lib/server-runtime/headers', { namedExports: await import('../lib/server-runtime/headers') })
+  mock.module('@/lib/intl/i18n-server', { namedExports: await import('../lib/intl/i18n-server') })
+  mock.module('@/lib/server-runtime/server', { namedExports: await import('../lib/server-runtime/server') })
   const { auth } = await import('../lib/auth')
   const { GET } = await import('../app/api/mobile/tasks/[id]/route')
   const { GET: list } = await import('../app/api/mobile/tasks/route')
@@ -115,6 +116,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const req = new Request(origin + '/mikka' + path, { headers: {
       'x-mikka-locale': 'en', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}),
       ...(selection ? { 'x-mikka-workspace-id': selection } : {}), ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...options.headers,
     } })
     const scope = context.createRequestScope(req)
     try { return await context.runRequestScope(scope, () => handler(req)) }
@@ -122,6 +124,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   }
   const request = (id: string, options?: ReadOptions) => run('/api/mobile/tasks/' + id, req => GET(req, { params: Promise.resolve({ id }) }), options)
   const listRequest = (options?: ReadOptions) => run('/api/mobile/tasks', list, options)
+  const { GET: readThreadArtifacts } = await import('../app/api/mobile/threads/[id]/artifacts/route')
+  const threadArtifacts = (id: string, options?: ReadOptions) => run('/api/mobile/threads/' + id + '/artifacts', req => readThreadArtifacts(req, { params: Promise.resolve({ id }) }), options)
   const persisted = async () => (await pool.query(`select
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","ownershipState",status,title) order by id),'[]') from issues where "userId"=$1) as tasks,
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","botId",status) order by id),'[]') from agent_runs where "userId"=$1) as runs,
@@ -318,9 +322,44 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       assert.equal(peerResponse.status, 200)
       const peerWork = (await peerResponse.json()).work
       assert.ok(peerWork.pullRequests.every((pull: { sourceConversationId?: string }) => !pull.sourceConversationId))
+      // The thread's Artifact segment on iOS: the task's conversation lists the whole Factory task's PRs and its own documents.
+      const shown = await threadArtifacts(latest, { workspaceId: teamWorkspace.id })
+      assert.equal(shown.status, 200)
+      const groups = (await shown.json()).groups
+      assert.deepEqual(groups.pullRequests.map((pull: { url: string }) => pull.url).sort(), ['https://github.com/acme/app/pull/1', 'https://github.com/acme/app/pull/42'])
+      assert.deepEqual(groups.reports.map((item: { artifactId: string; kind: string }) => [item.artifactId, item.kind]), [[artifactIds[1], 'html']])
+      assert.equal((await threadArtifacts(latest, { bearer: peer.token, workspaceId: teamWorkspace.id })).status, 404, 'another person never reads the thread\'s Artifacts')
+      assert.equal((await threadArtifacts(latest, { workspaceId: secondWorkspace.id })).status, 404, 'another workspace reads nothing')
     } finally {
       await pool.query('DELETE FROM factory_tasks WHERE id=$1 AND "userId"=$2', [factoryId, owner])
       await pool.query('DELETE FROM coordinator_events WHERE id=$1 AND "userId"=$2', [source, owner])
+    }
+  })
+  await t.test('a thread without a task lists its own runs\' evidence for its owner only, in its own workspace', async () => {
+    const thread = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: teamWorkspace.id, botId: bot })
+    const capture = randomUUID(), document = randomUUID()
+    await pool.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,size,"inlineContent","storageKey",sha256)
+      VALUES($1,$2,$3,'image','image/png','local','ready','Preview',4,$4,$5,'0')`, [capture, owner, thread, Buffer.from('PNG!'), 'fixture/' + capture])
+    await pool.query(`insert into artifacts(id,"userId","workspaceId",kind,title,"runId") values($1,$2,$3,'markdown','Thread report',$4)`, [document, owner, teamWorkspace.id, thread])
+    try {
+      // The app names its workspace; without it the request reads the default (Personal) one, where this thread is not.
+      assert.equal((await threadArtifacts(thread)).status, 404)
+      const response = await threadArtifacts(thread, { workspaceId: teamWorkspace.id })
+      assert.equal(response.status, 200)
+      const body = await response.json()
+      assert.equal(body.count, 2)
+      assert.deepEqual(body.groups.captures.map((item: { captureId: string; kind: string; webPath: string | null }) => [item.captureId, item.kind, item.webPath]), [[capture, 'image', null]])
+      assert.deepEqual(body.groups.reports.map((item: { artifactId: string; kind: string; version: number }) => [item.artifactId, item.kind, item.version]), [[document, 'markdown', 1]])
+      assert.deepEqual([body.groups.plans, body.groups.pullRequests], [[], []])
+      assert.equal((await threadArtifacts(thread, { bearer: peer.token, workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(thread, { workspaceId: secondWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(secondRun, { workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(randomUUID(), { workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(thread, { bearer: null, workspaceId: teamWorkspace.id })).status, 401)
+    } finally {
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [capture])
+      await pool.query('DELETE FROM artifacts WHERE id=$1', [document])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [thread])
     }
   })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
@@ -409,6 +448,60 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const closed = await (await listRequest(teamSelection)).json()
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
+  })
+  await t.test('one versioned list response includes canonical state and keeps the selected workspace boundary', async () => {
+    const path = '/api/mobile/tasks?presentation=1'
+    const response = await run(path, list, teamSelection)
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.presentationVersion, 1)
+    assert.equal(body.workspaceId, teamWorkspace.id)
+    assert.equal(body.next, null)
+    const visible = body.tasks.find((item: { id: string }) => item.id === issueId)
+    assert.deepEqual([visible.status, visible.group, visible.bot.id], ['done', 'done', bot])
+    assert.ok(body.tasks.every((item: { id: string }) => item.id !== secondTask && item.id !== personalTask))
+    const first = body.tasks[0]
+    const cursor = new URLSearchParams({ workspaceId: teamWorkspace.id, after: first.id, updatedAt: first.updatedAt })
+    const continuation = await run(path + '&' + cursor, list, teamSelection)
+    assert.equal(continuation.status, 200)
+    assert.deepEqual(await continuation.json(), { ...body, tasks: body.tasks.slice(1) })
+    assert.equal((await run(path, list, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 403)
+    assert.equal((await (await listRequest(teamSelection)).json()).presentationVersion, undefined)
+  })
+  await t.test('a recovered native read exports only the validated past failure in a retained error span', async () => {
+    const { createTracerProvider, SafeExporter } = await import('../lib/tracing/node')
+    const memory = new InMemorySpanExporter()
+    const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 0.000001, environment: 'dev' })
+    provider.register()
+    try {
+      const failedTraceId = '6abe308341a942df9b952484f9179a9b'
+      const report = { stage: 'list', reason: 'timeout', traceId: failedTraceId }
+      const path = '/api/mobile/tasks?presentation=1'
+      const send = (value: unknown, bearer?: string | null) => provider.getTracer('mobile-test').startActiveSpan('GET /api/mobile/tasks', { kind: SpanKind.SERVER }, async span => {
+        try {
+          return await run(path, list, { ...teamSelection, bearer, headers: {
+            'x-mikka-client-kind': 'mobile', 'x-mikka-app-version': '1.0.0',
+            'x-mikka-task-refresh-failure': JSON.stringify(value),
+          } })
+        } finally { span.end() }
+      })
+      assert.equal((await send(report)).status, 200)
+      assert.equal((await send({ ...report, error: 'private response text' })).status, 200)
+      assert.equal((await send(report, null)).status, 401)
+      await provider.forceFlush()
+      const failures = memory.getFinishedSpans().filter(span => span.name === 'mobile.tasks.refresh.failure')
+      assert.equal(failures.length, 1)
+      const { attributes } = failures[0]!
+      assert.equal(attributes['mikka.task_refresh.client_stage'], 'list')
+      assert.equal(attributes['mikka.task_refresh.reason'], 'timeout')
+      assert.equal(attributes['mikka.task_refresh.failed_trace_id'], failedTraceId)
+      assert.equal(attributes['mikka.app.version'], '1.0.0')
+      assert.doesNotMatch(JSON.stringify(attributes), /private response text/)
+    } finally {
+      await provider.shutdown()
+      trace.disable()
+      traceContext.disable()
+    }
   })
   await t.test('without a thread, flags and dependencies preserve todo with matching reasons and visible identifiers', async () => {
     await pool.query(`update user_schedules set status='cancelled',next_at=null where id=$1`, [schedule])
@@ -529,7 +622,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       for (const value of [task, row]) assert.deepEqual([value.state, value.reason], [state, reason])
     }
     await compare('blocked', 'offline')
-    await pool.query('update devices set "lastSeenAt"=now() where id=$1', [device])
+    await pool.query('update devices set "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL where id=$1', [device])
     await compare('queued', null)
     await pool.query('update devices set enabled=false where id=$1', [device])
     await compare('blocked', 'offline')

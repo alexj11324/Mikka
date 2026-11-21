@@ -21,7 +21,7 @@ import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigati
 import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
 import { meetsMinimumVersion } from '@mikka/protocol/version'
-import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
+import { windowAppearance } from './window-appearance'
 import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
 import { BundledAuth } from './bundled-auth'
@@ -34,6 +34,7 @@ import { ServerDirectory } from './server-directory'
 import { BundledServers } from './bundled-servers'
 import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
+import { agentLogins } from './agent-logins'
 import { openBundledWebPage } from './bundled-web'
 import { markStartup } from '../startup'
 
@@ -299,8 +300,7 @@ function reloadApp(): void {
 
 function createMainWindow(): void {
   markStartup('main.window.start')
-  // Read once at launch; a changed Reduce transparency setting applies from the next launch.
-  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors, reduceTransparency: nativeTheme.prefersReducedTransparency })
+  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors })
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -308,7 +308,7 @@ function createMainWindow(): void {
     minHeight: 600,
     show: false,
     // The page paints its own top bar, so the native one must not show as a separate band.
-    ...appearance.options,
+    ...appearance,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -323,7 +323,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`],
     },
   })
   markStartup('main.window.created')
@@ -630,6 +630,7 @@ async function start(): Promise<void> {
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
     pickRepo,
+    agentLogins,
     localAccount: () => readLocalDeviceAccount((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     localOwner: () => readLocalDeviceOwner((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment?view=owner', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,

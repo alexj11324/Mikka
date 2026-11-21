@@ -3,6 +3,7 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, createContext, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import { SWRConfig } from 'swr'
 import { ViewStateProvider } from '@/lib/hooks/view-state'
 import { Button } from '@/components/ui/button'
 import type { BoardMenuItem, BoardScreenProps } from '@/components/slots/board-contract'
@@ -14,13 +15,17 @@ const translate = Object.assign((key: string) => key, { has: () => false })
 const nothing = () => {}
 const empty = () => null
 const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
-mock.module('swr', { defaultExport: () => ({ data: undefined }) })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
+const syncReads: (string | undefined)[] = []
+let mappedWorkspace: string | undefined
 mock.module('@/hooks/use-task-collection', { namedExports: { TaskPresentationsContext: createContext({}) } })
 mock.module('@/hooks/use-live-lists', { namedExports: { useLiveTaskRunList: () => ({ data: undefined }) } })
 mock.module('@/hooks/use-list-expiry', { namedExports: { useListExpiry: nothing } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
-mock.module('@/app/actions/linear-sync', { namedExports: { getLinearBoardSync: async () => ({ synced: false }) } })
+mock.module('@/app/actions/linear-sync', { namedExports: { getLinearBoardSync: async (workspace?: string) => {
+  syncReads.push(workspace)
+  return { synced: !!workspace && workspace === mappedWorkspace }
+} } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { CoordinatorAvatar: empty } })
 mock.module('@/components/nav/conversation-pill', { namedExports: { ConversationPill: empty } })
 mock.module('@/components/coordinator/coordinator-chat', { namedExports: { CoordinatorChat: empty } })
@@ -28,8 +33,8 @@ mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTas
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: Pass, SheetHeader: Pass, SheetTitle: Pass } })
 // The test adapter exposes the public slot callbacks. The official renderer
 // is exercised in the companion repository without copying its implementation.
-mock.module('./board-screen', { namedExports: { BoardScreenView: ({ issues, view, onView, filterItems }: Pick<BoardScreenProps, 'view' | 'onView' | 'filterItems'> & { issues: Issue[] }) =>
-  <div data-board-view={view}>
+mock.module('./board-screen', { namedExports: { BoardScreenView: ({ issues, view, onView, filterItems, tools }: Pick<BoardScreenProps, 'view' | 'onView' | 'filterItems' | 'tools'> & { issues: Issue[] }) =>
+  <div data-board-view={view}>{tools}
     <Button aria-label="viewList" aria-pressed={view === 'list'} onClick={() => onView('list')}>List</Button>
     {filterItems.map((group: BoardMenuItem) => <div key={group.label}>
       {group.submenu?.map(item => <Button key={item.label} role="menuitemcheckbox" aria-checked={item.checked} onClick={item.onSelect}>{item.label}</Button>)}
@@ -67,6 +72,31 @@ async function render({ owner = 'owner-one', workspace = 'workspace-one', visibl
     {visible && <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} key={remount ? `${owner}:${workspace}` : 'board'} issues={[issue(owner, workspace, 'one'), issue(owner, workspace, 'two')]} userId={owner} workspaceId={workspace} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />}
   </ViewStateProvider>))
 }
+test('the Board reads Linear for the displayed workspace and account, including on manual refresh', async () => {
+  const cache = new Map()
+  const show = async (userId: string, workspaceId?: string) => act(async () => root.render(
+    <SWRConfig value={{ provider: () => cache }}>
+      <BoardPage issues={[]} userId={userId} workspaceId={workspaceId} presentationRead={{ isLoading: false, mutate: async () => undefined }}
+        onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
+    </SWRConfig>))
+  const button = (label: string) => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+  syncReads.length = 0
+  mappedWorkspace = 'workspace-one'
+  await show('owner-one')
+  assert.deepEqual(syncReads, [])
+  await show('owner-one', 'workspace-one')
+  assert.ok(button('synced'))
+  await show('owner-one', 'workspace-two')
+  assert.ok(button('refresh'))
+  mappedWorkspace = 'workspace-two'
+  await show('owner-two', 'workspace-two')
+  assert.ok(button('synced'))
+  mappedWorkspace = undefined
+  await act(async () => button('synced')!.click())
+  assert.ok(button('refresh'))
+  assert.deepEqual(syncReads, ['workspace-one', 'workspace-two', 'workspace-two', 'workspace-two'])
+})
+
 test('a Board with an unresolved or failed Task presentation waits for the authorized projection before rendering cards', async () => {
   const task = issue('owner-one', 'workspace-one', 'one')
   let reads = 0

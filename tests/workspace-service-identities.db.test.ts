@@ -413,6 +413,41 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.equal((await serviceRead({ authorization: firstKey })).status, 401)
     assert.equal((await serviceRead(bearer(firstKey.replace('mksvc_', 'MKSVC_')))).status, 401)
     assert.deepEqual((await serviceRead(bearer(firstKey), project)).data.projects, [])
+    await t.test('service Project pagination fills the page with active, explicitly granted Projects', async () => {
+      const { setProjectArchive } = await import('../lib/project-lifecycle')
+      const ids = [project]
+      for (let index = 0; index < 101; index++) {
+        ids.push(await seedProject(pool, owner, [{ teamId: firstTeam.id, workspaceId: first.id }]))
+      }
+      ids.sort()
+      const access = resource + '/projects'
+      const scope = (expectedProjectIds: string[], projectIds: string[]) => ({ expectedProjectIds, projectIds, confirmExpansion: true })
+      assert.equal((await request({ cookie, origin }, first.id, 'PUT', access, scope([project], ids))).status, 200)
+      try {
+        const archived = ids.filter(id => id !== project).slice(0, 2)
+        for (const id of archived) await setProjectArchive(owner, first.id, { id, archived: true, message: 'Pagination fixture' })
+        const allowed = ids.filter(id => !archived.includes(id))
+        const firstPage = await serviceRead(bearer(firstKey))
+        assert.equal(firstPage.status, 200)
+        assert.equal(firstPage.data.projects.length, allowed.length)
+        assert.deepEqual(firstPage.data.projects.map((row: { id: string }) => row.id), allowed)
+        assert.equal(firstPage.data.nextCursor, null)
+        const tail = await serviceRead(bearer(firstKey), allowed.at(-2))
+        assert.deepEqual(tail.data.projects.map((row: { id: string }) => row.id), allowed.slice(-1))
+        assert.equal(tail.data.nextCursor, null)
+        await setProjectArchive(owner, first.id, { id: archived[0], archived: false, message: 'Restore fixture' })
+        const active = ids.filter(id => id !== archived[1])
+        const full = await serviceRead(bearer(firstKey))
+        assert.deepEqual(full.data.projects.map((row: { id: string }) => row.id), active.slice(0, 100))
+        assert.equal(full.data.nextCursor, active[99])
+        const last = await serviceRead(bearer(firstKey), full.data.nextCursor)
+        assert.deepEqual(last.data.projects.map((row: { id: string }) => row.id), active.slice(100))
+        assert.equal(last.data.nextCursor, null)
+      } finally {
+        assert.equal((await request({ cookie, origin }, first.id, 'PUT', access, scope(ids, [project]))).status, 200)
+      }
+    })
+
     await t.test('the dedicated bearer reads only current, explicitly granted Project details', async () => {
       const fixture = await pool.query('UPDATE workspace_projects SET description=$2 WHERE id=$1 RETURNING name,description,"createdAt","updatedAt"', [project, 'Release notes'])
       await pool.query(`INSERT INTO workspace_project_repositories ("projectId","workspaceId","repositoryKey","baseBranch","isPrimary")

@@ -1,17 +1,30 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { splitSetCookieHeader } from 'better-auth/cookies'
 import { desktopSessionCacheFromHeaders } from '../desktop-rpc/session-cache'
 
 type SessionContext = { headers?: Headers; query?: Record<string, unknown> }
-type Scope = { cookie: string; session: unknown; fresh: boolean; refresh: () => Promise<unknown>; refreshing?: Promise<unknown> }
+type SessionOptions = { fresh: boolean; refresh: () => Promise<unknown>; profileUpdated?: (output: Headers) => void }
+type Scope = SessionOptions & { cookie: string; session: unknown; refreshing?: Promise<unknown> }
 const storage = new AsyncLocalStorage<Scope>()
 
 /** Only a successfully authenticated browser RPC installs this scope. It is
  * separate from desktop identity: browser billing and multiSession retain
  * their normal cookie behavior. */
-export function withBrowserSession<T>(cookie: string, session: unknown, options: { fresh: boolean; refresh: () => Promise<unknown> }, work: () => T): T {
+export function withBrowserSession<T>(cookie: string, session: unknown, options: SessionOptions, work: () => T): T {
   return storage.run({ cookie, session, ...options }, work)
 }
 export function withoutBrowserSession<T>(work: () => T): T { return storage.exit(work) }
+
+/** Carry the SDK's post-write session cache back to the browser that made this RPC. */
+export function browserProfileUpdated(input: Headers, output: Headers): void {
+  const scope = storage.getStore()
+  if (scope && !input.has('authorization') && input.get('cookie') === scope.cookie) scope.profileUpdated?.(output)
+}
+
+function isSessionCacheCookie(cookie: string, name: string): boolean {
+  const key = cookie.slice(0, cookie.indexOf('='))
+  return key === name || (key.startsWith(name + '.') && /^\d+$/.test(key.slice(name.length + 1)))
+}
 
 export function readBrowserSession(context: SessionContext | undefined, fresh: boolean): Promise<unknown> | undefined {
   const scope = storage.getStore()
@@ -36,7 +49,7 @@ export function readBrowserSession(context: SessionContext | undefined, fresh: b
 
 type AuthResult<Session> = { response: Session | null; headers: Headers }
 type Reader<Session> = (input: { headers: Headers; query?: { disableCookieCache: boolean }; returnHeaders: true }) => Promise<AuthResult<Session>>
-type Authenticated<Session> = { session: Session; headers: Headers; responseHeaders: Headers; fresh: boolean }
+type Authenticated<Session> = { session: Session; headers: Headers; responseHeaders: Headers; fresh: boolean; cookieName: string }
 
 export function browserAuthentication<Session>(read: Reader<Session>, cookieName: () => Promise<string>) {
   return {
@@ -46,13 +59,18 @@ export function browserAuthentication<Session>(read: Reader<Session>, cookieName
       if (!result.response) return null
       // The configured durable Better Auth session cache emits session_data
       // only on a DB read/refresh. A signed cache hit is never marked fresh.
-      const issued = desktopSessionCacheFromHeaders(result.headers, await cookieName())
-      return { session: result.response, headers, responseHeaders: result.headers, fresh: Boolean(issued) }
+      const name = await cookieName()
+      const issued = desktopSessionCacheFromHeaders(result.headers, name)
+      return { session: result.response, headers, responseHeaders: result.headers, fresh: Boolean(issued), cookieName: name }
     },
     async scope(identity: Authenticated<Session>, work: () => Promise<Response>): Promise<Response> {
       const outputs: Headers[] = [identity.responseHeaders]
+      let updatedCache: string[] = []
       return withBrowserSession(identity.headers.get('cookie')!, identity.session, {
         fresh: identity.fresh,
+        profileUpdated: output => {
+          updatedCache = splitSetCookieHeader(output.get('set-cookie') ?? '').filter(cookie => isSessionCacheCookie(cookie, identity.cookieName))
+        },
         refresh: async () => {
           const result = await withoutBrowserSession(() => read({ headers: identity.headers, query: { disableCookieCache: true }, returnHeaders: true }))
           outputs.push(result.headers)
@@ -60,9 +78,11 @@ export function browserAuthentication<Session>(read: Reader<Session>, cookieName
         },
       }, async () => {
         const response = await work()
-        for (const output of outputs) for (const value of output.getSetCookie()) {
+        for (const output of outputs) for (const value of splitSetCookieHeader(output.get('set-cookie') ?? '')) {
+          if (updatedCache.length && isSessionCacheCookie(value, identity.cookieName)) continue
           if (!response.headers.getSetCookie().includes(value)) response.headers.append('set-cookie', value)
         }
+        for (const value of updatedCache) response.headers.append('set-cookie', value)
         // These credentials belong exclusively to the native main process.
         response.headers.delete('x-mikka-session-token')
         response.headers.delete('x-mikka-session-cache')

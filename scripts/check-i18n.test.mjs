@@ -107,7 +107,7 @@ test('findHardcodedText catches Chinese in template literals', () => {
 
 test('findMissingTranslationKeys resolves namespaced and object-form translators', () => {
   const source = `
-    import { useTranslations, getTranslations } from 'next-intl'
+    import { useTranslations, getTranslations } from '@/lib/intl/i18n-client'
     export async function Demo() {
       const t = useTranslations('Auth')
       const statusT = useTranslations('Issue.status')
@@ -123,7 +123,7 @@ test('findMissingTranslationKeys resolves namespaced and object-form translators
 
 test('findMissingTranslationKeys skips dynamic and ambiguous keys', () => {
   const source = `
-    import { useTranslations } from 'next-intl'
+    import { useTranslations } from '@/lib/intl/i18n-client'
     export function Demo({ kind }: { kind: string }) {
       const t = useTranslations('Auth')
       return <p>{t(\`status.\${kind}\`)}{t('title')}</p>
@@ -144,7 +144,7 @@ test('copy never says a bot owns or runs a thread', () => {
   }
   assert.equal(findThreadOwnership(bad).length, 9)
   const good = {
-    'zh-CN': { a: 'Coordinator 派出的线程', b: '{bot} 派出的线程', c: '{name} 的线程', d: '所属项目', e: '派出线程', f: '与 Coordinator 的对话' },
+    'zh-CN': { a: 'Coordinator 派出的线程', b: '{bot} 派出的线程', c: '{name} 的线程', d: '所属项目', e: '派出线程', f: 'Coordinator 线程' },
     en: { a: 'Thread {bot} dispatched', b: "{name}'s thread", c: 'the threads they dispatched' },
   }
   assert.deepEqual(findThreadOwnership(good), [])
@@ -152,5 +152,11 @@ test('copy never says a bot owns or runs a thread', () => {
 
 test('Chinese copy calls a thread 线程, never 执行线程 or 运行链', () => {
   assert.equal(findBannedThreadWords({ 'zh-CN': { a: '打开执行线程', b: { c: '运行链已停止' } } }).length, 2)
-  assert.deepEqual(findBannedThreadWords({ 'zh-CN': { a: '打开线程', b: '登录会话已失效', c: 'Bot 对话' } }), [])
+  assert.deepEqual(findBannedThreadWords({ 'zh-CN': { a: '打开线程', b: '登录会话已失效', c: 'Bot 线程' } }), [])
+})
+
+test('Chinese copy never says 对话 for a thread or chat; 对话框 (a dialog box) stays', () => {
+  const problems = findBannedThreadWords({ 'zh-CN': { a: '新建对话', b: { c: 'Bot 对话' }, d: '与 Coordinator 的对话框外的对话', e: '关闭对话框' }, en: { a: '对话' } })
+  assert.deepEqual(problems.map(problem => problem.split('"')[1]), ['a', 'b.c', 'd'])
+  assert.deepEqual(findBannedThreadWords({ 'zh-CN': { a: '关闭对话框', b: '线程', c: '打开对话框后继续' } }), [])
 })

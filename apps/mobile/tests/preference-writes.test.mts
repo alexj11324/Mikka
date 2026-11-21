@@ -114,3 +114,41 @@ test('refusals, unconfirmed responses and transport failures never return a save
   }
   await assert.rejects(saveProfileName('Name', async () => { throw new Error('offline') }), /offline/)
 })
+
+test('a save scheduled as the writer becomes idle waits for its own acknowledgement', async () => {
+  const f = fixture()
+  let next: Promise<boolean> | undefined
+  const stop = f.writer.subscribe(() => {
+    if (f.writer.snapshot().status === 'idle') {
+      stop()
+      queueMicrotask(() => { next = f.writer.save({ push: false }) })
+    }
+  })
+  const first = f.writer.save({ memory: false })
+  f.requests[0]!.response.resolve({ memory: false, push: true })
+  assert.equal(await first, true)
+  assert.deepEqual(f.requests.map(call => call.patch), [{ memory: false }, { push: false }])
+  f.requests[1]!.response.resolve({ memory: false, push: false })
+  assert.equal(await next, true)
+  assert.deepEqual(f.writer.snapshot(), { status: 'idle', intent: {} })
+  assert.deepEqual(f.confirmed(), { memory: false, push: false })
+})
+
+test('a retry started by the failure notification owns the retried write', async () => {
+  const f = fixture()
+  let retried: Promise<boolean> | undefined
+  const stop = f.writer.subscribe(() => {
+    if (f.writer.snapshot().status === 'unconfirmed') {
+      stop()
+      retried = f.writer.retry()
+    }
+  })
+  const original = f.writer.save({ push: false })
+  f.requests[0]!.response.reject(new Error('offline'))
+  assert.equal(await original, false)
+  assert.deepEqual(f.requests.map(call => call.patch), [{ push: false }, { push: false }])
+  f.requests[1]!.response.resolve({ memory: true, push: false })
+  assert.equal(await retried, true)
+  assert.deepEqual(f.confirmed(), { memory: true, push: false })
+  assert.deepEqual(f.writer.snapshot(), { status: 'idle', intent: {} })
+})

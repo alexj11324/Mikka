@@ -1,9 +1,10 @@
 'use server'
 
+import { browserProfileUpdated } from '@/lib/browser-rpc/session'
 import { withFreshSession } from '@/lib/fresh-session'
 import { recordDesktopTokenRotation } from '@/lib/desktop-rpc/session'
-import { headers } from 'next/headers'
-import { getTranslations } from 'next-intl/server'
+import { headers } from '@/lib/server-runtime/headers'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { GovernanceError } from '@/lib/governance/errors'
@@ -43,13 +44,18 @@ function authErrorCode(error: unknown): string | undefined {
   return typeof body?.code === 'string' ? body.code : undefined
 }
 
+async function updateProfile(headers: Headers, body: { name: string } | { image: string }) {
+  const result = await auth.api.updateUser({ body, headers, returnHeaders: true })
+  browserProfileUpdated(headers, result.headers)
+}
+
 /** The person's own display name; the settings page shows and edits it. */
 export async function updateDisplayName(name: string): Promise<ActionResult<{ name: string }>> {
   return runAction(async () => {
     const parsed = displayName.safeParse(name)
     if (!parsed.success) throw new ActionFailureError('validationNameRequired')
     const { user, headers: requestHeaders } = await requireSession()
-    await auth.api.updateUser({ body: { name: parsed.data }, headers: requestHeaders })
+    await updateProfile(requestHeaders, { name: parsed.data })
     await ownerIssueListsChanged(pool, user.id)
     await ownerProfileListsChanged(pool, user.id)
     return { name: parsed.data }
@@ -70,7 +76,7 @@ export async function uploadAvatar(form: FormData): Promise<ActionResult<{ image
     const checked = checkAvatarFile(file.type, new Uint8Array(await file.arrayBuffer()))
     if (!checked.ok) throw new ActionFailureError(checked.reason === 'size' ? 'avatarTooLarge' : 'avatarInvalidType')
     const image = await saveAvatar(user.id, checked.contentType, checked.bytes)
-    await auth.api.updateUser({ body: { image }, headers: requestHeaders })
+    await updateProfile(requestHeaders, { image })
     await ownerIssueListsChanged(pool, user.id)
     await ownerProfileListsChanged(pool, user.id)
     return { image }

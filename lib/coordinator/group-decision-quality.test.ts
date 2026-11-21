@@ -43,6 +43,8 @@ test('trace snapshots detect duty/authorization changes without copying role ins
 test('receipt allowlist drops private envelopes and rejects malformed or forged model metadata', () => {
   const receipt = { executionId: 'execution', modelId: DECISION_MODEL as typeof DECISION_MODEL, providerGenerationId: 'provider', startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:01Z', requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const, credential: 'never-copy-this' }
   assert.equal(groupDecisionReceipt(receipt)?.requestDigest, receipt.requestDigest)
+  const historical = { ...receipt, modelId: 'openai/gpt-6-luna-decisions' as const }
+  assert.equal(groupDecisionReceipt(historical)?.modelId, historical.modelId)
   assert.ok(!JSON.stringify(groupDecisionReceipt(receipt)).includes(receipt.credential))
   assert.equal(groupDecisionReceipt({ ...receipt, requestDigest: 'invalid' }), null)
   assert.equal(groupDecisionReceipt({ ...receipt, completedAt: '2025-01-01' }), null)

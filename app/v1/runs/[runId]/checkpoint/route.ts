@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm'
 import type { PoolClient } from 'pg'
 import { RUN_CHECKPOINT_MAX_BYTES, runCheckpointReceiptSchema, runCheckpointSchema } from '@mikka/protocol/device'
@@ -19,7 +19,6 @@ import { prepareCheckpointReview, retainCheckpointReview } from '@/lib/coding-wo
 import { observeCommitEffects } from '@/lib/db/commit-effects'
 import { runChanged } from '@/lib/live/panels'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 /**

@@ -1,5 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { createHmac } from 'node:crypto'
 import { auth, authBaseURL } from '@/lib/auth'
 

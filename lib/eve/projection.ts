@@ -1,20 +1,43 @@
 import { parts, calls, turn, type SessionView, type TurnOutcome } from 'eve/events'
+import type { sessions } from 'eve/server'
 import type { EveScope } from './scope'
 
 export const eveStreamId = (sessionId:string,turnId:string) => `eve:${sessionId}:${turnId}`
 
 /** Compatibility history is derived from the eve committed view, never used as eve model history. */
-export function projectEveTurn(view:SessionView,sessionId:string,turnId:string,outcome:TurnOutcome) {
+export function projectEveTurn(view:SessionView,sessionId:string,turnId:string,outcome:TurnOutcome,stoppedText?:string) {
   const code=turn(view,turnId)?.error?.code
   const failure=typeof code==='string' && /^[a-zA-Z][a-zA-Z0-9_.:-]{0,127}$/.test(code) ? code : 'turn_failed'
   const content = parts(view,{turnId}).flatMap(part => (part.kind === 'text' || part.kind === 'reasoning') && typeof part.value === 'string' ? [{type:part.kind,text:part.value}] : [])
   const tools = calls(view,{turnId,kind:'tool'})
   const toolCalls = tools.map(call => ({ type:'tool-call',toolCallId:call.callId,toolName:call.name,input:call.input ?? {} }))
+  const stopped = outcome === 'cancelled' ? { mikkaStopped:true, ...(stoppedText ? {mikkaDisplay:{version:1, kind:'reply', text:stoppedText}} : {}) } : {}
   const output = tools.filter(call => ['completed','failed','cancelled','rejected'].includes(call.state)).map(call => ({type:'tool-result',toolCallId:call.callId,toolName:call.name,output:{type:'json',value:call.output ?? {error:call.error?.code ?? call.state}}}))
   return [
-    {role:'assistant',content:[...content,...toolCalls],mikkaStreamId:eveStreamId(sessionId,turnId),...(outcome === 'cancelled' ? {mikkaStopped:true} : {}),...(outcome === 'failed' ? {mikkaFailure:failure} : {})},
+    {role:'assistant',content:[...content,...toolCalls],mikkaStreamId:eveStreamId(sessionId,turnId),...stopped,...(outcome === 'failed' ? {mikkaFailure:failure} : {})},
     ...(output.length ? [{role:'tool',content:output}] : []),
   ]
+}
+
+/** The settled frame can omit interrupted output. Read the committed native facts through this turn's end. */
+export async function stoppedTurnDisplay(reader:ReturnType<typeof sessions.attach>,turnId:string,startIndex:number) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const text: string[] = []
+    let interrupted = false
+    try {
+      for await (const event of reader.stream({ follow:false, startIndex, signal:AbortSignal.timeout(5_000) })) {
+        if (event.type === 'turn.settled' && event.data.turnId === turnId) return interrupted ? text.join('\n\n') : undefined
+        if (event.type !== 'content.completed' || event.scope?.turnId !== turnId || event.data.kind !== 'text' || typeof event.data.value !== 'string') continue
+        text.push(event.data.value)
+        if (event.data.interrupted) interrupted = true
+      }
+    } catch {
+      // Open a fresh bounded reader once. A partially read attempt never contributes duplicate text.
+    }
+  }
+  // A failed display read must not prevent the product from recording Stop and releasing its lease.
+  console.warn('eve_stopped_transcript_unavailable')
+  return undefined
 }
 
 export async function projectTurnState(scope:EveScope,sessionId:string,turnId:string,working:boolean,messages?:unknown[],settlement?:{outcome:TurnOutcome;sourceEventId?:string}) {

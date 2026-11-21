@@ -301,9 +301,9 @@ export async function readDriveHistory(
   database: Pick<Pool, 'query'>,
   actor: { ownerId: string },
   volumeId: string,
-  options: { limit?: number; beforeId?: string } = {},
+  options: { limit?: number | null; beforeId?: string } = {},
 ): Promise<DriveVersionSummary[]> {
-  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
+  const limit = options.limit === null ? null : Math.min(Math.max(options.limit ?? 50, 1), 200)
   const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [volumeId])
   if (!volume || volume.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   // The volume lock serializes sequence numbers. Independent writers can generate
@@ -313,10 +313,12 @@ export async function readDriveHistory(
     threadId: string | null; threadTitle: string | null; authorName: string; restoredFromVersionId: string | null; createdAt: Date
   }>(`SELECT id,seq,kind,"fileCount","totalBytes",digest,"threadId","threadTitle","authorName","restoredFromVersionId","createdAt"
       FROM drive_volume_versions
-      WHERE "volumeId"=$1 AND ($2::text IS NULL OR seq < (
+      WHERE "volumeId"=$1 AND EXISTS (
+        SELECT 1 FROM drive_volumes WHERE id=$1 AND "ownerId"=$4 AND "archivedAt" IS NULL
+      ) AND ($2::text IS NULL OR seq < (
         SELECT seq FROM drive_volume_versions WHERE "volumeId"=$1 AND id=$2
       ))
-      ORDER BY seq DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit])
+      ORDER BY seq DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit, actor.ownerId])
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
@@ -328,7 +330,7 @@ export async function readDriveFileHistory(
   actor: { ownerId: string },
   volumeId: string,
   path: string,
-  options: { limit: number; beforeId?: string },
+  options: { limit: number | null; beforeId?: string },
 ): Promise<(DriveVersionSummary & { file: DriveManifestEntry | null })[]> {
   const { rows } = await database.query<DriveVersionSummary & { file: DriveManifestEntry | null }>(`
     SELECT v.id, v.seq, v.kind, v."fileCount", v."totalBytes", v.digest, v."threadId", v."threadTitle",
@@ -352,20 +354,21 @@ export async function readDriveVersion(
   actor: { ownerId: string },
   volumeId: string,
   versionId: string,
-): Promise<DriveVersionSummary & { manifest: DriveManifestEntry[] }> {
+): Promise<DriveVersionSummary & { manifest: DriveManifestEntry[]; parentDigest: string | null }> {
   const { rows: [version] } = await database.query<{
     id: string; volumeId: string; seq: number; kind: DriveVersionSummary['kind']; fileCount: number; totalBytes: string; digest: string
-    manifest: DriveManifestEntry[]; threadId: string | null; threadTitle: string | null; authorName: string
+    manifest: DriveManifestEntry[]; parentDigest: string | null; threadId: string | null; threadTitle: string | null; authorName: string
     restoredFromVersionId: string | null; createdAt: Date; ownerId: string
   }>(`SELECT v.id,v."volumeId",v.seq,v.kind,v."fileCount",v."totalBytes",v.digest,v.manifest,v."threadId",v."threadTitle",
-        v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId"
+        v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId",prev.digest AS "parentDigest"
       FROM drive_volume_versions v JOIN drive_volumes d ON d.id=v."volumeId"
-      WHERE v.id=$1 AND v."volumeId"=$2 AND d."archivedAt" IS NULL`, [versionId, volumeId])
+      LEFT JOIN drive_volume_versions prev ON prev."volumeId"=v."volumeId" AND prev.seq=v.seq-1
+      WHERE v.id=$1 AND v."volumeId"=$2 AND d."ownerId"=$3 AND d."archivedAt" IS NULL`, [versionId, volumeId, actor.ownerId])
   if (!version || version.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   return { id: version.id, seq: version.seq, kind: version.kind, fileCount: version.fileCount,
     totalBytes: Number(version.totalBytes), digest: version.digest, threadId: version.threadId,
     threadTitle: version.threadTitle, authorName: version.authorName,
-    restoredFromVersionId: version.restoredFromVersionId, createdAt: version.createdAt, manifest: version.manifest }
+    restoredFromVersionId: version.restoredFromVersionId, createdAt: version.createdAt, parentDigest: version.parentDigest, manifest: version.manifest }
 }
 
 /**
@@ -381,7 +384,7 @@ export async function restoreDriveVersion(
   database: { connect: Pool['connect'] },
   scope: { ownerId: string; volumeId: string },
   actor: DriveActor,
-  input: { versionId: string; expectedDigest: string; mutationId: string },
+  input: { versionId: string; expectedDigest: string; mutationId?: string },
 ): Promise<DriveWriteResult> {
   const requestDigest = sha256Hex(JSON.stringify(['restore', scope.volumeId, input.versionId, input.expectedDigest]))
   return withTransaction(database, async client => {
@@ -390,15 +393,26 @@ export async function restoreDriveVersion(
     }>('SELECT id,"ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL FOR UPDATE', [scope.volumeId])
     if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
 
-    // A restore is idempotent for the same reason a write is.
-    const { rows: [receipt] } = await client.query<{ requestDigest: string; versionId: string; resultDigest: string }>(
-      'SELECT "requestDigest","versionId","resultDigest" FROM drive_mutations WHERE "volumeId"=$1 AND "mutationId"=$2', [volume.id, input.mutationId])
-    if (receipt) {
-      if (receipt.requestDigest !== requestDigest) throw new DriveError('drive_replay_mismatch', 409)
-      const { rows: [version] } = await client.query<{ seq: number; fileCount: number; totalBytes: string }>(
-        'SELECT seq,"fileCount","totalBytes" FROM drive_volume_versions WHERE id=$1', [receipt.versionId])
-      return { headVersionId: receipt.versionId, headDigest: receipt.resultDigest, seq: version?.seq ?? 0,
-        entryCount: version?.fileCount ?? 0, totalBytes: Number(version?.totalBytes ?? 0), replayed: true }
+    if (input.mutationId) {
+      const { rows: [receipt] } = await client.query<{ requestDigest: string; versionId: string; resultDigest: string }>(
+        'SELECT "requestDigest","versionId","resultDigest" FROM drive_mutations WHERE "volumeId"=$1 AND "mutationId"=$2', [volume.id, input.mutationId])
+      if (receipt) {
+        if (receipt.requestDigest !== requestDigest) throw new DriveError('drive_replay_mismatch', 409)
+        const { rows: [version] } = await client.query<{ seq: number; fileCount: number; totalBytes: string }>(
+          'SELECT seq,"fileCount","totalBytes" FROM drive_volume_versions WHERE id=$1', [receipt.versionId])
+        return { headVersionId: receipt.versionId, headDigest: receipt.resultDigest, seq: version?.seq ?? 0,
+          entryCount: version?.fileCount ?? 0, totalBytes: Number(version?.totalBytes ?? 0), replayed: true }
+      }
+    } else {
+      // The Organization contract supplies a source version and an observed digest.
+      // Only the current head can acknowledge this exact restore after a lost response.
+      const { rows: [applied] } = await client.query<{ seq: number; fileCount: number; totalBytes: string }>(`
+        SELECT v.seq,v."fileCount",v."totalBytes" FROM drive_volume_versions v
+        JOIN drive_volume_versions prev ON prev."volumeId"=v."volumeId" AND prev.seq=v.seq-1
+        WHERE v.id=$1 AND v."volumeId"=$2 AND v.kind='restore' AND v."restoredFromVersionId"=$3 AND prev.digest=$4`,
+      [volume.headVersionId, volume.id, input.versionId, input.expectedDigest])
+      if (applied) return { headVersionId: volume.headVersionId, headDigest: volume.headDigest, seq: applied.seq,
+        entryCount: applied.fileCount, totalBytes: Number(applied.totalBytes), replayed: true }
     }
 
     const { rows: [source] } = await client.query<{ manifest: DriveManifestEntry[]; digest: string }>(
@@ -421,7 +435,7 @@ export async function restoreDriveVersion(
     }
     // The restored version is written forward as a new one that names its source.
     return commitVersion(client, volume, current, source.manifest, actor, 'restore', input.versionId,
-      input.mutationId, requestDigest, input.expectedDigest)
+      input.mutationId ?? null, requestDigest, input.expectedDigest)
   })
 }
 

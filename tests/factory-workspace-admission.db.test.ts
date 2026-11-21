@@ -59,15 +59,15 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     await controls.query(await readFile(new URL(name, directory), 'utf8'))
   }
   const context = await import('../apps/api/src/context')
-  const framework = await import('next/headers')
-  mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     headers: async () => context.requireRequestScope().headers,
     cookies: async () => context.requireRequestScope().cookies,
   } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: (work: () => unknown) => context.requireRequestScope().after.add(work) } })
-  const locale = await import('next-intl/server')
-  mock.module('next-intl/server', { namedExports: { ...locale, getLocale: async () => 'en',
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => unknown) => context.requireRequestScope().after.add(work) } })
+  const locale = await import('@/lib/intl/i18n-server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...locale, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   // Only the external GitHub wire and background consumer are fixtures.
   // Native authentication, SQL, queue admission, Profile and COMMIT are real.
@@ -328,14 +328,21 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
 
   await t.test('Profile COMMIT rechecks Enterprise policy on its sole owned APP client and rolls back the new version', async () => {
     const organizationId = randomUUID(), profileId = randomUUID()
-    const { AgentProfileStore } = await import('../lib/factory/agent-profile-store')
+    const { AgentProfileStore, acquireProfileMembership } = await import('../lib/factory/agent-profile-store')
     await controls.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Profile borrow fixture\',$2)', [organizationId, owner])
     await controls.query('INSERT INTO mikka_organization_workspaces("organizationId","workspaceId") VALUES($1,$2)', [organizationId, alpha])
     await controls.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,false,false)', [organizationId])
-    const store = new AgentProfileStore(app, { validateModel: async () => {
-      // Inherit has no external model source to validate. This owned-fixture
-      // barrier changes real APP policy after admission, before the real COMMIT.
-      await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+    const store = new AgentProfileStore(app, { membership: async scope => {
+      // The real borrowed membership, with an owned-fixture barrier that changes
+      // real APP policy after admission, just before its final check and COMMIT.
+      const member = await acquireProfileMembership(scope)
+      return {
+        check: async client => {
+          await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+          await member.check(client)
+        },
+        close: () => member.close(),
+      }
     } })
     try {
       await assert.rejects(actAs({ id: session.user.id, [tokenWorkspace]: alpha, [enterprisePrincipal]: session.user[enterprisePrincipal] }, () => withFactoryMembership(owner, () => store.create({ ownerId: owner, workspaceId: alpha }, {
@@ -508,7 +515,7 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   await controls.query('INSERT INTO repository_settings("userId","remoteKey",push) VALUES($1,$2,$3)', [owner, normalizeRepository(repository).key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: owner, approvedAt: new Date().toISOString() })])
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), connectionId = randomUUID()
   const model = 'gpt-6-luna'
-  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES($1,$2,\'Factory local fixture\',\'local\',\'server\',true,now(),$3)', [deviceId, owner, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: [model] }])])
+  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,$2,\'Factory local fixture\',\'local\',\'server\',true,now(),$3,now())', [deviceId, owner, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: [model] }])])
   await controls.query('INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,\'codex\',\'Factory local fixture\',$3)', [agentId, owner, deviceId])
   await controls.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,\'main\')', [repoId, deviceId, owner, normalizeRepository(repository).key, 'https://github.com/' + repository + '.git'])
   await controls.query('INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES($1,$2,$3,\'codex\',\'connected\',1,$4,$5,\'synthetic-subject\',$6,$7)', [

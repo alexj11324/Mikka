@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef } from 'react'
 import { useViewScroll } from '@/lib/hooks/view-state'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { InlineLoadError } from '@/components/load-error'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ResizeHandle } from '@/components/ui/resizable-pane'

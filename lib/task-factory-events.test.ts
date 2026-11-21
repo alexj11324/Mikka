@@ -72,3 +72,17 @@ test('progress folds visible gates per run, retains retries and keeps pre-dispat
   assert.equal(taskFactoryProgress([...receipts, ...otherTask]).length, 6)
   assert.equal(JSON.stringify(items).includes('foreign'), false)
 })
+
+test('an evidence link opens the producing run\'s thread, and a receipt the read no longer admits stays on the task', async () => {
+  const { taskEvidenceThread } = await import('./task-factory-events')
+  const rows = taskFactoryEvents('task', [{ id: 'gate', createdAt: '2026-11-09T01:00:00Z', stage: 'review', status: 'passed', revision: 1, attemptId: 'review' }],
+    [{ id: 'review', runId: 'review-run', candidateId: null }, { id: 'build', runId: 'build-run', candidateId: null }], [
+      { id: 'capture', createdAt: '2026-11-09T01:01:00Z', kind: 'image', title: 'Home', runId: 'review-run', attemptId: 'review' },
+      { id: 'pr:build-run', createdAt: '2026-11-09T01:02:00Z', kind: 'pull_request', title: 'Fix', runId: 'build-run', attemptId: 'build' },
+    ])
+  assert.equal(taskEvidenceThread(rows, { factoryTaskId: 'task', receiptId: 'capture' }), 'review-run')
+  assert.equal(taskEvidenceThread(rows, { factoryTaskId: 'task', receiptId: 'pr:build-run' }), 'build-run')
+  assert.equal(taskEvidenceThread(rows, { factoryTaskId: 'task', receiptId: 'gate' }), null)
+  assert.equal(taskEvidenceThread(rows, { factoryTaskId: 'other', receiptId: 'capture' }), null)
+  assert.equal(taskEvidenceThread(rows, { factoryTaskId: 'task', receiptId: 'revoked' }), null)
+})

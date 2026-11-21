@@ -9,7 +9,7 @@ const databaseUrl = process.env.E2E_DATABASE_URL
 const eligible = databaseUrl && disposableDatabase(process.env, databaseUrl)
 if (!eligible && process.env.REQUIRE_DB === '1') throw new Error('Gateway presence acceptance requires isolated loopback *_e2e Postgres')
 
-test('real Postgres: idle gateway presence drives dispatch, device selection and post-commit uninstall', { skip: !eligible }, async t => {
+test('real Postgres: the device session drives dispatch, device selection and post-commit uninstall, with no gateway status call', { skip: !eligible }, async t => {
   const [{ createRequestDatabaseScope, pool }, { targetDevice }, { poolDevices }, { removeOwnedDevice }] = await Promise.all([
     import('./db'), import('./dispatch-target'), import('./model-order'), import('./device-removal'),
   ])
@@ -17,7 +17,7 @@ test('real Postgres: idle gateway presence drives dispatch, device selection and
   const owner = `test-gateway-presence-${randomUUID()}`
   const deviceId = randomUUID(), agentId = randomUUID(), tokenId = randomUUID()
   const stale = new Date(Date.now() - 3_600_000)
-  let gatewayOnline = true
+  let statusReads = 0
   let pushCount = 0
   const pending: Promise<unknown>[] = []
   const symbol = Symbol.for('@vercel/request-context')
@@ -28,7 +28,8 @@ test('real Postgres: idle gateway presence drives dispatch, device selection and
   const server = createServer(async (request, response) => {
     assert.equal(request.headers.authorization, 'Bearer isolated-presence-db-secret')
     if (request.url === `/v1/devices/${deviceId}/status`) {
-      response.end(JSON.stringify({ online: gatewayOnline, lastSeenAt: new Date().toISOString() }))
+      statusReads++
+      response.end(JSON.stringify({ online: false }))
       return
     }
     assert.equal(request.url, `/v1/devices/${deviceId}/push`)
@@ -69,8 +70,8 @@ test('real Postgres: idle gateway presence drives dispatch, device selection and
   await scope.run(async () => {
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt")
       VALUES ($1,'Gateway presence fixture',$1||'@example.invalid',false,now(),now())`, [owner])
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses)
-      VALUES ($1,$2,'Idle gateway fixture','local',true,$3,'[{"harness":"codex","installed":true}]')`, [deviceId, owner, stale])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt",harnesses)
+      VALUES ($1,$2,'Idle session fixture','local',true,$3,$3,'[{"harness":"codex","installed":true}]')`, [deviceId, owner, stale])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Gateway fixture')`, [agentId, owner, deviceId])
     await pool.query(`INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)`, [tokenId, owner, randomUUID()])
     await pool.query(`INSERT INTO device_token_devices ("tokenId","deviceId","userId") VALUES ($1,$2,$3)`, [tokenId, deviceId, owner])
@@ -80,12 +81,13 @@ test('real Postgres: idle gateway presence drives dispatch, device selection and
     assert.equal(target.agentId, agentId)
     assert.equal((await poolDevices(pool, owner))[0]?.online, true)
     assert.deepEqual(await targetDevice(pool, 'foreign-owner', deviceId), { error: 'notFound' })
-    gatewayOnline = false
+    await pool.query('UPDATE devices SET "sessionClosedAt"=clock_timestamp() WHERE id=$1', [deviceId])
     assert.deepEqual(await targetDevice(pool, owner, deviceId), { error: 'unavailable' })
     assert.equal((await poolDevices(pool, owner))[0]?.online, false)
-    gatewayOnline = true
-    const heartbeat = (await pool.query('SELECT "lastSeenAt" FROM devices WHERE id=$1', [deviceId])).rows[0].lastSeenAt
-    assert.equal(heartbeat.getTime(), stale.getTime(), 'presence reads never write Neon heartbeats')
+    await pool.query('UPDATE devices SET "sessionOpenedAt"=clock_timestamp() WHERE id=$1', [deviceId])
+    const seen = (await pool.query('SELECT "lastSeenAt" FROM devices WHERE id=$1', [deviceId])).rows[0].lastSeenAt
+    assert.equal(seen.getTime(), stale.getTime(), 'presence reads never write')
+    assert.equal(statusReads, 0, 'presence never asks the gateway')
 
     assert.deepEqual(await removeOwnedDevice(owner, deviceId), { id: deviceId, revokedTokens: 0, uninstall: 'queued' })
     await Promise.all(pending)

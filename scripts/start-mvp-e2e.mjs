@@ -33,7 +33,7 @@ const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = fileURLToPath(new URL('../tests/mvp/preload.mjs', import.meta.url))
 const child = spawn(process.execPath, ['--import', preload, 'scripts/start-app.mjs', '--port', '3100'], {
   cwd: fileURLToPath(new URL('..', import.meta.url)), stdio: 'inherit',
-  env: { ...process.env, AI_GATEWAY_API_KEY: MVP_DECISION_KEY,
+  env: { ...process.env, MIKKA_LITELLM_MASTER_KEY: MVP_DECISION_KEY, MIKKA_LITELLM_URL: 'http://127.0.0.1:3191/litellm',
     MIKKA_BYOS_ENABLED:'1',MIKKA_BYOS_WORKER_BINARY:fileURLToPath(new URL('../tests/mvp/subscription-worker.mjs',import.meta.url)),
     MIKKA_BYOS_INFISICAL_ORIGIN:'http://127.0.0.1:3191',MIKKA_BYOS_INFISICAL_PROJECT:'mvp-synthetic',MIKKA_BYOS_INFISICAL_ENVIRONMENT:'test',
     MIKKA_BYOS_INFISICAL_PATH:'/custody',MIKKA_BYOS_ACCESS_INFISICAL_PATH:'/access',MIKKA_BYOS_INFISICAL_TOKEN:'mvp-synthetic-custody',MIKKA_BYOS_ACCESS_INFISICAL_TOKEN:'mvp-synthetic-access',MIKKA_BYOS_VALIDATED_MODEL_ROUTES:'codex_cpa',

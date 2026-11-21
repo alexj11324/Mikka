@@ -137,7 +137,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       })
 
     for (const kind of ['question_resume', 'question_recover'] as const) await t.test(`${kind}: the real cloud claim retains the original started Profile after edit without changing its digest`, async () => {
-      const [{ AgentProfileStore, parseAgentProfile, agentProfileInstructions, assertProfileSelection }, { resolveAgentProfileSkills },
+      const [{ AgentProfileStore, parseAgentProfile, agentProfileInstructions, assertProfileSelection, contentOnlyAgentProfile }, { resolveAgentProfileSkills },
         { freezeWorkerDefinition }, { freezeExecutionIdentity }, { workspacePool }, { claimCloudRun }, { assertRunProfileClaim }] = await Promise.all([
         import('../agent-profile'), import('../agent-profile-skills'), import('../../agent-kit/worker'), import('../../execution-identity'),
         import('../../workspace-db'), import('../../computer/claim'), import('../profile-admission'),
@@ -157,9 +157,11 @@ test('real PG: question receipts preserve one execution without opening a repair
         model: { mode: 'fixed', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: f.connectionId } } })
       const profile = await profiles.create(scope,definition), skills = resolveAgentProfileSkills(definition.skills)
       const entry = { id: `question-profile:${profile.id}`, harness: 'codex' as const, model: 'gpt-6-luna', source: { kind: 'subscription' as const, connectionId: f.connectionId } }
+      // A Profile holds content only (decision 2026-11-15-1630): the selection carries the stored body, as an explicit dispatch builds it.
+      const stored = contentOnlyAgentProfile(definition)
       const selection: import('../agent-profile').AgentProfileSelection = { profileId: profile.id, version: profile.version, digest: profile.digest,
-        name: profile.name, source: 'explicit', reason: 'Owner-selected native question fixture', scope, definition, skills,
-        instructions: agentProfileInstructions(definition,skills), effort: definition.effort, targetEntry: entry }
+        name: profile.name, source: 'explicit', reason: 'Owner-selected native question fixture', scope, definition: stored, skills,
+        instructions: agentProfileInstructions(stored,skills), targetEntry: entry, contentOnly: true }
       await assertProfileSelection(pool,scope,selection)
       const worker = freezeWorkerDefinition({ harness: 'codex', model: 'gpt-6-luna', instructions: selection.instructions, prompt: 'Synthetic task',
         parent: null, executionId: null, subscription: { id: f.bindingId, route: 'codex_cli', modelId: 'gpt-6-luna' },
@@ -754,7 +756,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       // The continuation message uses this same receipt-bound reader and the
       // citation sources frozen by real check dispatch, not the old empty prompt.
       const checkDevice = randomUUID(), checkAgent = randomUUID(), checkRepo = randomUUID()
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Independent check','cloud',now(),$2)`,
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Independent check','cloud',now(),$2,now())`,
         [checkDevice, JSON.stringify([{ harness, installed: true }])])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,'owner',$2,$3,$4)`, [checkAgent, checkDevice, harness, `Independent checker ${checkAgent}`])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/tmp/fixture')`, [checkRepo, checkDevice])

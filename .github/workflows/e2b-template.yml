@@ -2,6 +2,11 @@ name: E2B additive template candidates
 # Reusable builder only. It cannot make a candidate public or change production.
 on:
   workflow_call:
+    inputs:
+      source_sha:
+        description: The Cloudflare-served commit whose worker is built (a later main may dispatch it)
+        type: string
+        required: true
     outputs:
       source-sha:
         value: ${{ jobs.build.outputs.source-sha }}
@@ -15,9 +20,11 @@ on:
         value: ${{ jobs.build.outputs.candidate-identities }}
 permissions:
   contents: read
+env:
+  MIKKA_RUNTIME_SOURCE: ${{ inputs.source_sha }}
 jobs:
   build:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -32,14 +39,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this main run; the builder packages it from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before building candidates
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Install the pinned E2B SDK
         run: |
           python3 -m venv "$RUNNER_TEMP/e2b"
@@ -59,14 +64,14 @@ jobs:
       - name: Build private versioned candidates and require official file conservation
         id: build
         run: |
-          name="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"
+          name="mikka-${MIKKA_RUNTIME_SOURCE::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$MIKKA_RUNTIME_SOURCE" --json > "$RUNNER_TEMP/candidates.json"
           node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs'
           import { assertReportIdentity, cleanupIdentity, reportDigest, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: report.workerSha,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             for (const kind of ['desktop', 'claude', 'codex']) {

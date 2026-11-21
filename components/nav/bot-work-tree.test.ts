@@ -8,7 +8,7 @@ import { botWorkTree } from './bot-work-tree'
 type Issue = Parameters<typeof botWorkTree>[3][number]
 type Thread = Parameters<typeof botWorkTree>[2][number]
 const issue = (id: string, status = 'doing'): Issue => ({
-  id, status, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`,
+  id, status, stateId: null, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`,
   ownerId: 'owner', ownerName: 'Owner', ownerImage: null, teamId: null,
   workspaceId: 'workspace', projectId: null,
   scope: 'personal', priority: 'normal', revision: 1,

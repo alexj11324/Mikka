@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { act, createElement, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 
 const original = '20000000-0000-4000-8000-000000000002'
 const current = '30000000-0000-4000-8000-000000000003'
@@ -12,7 +14,11 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 mock.module('react-native', { namedExports: { StyleSheet: { create: (css: unknown) => css }, View: 'div' } })
 mock.module('react-native-keyboard-controller', { namedExports: { KeyboardChatScrollView: ({children}:{children:ReactNode}) => createElement('section',null,children) } })
 mock.module('react-native-safe-area-context', { namedExports: { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) } })
-mock.module('lucide-react-native', { namedExports: { Square: none } })
+const lucide = { namedExports: { Square: none } }
+mock.module('lucide-react-native', lucide)
+// A require-loaded screen picks the package's CommonJS entry; where that differs from the ESM one, mock it too.
+const lucideMain = pathToFileURL(createRequire(new URL('../package.json', import.meta.url)).resolve('lucide-react-native')).href
+if (lucideMain !== import.meta.resolve('lucide-react-native')) mock.module(lucideMain, lucide)
 mock.module('expo-router', { namedExports: { useRouter: () => ({}), useLocalSearchParams: () => ({ id: original }) } })
 for (const [file, names] of Object.entries({
   'components/chat.tsx':['BotBubble','MyBubble'], 'components/icons.tsx':['Spinner','StatusIcon'],
@@ -20,6 +26,8 @@ for (const [file, names] of Object.entries({
   'components/ReadNotice.tsx':['ReadNotice'],'components/Text.tsx':['Text'],'components/StopFailed.tsx':['StopFailed'],
   'components/ThreadQuotaPaused.tsx':['ThreadQuotaPaused'],'features/chat/components/thread-reply-versions.tsx':['MobileReplyVersions'],
   'features/tasks/components/thread-steps.tsx':['ThreadSteps'],
+  // 线程 | Artifact (Alex, 2026-11-15): the Artifact list and the segmented control are their own tests (thread-artifacts.test.mts).
+  'features/tasks/components/thread-artifacts.tsx':['ThreadArtifactsList','ThreadSegments'],
 })) stub(file, Object.fromEntries(names.map(name=>[name,none])))
 stub('components/NavBar.tsx',{NavBar:none,underBar:{}})
 stub('components/BarBackdrop.tsx',{useScrolledUnderBar:()=>({})})
@@ -29,6 +37,8 @@ stub('lib/stop.ts',{composerStops:()=>true})
 stub('lib/useStop.ts',{useStop:(post:()=>Promise<void>)=>({stop:post,sending:false})})
 stub('lib/api.ts',{ApiError:Error,api:async(path:string)=>{observed.stop=path}})
 stub('lib/useApi.ts',{useLiveApi:(path:string)=>{
+  // The thread's Artifact read is not this test's: it has nothing, so the screen keeps its title.
+  if (path?.endsWith('/artifacts')) return {data:null,reload:none}
   observed.read=path
   return {data:{liveRunId,thread:{status:'running'},active:true,canReply:true,items:[]},reload:none}
 }})

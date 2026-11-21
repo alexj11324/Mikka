@@ -1,5 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import { Container, getContainer } from '@cloudflare/containers'
+import { Container } from '@cloudflare/containers'
 import { brokerRequest, identityRequest } from '../credential-identity/transport.mjs'
 
 export { ContainerProxy } from '@cloudflare/containers'
@@ -39,7 +39,7 @@ export class CredentialIdentityOutbound extends WorkerEntrypoint {
 
 export class CredentialBroker extends WorkerEntrypoint {
   fetch(request) {
-    return brokerRequest(request, forwarded => getContainer(this.env.CREDENTIAL_BROKER_RUNTIME, 'broker').fetch(forwarded))
+    return brokerRequest(request, forwarded => this.env.CREDENTIAL_BROKER_RUNTIME.getByName('broker').fetch(forwarded))
   }
 }
 

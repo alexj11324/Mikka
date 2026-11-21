@@ -16,6 +16,7 @@ on:
       - 'lib/builtin-gateway/config.ts'
       - 'lib/edition.ts'
       - 'packages/protocol/src/coded-error.ts'
+      - 'packages/protocol/src/device.ts'
       - '.github/workflows/device-gateway.yml'
   pull_request:
     paths: *gateway_paths
@@ -45,8 +46,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node --test scripts/device-gateway/deploy.test.mjs
       - run: node --test cloudflare/device-gateway/test/presence.test.mjs
+      - run: node --test cloudflare/device-gateway/test/session.test.mjs
       - run: node --test cloudflare/device-gateway/test/runtime.test.mjs
-      - run: node --import tsx --test lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts cloudflare/device-gateway/src/route.test.ts
+      - run: node --import tsx --test lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts cloudflare/device-gateway/src/route.test.ts cloudflare/device-gateway/src/session-report.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/ticket.test.ts lib/mobile-threads-presence.test.ts
       - name: Select changed Worker and confirm the legacy production origin
         id: select
@@ -56,7 +58,7 @@ jobs:
         run: node scripts/device-gateway/select-release.mjs device
   deploy:
     needs: test
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && needs.test.outputs.publish == 'true'
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main' && needs.test.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:

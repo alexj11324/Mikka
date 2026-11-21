@@ -11,7 +11,7 @@ const EASE = cubicBezier(0.23, 1, 0.32, 1)
 const DURATION = 200
 
 /**
- * Text selected in a message (选择文本): a row of glass capsules just above the composer. 添加到对话 puts the
+ * Text selected in a message (选择文本): a row of glass capsules just above the composer. 添加到线程 puts the
  * selection into the composer as its quote; each of the others is an instruction sent at once as a reply quoting it. The capsules rise in from the left, 30 ms apart; under
  * Reduce Motion only the glass fades. It stays mounted for the exit, then leaves.
  */

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { auditPageInput, auditScopeQuery, csvField } from '@/lib/audit/cursor'
@@ -6,7 +6,6 @@ import { createHash } from 'node:crypto'
 import { AuditExportError, createAuditExport, readAuditExportPage } from '@/lib/audit/export'
 import { WorkspaceError } from '@/lib/workspace-access'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 type Context = { params: Promise<{ workspaceId: string }> }

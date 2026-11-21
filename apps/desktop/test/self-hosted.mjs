@@ -8,8 +8,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
+import { verifyWorkspaceAutomation } from './self-hosted-automations.mjs'
+import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
+import { verifyOrganizationLifecycle } from './self-hosted-organization.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { verifyInstalledProjectCheckout } from './self-hosted-project-checkout.mjs'
+import { prepareLinuxRepositoryDialog, verifyLinuxRepositoryDialog, verifyPickedRepository } from './native-repository-picker.mjs'
 import { readNativeStartup } from './native-startup.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -28,6 +34,10 @@ export function validateSelfHostedDesktopTarget(value, env) {
     assert.ok(member && typeof member.id === 'string' && member.id.length > 0 && member.id.length <= 128)
     assert.match(member.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
     assert.ok(typeof member.password === 'string' && member.password.length >= 24 && member.password.length <= 200)
+    if (env.MIKKA_UI_OVERLAY_SHA) {
+      assert.match(member.invitation?.id ?? '', UUID)
+      assert.match(member.invitation?.organizationId ?? '', UUID)
+    }
     assert.ok(member.id !== value.ownerId && member.email !== value.email && member.password !== value.password)
   }
   assert.ok(env.RUNNER_TEMP && env.GITHUB_WORKSPACE && env.MIKKA_DESKTOP_EXECUTABLE)
@@ -71,20 +81,25 @@ async function main() {
     await rm(privateFile); report.cleanup.privateFile = true
     const target = fixture.origin + '/mikka'
     phase = 'launch'
+    const linuxPicker = overlaySha && process.platform === 'linux' && process.env.MIKKA_TEST_X11_DIRECTORY_DIALOG === '1'
+      ? await prepareLinuxRepositoryDialog(profile) : null
     application = await launchElectron({ executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE,
       args: [], cwd: fileURLToPath(new URL('../../..', import.meta.url)),
-      env: { ...process.env, MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
+      env: { ...process.env, ...(linuxPicker ? { XDG_CONFIG_HOME: linuxPicker.config } : {}), MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
     if (overlaySha) {
       phase = 'packaged_official_overlay'
-      const matches = await application.evaluate(async ({ app }, expected) => {
+      const runtime = await application.evaluate(async ({ app }, expected) => {
         const path = process.getBuiltinModule('node:path')
         const fs = process.getBuiltinModule('node:fs')
         const archive = app.getAppPath()
-        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return false
+        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return null
         const manifest = JSON.parse(fs.readFileSync(path.join(archive, 'dist', 'mikka-ui-overlay.json'), 'utf8'))
-        return manifest.overlaySha === expected
+        if (manifest.overlaySha !== expected) return null
+        return { app: app.getVersion(), electron: process.versions.electron, chromium: process.versions.chrome,
+          platform: process.platform, architecture: process.arch }
       }, overlaySha)
-      assert.equal(matches, true, 'the launched official application must contain the selected UI revision')
+      assert.ok(runtime?.app && runtime.electron && runtime.chromium, 'the launched official application must contain the selected UI revision')
+      report.runtime = runtime
       passed('packaged_official_overlay_matches_selected_revision')
     }
     page = await application.firstWindow({ timeout: 90_000 })
@@ -127,7 +142,15 @@ async function main() {
     assert.equal(await page.evaluate(() => window.__selfHostedAcceptance.failed), false)
     passed('actual_builtin_live_ticket_and_socket')
     phase = 'chat_reply'
-    await rpc('coordinator.sendCoordinatorMessage', ['selfhost_turn_32', null, fixture.botId, randomUUID()])
+    const accepted = await page.evaluate(async input => {
+      const response = await fetch(`/mikka/api/agents/eve/v1/session?botId=${input.botId}`, {
+        method: 'POST', credentials: 'omit', headers: { 'content-type': 'application/json', 'x-mikka-submission-id': input.submissionId },
+        body: JSON.stringify({ message: 'selfhost_turn_32', clientContext: { expectedOwnerId: input.ownerId, expectedWorkspaceId: input.workspaceId } }),
+      })
+      return { status: response.status, body: await response.json() }
+    }, { botId: fixture.botId, ownerId: fixture.ownerId, workspaceId: fixture.workspaceId, submissionId: randomUUID() })
+    assert.equal(accepted.status, 202); assert.equal(accepted.body.ok, true)
+    assert.match(accepted.body.sessionId, /^wrun_/); assert.ok(accepted.body.deliveryId)
     const deadline = Date.now() + 60_000
     for (;;) {
       const before = await page.evaluate(() => window.__selfHostedAcceptance.chatEvents)
@@ -178,7 +201,26 @@ async function main() {
     }
     if (overlaySha) {
       phase = 'conversation_owner_member'
-      await verifyConversationOrganization({ page, fixture, rpc, passed, setPhase: value => { phase = value } })
+      const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
+      const sharedWorkspace = await verifyConversationOrganization(controls)
+      await verifyOrganizationLifecycle({ ...controls, workspaceId: sharedWorkspace })
+      report.driveFolder = {}
+      report.driveUploads = []
+      await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory, folderCheck: report.driveFolder, receipts: report.driveUploads })
+      report.versionAdmissions = await verifyDesktopVersionHistory(controls)
+      await verifyWorkspaceAutomation({ ...controls, workspaceId: sharedWorkspace })
+      phase = 'native_repository_picker'
+      if (linuxPicker) {
+        await verifyLinuxRepositoryDialog(page, linuxPicker, async (root, choose) => {
+          phase = 'project_checkout'
+          report.projectCheckout = await verifyInstalledProjectCheckout({ page, rpc, workspaceId: sharedWorkspace, root, choose })
+          passed('installed_project_choose_native_git_root_read_after_reload_and_clear')
+        })
+        passed('packaged_linux_gtk_selects_nested_git_roots_and_cancels_over_native_ipc')
+      } else {
+        await verifyPickedRepository(application, page, directory)
+        passed('packaged_repository_picker_resolves_origin_and_upstream_with_fixture_dialog_selection')
+      }
     }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())

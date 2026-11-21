@@ -10,9 +10,13 @@ import { catalogueToolDisplayName } from '@/lib/coordinator/tool-metadata'
  * token. The token is only an Authorization header here; results are masked
  * and errors are codes, so it never reaches the model, chat, logs or memory.
  */
-export const GITHUB_MCP_URL = 'https://api.githubcopilot.com/mcp/'
-/** The server's default toolsets plus Actions, for CI. */
-export const GITHUB_MCP_TOOLSETS = 'default,actions'
+/**
+ * Every toolset the server offers: `/x/all` is GitHub's documented path for
+ * "All available toolsets" (github-mcp-server docs/remote-server.md). The
+ * catalogue is paged (PAGE_BYTES) and every call still passes the workspace's
+ * GitHub policy (lib/operations/github-call-policy.ts).
+ */
+export const GITHUB_MCP_URL = 'https://api.githubcopilot.com/mcp/x/all'
 export const GITHUB_MCP_MIN_VALIDITY_MS = 5 * 60_000
 
 const PAGE_BYTES = 32 * 1024
@@ -84,7 +88,7 @@ export function createGitHubMcpRuntime(token: (userId: string) => Promise<{ toke
     if (name !== undefined && (typeof name !== 'string' || name.length < 1 || name.length > 128)) return { error: 'githubToolNameInvalid' }
     const result = await runMcpCommand(async () => {
       const { token: value } = await token(userId)
-      return { url: GITHUB_MCP_URL, transport: 'http', headers: { Authorization: `Bearer ${value}`, 'X-MCP-Toolsets': GITHUB_MCP_TOOLSETS }, secrets: [value] }
+      return { url: GITHUB_MCP_URL, transport: 'http', headers: { Authorization: `Bearer ${value}` }, secrets: [value] }
     }, 'name' in command ? command : page?.remote ? { cursor: page.remote } : {}, dependencies, { code: error => error instanceof GitHubAccessError ? error.code : undefined })
     // Any other credential-shaped text GitHub returns is masked too.
     const masked = maskDeep(result, credentialMasker)

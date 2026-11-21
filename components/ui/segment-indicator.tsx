@@ -17,7 +17,7 @@ function SegmentIndicator({
   className,
 }: {
   layoutId: string
-  variant?: "pill" | "line"
+  variant?: "pill" | "line" | "glass"
   className?: string
 }) {
   const reduce = useReducedMotion()
@@ -28,12 +28,15 @@ function SegmentIndicator({
       aria-hidden="true"
       data-slot="segment-indicator"
       // The radius is a style so Motion corrects it while the pill stretches between items of different widths.
-      style={variant === "pill" ? { borderRadius: 6 } : undefined}
+      style={variant === "pill" ? { borderRadius: 6 } : variant === "glass" ? { borderRadius: 9999 } : undefined}
       className={cn(
         "pointer-events-none absolute -z-10",
         variant === "pill"
           ? "inset-0 bg-background shadow-xs dark:bg-control-hover"
-          : "inset-x-0 -bottom-[5px] h-0.5 bg-foreground",
+          : variant === "glass"
+            // The selected segment is a slightly darker inner pill on the glass track.
+            ? "inset-0 bg-(--foreground)/10 dark:bg-(--foreground)/15"
+            : "inset-x-0 -bottom-[5px] h-0.5 bg-foreground",
         className
       )}
     />

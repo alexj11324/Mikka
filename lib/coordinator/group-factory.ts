@@ -67,6 +67,7 @@ export function groupExecutionRemedy(reason:string,locale:GroupLocale='zh-CN'):s
   if (['repositoryRequired','agentRepoMissing','repositoryNotFound'].includes(reason)) return copy.repositoryRemedy
   if (['noDevice','machineUnavailable','deviceOffline','agentNoDevice','cloudComputerUnavailable','cloudNotConfigured','cloudTemporarilyUnavailable'].includes(reason)) return copy.runtimeRemedy
   if (reason==='task_tool_disabled') return copy.toolRemedy
+  if (reason==='agentRequired') return copy.agentRemedy
   return copy.authorizationRemedy
 }
 
@@ -74,7 +75,7 @@ export type GroupFactoryAdapters = {
   authorize(scope:Scope):Promise<void>
   executionBot(scope:Scope):Promise<{botId:string;reporterOwnerId:string;repository:string|null}>
   create(userId:string,eventId:string,title:string):Promise<string>
-  dispatch(userId:string,input:{issueId:string;repo?:string;note:string;requestKey:string;sourceEventId:string},botId:string):Promise<{runId?:string;thread?:string;status?:string;error?:string}>
+  dispatch(userId:string,input:{issueId:string;repo?:string;note:string;requestKey:string;sourceEventId:string;agent?:'claude_code'|'codex'},botId:string):Promise<{runId?:string;thread?:string;status?:string;error?:string}>
   latest(userId:string,issueId:string):Promise<{id:string}|null>
   continuation(userId:string,runId:string,text:string,eventId:string):Promise<unknown>
   stop(userId:string,task:TaskState,botId:string,eventId:string):Promise<void>
@@ -156,7 +157,8 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
   // Replay reads it instead of injecting another message into the same thread.
   if (!(task.requestEpoch===eventId && task.runId)) {
     await runtime.authorize(scope)
-    const result=await runtime.dispatch(scope.userId,{issueId,...(repository?{repo:repository}:{}),note:scope.text,requestKey:`group:${scope.messageId}`,sourceEventId:eventId},botId)
+    const agent=groupMessageAgent(scope.text)
+    const result=await runtime.dispatch(scope.userId,{issueId,...(repository?{repo:repository}:{}),note:scope.text,requestKey:`group:${scope.messageId}`,sourceEventId:eventId,...(agent?{agent}:{})},botId)
     if (result.error) {
       task=await readTask(client,scope.userId,issueId,botId);await reported()
       return finish({...groupTaskReport(task,copy.newRunNotStarted.replace('{remedy}',groupExecutionRemedy(result.error,locale)),locale),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:'blocked',reportTiming:'now'}})
@@ -218,18 +220,19 @@ async function productionAdapters():Promise<GroupFactoryAdapters> {
   return {
     authorize:scope=>authorizeGroupFactoryActor(pool,scope),
     async executionBot(scope) {
-      const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
+      const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository,"environmentId" FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
       if (!bot) throw Error('group_task_not_authorized')
       // A shared Bot is the reporter. Execution stays on the requester's own
       // Coordinator/resources, never impersonating the reporter's owner.
       const botId=bot.ownerId===scope.userId ? bot.id : await (await import('./coordinator-bot')).chatBotId(scope.userId,null,scope.workspaceId)
-      return {botId,reporterOwnerId:bot.ownerId,repository:bot.repository}
+      return {botId,reporterOwnerId:bot.ownerId,repository:await (await import('@/lib/bot-environment')).botRepository({workspaceId:scope.workspaceId,environmentId:bot.environmentId,repository:bot.repository})}
     },
     async create(userId,sourceEventId,title) { return (await (await import('./issue-create')).createIssueFromRequest(userId,{sourceEventId,title})).issueId },
     async dispatch(userId,input,botId) {
       const {latestTaskRun}=await import('@/lib/thread-dispatch')
       const previous=await latestTaskRun(pool,userId,input.issueId)
-      if (input.repo || previous?.remoteUrl) return (await import('@/workflows/coordinator/steps')).dispatchRun(userId,{...input,repo:input.repo ?? previous!.remoteUrl!},undefined,botId)
+      const {agent,...request}=input
+      if (input.repo || previous?.remoteUrl) return (await import('@/workflows/coordinator/steps')).dispatchRun(userId,{...request,repo:input.repo ?? previous!.remoteUrl!,...(agent && !previous?{model:{harness:agent}}:{})},undefined,botId)
       return dispatchStandaloneTask(userId,input,botId)
     },
     async latest(userId,issueId) { return (await import('@/lib/thread-dispatch')).latestTaskRun(pool,userId,issueId) },
@@ -262,7 +265,9 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
     const {latestThreadRunModel}=await import('@/lib/computer/run-model')
     const kept=previous ? await latestThreadRunModel(pool,userId,input.issueId,previous.agentId) : null
     if (previous && !kept) return {error:'threadModelUnavailable' as const}
-    const choice=previous ? null : await resolveAgentProfileDispatch(pool,{ownerId:userId,workspaceId,botId},{issueId:input.issueId,stage:'execute',note,location:'cloud',cloudPurpose:'desktop'})
+    // A new thread runs on the Agent the message names; nothing picks one (decision 2026-11-17-1800).
+    if (!previous && !input.agent) return {error:'agentRequired' as const}
+    const choice=previous ? null : await resolveAgentProfileDispatch(pool,{ownerId:userId,workspaceId,botId},{issueId:input.issueId,stage:'execute',note,location:'cloud',cloudPurpose:'desktop',asked:{harness:input.agent!}})
     const target=choice?.target
     if (target && target.kind!=='cloud') return {error:'machineUnavailable' as const}
     const harness=previous?.harness ?? (target?.kind==='cloud' ? target.harness : null)
@@ -271,11 +276,17 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
     if (!runtime) return {error:'cloudComputerUnavailable' as const}
     const source=target?.kind==='cloud' ? target.entry.source : null
     const subscriptionBindingId=source?.kind==='subscription' && target?.kind==='cloud' ? await bindAgentToConnection(pool,{ownerId:userId,workspaceId},runtime.agentId,harness,source.connectionId,target.model) : undefined
-    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,agentProfile:choice?.agentProfile,modelDispatch:{mode:choice?.selectionMode ?? 'preference',location:'cloud',entry:target.entry,...(target.routing?{routing:target.routing}:{})},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
+    const selection:RunModel|null=kept ?? (target?.kind==='cloud' ? {model:target.model,agentProfile:choice?.agentProfile,modelDispatch:{mode:choice?.selectionMode ?? 'preference',location:'cloud',entry:target.entry},...(subscriptionBindingId?{subscriptionBindingId}:{}),...(source?.kind==='api_key'?{apiKeyId:source.keyId}:{})} : null)
     if (!selection) return {error:'threadModelUnavailable' as const}
     const {dispatchComputerTask}=await import('@/workflows/coordinator/steps')
     return dispatchComputerTask(userId,{botId,issueId:input.issueId,harness,note,...selection,sourceEventId:input.sourceEventId,factoryBotId:botId,...(previous?{threadRunId:previous.id}:{}),...(previous?.readOnly?{readOnly:true}:{})},`group:${input.sourceEventId}`)
   }})
+}
+
+/** The Agent a group message names: exactly one of Claude Code and Codex, else none (the dispatch asks for one). */
+export function groupMessageAgent(text:string):'claude_code'|'codex'|undefined {
+  const claude=/claude/i.test(text), codex=/codex/i.test(text)
+  return claude===codex ? undefined : claude ? 'claude_code' : 'codex'
 }
 
 /** Bound tasks with a reportable revision their group has not been told (b: group_task_bindings, t: factory_tasks). */

@@ -17,7 +17,7 @@ const env = () => ({ GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_SHA: DRIVER,
 const event = () => ({ repository: { full_name: 'alexj11324/Mikka' }, ref: ACCEPTANCE_BRANCH, after: DRIVER, deleted: false })
 const plan = () => ({ purpose: 'production-readiness', mode: 'readonly', applicationSha: APP })
 const attestation = () => ({ purpose: 'production-readiness', status: 'ready', repository: 'alexj11324/Mikka',
-  applicationSha: APP, driverRevision: DRIVER, mode: 'readonly', webDeployRunId: 10,
+  applicationSha: APP, driverRevision: DRIVER, mode: 'readonly',
   metadataReadAuthorized: true, executionReady: false,
   runtime: { status: 'published', runId: 11, sourceCommit: APP, workerSha: null,
     sourceEvidence: 'verified_publish_step', validateJobId: 110, publishJobId: 111 }, checkedAt: new Date(NOW).toISOString() })
@@ -34,8 +34,8 @@ const viteManifest = () => ({ version: 1, target: 'web', rendererBuild: 'a'.repe
 const VITE_PIN = '370cc898-local-prebuilt-1'
 const viteDocument = (pin = VITE_PIN) => '<script type="module" crossorigin src="/mikka/assets/index-aBc123.js'
   + (pin ? '?dpl=' + pin : '') + '"></script>'
-const release = kind => ({ id: kind === 'web' ? 10 : 11, name: kind === 'web' ? 'Web deploy' : 'E2B official instance runtime',
-  path: '.github/workflows/' + (kind === 'web' ? 'web-deploy.yml' : 'e2b-official-runtime.yml'), event: 'push',
+const release = () => ({ id: 11, name: 'E2B official instance runtime',
+  path: '.github/workflows/e2b-official-runtime.yml', event: 'push',
   head_branch: 'main', head_sha: APP, head_repository: { full_name: 'alexj11324/Mikka' }, status: 'completed', conclusion: 'success' })
 const publishedJobs = () => [
   { id: 110, run_id: 11, name: 'validate', status: 'completed', conclusion: 'success',
@@ -116,7 +116,7 @@ test('only the existing acceptance push or a main manual readonly request is aut
   assert.throws(() => triggerGuard(manualEnv, { repository: event().repository, inputs: { application_sha: APP, mode: 'active' } }, plan()), /trigger_rejected/)
 })
 
-test('attestation checks both exact releases before smoke credentials and never sends the GitHub token to production', async () => {
+test('attestation checks the live build and runtime release before smoke credentials and never sends the GitHub token to production', async () => {
   const credentialsUnusable = new Proxy(env(), { get(target, key) { if (String(key).startsWith('SMOKE_')) assert.fail('credential read before attestation'); return target[key] } })
   const calls = []
   const actual = await attestReadiness({ env: credentialsUnusable, event: event(), plan: plan(), now: () => NOW,
@@ -124,7 +124,7 @@ test('attestation checks both exact releases before smoke credentials and never 
       calls.push(String(url))
       if (new URL(url).origin === 'https://api.github.com') {
         assert.equal(init.headers.authorization, 'Bearer SYNTHETIC-GITHUB-TOKEN')
-        return response(String(url).includes('/jobs?') ? { jobs: publishedJobs() } : { workflow_runs: [release('web'), release('worker')] })
+        return response(String(url).includes('/jobs?') ? { jobs: publishedJobs() } : { workflow_runs: [release('worker')] })
       }
       assert.equal(init.headers.authorization, undefined)
       return response({ build: APP })
@@ -138,7 +138,7 @@ test('a missing, pending, foreign or wrong-SHA worker is unproven rather than a 
     { head_repository: { full_name: 'foreign/repo' } }, { head_branch: 'other' }]) {
     const result = await attestReadiness({ env: env(), event: event(), plan: plan(), now: () => NOW,
       fetchImpl: async url => new URL(url).origin === 'https://api.github.com'
-        ? response({ workflow_runs: [release('web'), { ...release('worker'), ...change }] }) : response({ build: APP }) })
+        ? response({ workflow_runs: [{ ...release('worker'), ...change }] }) : response({ build: APP }) })
     assert.equal(result.status, 'partial')
     assert.equal(result.runtime.status, 'unproven')
     assert.equal(result.runtime.sourceCommit, null)

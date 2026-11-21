@@ -1,7 +1,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { NextIntlClientProvider, useTranslations } from 'next-intl'
+import { IntlProvider, useTranslations } from '@/lib/intl/i18n-client'
 import { SWRConfig } from 'swr'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/components/icons'
 import { toast } from 'sonner'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'
@@ -55,13 +55,13 @@ export function App() {
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   const status = platform === 'web' && serverDocumentKind() === 'status'
   const mobileTask = platform === 'web' && !serverDocumentKind() ? mobileTaskLaunch(location) : null
-  return <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
+  return <IntlProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
     <ThemeProvider>{mobileTask
       ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><MobileTaskHandoff key={location.href} launch={mobileTask} /></Suspense></RendererBoundary>
       : status
       ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><ServerStatus /></Suspense></RendererBoundary>
       : <><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></>}</ThemeProvider>
-  </NextIntlClientProvider>
+  </IntlProvider>
 }
 
 function SessionApplication() {

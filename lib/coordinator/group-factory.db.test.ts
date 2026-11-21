@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
+import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupMessageAgent, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
 import { initializeGroupDecisionTrace, recordGroupDecisionRoute, type GroupDecisionTrace } from './group-decision-trace'
 import { groupTraceObservation } from './group-decision-eval'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -29,6 +29,7 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
   const client=await pool.connect()
   try {
     await client.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await client.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await client.query(`CREATE TABLE bots (id uuid PRIMARY KEY); CREATE TABLE issues(id uuid PRIMARY KEY,title text,"userId" text,"workspaceId" uuid,"ownershipState" text DEFAULT 'bound',content jsonb);
       CREATE TABLE attention_settings("userId" text PRIMARY KEY,locale text);
@@ -157,6 +158,16 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
     assert.ok(authorizations>5)
     console.log(`Retained isolated group Factory bridge schema ${schema}; source/dispatch adapters synthetic, PG persistence real`)
   } finally {client.release();await pool.end();await outer.end();await authority.end()}
+})
+
+test('a group task names its Agent in the message; none or both names none, and agentRequired says how to fix it',()=>{
+  // Decision 2026-11-17-1800: every dispatch names its Agent; nothing picks a default.
+  assert.equal(groupMessageAgent('@bot 用 Codex 修一下登录'),'codex')
+  assert.equal(groupMessageAgent('@bot let Claude Code fix the login'),'claude_code')
+  assert.equal(groupMessageAgent('@bot fix the login'),undefined)
+  assert.equal(groupMessageAgent('@bot Claude Code or Codex, fix it'),undefined)
+  assert.match(groupExecutionRemedy('agentRequired','zh-CN'),/Claude Code 或 Codex/)
+  assert.match(groupExecutionRemedy('agentRequired','en'),/Claude Code or Codex/)
 })
 
 test('server reports do not claim work passed merely because execute passed',()=>{
@@ -289,6 +300,7 @@ test('PG: production group Factory authorization uses typed Bot membership and r
   const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`})
   try {
     await pool.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261113180454_standalone_bot_conversations.sql',import.meta.url),'utf8'))

@@ -81,7 +81,9 @@ test('Web finishing before its exact E2B release defers without signing in or re
     GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: source, GITHUB_RUN_ID: '420', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_TOKEN: 'fixture-token', APPLICATION_SHA: source, RUNNER_TEMP: '/tmp', FACTORY_VISUAL_MODEL_CASE: 'all' }
   const fetchImpl = async url => {
-    const path = new URL(url).pathname.replace('/repos/alexj11324/Mikka', '') + new URL(url).search
+    const parsed = new URL(url)
+    const path = parsed.pathname === '/repositories/1427517699/git/ref/heads/main'
+      ? '/git/ref/heads/main' : parsed.pathname.replace('/repos/alexj11324/Mikka', '') + parsed.search
     paths.push(path)
     let value
     if (path === '/pulls/1789') value = { number: 1789, merged: true, merge_commit_sha: source,
@@ -124,17 +126,17 @@ function runEvidence(runId = id(4)) {
       version: 1, requester: scope.ownerId, executionPrincipal: scope.ownerId, outputOwner: scope.ownerId, botOwner: scope.ownerId,
       botId: scope.botId, workspaceId: scope.workspaceId, personalResourcePolicy: 'requester_only',
       resourceBindings: [{ kind: 'device', id: id(6), ownerId: scope.ownerId, access: 'owner' },
-        { kind: 'subscription', id: id(7), ownerId: scope.adminId, access: 'workspace_share', revision: '2' }],
-      billingAccount: { model: { kind: 'subscription', ownerId: scope.adminId, resourceId: id(7) },
+        { kind: 'subscription', id: id(7), ownerId: scope.ownerId, access: 'owner', revision: '2' }],
+      billingAccount: { model: { kind: 'subscription', ownerId: scope.ownerId, resourceId: id(7) },
         runtime: { kind: 'e2b', ownerId: scope.ownerId, resourceId: scope.ownerId } },
     } } }
 }
 
-test('official shared subscription proof refuses API fallback, wrong payer and another profile version', () => {
+test('official own subscription proof refuses API fallback, wrong payer and another profile version', () => {
   const expected = { item, scope, profile, issueId: id(5), runId: id(4) }
   assert.equal(executionProof(runEvidence(), expected).sharedSubscription, true)
   for (const change of [e => { e.run.credentialType = 'api_key' }, e => { e.run.model = 'unselected-model' },
-    e => { e.run.executionIdentity.billingAccount.model.ownerId = scope.ownerId }, e => { e.run.agentProfile.version++ }]) {
+    e => { e.run.executionIdentity.billingAccount.model.ownerId = scope.adminId }, e => { e.run.agentProfile.version++ }]) {
     const value = runEvidence(); change(value); rejects(() => executionProof(value, expected), 'scope')
   }
 })
@@ -287,7 +289,9 @@ test('native visual proof binds the entire browser program, actual queued captur
   }
 })
 
-test('released real FFmpeg processing is byte-deterministic for the native expected-output versus normal uploader comparison', async () => {
+// The community image lane has no FFmpeg; every lane that installs it runs this.
+const ffmpeg = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true } catch { return false } })()
+test('released real FFmpeg processing is byte-deterministic for the native expected-output versus normal uploader comparison', { skip: !ffmpeg && 'FFmpeg is not installed' }, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-visual-ffmpeg-'))
   try {
     const input = join(directory, 'actual-test.webm')
@@ -432,7 +436,7 @@ test('actual GET bytes through activity and immutable report links must match; e
 test('workflow keeps failed native steps red, continues the other path, and gates all credentials behind exact release checks', async () => {
   const text = await readFile(new URL('../../.github/workflows/factory-visual-evidence-acceptance.yml', import.meta.url), 'utf8')
   assert.doesNotMatch(text, /continue-on-error|secrets:\s*inherit|pull_request_target/)
-  assert.match(text, /workflows: \[Web deploy, E2B additive runtime release\]/)
+  assert.match(text, /workflows: \[E2B additive runtime release\]/)
   assert.match(text, /group: production-smoke-owner-acceptance/)
   assert.match(text, /ref: \$\{\{ needs\.authorize\.outputs\.source-sha \}\}/)
   const codex = text.slice(text.indexOf('- name: ' + CASE_STEPS.codex), text.indexOf('- name: Require both official'))

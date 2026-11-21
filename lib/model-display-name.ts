@@ -19,7 +19,7 @@ export interface ModelDisplayName {
   vendor: ModelVendor
 }
 
-export const MODEL_VENDORS = ['anthropic', 'openai', 'google', 'deepseek', 'moonshot', 'alibaba', 'zhipu', 'mistral', 'meta', 'xai', 'other'] as const
+export const MODEL_VENDORS = ['anthropic', 'openai', 'google', 'deepseek', 'moonshot', 'alibaba', 'zhipu', 'mistral', 'meta', 'xai', 'minimax', 'other'] as const
 export type ModelVendor = typeof MODEL_VENDORS[number]
 
 /** A vendor from an id's own name (claude-…, gpt-…) or the prefix a gateway puts before it (anthropic/…). */
@@ -30,10 +30,11 @@ const VENDOR_PATTERNS: [RegExp, ModelVendor][] = [
   [/^deepseek(?![a-z])/, 'deepseek'],
   [/^(?:moonshot(?:ai)?|kimi)(?![a-z])/, 'moonshot'],
   [/^(?:alibaba|qwen|qwq)(?![a-z])/, 'alibaba'],
-  [/^(?:zhipu(?:ai)?|z-ai|glm)(?![a-z])/, 'zhipu'],
+  [/^(?:zhipu(?:ai)?|z-ai|zai|glm)(?![a-z])/, 'zhipu'],
   [/^(?:mistral(?:ai)?|codestral|devstral|magistral)(?![a-z])/, 'mistral'],
   [/^(?:meta(?:-llama)?|llama)(?![a-z])/, 'meta'],
-  [/^(?:x-ai|xai|grok)(?![a-z])/, 'xai'],
+  [/^(?:x-ai|xai|spacexai|grok)(?![a-z])/, 'xai'],
+  [/^minimax(?![a-z])/, 'minimax'],
 ]
 
 /** Who makes a model: its id first, then any gateway prefix (`openrouter/anthropic/…`); `other` when none says. */

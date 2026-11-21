@@ -90,6 +90,46 @@ async function serviceOrganizationAllowed(tx: PoolClient, organizationId: string
   }, { kind: 'service' })
 }
 
+/**
+ * Authenticate an `mksvc_` bearer as its service identity for the `/api/v1`
+ * interop routes (decision 2026-11-19-2200). Same checks as the Project read:
+ * a live team Workspace, an enabled unexpired credential, the Organization
+ * binding of an `mksvc_org_` key and the Organization's machine-credential
+ * policy. It proves only the nonhuman principal; every resource still needs
+ * that service's explicit grant.
+ */
+export async function authenticateServiceCredential(header: string | null): Promise<{ workspaceId: string; serviceIdentityId: string } | null> {
+  const credentials = /^Bearer +(\S+)$/i.exec(header ?? '')?.[1]
+  const bearer = /^mksvc_(org_)?[A-Za-z0-9_-]{43}$/.exec(credentials ?? '')
+  if (!bearer) return null
+  const [token, organizationBound] = bearer
+  const hash = digest(token)
+  const identity = await workspaceDb.transaction(async workspace => {
+    const { rows: [candidate] } = await workspace.execute<{ id: string; workspaceId: string }>(sql`SELECT id,"workspaceId" FROM mikka_workspace_service_identities
+      WHERE "credentialHash"=${hash}`)
+    if (!candidate) return null
+    const { workspaceId, id } = candidate
+    const { rows: [tenant] } = await workspace.execute(sql`SELECT id FROM mikka_workspaces WHERE id=${workspaceId}::uuid AND kind='team' FOR SHARE`)
+    if (!tenant) return null
+    const { rows: [valid] } = await workspace.execute(sql`SELECT id FROM mikka_workspace_service_identities WHERE id=${id}::uuid
+      AND "workspaceId"=${workspaceId}::uuid AND "credentialHash"=${hash} AND enabled
+      AND ("credentialExpiresAt" IS NULL OR "credentialExpiresAt">clock_timestamp()) FOR SHARE`)
+    if (!valid) return null
+    const link = await organizationLink(workspace, workspaceId)
+    if (link?.archived) return null
+    if (organizationBound) {
+      if (!link) return null
+      const binding = await workspace.execute(sql`SELECT 1 FROM mikka_service_key_organization_bindings
+        WHERE "identityId"=${id}::uuid AND "workspaceId"=${workspaceId}::uuid
+          AND "organizationId"=${link.organizationId}::uuid AND "credentialHash"=${hash} FOR SHARE`)
+      if (!binding.rowCount) return null
+    }
+    if (link && !await writeTransaction(pool, app => serviceOrganizationAllowed(app, link.organizationId))) return null
+    return { workspaceId, serviceIdentityId: id }
+  })
+  return identity
+}
+
 /** The bearer proves only this nonhuman principal. The existing SQL ACL checks its
  * explicit Project grant, expiry and every ancestor on each bounded read. */
 type ProjectRead = { after: string | null } | { projectId: string }
@@ -125,12 +165,13 @@ export async function readServiceCredentialProjects(header: string | null, read:
     }
     return writeTransaction(pool, async app => {
       if (link && !await serviceOrganizationAllowed(app, link.organizationId)) return null
-      const { rows } = await app.query<{ id: string; visibility: string }>(`SELECT p.id,p.visibility FROM resource_access_policies p
+      const grantPage = (after: string | null) => app.query<{ id: string; visibility: string }>(`SELECT p.id,p.visibility FROM resource_access_policies p
         JOIN resource_access_grants g ON g."resourceKind"=p.kind AND g."resourceId"=p.id
         WHERE p."workspaceId"=$1 AND p.kind='project' AND g."subjectKind"='service' AND g."subjectId"=$2
           AND ($3::uuid IS NULL OR p.id>$3::uuid) AND ($4::uuid IS NULL OR p.id=$4::uuid)
           AND mikka_resource_acl_allowed('service',$2,$1,'project',p.id,'canReadContent')
-        ORDER BY p.id LIMIT 101`, [workspaceId, id, cursor, projectId])
+        ORDER BY p.id LIMIT 101`, [workspaceId, id, after, projectId])
+      let { rows } = await grantPage(cursor)
       if (projectId) {
         if (!rows.length) throw new GovernanceError('not_found')
         const { rows: [project] } = await workspace.execute<{
@@ -155,10 +196,18 @@ export async function readServiceCredentialProjects(header: string | null, read:
           visibility: rows[0].visibility, repositories: publicRepositories,
         }
       }
-      const page = rows.slice(0, 100)
-      const { rows: projects } = await workspace.execute<{ id: string; name: string }>(sql`SELECT id,name FROM workspace_projects
-        WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(page.map(row => row.id))}::uuid[]) AND "archivedAt" IS NULL ORDER BY id`)
-      return { workspaceId, serviceIdentityId: id, projects, nextCursor: rows.length > 100 ? page[99].id : null }
+      const projects: { id: string; name: string }[] = []
+      // Grants are in APP, while archival is authoritative in the Workspace DB.
+      // Only visible active Projects count toward the page or its continuation.
+      while (rows.length) {
+        const active = await workspace.execute<{ id: string; name: string }>(sql`SELECT id,name FROM workspace_projects
+          WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(rows.map(row => row.id))}::uuid[])
+            AND "archivedAt" IS NULL ORDER BY id`)
+        projects.push(...active.rows)
+        if (projects.length > 100 || rows.length < 101) break
+        rows = (await grantPage(rows[rows.length - 1].id)).rows
+      }
+      return { workspaceId, serviceIdentityId: id, projects: projects.slice(0, 100), nextCursor: projects.length > 100 ? projects[99].id : null }
     })
   })
 }

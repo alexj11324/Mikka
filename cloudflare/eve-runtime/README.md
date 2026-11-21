@@ -8,7 +8,22 @@ and reclamation belong to the Sandbox Provider.
 
 ## Build and initialize
 
-Use the public GitHub Actions Eve image workflow with frozen dependencies. Its
+In cloud Linux with Docker, Node 24 and frozen dependencies installed, run:
+
+```sh
+pnpm check:eve-image
+```
+
+The same command runs in the existing Eve pull request image job. It checks the
+model, Stop and packaging contracts before compilation, builds Eve and its shared
+resources once with network access disabled, then builds a local Docker image.
+It verifies that exact image ID against the resource manifest, source and
+Postgres World metadata, its non-root startup configuration and entry syntax.
+It sends no provider request and does not publish an image. Starting the real
+server and its health route requires an isolated PostgreSQL World; this command
+does not establish live model or Stop acceptance.
+
+Use the protected public GitHub Actions Eve image workflow for publication. Its
 Node build selects `NITRO_PRESET=node-server` and
 `WORKFLOW_TARGET_WORLD=@workflow/world-postgres`, then packages the compiled output with
 `node scripts/package-cf-eve-host.mjs`. The image starts that output with
@@ -39,6 +54,17 @@ The official package supports `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` and
 `10` pool connections. Size the pool for the selected concurrency and database
 connection limit. Eve's guide recommends at least concurrency plus two
 connections.
+
+The package's default poll interval is 500 ms per worker, so 50 idle workers
+query the database about 100 times a second. The host sets
+`WORKFLOW_POSTGRES_POLL_INTERVAL_MS` to `5000`; LISTEN/NOTIFY still wakes idle
+workers as soon as a job is added. A deployment can override it with
+`EVE_ENV_WORKFLOW_POSTGRES_POLL_INTERVAL_MS`. Keep the concurrency at 50: the
+package documents a deadlock at 10.
+
+Each release runs its own Eve Container, and the host never sleeps. Stop a
+release's Container with `stopForOwner` once no gateway release serves it,
+otherwise every release keeps polling the database.
 
 The named service `EveService` forwards the native protocol at
 `https://eve.internal/eve/v1/*`. Postgres queue delivery stays inside the

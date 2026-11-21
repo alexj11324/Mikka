@@ -1,7 +1,7 @@
 import { useRef, useState, type ComponentRef } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
-import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, modelSourceLabel, optionName, type ModelMenuControls } from '@/lib/model-menu'
+import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, shownOptions, modelSourceLabel, optionName, type ModelMenuControls } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
 import { mobileMessages as copy } from '@/lib/messages'
 
@@ -29,7 +29,7 @@ export function ModelMenu({ model, running = false, label }: { model: ModelMenuC
           <ScrollView contentContainerStyle={styles.options}>
             {groups.map((group, index) => <View key={`${group.kind}-${index}`} style={styles.group}>
               <Text accessibilityRole="header" style={styles.source}>{groupTitle(group)}</Text>
-              {group.options.map(option => <Pressable key={option.id} accessibilityRole="radio" accessibilityLabel={`${optionName(option)}，${groupTitle(group)}${groupTag(group) ? `，${groupTag(group)}` : ''}`}
+              {shownOptions(group, current.id).map(option => <Pressable key={option.id} accessibilityRole="radio" accessibilityLabel={`${optionName(option)}，${groupTitle(group)}${groupTag(group) ? `，${groupTag(group)}` : ''}`}
                 accessibilityState={{ checked: current.id === option.id, disabled: busy, busy: choosing === option.id }} aria-checked={current.id === option.id} aria-disabled={busy} aria-busy={choosing === option.id} disabled={busy}
                 onPress={() => { close(); void choose(option.id) }} style={({ pressed }) => [styles.option, pressed && { backgroundColor: colors.pressed }]}>
                 <View style={styles.optionBody}><Text style={styles.optionName}>{optionName(option)}</Text>{groupTag(group) ? <Text style={styles.source}>{groupTag(group)}</Text> : null}</View>

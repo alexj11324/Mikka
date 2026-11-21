@@ -1,4 +1,6 @@
 import { connectForCommitEffects } from '../db/commit-effects'
+import { withDatabaseClient } from '../db'
+import { secretMaskerFor } from '../secrets/runtime'
 import { factoryEventId } from "./event-id";
 import { readIssueMetadata } from "../issue-metadata";
 import type { JSONContent } from "@tiptap/core";
@@ -469,16 +471,27 @@ export function createFactoryStore(
       )).rows : [];
       const authorized = listed.filter(row => sources.some(source => source.id === row.sourceEventId && source.botId === (row.botId ?? null)));
       const states = await readFactoryFlowStates(tx, publicFlow ? authorized.filter(row => factoryFlowVersion(row) === 2) : []);
+      // One issue is one tenant, so the masker is resolved once for the whole
+      // list. It runs on the connection this transaction already holds: the
+      // masker reads through the global pool, and a second checkout while this
+      // transaction waits would starve a small pool. Both the v2 summary and
+      // the legacy `reason` use it, so neither path leaks a saved secret.
+      // The issue's own tenant, not the first task's: the list is scoped to it
+      // by `inScope` below, and reading it from the row we already locked needs
+      // no assumption about which task happens to be first.
+      const mask = publicFlow
+        ? await withDatabaseClient(tx, () => secretMaskerFor({ workspaceId: issue.workspaceId, ownerId: userId }))
+        : undefined;
       const tasks: (FactoryTaskSummary | FactoryPublicTaskSummary)[] = [];
       for (const row of authorized) {
         const state = states.get(row.id);
         if (state) {
-          tasks.push(publicFactoryTaskSummary(row, state, row));
+          tasks.push(publicFactoryTaskSummary(row, state, row, mask));
           continue;
         }
         const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
         const completionRecovery = (await completedRunForRecovery(tx, row)) || (await retainedDeliverableForRecovery(tx, row)) ? { binding: { taskId: id, revision } } : undefined;
-        tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
+        tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason, mask),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
       }
       return { contractVersion: 1 as const, issueId, tasks };
     });

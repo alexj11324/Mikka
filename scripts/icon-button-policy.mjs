@@ -8,7 +8,8 @@ export function auditIconButtons(file, text) {
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement) || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) continue
     for (const spec of statement.importClause.namedBindings.elements) {
-      if (statement.moduleSpecifier.text === 'lucide-react') icons.add(spec.name.text)
+      // Mikka's own glyphs (2026-11-18-1900) and a task's status icon are both drawn as icons.
+      if (['lucide-react', '@/components/icons'].includes(statement.moduleSpecifier.text)) icons.add(spec.name.text)
       if ((spec.propertyName?.text ?? spec.name.text) === 'Button') buttons.add(spec.name.text)
     }
   }

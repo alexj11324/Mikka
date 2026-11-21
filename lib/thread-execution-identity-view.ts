@@ -52,6 +52,8 @@ const evidence = z.object({ run: z.object({
   executionIdentity: identity.nullable(),
   labels: executionIdentityLabelsSchema.nullable().optional().catch(null),
   modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
+  /** The task followed the dispatching chat's model rather than one someone named. */
+  modelFollowed: z.boolean().nullable().optional().catch(null),
   // What this run's prompt carried of its workspace skills: the bodies it
   // inlined, and the ones it only named because the section would not hold
   // them whole. Separate from `configuredSkills`/`loadedSkills` below, which

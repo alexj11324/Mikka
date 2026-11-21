@@ -66,6 +66,8 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
       issueIds: [], revision: 1,
     })
     await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: wsA, name: 'Memory consumer' })
+    // A chat runs only on a model the person chose (no 「Mikka 默认」, decision 2026-11-15-1900).
+    await db.insert(schema.botModelChoices).values({ ownerId: owner, workspaceId: wsA, botKey: botId, creditsModel: 'deepseek/deepseek-v4.1-flash' })
     await db.insert(schema.coordinatorSessions).values({ userId: owner, botId })
 
     const requestId = randomUUID()

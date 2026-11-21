@@ -775,7 +775,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       await pool.query('INSERT INTO repository_settings("userId","remoteKey",push) VALUES($1,$2,$3)', [p.id, normalizeRepository(repo).key,
         JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: p.id, approvedAt: new Date().toISOString() })])
       const deviceId = randomUUID(), agentId = await seedAgent(pool, p.id)
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,'Synthetic backfill device','local',true,now())`, [deviceId, p.id])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES($1,$2,'Synthetic backfill device','local',true,now(),now())`, [deviceId, p.id])
       await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
       await seedAllowedModel(pool, p.id, { workspaceId: p.workspaceId, deviceIds: [deviceId] })
       const issueId = await seedIssue(pool, p.id)
@@ -1096,12 +1096,21 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   await t.test('model choice goes through the ordinary bot path', async () => {
     const p = await person('model-choice')
     const { ExecutionSettings } = await import('../lib/execution-settings')
-    const { HOSTED_CHOICE } = await import('../lib/bot-model-menu-view')
+    const { creditsOptionId } = await import('../lib/bot-model-menu-view')
+    const { SELF_HOSTED_DEFAULT_CATALOG_ID } = await import('../lib/model-gateway/config')
     const { botId, workspaceId } = await bots.coordinatorBot(p.id, null)
     const settings = new ExecutionSettings(appPool)
-    await settings.setBotModel({ ownerId: p.id, workspaceId }, botId, HOSTED_CHOICE)
-    assert.deepEqual((await pool.query('SELECT "botKey" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId }], 'saved under the bot row, never \'coordinator\'')
-    assert.equal(await settings.botModel({ ownerId: p.id, workspaceId }, botId), HOSTED_CHOICE)
+    // A self-hosted server offers its managed LiteLLM default; the pick is saved like any other.
+    const names = ['MIKKA_EDITION', 'MIKKA_LITELLM_URL', 'MIKKA_LITELLM_MASTER_KEY'] as const
+    const before = Object.fromEntries(names.map(name => [name, process.env[name]]))
+    Object.assign(process.env, { MIKKA_EDITION: 'community', MIKKA_LITELLM_URL: 'https://litellm.example.invalid',
+      MIKKA_LITELLM_MASTER_KEY: 'synthetic-fixture-only' })
+    try {
+      const credits = creditsOptionId(SELF_HOSTED_DEFAULT_CATALOG_ID)
+      await settings.setBotModel({ ownerId: p.id, workspaceId }, botId, credits)
+      assert.deepEqual((await pool.query('SELECT "botKey","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId, creditsModel: SELF_HOSTED_DEFAULT_CATALOG_ID }], 'saved under the bot row, never \'coordinator\'')
+      assert.equal(await settings.botModel({ ownerId: p.id, workspaceId }, botId), credits)
+    } finally { for (const name of names) if (before[name] === undefined) delete process.env[name]; else process.env[name] = before[name] }
   })
 
   await t.test('the Coordinator stays outside workspace app policy; an ordinary bot does not', async () => {

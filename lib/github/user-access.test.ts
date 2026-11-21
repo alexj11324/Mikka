@@ -100,6 +100,74 @@ function deferred<T>() {
 }
 const nextTurn = () => new Promise<void>(resolve => setImmediate(resolve))
 
+test('branch pages use the admitted repository ID and return only names and commit SHAs', async () => {
+  connected = { token: expectedToken, githubAccountId: '42' }
+  const original = answer
+  const sha = 'a'.repeat(40)
+  answer = url => url.pathname === '/repositories/91/branches'
+    ? Response.json([{ name: 'team/feature', commit: { sha, url: 'unused' } }], {
+      headers: url.searchParams.get('page') === '1' ? { link: '<https://api.github.com/unused>; rel="next"' } : {},
+    }) : original(url)
+  const { GET } = await import('../../app/api/integrations/github/repositories/branches/route')
+  const call = (query: string) => GET({ url: 'https://mikka.test/api/integrations/github/repositories/branches?' + query, headers: requestHeaders, signal: new AbortController().signal } as Request)
+  const first = await call('repository=Owner/Project')
+  assert.equal(first.status, 200)
+  assert.deepEqual(await first.json(), { repository: 'Owner/Project', branches: [{ name: 'team/feature', sha }], nextPage: 2 })
+  assert.equal((await (await call('repository=Owner/Project&page=2')).json()).nextPage, null)
+  assert.equal((await call('repository=Other/Repo')).status, 403)
+  assert.equal((await call('repository=Owner/Project&page=-1')).status, 400)
+  assert.equal((await call('repository=../Project')).status, 400)
+  user = null
+  assert.equal((await call('repository=Owner/Project')).status, 401)
+  assert.equal(paths().filter(path => path.endsWith('/branches')).length, 2)
+})
+
+test('a pull request’s files are read inside the admitted repository ID and come back as the review page’s diff', async () => {
+  connected = { token: expectedToken, githubAccountId: '42' }
+  const original = answer
+  const baseSha = 'b'.repeat(40), headSha = 'c'.repeat(40)
+  answer = url => {
+    if (url.pathname === '/repositories/91/pulls/7') return json({
+      number: 7, title: 'Any PR, not only ours', state: 'closed', merged: true, merged_at: '2026-11-18T00:00:00Z',
+      html_url: 'https://github.com/Owner/Project/pull/7',
+      base: { ref: 'main', sha: baseSha, repo: repository }, head: { ref: 'feature', sha: headSha },
+    })
+    if (url.pathname !== '/repositories/91/pulls/7/files') return original(url)
+    return url.searchParams.get('page') === '1'
+      ? json([{ filename: 'src/app.ts', status: 'modified', patch: '@@ -1,1 +1,2 @@\n kept\n+added\n' }], true)
+      : json([
+        { filename: 'assets/logo.png', status: 'modified' },
+        { filename: 'src/new.ts', status: 'renamed', previous_filename: 'src/old.ts', patch: '@@ -1,1 +1,1 @@\n-old\n+new\n' },
+        { filename: '.github/workflows/ci.yml', status: 'added', patch: '@@ -0,0 +1,1 @@\n+on: push\n' },
+      ])
+  }
+  const { GET } = await import('../../app/api/integrations/github/repositories/pulls/files/route')
+  const call = (query: string) => GET({ url: 'https://mikka.test/api/integrations/github/repositories/pulls/files?' + query, headers: requestHeaders, signal: new AbortController().signal } as Request)
+  const response = await call('repo=Owner/Project&number=7')
+  assert.equal(response.status, 200)
+  const files = await response.json()
+  assert.equal(files.url, 'https://github.com/Owner/Project/pull/7')
+  assert.equal(files.state, 'merged')
+  assert.deepEqual([files.base, files.head], [{ ref: 'main', sha: baseSha }, { ref: 'feature', sha: headSha }])
+  assert.deepEqual(files.changes.files.map((file: { path: string; previousPath: string | null; status: string; binary: boolean }) =>
+    [file.path, file.previousPath, file.status, file.binary]), [
+    ['src/app.ts', null, 'modified', false],
+    ['assets/logo.png', null, 'modified', true],
+    ['src/new.ts', 'src/old.ts', 'renamed', false],
+    // A dotfile path is an ordinary changed file, not something to hide.
+    ['.github/workflows/ci.yml', null, 'added', false],
+  ])
+  assert.deepEqual([files.changes.additions, files.changes.deletions], [3, 1])
+  // A file GitHub sent no patch for lists and draws no lines; the rest of the change is not claimed.
+  assert.deepEqual([files.patchUnavailable, files.moreFiles], [1, false])
+  assert.equal(paths().filter(path => path.endsWith('/pulls/7/files')).length, 2)
+  // Another repository than the admitted one never receives a pull request read.
+  assert.equal((await call('repo=Other/Repo&number=7')).status, 403)
+  assert.equal((await call('repo=Owner/Project&number=0')).status, 400)
+  user = null
+  assert.equal((await call('repo=Owner/Project&number=7')).status, 401)
+})
+
 test('an exact repository read uses one viewer token for live user/App intersection and the final repository identity', async () => {
   connected = { token: 'private-test-token', githubAccountId: '42' }
   const budget = { deadline: Date.now() + 25_000, signal: new AbortController().signal }
@@ -481,4 +549,39 @@ test('settings errors carry the cookie viewer so another displayed account canno
   assert.equal(response.status, 401)
   assert.deepEqual(await response.json(), { viewerId: 'person-2', error: 'githubReconnectRequired' })
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
+})
+
+test('repository tree resolves the admitted numeric repository and checks its immutable tree before returning visible paths', async () => {
+  const previous = answer, commitSha = '1'.repeat(40), treeSha = '2'.repeat(40)
+  let truncated = false
+  answer = url => {
+    if (url.pathname === `/repositories/${repository.id}/commits/feature%2Fqa`) return json({ sha: commitSha, commit: { tree: { sha: treeSha } } })
+    if (url.pathname === `/repositories/${repository.id}/git/trees/${treeSha}`) {
+      assert.equal(url.searchParams.get('recursive'), '1')
+      return json({ sha: treeSha, truncated, tree: [
+        { path: 'src', mode: '040000', type: 'tree', sha: '3'.repeat(40) },
+        { path: '.env', mode: '100644', type: 'blob', sha: '4'.repeat(40), size: 0 },
+      ] })
+    }
+    return previous(url)
+  }
+  const read = () => access.readRepositoryTree('person-1', 'owner/project', 'feature/qa', { deadline: Date.now() + 25_000 })
+  assert.deepEqual(await read(), { repository: repository.full_name, commitSha, treeSha,
+    entries: [{ path: 'src', mode: '040000', type: 'tree', sha: '3'.repeat(40) }] })
+  truncated = true
+  await assert.rejects(read, /workspace_snapshot_unavailable/)
+})
+
+test('admitted repository returns matching recent PR openers, independent of reviewers and repeated names', async () => {
+  const previous = answer
+  answer = url => {
+    if (url.pathname === '/repositories/91/pulls') {
+      assert.equal(url.searchParams.get('state'), 'all')
+      assert.equal(url.searchParams.get('per_page'), '50')
+      return Response.json([{ user: { login: 'Ada' } }, { user: { login: 'Ada' } },
+        { user: { login: 'Grace' }, requested_reviewers: [{ login: 'Ada-Reviewer' }] }])
+    }
+    return previous(url)
+  }
+  assert.deepEqual(await access.recentRepositoryPullAuthors('person-1', 'v2/github.com/owner/project', 'ad', { deadline: Date.now() + 25_000 }), ['Ada'])
 })

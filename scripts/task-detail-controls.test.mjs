@@ -13,7 +13,7 @@ const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 let teamKeys, timeline, timelineHistory, teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
 mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-pull-request-timeline') return { data: timeline }
@@ -38,6 +38,7 @@ stub('app/actions/team-relations.ts', {
   setIssueTeam: async input => { teamWrites.push(input); return response ?? { ok: true, data: input.teamId } },
 })
 stub('app/actions/teams.ts', { listTeams: async () => teams })
+stub('app/actions/task-list.ts', { listUnreadTaskIds: async () => [], setTaskUnread: async () => ({ unread: false }), countTaskListViews: async () => ({}) })
 stub('app/actions/task-domain.ts', { getTaskPresentations: () => { throw new Error('Unexpected Task presentation read in detail controls fixture') } })
 stub('app/actions/issues.ts', {
   setIssueScope: noop, promoteIssueToTeam: noop,
@@ -224,7 +225,8 @@ test('Task property menus expose every writable value, send precisely that value
   const propertyCodes = { status: ISSUE_STATUS_CODES, priority: ISSUE_PRIORITY_CODES }
   const saveInput = z.toJSONSchema(save, { io: 'input', unrepresentable: 'any' }).prefixItems[0]
   assert.deepEqual(Object.keys(saveInput.properties).sort(),
-    ['id', 'revision', 'workspaceId', 'title', 'content', ...Object.keys(propertyCodes)].sort(),
+    // stateId refines status to one of the workspace's states (decision 2026-11-19-2115); tests/workspace-issue-states.db.test.ts covers it.
+    ['id', 'revision', 'workspaceId', 'title', 'content', 'stateId', ...Object.keys(propertyCodes)].sort(),
     'classify each new save field and cover its consumer')
   const input = { title: 'Task', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' }
   const dispose = await mount({

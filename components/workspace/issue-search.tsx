@@ -1,7 +1,7 @@
 'use client'
 
-import { Plus } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { Plus } from '@/components/icons'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { listIssues } from '@/app/actions/issues'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'

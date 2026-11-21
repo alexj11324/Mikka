@@ -1,8 +1,6 @@
 import { Pool } from 'pg'
 import { deploymentAttestation, environmentFingerprint, loadEnvironment, readIdentityMaterial } from '@/scripts/test-accounts/environment.mjs'
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 // Read-only proof for a runner-owned disposable environment. There is no login,
 // session creation, reset, provisioning or mutation operation on this endpoint.

@@ -1,6 +1,6 @@
 'use server'
 import { withFreshSession } from '@/lib/fresh-session'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 
 import { and, asc, count, eq, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'

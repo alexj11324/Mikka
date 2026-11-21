@@ -41,7 +41,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
     const botId = await seedBot(pool, workspaceId, userId), agentId = await seedAgent(pool, userId)
     const deviceId = randomUUID(), repoId = randomUUID(), deviceTokenId = randomUUID(), runId = randomUUID()
     const remoteKey = 'v2/github.com/mikka-ci/review-fixture', sandboxId = sponsored ? 'a'.repeat(64) : `synthetic-${randomUUID()}`, worktreePath = sponsored ? `/workspace/worktrees/${runId}` : `/home/user/.mikka/worktrees/${runId}`
-    await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now())', [deviceId, userId])
+    await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now(),now())', [deviceId, userId])
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,\'https://github.com/mikka-ci/review-fixture.git\')', [repoId, deviceId, userId, remoteKey])
     await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1::uuid,$2,$1::text,$3,$4,now()+interval \'1 hour\')', [deviceTokenId, userId, deviceId, workspaceId])
     const definition = { executionIdentity:{workspaceId, ...(sponsored ? {billingAccount:{runtime:{kind:'cloudflare_sponsored'}}} : {})},
@@ -102,8 +102,8 @@ test('task review: current owner, session, tenant and immutable physical checkou
     assert.equal('token' in authority, false)
   })
   await t.test('sponsor review uses the frozen platform and repository, with distinct guest leases in one human operation',async()=>{
-    const f=await fixture(true), previous=[process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES,process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN]
-    process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES=f.workspaceId
+    const f=await fixture(true), previous=[process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED,process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN]
+    delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
     process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN='synthetic-fixture-only'
     try {
       const {beginReviewSession}=await import('./review-sessions')
@@ -119,15 +119,15 @@ test('task review: current owner, session, tenant and immutable physical checkou
       assert.equal(rows.length,2)
       assert.ok(rows.every(row=>row.provider==='cloudflare' && row.repositoryKey===f.remoteKey && row.reviewOperationId===terminal.reviewOperationId))
       await refused(read(f,f.peer),403,'not_owner_terminal')
-      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = f.otherWorkspaceId
+      process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = '1'
       await assert.rejects(read(f), (error: unknown) =>
         error instanceof ReviewAuthorityError && error.status === 403 && error.code === 'review_scope_denied' &&
         error.detail === 'sponsored_placement' && error.cause instanceof Error)
-      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = f.workspaceId
+      delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
       await pool.query('UPDATE thread_machines SET "snapshotId"=$2 WHERE "runId"=$1',[f.runId,'synthetic'])
       await refused(read(f),403,'review_scope_denied')
     } finally {
-      for(const [i,key] of ['MIKKA_CLOUDFLARE_TASK_WORKSPACES','MIKKA_TASK_MACHINE_BRIDGE_TOKEN'].entries())
+      for(const [i,key] of ['MIKKA_CLOUDFLARE_TASKS_DISABLED','MIKKA_TASK_MACHINE_BRIDGE_TOKEN'].entries())
         if(previous[i] === undefined) delete process.env[key]; else process.env[key]=previous[i]
     }
   })

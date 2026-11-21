@@ -9,6 +9,7 @@ import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorBot } from './coordinator-bot'
+import { COORDINATOR_WAKE_SCOPES_SQL } from './wake-recovery'
 import { deliverRunCompletion } from './run-completion-delivery'
 import { verifiedCiSuiteTransport } from './ci-suite-transport'
 
@@ -96,7 +97,7 @@ export async function recoverWakeDeadline(ticket: import('./wake-recovery').Wake
 /** Existing source-outbox reconciliation; never inspects or restarts an eve workflow. */
 export async function retryCoordinatorWakes(deadline = Date.now()+45_000) {
   const counts = {due:0,started:0,deferred:0,failed:0,exhausted:0,interrupted:0}
-  const scopes = (await pool.query<{userId:string;botId:string}>(`SELECT DISTINCT "userId","botId" FROM coordinator_events WHERE "deliveredAt" IS NULL AND "botId" IS NOT NULL AND (kind='user_message' OR tier IS NULL OR tier<>'background')`)).rows
+  const scopes = (await pool.query<{userId:string;botId:string}>(COORDINATOR_WAKE_SCOPES_SQL)).rows
   counts.due = scopes.length
   for (const scope of scopes) {
     if (Date.now()>=deadline || !await coordinatorEnabled(scope.userId,scope.botId)) {counts.deferred++;continue}

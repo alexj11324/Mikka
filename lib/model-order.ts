@@ -2,6 +2,8 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { cloudModelSupport, type CloudModelState } from './cloud-template-models'
 import type { Pool, PoolClient } from 'pg'
+import type { UsableApiKey } from './model-api-keys'
+import type { ExecutionSettings } from './execution-settings'
 import { z } from 'zod'
 import { deviceOnlineStates } from './device-presence'
 import { deviceSchedulingView, type SchedulingNode } from './device-scheduling'
@@ -11,8 +13,8 @@ import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
-  type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, placeStage, planDispatch, sourceId as entrySourceId, whyNoDevice,
+  type CredentialState, type StoredEntry, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
 /**
@@ -28,7 +30,8 @@ type Query = Pick<Pool | PoolClient, 'query'>
 export interface OrderScope { ownerId: string; workspaceId: string }
 
 /** One allowed model as the page shows it. */
-export interface OrderRow extends OrderEntry {
+export interface OrderRow extends Omit<OrderEntry, 'source'> {
+  source: StoredEntry['source']
   /** The subscription's provider or the key's provider, for its mark and label. */
   provider: string
   /** The Agents this model and credential can run on: one, or both for a DeepSeek or Kimi key (the row's Agent menu). */
@@ -73,26 +76,24 @@ export interface OrderView {
 export type OrderContextView = Pick<OrderView, 'location' | 'preferredHarness' | 'entries' | 'candidates' | 'cloudReady' | 'cloudModels'>
 
 interface EntryRow { id: string; harness: OrderHarness; model: string; sourceKind: 'subscription' | 'api_key'; sourceId: string }
-const toEntry = (row: EntryRow): OrderEntry => ({
+const toEntry = (row: EntryRow): StoredEntry => ({
   id: row.id, harness: row.harness, model: row.model,
   source: row.sourceKind === 'subscription' ? { kind: 'subscription', connectionId: row.sourceId } : { kind: 'api_key', keyId: row.sourceId },
 })
-const sourceId = (entry: Pick<OrderEntry, 'source'>) => entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId
+const sourceId = (entry: Pick<OrderEntry, 'source'>) => entrySourceId(entry.source)
+
+export interface ModelCandidateSnapshot {
+  rows?: Awaited<ReturnType<ExecutionSettings['botModels']>>
+  keys?: UsableApiKey[]
+}
 
 /** What the person can add here: their usable subscriptions' models and their usable keys' models. */
-export async function orderCandidates(query: Query, scope: OrderScope): Promise<(OrderCandidate & { provider: string; credentialOwnerId: string })[]> {
+export async function orderCandidates(query: Query, scope: OrderScope, cached: ModelCandidateSnapshot = {}): Promise<(OrderCandidate & { provider: string; credentialOwnerId: string })[]> {
   const { ExecutionSettings } = await import('./execution-settings')
   const { usableApiKeys } = await import('./model-api-keys')
   const settings = new ExecutionSettings(query as Pool)
-  const rows = await settings.modelCandidates(scope, query)
-  const { pooledOwners } = await import('./personal-policy')
-  const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-  // Sharing grants use in this workspace, never ownership of the account. Both parties must still
-  // be active members; the owner is derived from server records, never an EntrySource supplied by a client.
-  for (const ownerId of await pooledOwners(query, scope.ownerId, scope.workspaceId)) {
-    try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId) } catch { continue }
-    rows.push(...await settings.modelCandidates({ ...scope, ownerId }, query))
-  }
+  const rows = cached.rows ?? await settings.modelCandidates(scope, query)
+  // A subscription serves its owner only (decision 2026-11-17): no teammate's account is a candidate.
   // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
   const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]
   const listed = new Map((connectionIds.length ? (await query.query<{ id: string; models: unknown }>(
@@ -106,7 +107,7 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
     ? rank(a.item.source.connectionId, a.item.model) - rank(b.item.source.connectionId, b.item.model) || a.at - b.at
     : a.at - b.at).map(({ item }) => item)
   // A key serves each Agent of each protocol it speaks: a DeepSeek or Kimi model is a candidate on both (model · Agent).
-  const keys = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.flatMap(model => apiKeyHarnesses(key).map(harness => ({
+  const keys = (cached.keys ?? await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.flatMap(model => apiKeyHarnesses(key).map(harness => ({
     harness: harness as OrderHarness, model, name: model,
     source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider, credentialOwnerId: key.ownerId,
   }))))
@@ -120,6 +121,8 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
  * Default/inherited selection still uses orderCandidates and its full ordering.
  * This is a fresh candidate read, not a credential grant or cached admission. */
 export async function selectedOrderCandidates(query: Query, scope: OrderScope, entry: OrderEntry): ReturnType<typeof orderCandidates> {
+  // Mikka 额度 is no connected credential; it has no candidates to select.
+  if (entry.source.kind === 'credits') return []
   if (!z.uuid().safeParse(sourceId(entry)).success) return []
   if (entry.source.kind === 'api_key') {
     const { usableApiKeys } = await import('./model-api-keys')
@@ -155,18 +158,14 @@ async function settingsRow(query: Query, scope: OrderScope) {
 }
 
 /** The allowed models in order: the stored list, or for an untouched list the default preference (ids are stable per entry). */
-export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: OrderEntry[] }> {
+export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: StoredEntry[] }> {
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
     const available = latestDefaultCandidates(candidates ?? await orderCandidates(query, scope))
     const defaults = defaultOrderByAgent(available, settings.preferredHarness)
-    // Include lighter reported models from the default credentials without
-    // silently adding a different paid key. Turning routing off restores each
-    // Agent's default list; saved lists remain exactly as set.
-    const sources = new Set(defaults.map(item => `${item.source.kind}:${sourceId(item)}`))
-    const extra = settings.autoModelRouting ? onPreferredAgent(available, settings.preferredHarness)
-      .filter(item => sources.has(`${item.source.kind}:${sourceId(item)}`)) : []
-    const list = [...new Map([...defaults, ...extra].map(item => [entryKey(item), item])).values()]
+    // Each Agent's default list. The lighter models it once added for the
+    // retired difficulty routing are no longer included (decision 2026-11-15-1630).
+    const list = [...new Map(defaults.map(item => [entryKey(item), item])).values()]
     // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
     // identity key in memory, but give its opaque row id a stable JSONB-safe form.
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
@@ -186,11 +185,11 @@ export { dispatchOrder } from './model-order-plan'
 
 export type RefreshOrderQuota = (scope: OrderScope, connectionId: string, signal: AbortSignal, credentialOwnerId?: string) => Promise<void>
 const quotaRefreshes = new WeakMap<Query, Map<string, Promise<void>>>()
-const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
+const refreshOrderQuota = (_query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
   const service = (await import('./subscription-runtime')).subscriptionRuntime()
   await service.member(scope.ownerId, scope.workspaceId)
   await service.workspace(credentialOwnerId, scope.workspaceId)
-  if (credentialOwnerId !== scope.ownerId && !(await (await import('./personal-policy')).othersMayUse(query, credentialOwnerId, scope.workspaceId))) throw new ActionFailureError('executionAccountUnavailable')
+  if (credentialOwnerId !== scope.ownerId) throw new ActionFailureError('executionAccountUnavailable')
   await service.allowance(credentialOwnerId, connectionId, signal)
 }
 
@@ -216,7 +215,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     ? [[candidate.source.keyId, candidate.credentialOwnerId ?? scope.ownerId] as const] : []))
   const readConnections = async () => {
     const authorized = [] as [string, string][]
-    for (const [id, owner] of owners) if (owner === scope.ownerId || await (await import('./personal-policy')).othersMayUse(query, owner, scope.workspaceId)) authorized.push([id, owner])
+    for (const [id, owner] of owners) if (owner === scope.ownerId) authorized.push([id, owner])
     return new Map((authorized.length ? (await query.query<{ id: string; ownerId: string; state: string; paused: boolean; quota: unknown; provider: 'claude' | 'codex'; epoch: string; removed: boolean }>(
       'SELECT c.id::text AS id,c."ownerId",c.state,c.paused,c.quota,c.provider,c.epoch::text AS epoch,c."removedAt" IS NOT NULL AS removed FROM byos_connections c JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON c.id::text=authorized.id AND c."ownerId"=authorized.owner', [authorized.map(([id]) => id), authorized.map(([, owner]) => owner)])).rows : []).map(row => [row.id, row]))
   }
@@ -248,6 +247,9 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
   const health = await providerHealthStates(query, scope, authorizedCandidates, checkedAt)
   const states = new Map<string, { credential: CredentialState; provider: string; quotaCheckPending?: true }>()
   for (const entry of entries) {
+    // A Mikka 额度 model runs through the model gateway, which charges or refuses
+    // each request itself (decision 2026-11-15-2000).
+    if (entry.source.kind === 'credits') { states.set(entry.id, { credential: { usable: true }, provider: 'mikka' }); continue }
     if (entry.source.kind === 'subscription') {
       const row = connections.get(entry.source.connectionId)
       const provider = row?.provider ?? (entry.harness === 'codex' ? 'codex' : 'claude')
@@ -302,11 +304,11 @@ export async function checkOrderQuota(query: Query, scope: OrderScope, connectio
  * A run not yet ended counts toward its device's load (pickDevice).
  */
 export async function poolDevices(query: Query, ownerId: string): Promise<(PoolDevice & { lastSeenAt: number | null })[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
-    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; sessionOpenedAt: Date | null; sessionClosedAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
+    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,d."deviceType",d."createdAt",
       (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
-  const presence = await deviceOnlineStates(rows)
+  const presence = deviceOnlineStates(rows)
   return rows.map(row => ({
     id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,
@@ -447,7 +449,7 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
     if (change.kind === 'add') {
       const available = new Map(candidates.map(candidate => [entryKey(candidate), candidate]))
       const have = new Set(entries.map(entryKey))
-      const added: OrderEntry[] = []
+      const added: StoredEntry[] = []
       for (const raw of z.array(candidateInput).min(1).max(100).parse(change.entries)) {
         const key = entryKey(raw)
         if (!available.has(key)) throw new ActionFailureError('executionModelUnknown')

@@ -28,7 +28,6 @@ import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { afterDatabaseCommit } from '@/lib/db/commit-effects'
-import { THREAD_MACHINE_BUDGET_MS } from './thread-lifecycle'
 import { logThreadLifecycle } from './thread-lifecycle-log'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
@@ -594,14 +593,16 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     const run = (await client.query('SELECT status,"leaseExpiresAt","stopRequestedAt","stopReason","startedAt","sessionId","deviceTokenId","pauseReason",report FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     const machine = (await client.query(`SELECT "sandboxId","snapshotId","operationId","deviceId","issueId","computeSeconds","runningSince",state,epoch,"workerLeaseUntil",lifecycle,"snapshotState","snapshotOperationId","filesystemSnapshotId" FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
-    if (!machine?.sandboxId || machine.state === 'ended') return null
-    if (expectedFence && (machine.epoch !== expectedFence.epoch || machine.sandboxId !== expectedFence.sandboxId)) return null
+    if (!machine?.sandboxId || machine.state === 'ended' ||
+      (expectedFence && (machine.epoch !== expectedFence.epoch || machine.sandboxId !== expectedFence.sandboxId))) {
+      // Recovery ignores stale observations. A person's pause must acknowledge the binding it actually parked.
+      if (expectedFence?.revokeReview) throw new ComputerError(409, 'Thread machine changed before it could be paused')
+      return null
+    }
     if (expectedFence?.revokeReview) await (await import('../coding-workspace/review-sessions'))
       .fenceReviewSessions(client, { runIds: [runId] }, 'machine_changed')
     else if (['succeeded', 'failed'].includes(run?.status) && !run.stopRequestedAt && run.stopReason !== 'device_lost'
-      && run.report?.safePoint?.session === 'exited'
-      && Number(machine.computeSeconds) * 1_000 + (machine.state === 'running' && machine.runningSince
-        ? Math.max(0, Date.now() - new Date(machine.runningSince).getTime()) : 0) < THREAD_MACHINE_BUDGET_MS) {
+      && run.report?.safePoint?.session === 'exited') {
       const held = (await client.query<{ until: Date | null }>(`SELECT max(s."expiresAt") AS until FROM coding_review_sessions s
         JOIN issues i ON i.id=s."taskId" WHERE s."runId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3
           AND s."sandboxId"=$4 AND s."machineEpoch"=$5 AND s."machineOperationId"=$6

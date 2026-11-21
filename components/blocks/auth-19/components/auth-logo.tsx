@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'

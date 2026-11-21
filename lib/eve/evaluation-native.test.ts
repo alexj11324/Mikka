@@ -37,7 +37,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  await writeFile(join(cwd,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.0.0-rc.9'}}))
  await writeFile(join(fixture,'tsconfig.json'),JSON.stringify({compilerOptions:{module:'ESNext',target:'ES2022',moduleResolution:'Bundler',strict:true,skipLibCheck:true}}))
  await writeFile(join(cwd,'tsconfig.json'),JSON.stringify({extends:'../../tsconfig.json'}))
- const sources=['apps/eve/agent/agent.ts','apps/eve/agent/instructions.ts','apps/eve/agent/channels/evaluation.ts','apps/eve/agent/tools/product.ts','apps/eve/agent/tools/agent.ts','apps/eve/agent/tools/no_reply.ts','apps/eve/agent/tools/ask_question.ts','apps/eve/agent/hooks/product.ts','apps/eve/agent/connections/personal.ts','apps/eve/agent/skills/assigned.ts','lib/eve/auth.ts','lib/eve/scope.ts','lib/eve/runtime.ts','lib/eve/evaluation-channel.ts','lib/eve/evaluation-context.ts','lib/eve/evaluation-runtime.ts','lib/eve/streaming-model.ts','lib/agent-kit/eval-fixtures.ts']
+ const sources=['apps/eve/agent/agent.ts','apps/eve/agent/instructions.ts','apps/eve/agent/channels/evaluation.ts','apps/eve/agent/tools/product.ts','apps/eve/agent/tools/agent.ts','apps/eve/agent/tools/no_reply.ts','apps/eve/agent/tools/ask_question.ts','apps/eve/agent/hooks/product.ts','apps/eve/agent/connections/personal.ts','apps/eve/agent/skills/assigned.ts','lib/eve/auth.ts','lib/eve/host-authorization.mjs','lib/eve/scope.ts','lib/eve/runtime.ts','lib/eve/evaluation-channel.ts','lib/eve/evaluation-context.ts','lib/eve/evaluation-runtime.ts','lib/eve/streaming-model.ts','lib/model-effort.ts','lib/model-routing.ts','lib/agent-kit/eval-fixtures.ts']
  for(const source of sources)await writeFile(join(fixture,source),await readFile(join(root,source)))
  // Only provider/account boundaries and storage are synthetic. Channel, auth,
  // dynamic capabilities, approvals, hooks and the native Client are unchanged.
@@ -57,7 +57,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  await writeFile(join(fixture,'lib/deployment-switches.ts'),`export function deploymentSwitch(){throw Error('Real product switches forbidden')}`)
  await writeFile(join(fixture,'lib/factory/reconcile-pending.ts'),`export async function pendingFactoryReconciliation(){throw Error('Real Factory reconciliation forbidden')}`)
  await writeFile(join(fixture,'lib/eve/product-tool.ts'),`export function createProductTool(){throw Error('Real product tools forbidden')}`)
- await writeFile(join(fixture,'lib/eve/projection.ts'),`export function projectEveTurn(){throw Error('Chat projection forbidden')}export const projectTurnState=projectEveTurn`)
+ await writeFile(join(fixture,'lib/eve/projection.ts'),`export function projectEveTurn(){throw Error('Chat projection forbidden')}export const projectTurnState=projectEveTurn, stoppedTurnDisplay=projectEveTurn`)
  await writeFile(join(fixture,'lib/eve/scheduled-read.ts'),`export async function loadScheduledRead(){throw Error('Scheduled authority forbidden')}`)
  await mkdir(join(fixture,'lib/plugins'),{recursive:true})
  await writeFile(join(fixture,'lib/plugins/runtime.ts'),`export const personalPlugins={async snapshot(){throw Error('Personal MCP forbidden')}}`)

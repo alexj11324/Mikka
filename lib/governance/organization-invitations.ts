@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, gt, isNull, notExists, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, notExists, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { organizationInvitations, organizationMembers, organizations } from '@/lib/db/governance-schema'
 import { pool } from '@/lib/db'
@@ -27,7 +27,12 @@ async function verifiedInvitationRecipient(user: { id: string; email: string }) 
 export async function listReceivedOrganizationInvitations(user: { id: string; email: string }) {
   const recipient = await verifiedInvitationRecipient(user)
   const invitations = await workspaceDb.select({
-    id: organizationInvitations.id, organizationName: organizations.name, expiresAt: organizationInvitations.expiresAt,
+    id: organizationInvitations.id,
+    organizationId: organizations.id,
+    organizationName: organizations.name,
+    inviterName: organizationMembers.name,
+    invitedAt: organizationInvitations.createdAt,
+    expiresAt: organizationInvitations.expiresAt,
   }).from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
     .innerJoin(organizationMembers, and(eq(organizationMembers.organizationId, organizations.id),
@@ -71,9 +76,13 @@ export async function issueOrganizationInvitations(organizationId: string, actor
     await assertOrganizationAccountWritable(tx, actorId)
     await requireActiveOrganizationMember(tx, organizationId, actorId)
     const members = new Set((await tx.select({ email: organizationMembers.email }).from(organizationMembers)
-      .where(eq(organizationMembers.organizationId, organizationId))).map(row => row.email.toLowerCase()))
-    const existing = new Map((await tx.select().from(organizationInvitations)
-      .where(eq(organizationInvitations.organizationId, organizationId))).map(row => [row.email, row]))
+      .where(and(eq(organizationMembers.organizationId, organizationId),
+        inArray(sql`lower(${organizationMembers.email})`, emails)))).map(row => row.email.toLowerCase()))
+    const existing = new Map((await tx.select({
+      email: organizationInvitations.email, id: organizationInvitations.id,
+      status: organizationInvitations.status, expiresAt: organizationInvitations.expiresAt,
+    }).from(organizationInvitations).where(and(eq(organizationInvitations.organizationId, organizationId),
+      inArray(organizationInvitations.email, emails)))).map(row => [row.email, row]))
     const seen = new Set<string>()
     const outcomes: OrganizationInvitationOutcome[] = []
     const now = new Date()
@@ -113,9 +122,10 @@ export async function listOrganizationInvitations(organizationId: string, actorI
       id: organizationInvitations.id, email: organizationInvitations.email,
       createdBy: organizationInvitations.createdBy, status: organizationInvitations.status,
       createdAt: organizationInvitations.createdAt, expiresAt: organizationInvitations.expiresAt,
-    }).from(organizationInvitations).where(eq(organizationInvitations.organizationId, organizationId))
+    }).from(organizationInvitations).where(and(eq(organizationInvitations.organizationId, organizationId),
+      member.role === 'member' ? eq(organizationInvitations.createdBy, actorId) : undefined))
       .orderBy(asc(organizationInvitations.createdAt))
-    return { invitations: rows.filter(row => member.role !== 'member' || row.createdBy === actorId) }
+    return { invitations: rows }
   })
 }
 

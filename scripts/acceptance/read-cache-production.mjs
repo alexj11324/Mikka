@@ -35,7 +35,7 @@ const blocked = new Set(['trigger_rejected', 'attestation_required', 'account_re
   'session_missing', 'session_identity', 'session_close_failed', 'existing_bot_missing', 'existing_task_missing',
   'existing_thread_missing', 'existing_chat_tail_missing',
   'scope_changed', 'read_access_changed', 'request_failed', 'http_refused', 'acceptance_timeout', 'action_discovery_failed',
-  'deployment_proof', 'web_deploy', 'issue_proof'])
+  'deployment_proof', 'issue_proof'])
 const failures = new Set(['request_denied', 'redirect_refused', 'response_invalid', 'list_merge_invalid', 'chat_merge_invalid', 'acceptance_failed'])
 export class ProductionReadCacheError extends Error {
   constructor(code, options) {
@@ -67,12 +67,10 @@ export function productionGuard(env, event) {
     check(env.GITHUB_REPOSITORY === REPOSITORY && event?.repository?.full_name === REPOSITORY
       && env.GITHUB_REF === 'refs/heads/main' && /^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '')
       && event.action === 'completed' && automaticRelease(run, env.GITHUB_SHA, run?.id), 'trigger_rejected')
-    return { applicationSha: run.head_sha, driverRevision: env.GITHUB_SHA, mode: 'readonly', trigger: 'workflow_run', webDeployRunId: run.id }
+    return { applicationSha: run.head_sha, driverRevision: env.GITHUB_SHA, mode: 'readonly', trigger: 'workflow_run' }
   }
   check(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === 'refs/heads/main', 'trigger_rejected')
-  const guard = triggerGuard(env, event, plan)
-  check(guard.applicationSha === guard.driverRevision, 'trigger_rejected')
-  return guard
+  return triggerGuard(env, event, plan)
 }
 
 export async function attestProductionReadCache({ env = process.env, event, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
@@ -110,14 +108,10 @@ export async function attestProductionReadCache({ env = process.env, event, fetc
     await currentMain()
     const pin = async () => check((await read(`${ORIGIN}/mikka/api/version`)).build === guard.applicationSha, 'build_mismatch')
     await pin()
-    const run = await read(`${repositoryApi}/actions/runs/${guard.webDeployRunId}`, true)
-    check(automaticRelease(run, guard.applicationSha, guard.webDeployRunId), 'web_deploy')
-    await pin()
     await currentMain()
     return { ...base, status: 'ready', metadataReadAuthorized: true, readable: true, checkedAt: new Date(now()).toISOString() }
   }
-  // The existing proof checks the public build on both sides of a successful
-  // exact-SHA Web deploy. Worker execution readiness is irrelevant to reads.
+  // The live /mikka/api/version must serve the expected build. Worker execution readiness is irrelevant to reads.
   return attestReadiness({ env, event, plan, fetchImpl, now })
 }
 
@@ -128,11 +122,10 @@ function requireAttestation(guard, attestation, now, issueNumber) {
   check(attestation?.repository === REPOSITORY && attestation.mode === 'readonly'
     && attestation.applicationSha === guard.applicationSha && attestation.driverRevision === guard.driverRevision
     && attestation.executionReady === false
-    && Number.isSafeInteger(attestation.webDeployRunId) && attestation.webDeployRunId > 0
     && Number.isFinite(age) && age >= 0 && age <= 300_000, 'attestation_required')
   if (guard.trigger === 'workflow_run') {
     check(attestation.purpose === purpose && attestation.trigger === 'workflow_run'
-      && attestation.webDeployRunId === guard.webDeployRunId && attestation.issueNumber === issueNumber, 'attestation_required')
+      && attestation.issueNumber === issueNumber, 'attestation_required')
     if (attestation.status === 'skipped') {
       check(attestation.code === 'issue_closed' && attestation.issueState === 'closed'
         && attestation.metadataReadAuthorized === false && attestation.readable === false, 'attestation_required')
@@ -219,7 +212,7 @@ export async function runProductionReadCache({ env = process.env, event, attesta
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
   const measurements = [], refs = {}, deadline = now() + 300_000
-  const report = { version: 1, issue: issueNumber, purpose, ...guard, webDeployRunId: attestation.webDeployRunId,
+  const report = { version: 1, issue: issueNumber, purpose, ...guard,
     status: 'running', startedAt: now(), normalSessionObserved: false, sessionClosed: false,
     browserCacheVerified: false, businessMutationRequests: 0, modelCalls: 0, fixturesCreated: 0, backendMaintenanceWritesMeasured: false,
     cacheMissProbe: 'discard-one-held-item-with-server-issued-proofs', reads: [] }

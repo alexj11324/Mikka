@@ -3,7 +3,8 @@ import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/api-auth'
 import { writeAllowed } from '@/lib/mobile-api'
 import { TASK_FILE_MAX_BYTES } from '@/lib/task-attachments/contract'
-import { listTaskFiles, readTaskFile, removeTaskFile, saveTaskFile, TaskFileError } from '@/lib/task-attachments/store'
+import { listTaskFiles, readTaskFile, removeTaskFile, requireTaskFileDownload, saveTaskFile, TaskFileError } from '@/lib/task-attachments/store'
+import { resolveTaskIdentifierAlias } from '@/lib/task-identity-store'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
@@ -14,12 +15,29 @@ async function attachments(request: Request, context: Context) {
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true, disableRefresh: true } })
   if (!session) return failure('authRequired', 401)
   if (request.method !== 'GET' && !writeAllowed(request)) return failure('originNotAllowed', 403)
-  const taskId = z.uuid().safeParse((await context.params).taskId)
-  const id = new URL(request.url).searchParams.get('id')
-  if (!taskId.success || (id !== null && !z.uuid().safeParse(id).success)) return failure('notFound', 404)
+  const { taskId: reference } = await context.params
+  const params = new URL(request.url).searchParams
+  const id = params.get('id')
+  const readUrl = request.method === 'GET' && params.get('format') === 'url'
+  const taskId = z.uuid().safeParse(reference)
+  if ((!taskId.success && (!readUrl || reference.length > 256)) || (id !== null && !z.uuid().safeParse(id).success)) return failure('notFound', 404)
+  if (readUrl && (!id || (params.has('fresh') && params.get('fresh') !== '1'))) return failure('invalid', 400)
   try {
     const { workspace } = await loadWorkspaceContext(session.tokenWorkspaceId, session.user)
-    const actor = { taskId: taskId.data, user: session.user, workspaceId: workspace.id }
+    let resolvedId = taskId.data
+    if (!resolvedId) {
+      const resolved = await resolveTaskIdentifierAlias({ workspaceId: workspace.id, identifier: reference })
+      if (resolved.kind !== 'found') return failure('notFound', 404)
+      resolvedId = resolved.issueId
+    }
+    const actor = { taskId: resolvedId, user: session.user, workspaceId: workspace.id }
+    if (readUrl && id) {
+      await requireTaskFileDownload(actor, id)
+      // The address must work when opened from the Task page itself, even at a different base path.
+      const url = new URL(`../${encodeURIComponent(resolvedId)}/attachments`, request.url)
+      url.searchParams.set('id', id)
+      return Response.json({ url: url.href, expiresAt: null }, { headers })
+    }
     if (request.method === 'GET' && id === null) return Response.json(await listTaskFiles(actor), { headers })
     if (!id) return failure('invalid', 400)
     if (request.method === 'GET') {

@@ -20,6 +20,8 @@ import { activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { issueListChanged } from '@/lib/live/lists'
+import { readDocumentThreads } from '@/lib/task-activity-wake'
+import { recordTaskActivityWakes } from '@/lib/task-activity-wake-store'
 import { issueMembersChanged } from '@/lib/live/issue-detail'
 import { mayGrantOwnerRole, mayManageMembers, mayMuteMember, maySetSubscription, type MembershipCaller } from '@/lib/issue-member-role'
 
@@ -46,7 +48,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
   }
   const writing = parsed.update !== undefined || parsed.seed !== undefined
   const exchange = () => db.transaction(async tx => {
-    const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, workspaceId: issues.workspaceId, content: issues.content, scope: issues.scope, linearSyncPolicy: issues.linearSyncPolicy, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
+    const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, workspaceId: issues.workspaceId, content: issues.content, title: issues.title, issuedIdentifier: issues.issuedIdentifier, scope: issues.scope, linearSyncPolicy: issues.linearSyncPolicy, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
     if (!writing) await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
@@ -54,6 +56,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
     try {
       if (stored) Y.applyUpdate(doc, Buffer.from(stored.state, 'base64'))
       const commentAuthors = snapshotCommentAuthorship(doc)
+      const threadsBefore = writing ? readDocumentThreads(doc) : []
       // The first exchange seeds from issues.content. If that content fails the editor schema, any seed is an
       // empty/lossy stand-in for it, so refuse instead of overwriting the body (the client stays read-only).
       if (!stored && !readableIssueContent(locked.content, issue.id)) throw new Error('document content invalid')
@@ -73,6 +76,10 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
         await tx.update(issues).set({ content, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId)))
         await documentChanged(tx, issue.id)
         await issueListChanged(tx, issue.id)
+        // A new comment or a Bot chip wakes the Bot it concerns (Capy's issue_activity), with this save.
+        await recordTaskActivityWakes(tx, { task: { id: locked.id, workspaceId: locked.workspaceId, title: locked.title, identifier: locked.issuedIdentifier },
+          writer: { id: user.id, name: user.name }, before: { threads: threadsBefore, content: locked.content as JSONContent }, after: { threads: readDocumentThreads(doc), content },
+          version: documentVersion(state) })
       }
       const [link] = locked.linearSyncPolicy === 'explicit' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
       return { changed, syncEligible: Boolean(link), version: documentVersion(state), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
@@ -161,8 +168,8 @@ export async function setMemberSubscribed(id: string, memberId: string, subscrib
     // Anyone may read for themselves through the task; only its owner changes another member.
     if (!maySetSubscription({ accountId: user.id, ownerId: issue.userId, role: null }, parsed.data.memberId)) return { error: 'memberOwnerOnly' }
     if (!mayMuteMember(parsed.data.memberId, issue.userId)) return { error: 'validationGeneric' }
-    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canReadContent' }, () => db.transaction(async tx => {
-      const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
+    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canReadContent' }, async (_workspace, tx) => {
+      const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).for('update')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       const [updated] = await tx.update(issueMembers).set({ subscribed: parsed.data.subscribed })
         .where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, parsed.data.memberId)))
@@ -170,7 +177,7 @@ export async function setMemberSubscribed(id: string, memberId: string, subscrib
       if (!updated) return { error: 'memberNotFound' }
       await issueMembersChanged(tx, id)
       return { success: true as const }
-    }))
+    })
   })
 }
 

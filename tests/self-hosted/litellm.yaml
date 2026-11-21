@@ -1,0 +1,19 @@
+# Isolated transport proof: real LiteLLM forwards to the synthetic provider.
+model_list:
+  - model_name: mikka-default
+    litellm_params: &fixture
+      model: openai/selfhost-ci
+      api_base: http://model:8080/v1
+      api_key: synthetic-selfhost-only
+      input_cost_per_token: 0.000001
+      output_cost_per_token: 0.000001
+  - model_name: mikka-title
+    litellm_params: *fixture
+  - model_name: mikka-planning
+    litellm_params: *fixture
+  - model_name: mikka-decision
+    litellm_params: *fixture
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+litellm_settings:
+  turn_off_message_logging: true

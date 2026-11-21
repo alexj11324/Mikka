@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import { createParser } from '@openuidev/lang-core'
 import messages from '../messages/en.json'
 import chineseMessages from '../messages/zh-CN.json'

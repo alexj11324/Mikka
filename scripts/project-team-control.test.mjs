@@ -20,7 +20,7 @@ mock.module('../app/actions/teams.ts', { namedExports: { listTeams: () => read('
 mock.module('../app/actions/team-relations.ts', { namedExports: {
   listProjectTeams: () => read('project-teams'), setProjectTeams: () => assert.fail('A read retry must never write'),
 } })
-mock.module('next-intl', { namedExports: { useTranslations: () => key => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => key => key } })
 function Cache() {
   mutate = useSWRConfig().mutate
   return null

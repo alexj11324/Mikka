@@ -22,6 +22,14 @@ on:
         description: Existing Eve owner routing release to maintain with this accepted API build
         type: string
         required: false
+      maintenance_workflow_postgres_patch:
+        description: SHA256 of the reviewed World Postgres 5.2.0 patch to backport to the maintenance image
+        type: string
+        required: false
+      maintenance_hosted_call_budget_sha:
+        description: SHA256 of the reviewed hosted policy with only the 120-second model call budget change
+        type: string
+        required: false
   pull_request:
     paths:
       - 'apps/eve/**'
@@ -29,20 +37,11 @@ on:
       - 'packages/eve-cloudflare-world/**'
       - 'cloudflare/eve-runtime/**'
       - 'scripts/build-eve.mjs'
-      - 'scripts/package-cf-eve-host.mjs'
-      - 'scripts/build-cloudflare-eve-image.sh'
-      - 'scripts/compile-cloudflare-eve-host.sh'
-      - 'patches/@fantasticfour*'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/cloudflare-eve-image.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/eve/**'
-      - 'lib/eve/**'
-      - 'packages/eve-cloudflare-world/**'
-      - 'cloudflare/eve-runtime/**'
-      - 'scripts/build-eve.mjs'
+      - 'scripts/check-eve-image.sh'
+      - 'scripts/verify-eve-image*.mjs'
+      - 'lib/abuse/model.ts'
+      - 'lib/abuse/model.test.ts'
+      - 'lib/abuse/policy.ts'
       - 'scripts/package-cf-eve-host.mjs'
       - 'scripts/build-cloudflare-eve-image.sh'
       - 'scripts/compile-cloudflare-eve-host.sh'
@@ -51,9 +50,14 @@ on:
       - '.github/workflows/cloudflare-eve-image.yml'
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
 jobs:
   image:
-    if: github.event_name != 'workflow_dispatch'
+    # All PRs retain their existing credential-free qualification. The
+    # protected Registry producer is allowed to run only on real main pushes.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -72,6 +76,8 @@ jobs:
           skip-electron: 'true'
       - name: Bind the existing release format
         run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
+      - name: Check, build and verify the local Eve image
+        run: pnpm check:eve-image
       # The business API publisher consumes this existing World artifact.
       - name: Bundle the private World authority from the locked public source
         env:
@@ -96,16 +102,12 @@ jobs:
           path: ${{ runner.temp }}/eve-world-artifact/
           if-no-files-found: error
           retention-days: 1
-      - name: Compile the official Eve runtime and shared product resources offline
-        run: bash scripts/build-cloudflare-eve-image.sh
-      - name: Build the portable Node 24 image
-        run: docker build -f cloudflare/eve-runtime/Dockerfile -t mikka-eve-qualification .
   publish:
     permissions:
       contents: read
       actions: read
       id-token: write
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 60
@@ -130,6 +132,32 @@ jobs:
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
         run: node scripts/load-cloudflare-api-receipt.mjs
+      - name: Preserve the verified Workflow Postgres patch from the main driver
+        if: inputs.maintenance_workflow_postgres_patch != ''
+        env:
+          WORKFLOW_POSTGRES_PATCH_SHA256: ${{ inputs.maintenance_workflow_postgres_patch }}
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          set -euo pipefail
+          [[ "$WORKFLOW_POSTGRES_PATCH_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test -n "$MAINTENANCE_OWNER_RELEASE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
+          git show "$GITHUB_SHA:patches/@workflow__world-postgres@5.2.0.patch" > "$patch_file"
+          printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
+      - name: Preserve the reviewed hosted model call budget from the main driver
+        if: inputs.maintenance_hosted_call_budget_sha != ''
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          set -euo pipefail
+          [[ "$HOSTED_CALL_BUDGET_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test -n "$MAINTENANCE_OWNER_RELEASE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          policy="$RUNNER_TEMP/eve-reviewed-hosted-policy.ts"
+          git show "$GITHUB_SHA:lib/abuse/policy.ts" > "$policy"
+          printf '%s  %s\n' "$HOSTED_CALL_BUDGET_SHA256" "$policy" | sha256sum --check --status
       - name: Check out the original API product source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -139,6 +167,53 @@ jobs:
       - uses: ./.github/actions/pnpm-install
         with:
           skip-electron: 'true'
+      - name: Apply the verified Workflow Postgres patch
+        if: inputs.maintenance_workflow_postgres_patch != ''
+        env:
+          WORKFLOW_POSTGRES_PATCH_SHA256: ${{ inputs.maintenance_workflow_postgres_patch }}
+        run: |
+          set -euo pipefail
+          patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
+          printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
+          world=$(node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { createRequire } from 'node:module'
+          import { dirname, resolve } from 'node:path'
+          const require = createRequire(resolve('apps/eve/package.json'))
+          const root = dirname(dirname(require.resolve('@workflow/world-postgres')))
+          const installed = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+          assert.equal(installed.name, '@workflow/world-postgres')
+          assert.equal(installed.version, '5.2.0')
+          console.log(root)
+          NODE
+          )
+          patch --directory="$world" --strip=1 --fuzz=0 --forward --batch --input="$patch_file"
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=%s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256"
+      - name: Check the reviewed hosted model call budget against the accepted API source
+        if: inputs.maintenance_hosted_call_budget_sha != ''
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          policy="$RUNNER_TEMP/eve-reviewed-hosted-policy.ts"
+          printf '%s  %s\n' "$HOSTED_CALL_BUDGET_SHA256" "$policy" | sha256sum --check --status
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          const original = readFileSync('lib/abuse/policy.ts', 'utf8')
+          const reviewed = readFileSync(join(process.env.RUNNER_TEMP, 'eve-reviewed-hosted-policy.ts'), 'utf8')
+          const before = 'export const HOSTED_CALL_TIMEOUT_MS = 60_000'
+          const after = 'export const HOSTED_CALL_TIMEOUT_MS = 120_000'
+          assert.equal(original.split(before).length, 2)
+          assert.equal(reviewed, original.replace(before, after))
+          writeFileSync(join(process.env.RUNNER_TEMP, 'eve-original-hosted-policy.ts'), original)
+          NODE
       - name: Issue a short-lived credential to read the original API image
         id: registry-read
         uses: ./.github/actions/cloudflare-registry-credentials
@@ -186,7 +261,44 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Compile the official Eve runtime and shared product resources offline
-        run: bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HOSTED_CALL_BUDGET_SHA256:-}" ]]; then
+            bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
+            exit
+          fi
+          policy="$RUNNER_TEMP/eve-reviewed-hosted-policy.ts"
+          original="$RUNNER_TEMP/eve-original-hosted-policy.ts"
+          compiled="$RUNNER_TEMP/eve-hosted-call-budget-compiled.sha256"
+          rm -f "$compiled"
+          git diff --exit-code
+          git diff --cached --exit-code
+          cmp "$original" lib/abuse/policy.ts
+          printf '%s  %s\n' "$HOSTED_CALL_BUDGET_SHA256" "$policy" | sha256sum --check --status
+          restore_policy() {
+            cp "$original" lib/abuse/policy.ts
+            git diff --exit-code
+            git diff --cached --exit-code
+          }
+          trap restore_policy EXIT
+          cp "$policy" lib/abuse/policy.ts
+          bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
+          restore_policy
+          trap - EXIT
+          printf '%s\n' "$HOSTED_CALL_BUDGET_SHA256" > "$compiled"
+      - name: Verify the reviewed hosted model call budget
+        if: inputs.maintenance_hosted_call_budget_sha != ''
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+        run: |
+          set -euo pipefail
+          test "$(cat "$RUNNER_TEMP/eve-hosted-call-budget-compiled.sha256")" = "$HOSTED_CALL_BUDGET_SHA256"
+          cmp "$RUNNER_TEMP/eve-original-hosted-policy.ts" lib/abuse/policy.ts
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'MIKKA_EVE_HOSTED_CALL_BUDGET_SHA256=%s\n' "$HOSTED_CALL_BUDGET_SHA256"
       - name: Build the portable Node 24 image
         run: |
           image_tag="${RUNTIME_IMAGE_TAG:-$MIKKA_DEPLOYMENT_ID}"

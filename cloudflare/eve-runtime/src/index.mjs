@@ -1,6 +1,5 @@
-import { bindWorkersAi, configureWorkersAi } from '../../workers-ai/binding.mjs'
-import { Container, getContainer } from '@cloudflare/containers'
-import { hostConfiguration, nativeRequest } from '../runtime/config.mjs'
+import { Container } from '@cloudflare/containers'
+import { hostConfiguration, nativeRequest, singletonContainerName } from '../runtime/config.mjs'
 
 const stateKey = 'mikka:eve-host:lifecycle:v1'
 const unavailable = () => Response.json({ ok: false, error: 'coordinatorUnavailable' }, {
@@ -22,12 +21,12 @@ export class EveRuntime extends Container {
     }
     this.envVars = { ...this.configuration.runtimeEnv, MIKKA_EVE_PRODUCT_TOKEN: productCapability,
       NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt' }
-    if (env.WORKERS_AI) configureWorkersAi(this, ctx, env.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID)
+    if (env.LITELLM) this.envVars.MIKKA_LITELLM_URL = 'https://litellm.internal'
     this.labels = { component: 'eve-runtime', release: this.configuration.releaseId }
   }
 
   async bindOutboundServices() {
-    if (this.envVars.MIKKA_WORKERS_AI_CAPABILITY) await bindWorkersAi(this.ctx, this.envVars)
+    if (this.env.LITELLM) await this.ctx.container.interceptOutboundHttps('litellm.internal', this.ctx.exports.LiteLlmOutbound)
     await this.ctx.container.interceptOutboundHttps('product.internal',
       this.ctx.exports.EveProductOutbound({ props: { capability: this.envVars.MIKKA_EVE_PRODUCT_TOKEN } }))
   }
@@ -48,7 +47,7 @@ export class EveRuntime extends Container {
     try {
       const response = await super.fetch(request)
       if (response.status >= 500 && !response.headers.get('content-type')?.includes('application/json')) {
-        await response.body?.cancel()
+        if (response.body) this.ctx.waitUntil(response.body.cancel().catch(() => {}))
         return unavailable()
       }
       return response
@@ -85,8 +84,8 @@ export default {
     const forwarded = nativeRequest(request)
     if (!forwarded) return Response.json({ ok: false, error: 'notFound' }, { status: 404 })
     try {
-      const configuration = hostConfiguration(env)
-      return await getContainer(env.EVE_RUNTIME, configuration.releaseId).fetch(forwarded)
+      const { EVE_RELEASE_ID: name = singletonContainerName } = env
+      return await env.EVE_RUNTIME.getByName(name).fetch(forwarded)
     } catch {
       console.error('CF_EVE_INGRESS_UNAVAILABLE')
       return unavailable()

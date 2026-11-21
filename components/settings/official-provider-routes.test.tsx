@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { SettingsReadError } from '@/lib/settings-data'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SWRConfig, type Middleware } from 'swr'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import en from '../../messages/en.json'
 import type { BotOverviewProps } from '../slots/bot-overview-contract'
 import type { SettingsMembersProps } from '../slots/settings-members-contract'
@@ -37,7 +37,7 @@ for (const [name, member] of [
 slot('settings-organization', { OrganizationSettings: none, ORGANIZATION_SETTINGS: false })
 slot('settings-content', { SettingsContentFrame: identity })
 slot('settings-governance', { GovernancePlan: none, GovernanceUsage: none, GovernanceTemplates: none })
-mock.module('../nav/use-save-bot', { namedExports: { useSaveBot: () => async (id: string, patch: unknown) => { writes.push({ id, patch }) } } })
+mock.module('../nav/use-save-bot', { namedExports: { useSaveBot: (workspaceId: string | undefined) => async (id: string, patch: unknown) => { writes.push({ workspaceId, id, patch }) } } })
 mock.module('./settings-sidebar', { namedExports: { SettingsSidebar: none } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace, error: readError }) } })
 mock.module('@/i18n/navigation', { namedExports: { Link: identity, usePathname: () => '/settings', useRouter: () => ({}) } })
@@ -88,7 +88,7 @@ test('frame tab, standalone column and sheet expose the same Bot identity and ed
     assert.equal(overview.conversation.id, bot.id)
     assert.equal(await overview.edit.rename(' New name '), null)
   }
-  assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ id: bot.id, patch: { name: 'New name' } })))
+  assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ workspaceId: team.workspace.id, id: bot.id, patch: { name: 'New name' } })))
   render(<ContextPanel {...props} conversation={{ ...bot, kind: 'coordinator' }} />)
   assert.equal(overview?.edit, null)
 })
@@ -101,7 +101,8 @@ test('only the visible Bot tab activates library, role or computer reads', () =>
     computerScopes.length = 0
     render(<BotOverviewBody {...props} tab={tab} />)
     const reads = cacheKeys.filter(Array.isArray).map(key => key[0])
-    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-library', 'bot-public-role'] : [])
+    // 详情 also reads the Bot Profile's settings and the workspace's Environments (components/nav/use-bot-settings.ts), once.
+    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-environments', 'bot-library', 'bot-public-role', 'bot-settings'] : [])
     assert.deepEqual(computerScopes, tab === 'computer' ? [team.workspace.id] : [])
   }
 })

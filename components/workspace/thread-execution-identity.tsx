@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
-import { Cloud, Copy, KeyRound, Laptop, Plug, Server, ShieldCheck } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Cloud, Copy, KeyRound, Laptop, Plug, Server, ShieldCheck } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -17,6 +17,10 @@ import { currentThreadExecutionEvidence, readThreadExecutionEvidence, type Threa
 import { DECISION_REASONS, type DecisionReason } from '@/lib/factory/agent-profile-decision'
 import { ProfileAgentMark, ProfileMark } from '@/components/labels/profile-mark'
 import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
+import { DEFAULT_MACHINE_SIZE, machineHourlyUsd } from '@/lib/cloud-computer/machine-pricing'
+
+/** Hourly price of the default Cloudflare task machine, as shown beside it (decision 2026-11-15-1900). */
+const DEFAULT_MACHINE_PRICE = machineHourlyUsd(DEFAULT_MACHINE_SIZE).toFixed(2)
 
 export function ThreadExecutionIdentity({ runId }: { runId: string }) {
   // A different actual run closes the previous dialog and starts with no data.
@@ -113,7 +117,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       ? t('costModelSubscription', { owner: owner(model.ownerId), provider: labels.subscriptions[model.resourceId]?.provider === 'codex' ? 'ChatGPT' : 'Claude' })
       : model.kind === 'api_key' ? t('costModelApiKey', { owner: owner(model.ownerId), provider: labels.apiKeys[model.resourceId] ? keyProvider(labels.apiKeys[model.resourceId].provider, labels.apiKeys[model.resourceId].name) : t('unknown') })
       : t('costModelLogin')
-    const runtimePart = runtime.kind === 'cloudflare_sponsored' ? t('costRuntimeCloudflare') : runtime.kind === 'e2b' ? t('costRuntimeE2b', { owner: owner(runtime.ownerId, true) })
+    const runtimePart = runtime.kind === 'cloudflare_sponsored' ? t('costRuntimeCloudflare', { price: DEFAULT_MACHINE_PRICE }) : runtime.kind === 'e2b' ? t('costRuntimeE2b', { owner: owner(runtime.ownerId, true) })
       : t('costRuntimeDevice', { owner: owner(runtime.ownerId, true), device: deviceName(runtime.resourceId) })
     const mikka = model.amount === 'metered' || runtime.amount === 'metered' ? t('costMikkaMetered') : t('costMikkaFree')
     return t('costSentence', { model: modelPart, runtime: runtimePart, mikka })
@@ -121,7 +125,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
   return <div className="flex flex-col gap-6 text-sm" data-execution-evidence-run={evidence.id}>
     <dl className="flex flex-col gap-3">
       <ValueRow label={t('harness')}>{evidence.harness ? <HarnessLabel harness={evidence.harness} /> : t('unknown')}</ValueRow>
-      <ValueRow label={t('model')}>{evidence.model ? <Line><span title={evidence.model}><ModelLabel model={evidence.model} /></span>{routing && <Quiet>· {t(`routingReasons.${routing.reason}`)}</Quiet>}</Line> : t('unknown')}</ValueRow>
+      <ValueRow label={t('model')}>{evidence.model ? <Line><span title={evidence.model}><ModelLabel model={evidence.model} /></span>{routing ? <Quiet>· {t(`routingReasons.${routing.reason}`)}</Quiet> : evidence.modelFollowed ? <Quiet>· {t('modelFollowed')}</Quiet> : null}</Line> : t('unknown')}</ValueRow>
       {where && <ValueRow label={t('runsOn')}><Line><where.Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{where.name}</Line></ValueRow>}
       {identity && <ValueRow label={t('workspace')}>{labels.workspace?.name ?? t('notRecorded')}</ValueRow>}
     </dl>

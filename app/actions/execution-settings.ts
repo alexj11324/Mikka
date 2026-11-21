@@ -1,5 +1,5 @@
 "use server";
-import { headers } from "next/headers";
+import { headers } from "@/lib/server-runtime/headers";
 import { auth } from "@/lib/auth";
 import { ActionFailureError, runAction } from "@/lib/action-error";
 import type { ActionResult } from "@/lib/action-result";
@@ -20,17 +20,17 @@ export async function listBotModels() {
   return new ExecutionSettings(pool).botModels(await context());
 }
 /** The chat's bot (no bot named: the person's Coordinator, an ordinary bot row) and the scope its picker reads and saves in. */
-async function chatScope(chatBot: string | null) {
+async function chatScope(chatBot: string | null, workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
   if (chatBot !== null && !z.uuid().safeParse(chatBot).success) throw new ActionFailureError("botNotFound");
   // No bot named: the Coordinator of the workspace the person has open.
-  const botId = chatBot ?? await chatBotId(session.user.id, null, (await loadWorkspaceContext(undefined, session.user)).workspace.id);
-  return { botId, scope: await botModelScope(session.user.id, botId) };
+  const botId = chatBot ?? await chatBotId(session.user.id, null, (await loadWorkspaceContext(workspaceId, session.user)).workspace.id);
+  return { botId, scope: await botModelScope(session.user.id, botId, workspaceId) };
 }
 /** The composer's model menu for a bot, or the Coordinator (`null`). */
-export async function getBotModelMenu(chatBot: string | null) {
-  const { botId, scope } = await chatScope(chatBot);
+export async function getBotModelMenu(chatBot: string | null, workspaceId?: string) {
+  const { botId, scope } = await chatScope(chatBot, workspaceId);
   const settings = new ExecutionSettings(pool);
   // The chat menu also upgrades optional Codex Fast metadata; ordinary dispatch keeps valid legacy catalogues.
   await settings.ensureCatalogues(scope, undefined, undefined, { codexPriority: true });

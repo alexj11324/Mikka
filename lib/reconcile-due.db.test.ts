@@ -6,6 +6,7 @@ import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 import { reconcileDue } from './reconcile-due'
 import { nextScheduleDue } from './schedules/store'
 import { cleanupWorkspaceEphemera } from './coding-workspace/retention'
+import { COORDINATOR_WAKE_SCOPES_SQL, MAX_WAKE_ATTEMPTS } from './coordinator/wake-recovery'
 
 // #1371: the one safety-net check. It is true for a job only when that job has
 // work already due that its own wake or timer did not pick up, and false on an
@@ -48,6 +49,22 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     assert.deepEqual(await due(), none)
     await event(`now()-interval '1 minute',now()-interval '1 second',NULL,NULL`)
     assert.deepEqual(await due(), { ...none, wakes: true })
+    await clear()
+  })
+
+  await t.test('the wake sweep visits only chats with a due wake, never an inbox whose wakes ran out', async () => {
+    // An exhausted runtime event stays undelivered and untriaged for good. Before, the sweep re-checked
+    // every such chat on each run once any other wake was due (32 chats, 500+ statements in production).
+    const scopes = async () => (await pool.query<{ botId: string }>(COORDINATOR_WAKE_SCOPES_SQL)).rows.map(row => row.botId).sort()
+    const [exhausted, dueBot] = [randomUUID(), randomUUID()]
+    const runtimeEvent = (botId: string, attempts: number) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeAttempts")
+      VALUES ($1,'owner',$2,'run_question',$3,'{}',now()-interval '1 day',$4)`, [randomUUID(), botId, randomUUID(), attempts])
+    await runtimeEvent(exhausted, MAX_WAKE_ATTEMPTS)
+    assert.deepEqual(await due(), none)
+    assert.deepEqual(await scopes(), [])
+    await runtimeEvent(dueBot, 0)
+    assert.deepEqual(await due(), { ...none, wakes: true })
+    assert.deepEqual(await scopes(), [dueBot])
     await clear()
   })
 

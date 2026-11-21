@@ -1,19 +1,19 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
-import { Check, Copy } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Check, Copy } from '@/components/icons'
 import { MessageAction } from '@/components/ai-elements/message'
 
 /** Actions under a message (`MessageActions`): shown while its `group/message` is hovered or focused, always on a touch screen. */
-export const HOVER_ACTIONS = 'opacity-0 transition-opacity duration-150 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none'
+export const HOVER_ACTIONS = 'opacity-0 transition-opacity duration-(--motion-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none'
 
 /**
  * The actions under a reply in a chat (R-83, revised 2026-11-10): always there, like Codex — a copy button that appears
  * only on hover reads as a stray mark, and a touch screen has no hover at all. They stay quiet through the muted icon
  * colour and only raise contrast on hover or focus, so nothing appears or disappears as the pointer moves.
  */
-export const REPLY_ACTIONS = 'transition-opacity duration-150 motion-reduce:transition-none'
+export const REPLY_ACTIONS = 'transition-opacity duration-(--motion-fast) motion-reduce:transition-none'
 
 /** How long the tick stays after a copy, as under a Claude or ChatGPT reply. */
 export const COPIED_MS = 2000

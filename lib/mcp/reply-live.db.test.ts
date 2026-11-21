@@ -51,8 +51,8 @@ test('MCP waits use committed PG notifications; independent web observers still 
   const deliveries: { ownerId: string; workspaceId: string; events: unknown }[] = []
   let onSchedule = () => {}
   let deferredScheduledWork: (() => Promise<void>)[] | null = null
-  const nextServer = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
+  const nextServer = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { onSchedule(); if (deferredScheduledWork) deferredScheduledWork.push(work); else pending.push(work()) },
   } })
   const original = await import('../live/notify')

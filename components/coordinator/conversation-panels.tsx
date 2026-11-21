@@ -2,11 +2,12 @@
 
 import { TaskConversation } from '@ui-slot/task-conversation'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { authClient } from '@/lib/auth-client'
-import { findThreadIssue, type IssueThreadDetail } from '@/app/actions/agents'
+import { findThreadIssue } from '@/app/actions/agents'
+import { useIssueThreadRead } from '@/hooks/use-issue-thread-read'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/load-error'
 import { TaskDetailPlacementContext } from '@/components/slots/task-detail-contract'
@@ -17,10 +18,12 @@ import { NAVIGATE_EVENT, navigate, openThread, readLocation, rememberWorkTab, se
  * The right-hand tabs a page hands its chat when the frame owns the panel (FRAME_OWNS_PANEL): the Overview
  * and the browser travel to the conversation's work area instead of a column beside it.
  */
-export const ConversationPanels = createContext<ThreadScreenProps['panels'] | undefined>(undefined)
-export const useConversationPanels = () => useContext(ConversationPanels)
+// The context itself is a leaf module (conversation-panels-context.ts): the thread panel reads it too, and
+// importing it from here would close a cycle through the panel this file imports.
+import { ConversationPanels, useConversationPanels } from './conversation-panels-context'
+export { ConversationPanels, useConversationPanels }
 
-// The task view and a thread's conversation load with their first tab, not with the chat.
+// Load standalone work panes only when they are opened. The task conversation uses the same run renderer.
 const TaskDetail = dynamic(() => import('@/components/workspace/task-detail').then(module => module.TaskDetail), { loading: () => <TabLoading /> })
 const IssueThreadPanel = dynamic(() => import('@/components/workspace/issue-thread-panel').then(module => module.IssueThreadPanel), { loading: () => <TabLoading /> })
 
@@ -64,7 +67,7 @@ export function EmbeddedTaskDetail({ issueId, origin, onOpenTask, onFlush, onClo
   const user = session?.user
   if (!user) return <TabLoading />
   return <TaskDetailPlacementContext value={placement}>
-    <TaskDetail id={issueId} thread={null} origin={origin} user={{ id: user.id, name: user.name, email: user.email }} navigation={NO_PAGER}
+    <TaskDetail id={issueId} deferWork thread={null} origin={origin} user={{ id: user.id, name: user.name, email: user.email }} navigation={NO_PAGER}
       onOpen={onOpenTask} onSaved={lifecycle?.onSaved ?? nothing} onDirty={nothing} onClose={onClose} onDeleted={onDeleted} onRegisterFlush={registerFlush} />
   </TaskDetailPlacementContext>
 }
@@ -76,12 +79,13 @@ export function EmbeddedTaskDetail({ issueId, origin, onOpenTask, onFlush, onClo
  */
 function ThreadTab({ runId, issueId: known, name, onOpenTask, onTitle, onTask }: { runId: string; issueId?: string | null; name?: string; onOpenTask: (id: string) => void; /** A thread the chat does not know names its tab once read. */ onTitle?: (runId: string, title: string) => void; onTask: (runId: string, taskId: string | null) => void }) {
   const t = useTranslations('IssueThreads')
-  const { data: looked, error, mutate } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
-  const issueId = known ?? looked?.issueId ?? null
+  const needsLookup = known === undefined
+  const { data: looked, error, mutate } = useSWR(needsLookup ? ['thread-issue', runId] : null, () => findThreadIssue(runId))
+  const issueId = needsLookup ? looked?.issueId ?? null : known
   useThreadTitle(issueId, runId, onTitle)
-  useEffect(() => { onTask(runId, issueId) }, [runId, issueId, onTask])
-  if (!known && looked === undefined) return error ? <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div> : <TabLoading />
-  if (!known && looked === null) return <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div>
+  useEffect(() => { if (!needsLookup || looked) onTask(runId, issueId) }, [runId, issueId, needsLookup, looked, onTask])
+  if (needsLookup && looked === undefined && !error) return <TabLoading />
+  if (needsLookup && !looked) return <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div>
   const toTask = issueId ? () => onOpenTask(issueId) : undefined
   return issueId && toTask
     ? <TaskConversation key={issueId} issueId={issueId} runId={runId} name={name} onBack={toTask} onOpenThread={openThread} onOpenTask={toTask} />
@@ -90,11 +94,11 @@ function ThreadTab({ runId, issueId: known, name, onOpenTask, onTitle, onTask }:
 
 /**
  * "<code> › <title>" for a thread the chat has no source for: its name from the conversation's own read of it (the
- * panel's `issue-thread` key, read here without a fetch of its own) and its task's code.
+ * panel's shared transcript reader) and its task's code.
  */
 function useThreadTitle(issueId: string | null, runId: string, onTitle?: (runId: string, title: string) => void) {
   const on = Boolean(onTitle && issueId)
-  const { data: thread } = useSWR<IssueThreadDetail>(on ? ['issue-thread', issueId, runId] : null, null)
+  const { data: thread } = useIssueThreadRead(issueId, on ? runId : null)
   const { data: issue } = useSWR(on ? ['work-tab-issue', issueId] : null, () => import('@/app/actions/issues').then(actions => actions.getIssue(issueId!)), { revalidateOnFocus: false })
   const code = issue && !issue.error ? issue.issue.identifier : null
   const name = thread?.thread.detail?.name || thread?.thread.prompt.trim() || (issue && !issue.error ? issue.issue.title : null)
@@ -144,7 +148,12 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string, sc
     setReveal(value => ({ reveal: value.reveal + 1, revealId: `${kind}:${id}` }))
   }, [])
   const openTask = useCallback((id: string) => open('task', id), [open])
-  const openRun = useCallback((id: string) => open('thread', id), [open])
+  const [threadNames, setThreadNames] = useState<Record<string, string>>({})
+  const openRun = useCallback((id: string, issueId?: string | null, name?: string) => {
+    if (name) setThreadNames(current => current[id] === name ? current : { ...current, [id]: name })
+    if (issueId !== undefined) learnTask(id, issueId)
+    open('thread', id)
+  }, [learnTask, open])
   const [learned, setLearned] = useState<Record<string, string>>({})
   const learn = useCallback((runId: string, title: string) => setLearned(current => current[runId] === title ? current : { ...current, [runId]: title }), [])
   useEffect(() => {
@@ -173,8 +182,9 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string, sc
     const thread = names.thread(item.id)
     // A run the chat has no source for (opened from the Overview, search or another thread) learns its title once read.
     const unknown = thread.issueId === undefined
-    return { id: `thread:${item.id}`, title: (unknown && learned[item.id]) || thread.title,
-      content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId} name={thread.name} onOpenTask={openTask} onTitle={unknown ? learn : undefined} onTask={learnTask} /> }
+    const name = threadNames[item.id] ?? thread.name
+    return { id: `thread:${item.id}`, title: (unknown && (learned[item.id] || name)) || thread.title, label: name,
+      content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId === undefined ? threadTasks[item.id] : thread.issueId} name={name} onOpenTask={openTask} onTitle={unknown ? learn : undefined} onTask={learnTask} /> }
   })
   const work: ThreadScreenProps['work'] = on ? { tabs, ...reveal, beforeClose, onActiveTab } : undefined
   return { work, openTask }

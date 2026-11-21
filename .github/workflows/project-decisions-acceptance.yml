@@ -1,9 +1,6 @@
 name: Project decisions production acceptance
 # Normal smoke session; secrets stay in the hosted workload and reports contain only fixed metadata.
 on:
-  workflow_run:
-    workflows: [Web deploy]
-    types: [completed]
   workflow_dispatch:
     inputs:
       mode:
@@ -21,11 +18,7 @@ jobs:
   acceptance:
     if: >-
       github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' ||
-       (github.event.workflow_run.name == 'Web deploy' && github.event.workflow_run.event == 'push' &&
-        github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka' &&
-        contains(github.event.workflow_run.head_commit.message, '[project-map-acceptance]')))
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 55
     permissions:
@@ -33,12 +26,12 @@ jobs:
       actions: read
       id-token: write
     env:
-      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ github.sha }}
       MIKKA_PROJECT_DECISIONS_MODE: ${{ github.event.inputs.mode || 'active' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -70,7 +63,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: project-decisions-${{ github.event.workflow_run.head_sha || github.sha }}
+          name: project-decisions-${{ github.sha }}
           path: |
             project-decisions-report/attestation.json
             project-decisions-report/report.json

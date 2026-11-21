@@ -76,7 +76,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     }},
     '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
     '@/lib/background':{afterJob:()=>{calls.push('wakeScheduled')}},
-    'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
+    '@/lib/server-runtime/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/coded-error':codedErrorProtocol,
     '@mikka/protocol/device':deviceProtocol,
@@ -124,8 +124,10 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       githubMachineCredential:async()=>{credentialChecks.push('credential');throw new Error('This benchmark fixture must not open GitHub credentials')},
     },
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
-    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token',...(options.cloud?{scopeDeviceId:'device',scopeWorkspaceId:'task-workspace'}:{})}),ownedDevice:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]})},
+    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token',...(options.cloud?{scopeDeviceId:'device',scopeWorkspaceId:'task-workspace'}:{})}),ownedDevice:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,sessionOpenedAt:new Date(),sessionClosedAt:null,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
+    // These HTTPS benchmark runs carry no API-key or credits model source.
+    '@/lib/model-gateway/litellm-client':{},'@/lib/auth-config':{},'@/lib/loopback':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{assert.equal(projectLease.active,true);calls.push('token');return {token:'synthetic-test-token'}}},
     // This fixture has no connected apps; retain the actual canonical MCP metadata.
     '@/lib/app-tools-server':{runAppToolkits:async()=>[]},
@@ -155,6 +157,8 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/deployment-switches':{deploymentSwitch:(name:DeploymentSwitch)=>deploymentSwitch(name,env)},
     '@/lib/computer/native-run-binding':{nativeRunBinding:async()=>({id:'subscription',ownerId:'owner',consumerId:'agent',workspaceId:'task-workspace',modelId:'native-default',route:'codex_cli'})},
     '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
+    // The benchmark device holds its gateway session; the claim checks it inside the transaction.
+    '@/lib/device-session':{deviceSessionHeld:async()=>true},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
     '@/lib/secrets/runtime':{
       taskSecretInjection:async(workspaceId:string|null,repository:string|null,runtimeEnv:unknown,executor:unknown,ownerId:string)=>{

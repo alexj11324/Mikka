@@ -4,7 +4,7 @@ import { useAgentCopy } from '@/hooks/use-agent-copy'
 import type { AgentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/chat-app
 
-import { ChevronDown, ListTodo } from "lucide-react";
+import { ChevronDown, ListTodo } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,
@@ -303,7 +303,7 @@ const title = titleProp ?? agentCopy.taskPlan
           aria-hidden="true"
           animate={{ rotate: currentOpen ? 180 : 0 }}
           transition={reduce ? { duration: 0 } : SPRING_SWAP}
-          className="text-muted-foreground/50 transition-colors group-hover:text-muted-foreground"
+          className="text-tertiary transition-colors group-hover:text-muted-foreground"
         >
           <ChevronDown className="size-3.5" />
         </motion.span>
@@ -348,10 +348,10 @@ const title = titleProp ?? agentCopy.taskPlan
                     <span
                       className={cn(
                         "min-w-0 flex-1 truncate text-sm leading-5",
-                        status === "pending" && "text-muted-foreground/65",
+                        status === "pending" && "text-tertiary",
                         status === "in-progress" && "text-foreground",
-                        status === "completed" && "text-muted-foreground/60",
-                        status === "cancelled" && "text-muted-foreground/55",
+                        status === "completed" && "text-tertiary",
+                        status === "cancelled" && "text-tertiary",
                       )}
                     >
                       <span className="relative inline-block max-w-full">
@@ -373,7 +373,7 @@ const title = titleProp ?? agentCopy.taskPlan
                       </span>
                     </span>
                     {item.detail ? (
-                      <span className="shrink-0 text-sm text-muted-foreground/55">
+                      <span className="shrink-0 text-sm text-tertiary">
                         {item.detail}
                       </span>
                     ) : null}

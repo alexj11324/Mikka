@@ -8,7 +8,6 @@ import { stopChatTurn } from '@/lib/coordinator/stop-turn'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 
-export const dynamic = 'force-dynamic'
 
 /** `POST /api/mobile/chat/stop` with `{ botId? }`: 停止 the turn working in the chat with the Coordinator (no `botId`) or one of the person's bots. */
 async function handlePOST(request: Request) {

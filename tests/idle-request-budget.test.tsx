@@ -176,7 +176,7 @@ async function measure(page: ReactNode, beforeFirstRead?: () => Promise<void>) {
   const { SWRConfig } = await import('swr')
   const { SWRDefaults } = await import('../components/swr-defaults')
   const { LiveProvider } = await import('../hooks/use-live-key')
-  const { NextIntlClientProvider } = await import('next-intl')
+  const { NextIntlClientProvider } = await import('@/lib/intl/i18n-client')
   const { SidebarProvider } = await import('../components/ui/sidebar')
   const messages = (await import('../messages/en.json')).default
   const container = browser.document.createElement('div') as unknown as HTMLElement; document.body.append(container)
@@ -275,6 +275,25 @@ Object.assign(fixtures, {
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',
 })
+const AUTOMATION = 'b0000000-0000-4000-8000-000000000001'
+const automation = { id: AUTOMATION, owner_id: OWNER, owner_name: 'Ada', workspace_id: WORKSPACE, bot_id: null, visibility: 'workspace' as const, status: 'active' as const, version: 2, next_at: '2026-11-06T14:00:00.000Z',
+  definition: { title: 'Morning triage', timezone: 'America/New_York', timing: { kind: 'cron' as const, expression: '0 9 * * 1-5' }, task: { kind: 'dispatch_task' as const, botId: BOT, prompt: 'Triage new issues' }, misfire: 'skip' as const, maxLatenessMinutes: 30, maxConcurrent: 1 } }
+Object.assign(fixtures, {
+  'task-list.listUnreadTaskIds': () => [],
+  'task-list.countTaskListViews': () => ({ forYou: 0, assigned: 0, created: 0, mentioned: 0, all: 0 }),
+  'automations.listAutomations': () => ({ schedules: [automation], nextCursor: null }),
+  'automations.getAutomation': () => ({ automation }),
+  'automations.automationHistory': () => ({ occurrences: [{ id: 'c0000000-0000-4000-8000-000000000001', due_at: AT, started_at: AT, finished_at: AT, status: 'succeeded', attempts: 1, error: null, result: { id: ISSUE, title: 'Fix sign-in redirect', identifier: 'MIK-7' } }] }),
+  'bots.listWorkspaceBots': () => ({ bots: [{ id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }] }),
+  'bots.listBots': () => bots,
+  'bots.listBotsForWorkspace': (workspaceId: unknown) => workspaceId === WORKSPACE ? bots : [],
+  'automations.automationUsage': () => ({ timezone: 'America/New_York', maxRunsPerDay: 5, days: [{ day: '2026-11-05', runs: 2, skipped: 0, tasks: 2, costMicroUsd: 420000 }] }),
+  'bots.getWorkspaceBotDefaults': () => ({ defaultModel: null, defaultRepository: null, models: [], repositories: ['v2/github.com/acme/web'] }),
+  // The editor's Environment choice (one read when it opens).
+  // Runs as' choices (one read when the editor opens).
+  'automations.automationRunAsChoices': () => ({ members: [{ id: OWNER, name: 'Ada' }] }),
+  'project-resources.listProjectResources': () => ({ policy: { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: [], repositories: [], environmentBindings: [] }),
+})
 // A bodyless native create prewarms the mapped session without starting a turn.
 // The public v27 protocol reports tail -1 until its first delivery; resume catches up and closes while idle.
 routes['/api/agents/eve/v1/session'] = () => ({ ok: true, sessionId: 'wrun_idle_fixture' })
@@ -285,6 +304,7 @@ routes['/api/auth/get-session'] = () => ({ user: { ...person, emailVerified: tru
 routes['/api/workspace/switcher'] = () => ({ workspace: { id: WORKSPACE, name: 'Mikka' }, live, accounts: [{ id: OWNER, email: person.email, choices: [{ id: OWNER_HOME, name: 'Personal', kind: 'personal' }, { id: WORKSPACE, name: 'Mikka', kind: 'team' }] }] })
 routes['/api/pending-actions'] = () => new Response('[]', { headers: { 'content-type': 'application/json', 'x-mikka-viewer': OWNER, 'x-mikka-observed-at': AT } })
 routes['/api/approved-writes'] = () => ({ enabled: false })
+routes['/api/factory/agent-profiles'] = () => ({ profiles: [], catalog: { models: [], skills: [] }, availability: {} })
 // Sub-agent login prompts: one read on mount, then only on a subagent_events push.
 routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
@@ -292,6 +312,7 @@ routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+routes['/api/settings/issue-states'] = () => ({ states: [], canEdit: false })
 const GROUP = '90000000-0000-4000-8000-000000000001'
 const groupMessage = (position: number, authorType: 'user' | 'bot', body: string) => ({ id: `90000000-0000-4000-8000-00000000000${position + 1}`, conversationId: GROUP, position: String(position), authorType, authorId: authorType === 'user' ? OWNER : BOT, body, mentions: [], replyToId: null, createdAt: AT })
 // A bot is answering: the case that used to re-read the chat every 2.5 s.
@@ -323,6 +344,8 @@ const shows: Record<string, string[]> = {
   'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
   'subscription-settings': ['ada@example.invalid'],
   'pull-request-badge': ['#81'],
+  automations: ['Morning triage', 'Scout'],
+  'automation-editor': ['Scout', 'MIK-7'],
 }
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
@@ -376,6 +399,16 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   'pull-request-badge': async () => {
     const { IssuePullRequestLink } = await import('../components/workspace/issue-pull-request-link')
     return <IssuePullRequestLink issueId={ISSUE} pr={{ url: PULL_REQUEST, state: 'open' }} />
+  },
+  // 自动化: the list, and one automation with its history; both read again only on a schedule_list push.
+  automations: async () => {
+    const { AutomationsPage } = await import('../components/automations/automations-page')
+    // The page opens on 我的, so the reader is the fixture's creator (owner_id) for the row to be in the list.
+    return <AutomationsPage userId={OWNER} workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
+  },
+  'automation-editor': async () => {
+    const { AutomationEditor } = await import('../components/automations/automation-editor')
+    return <AutomationEditor workspaceId={WORKSPACE} userId={OWNER} id={AUTOMATION} onOpen={noop} onBack={noop} />
   },
 }
 

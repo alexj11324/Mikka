@@ -29,7 +29,7 @@ test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Co
   const composer = page.getByLabel('给 写作助手 发消息', { exact: true })
   await composer.fill('帮我起草一份周报')
   await composer.press('Enter')
-  const botChat = page.getByRole('region', { name: '与 写作助手 的对话', exact: true })
+  const botChat = page.getByRole('region', { name: '写作助手 线程', exact: true })
   await expect(botChat.getByText('帮我起草一份周报', { exact: true })).toBeVisible()
   // With no Coordinator to answer, the unanswered message reads as a failed turn, not silence.
   await expect(page.getByRole('alert').filter({ hasText: '写作助手 暂时不可用' })).toBeVisible()
@@ -108,7 +108,7 @@ test('发送失败的消息留在对话里，点重试后发出', async ({ page 
   await failed.getByRole('button', { name: '重试', exact: true }).click()
   await expect(failed).toHaveCount(0)
   // Once in the conversation; the bot list's preview line also shows the last message.
-  await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('发送失败时保留', { exact: true })).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'Coordinator 线程', exact: true }).getByText('发送失败时保留', { exact: true })).toHaveCount(1)
 })
 
 // Usability review N3: offline, a send says so (「没有网络，未发送」) and keeps 重试; back online, 重试 sends it once.
@@ -135,7 +135,7 @@ test('断网时发送的消息说明没有网络，保留重试', async ({ page,
   const failed = page.getByTestId('failed-message')
   await failed.getByRole('button', { name: '重试', exact: true }).click()
   await expect(failed).toHaveCount(0)
-  await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('断网时发出的消息', { exact: true })).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'Coordinator 线程', exact: true }).getByText('断网时发出的消息', { exact: true })).toHaveCount(1)
 })
 })
 

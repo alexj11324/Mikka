@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, type ComponentProps } from 'react'
-import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import Link from '@/lib/client-runtime/link'
+import { usePathname, useSearchParams } from '@/lib/client-runtime/navigation'
 import { isLocalSettingsNavigation, pushSettingsHistory } from '@/lib/settings-navigation'
 
 export function SettingsLink({ workspaceId, href, onNavigate, ...props }: ComponentProps<typeof Link> & { workspaceId?: string }) {

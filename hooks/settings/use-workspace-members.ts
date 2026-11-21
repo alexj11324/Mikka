@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { memberCsv } from '@/lib/invitation-csv'
 import { revokeWorkspaceInvitation, updateWorkspaceMember } from '@/app/actions/workspace'

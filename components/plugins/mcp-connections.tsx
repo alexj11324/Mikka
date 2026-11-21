@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import useSWR, { type SWRResponse } from 'swr'
-import { useTranslations } from 'next-intl'
-import { Plus, Trash2, UserRound } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Plus, Trash2, UserRound } from '@/components/icons'
 import { withBasePath } from '@/lib/base-path'
 import { settingsKeys } from '@/lib/swr/keys'
 import { ReadResponseError } from '@/lib/swr/retry'
@@ -109,6 +109,7 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
             <Badge variant="secondary">{server.transport.toUpperCase()}</Badge>
             {!server.enabled && <Badge variant="secondary">{t('paused')}</Badge>}
             {unconfirmed === server.id ? <Badge variant="secondary">{t('unconfirmed')}</Badge> : server.mine && !page.canShare ? <span className="text-xs text-muted-foreground">{t(server.shared ? 'sharedReadOnly' : 'onlyYou')}</span> : null}
+            {server.mine && server.enabled && server.transport !== 'stdio' && <McpToolList key={`${workspaceId}:${server.id}:${server.revision}`} server={server} disabled={blocked} />}
             {server.mine && page.canShare && <Label className="flex min-h-10 items-center gap-2 font-normal text-muted-foreground">
               {t('share')}
               <Switch aria-label={t('shareLabel', { name: server.name })} checked={server.shared} disabled={blocked}
@@ -132,11 +133,58 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction disabled={pending || Boolean(read.error)} onClick={() => { if (sharing) void share(sharing, true) }}>{t('confirmShare')}</AlertDialogAction>
+          <AlertDialogAction variant="default" disabled={pending || Boolean(read.error)} onClick={() => { if (sharing) void share(sharing, true) }}>{t('confirmShare')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </div>
+}
+
+type ToolPage = { serverId: string; tools: { name: string }[]; nextCursor: string | null }
+
+function McpToolList({ server, disabled }: { server: McpWorkspaceServerView; disabled: boolean }) {
+  const t = useTranslations('Settings.mcpConnections')
+  const [open, setOpen] = useState(false)
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [page, setPage] = useState<ToolPage | null>(null)
+  const [cursor, setCursor] = useState<string>()
+  const latestRead = useRef(0)
+
+  async function read(next?: string) {
+    const readId = ++latestRead.current
+    setState('loading')
+    setCursor(next)
+    try {
+      const response = await fetch(withBasePath('/api/integrations/mcp/refresh'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId: server.id, cursor: next }), signal: AbortSignal.timeout(30_000),
+      })
+      if (!response.ok) throw new ReadResponseError(response.status)
+      const result: ToolPage = await response.json()
+      if (result.serverId !== server.id || !Array.isArray(result.tools)) throw new Error('MCP tool page mismatch')
+      if (latestRead.current === readId) { setPage(result); setState('ready') }
+    } catch { if (latestRead.current === readId) setState('error') }
+  }
+
+  return <>
+    <Button variant="outline" size="sm" disabled={disabled} onClick={() => { setOpen(true); void read() }}>{t('viewTools')}</Button>
+    <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) latestRead.current++ }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t('serverTools', { name: server.name })}</DialogTitle></DialogHeader>
+        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} bare />}
+        {state === 'error' && <SettingsSaveError message={t('toolsFailed')} retryLabel={t('checkAgain')} onRetry={() => void read(cursor)} />}
+        {state === 'ready' && page && <>
+          {page.tools.length ? <ul className="max-h-64 overflow-y-auto text-sm">
+            {page.tools.map((tool, index) => <li key={index} className="break-all py-1">{tool.name}</li>)}
+          </ul> : <p className="text-sm text-muted-foreground">{t('emptyTools')}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => void read()}>{t('refreshTools')}</Button>
+            {page.nextCursor !== null && <Button onClick={() => void read(page.nextCursor!)}>{t('nextTools')}</Button>}
+          </DialogFooter>
+        </>}
+      </DialogContent>
+    </Dialog>
+  </>
 }
 
 function McpServerForm({ pending, onCancel, onCreate }: { pending: boolean; onCancel(): void; onCreate(input: McpCreateInput): void }) {
@@ -194,8 +242,8 @@ function McpServerForm({ pending, onCancel, onCreate }: { pending: boolean; onCa
       <Field>
         <FieldLabel>{t(stdio ? 'variables' : 'headers')}</FieldLabel>
         {draft.values.map((row, index) => <div className="flex items-center gap-2" key={index}>
-          <Input aria-label={t('variableName', { index: index + 1 })} maxLength={128} required autoCapitalize="off" spellCheck={false} disabled={pending} value={row.name} onChange={event => changeValue(index, 'name', event.target.value)} />
-          <Input aria-label={t('variableValue', { index: index + 1 })} type="password" autoComplete="new-password" maxLength={4096} required disabled={pending} value={row.value} onChange={event => changeValue(index, 'value', event.target.value)} />
+          <Input className="h-(--control-sm)" aria-label={t('variableName', { index: index + 1 })} maxLength={128} required autoCapitalize="off" spellCheck={false} disabled={pending} value={row.name} onChange={event => changeValue(index, 'name', event.target.value)} />
+          <Input className="h-(--control-sm)" aria-label={t('variableValue', { index: index + 1 })} type="password" autoComplete="new-password" maxLength={4096} required disabled={pending} value={row.value} onChange={event => changeValue(index, 'value', event.target.value)} />
           <Button type="button" size="icon-sm" variant="ghost" disabled={pending} aria-label={t('removeVariable', { index: index + 1 })} onClick={() => change('values', draft.values.filter((_, i) => i !== index))}><Trash2 aria-hidden="true" /></Button>
         </div>)}
         <Button type="button" size="sm" variant="secondary" className="self-start" disabled={pending || draft.values.length >= 32} onClick={() => change('values', [...draft.values, { name: '', value: '' }])}><Plus data-icon="inline-start" aria-hidden="true" />{t(stdio ? 'addVariable' : 'addHeader')}</Button>

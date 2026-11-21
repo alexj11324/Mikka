@@ -13,6 +13,8 @@ export type SponsoredTaskPlacement = Readonly<{
   botId: string
   repositoryKey: string
   requestEventId: string
+  /** The size the machine is billed at: the run's request, else its Environment's default; absent is Mikka's default. */
+  size?: import('./machine-pricing').MachineSize
 }>
 export type TaskMachineActor = { userId: string; workspaceId: string }
 type Query = Pick<PoolClient, 'query'>
@@ -30,9 +32,14 @@ type BoundRun = ResourceRun & {
 export const hostedSnapshot = 'cloudflare-task-v1'
 const denied = () => new Error('Cloudflare task machine unavailable')
 
-export function hostedTaskEnabled(workspaceId: string) {
-  const cohort = (process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES ?? '').split(',').map((id) => id.trim())
-  return Boolean(process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN) && cohort.includes(workspaceId)
+/**
+ * Cloudflare task machines are open to every workspace; they are paid from
+ * Mikka 额度 (decision 2026-11-15-1900), so an unfunded workspace is refused when
+ * the machine would start, not here. MIKKA_CLOUDFLARE_TASKS_DISABLED=1 is the
+ * kill switch.
+ */
+export function hostedTaskEnabled(_workspaceId: string) {
+  return Boolean(process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN) && process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED !== '1'
 }
 
 export async function verifySponsoredChoice(query: Query, placement: SponsoredTaskPlacement) {
@@ -50,14 +57,14 @@ export async function verifySponsoredChoice(query: Query, placement: SponsoredTa
 
 const bindingSql = `SELECT r.id,r."userId",r."workspaceId",r."issueId",r."botId",r."agentId",r."deviceId",
       r."deviceRepoId",r."baseBranch",r."agentDefinition",m."operationId",m.lifecycle->'sponsoredRestore' AS "requiredCheckpoint",
-      COALESCE((m.lifecycle->>'sponsoredUntil')::timestamptz,m."workerLeaseUntil") AS until,repo."repoPath",repo."remoteUrl"
+      COALESCE((m.lifecycle->>'sponsoredUntil')::timestamptz+CASE WHEN (m.lifecycle->>'sponsoredUnfunded')::boolean IS TRUE THEN interval '0' ELSE interval '10 minutes' END,m."workerLeaseUntil") AS until,repo."repoPath",repo."remoteUrl"
     FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=r."workspaceId" AND b."botId"=r."botId"
     JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId" AND m."issueId"=r."issueId"
     JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=r."deviceId"
     WHERE r.id=$1 AND r."userId"=$2 AND r."workspaceId"=$3 AND m."snapshotId"=$4`
 const activeSql = ` AND m.state IN ('starting','running')
-    AND COALESCE((m.lifecycle->>'sponsoredUntil')::timestamptz,m."workerLeaseUntil")>clock_timestamp()
+    AND COALESCE((m.lifecycle->>'sponsoredUntil')::timestamptz+CASE WHEN (m.lifecycle->>'sponsoredUnfunded')::boolean IS TRUE THEN interval '0' ELSE interval '10 minutes' END,m."workerLeaseUntil")>clock_timestamp()
     AND r.status IN ('queued','preparing','running','waiting_input') AND r."stopRequestedAt" IS NULL
     AND (r.status='queued' OR r."leaseExpiresAt">clock_timestamp())`
 

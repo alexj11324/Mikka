@@ -2,8 +2,8 @@
 
 import { PersonAvatar } from '@/components/person-avatar'
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowUp, Check } from 'lucide-react'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowUp, Check } from '@/components/icons'
 import type { CommentAnchor, ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

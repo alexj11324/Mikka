@@ -1,12 +1,14 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped } from './ui-policy.mjs'
+import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped, exemptFrameworkShims } from './ui-policy.mjs'
 import { auditActionBindings, auditInteractions } from './interaction-policy.mjs'
 import { auditSettingsSurface } from './settings-policy.mjs'
 import { auditIconButtons } from './icon-button-policy.mjs'
 import { auditBasePath } from './base-path-policy.mjs'
 import { auditEntityDetail, auditTaskEntry, verifyEntityContracts } from './entity-ui-policy.mjs'
 import { auditSplitPanes } from './split-pane-policy.mjs'
+import { auditControlSizes } from './control-size-policy.mjs'
+import { auditMotion } from './motion-policy.mjs'
 import { auditRepository as auditPollingRepository } from './polling-policy.mjs'
 import { auditRepository as auditErrorCauseRepository } from './error-cause-policy.mjs'
 
@@ -21,9 +23,9 @@ if (config.style !== policy.style || config.iconLibrary !== policy.iconLibrary.r
 const businessFiles = files.filter(file => !isComponentLibrarySource(file, policy))
 for (const file of businessFiles) {
   const text = readFileSync(file, 'utf8')
-  diagnostics.push(...exemptAsShipped(file, file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy), policy))
+  diagnostics.push(...exemptFrameworkShims(file, exemptAsShipped(file, file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy), policy), policy))
   if (!file.endsWith('.css')) diagnostics.push(...auditBasePath(file, text), ...auditEntityDetail(file, text), ...auditTaskEntry(file, text))
-  if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text))
+  if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text), ...auditControlSizes(file, text), ...auditMotion(file, text))
 }
 for (const file of tracked.filter(file => /^apps\/(?:mobile|desktop)\/.*\.[jt]sx?$/.test(file) && existsSync(file))) {
   diagnostics.push(...auditEntityDetail(file, readFileSync(file, 'utf8')))

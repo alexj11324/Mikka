@@ -21,7 +21,7 @@ const FUTURE = "2099-01-01T00:00:00.000Z";
 const quota = (used: number, resetsAt: string, provider = "claude") =>
   JSON.stringify({ vendor: provider === "codex" ? "codex" : "claude_code", source: "official", status: "ok", plan: provider === "codex" ? "Pro" : "Max", windows: [{ kind: "five_hour", used, resetsAt }], observedAt: new Date().toISOString() });
 
-test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run", { skip: !databaseURL }, async () => {
+test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailable, next run", { skip: !databaseURL }, async t => {
   assert.ok(["127.0.0.1", "localhost"].includes(new URL(databaseURL!).hostname));
   assert.equal(new URL(databaseURL!).pathname, "/mikka_e2e");
   const admin = new Pool({ connectionString: databaseURL });
@@ -30,30 +30,36 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` });
   try {
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,"sessionOpenedAt" timestamptz,"sessionClosedAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false,"modelSettings" jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
-    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql"])
+    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql", "20261115175552_bot_model_choices_credits_model.sql", "20261115204738_model_gateway_tokens.sql", "20261120044916_bot_settings.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
     // Resource policy still runs against real non-Org rows in this isolated schema.
     await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
     mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool), workspacePool: pool } });
-    // Points and their fallback have their own tests: here Mikka 默认 has points.
+    // The Gateway catalogue has its own tests: here Mikka 额度 offers the shipped snapshot.
+    const { CATALOG_SNAPSHOT } = await import("./model-catalog");
+    const catalogServer = await import("./model-catalog-server");
+    let readCatalogue = async () => [...CATALOG_SNAPSHOT];
+    mock.module(new URL("./model-catalog-server.ts", import.meta.url).href, { namedExports: { modelCatalog: () => readCatalogue() } });
+    // Points and their fallback have their own tests: here Mikka 额度 has points.
     let hostedPoints = 98;
-    let hostedTrial = 0;
     let pointsChoice: { kind: "api_key"; keyId: string; model: string } | null = null;
-    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => hostedPoints > 0 || hostedTrial > 0 ? null : "points_exhausted", pointsFallback: async () => pointsChoice, hostedPointsHere: async () => ({ points: hostedPoints, trialLeft: hostedTrial }) } });
+    const pointsFallback = (await import("./points-fallback")).pointsFallback;
+    let readFallback: typeof pointsFallback = async () => pointsChoice;
+    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => hostedPoints > 0 ? null : "points_exhausted", pointsFallback: (...args: Parameters<typeof pointsFallback>) => readFallback(...args), hostedPointsHere: async () => ({ points: hostedPoints }) } });
     const { ExecutionSettings } = await import("./execution-settings");
     const { botModelMenu } = await import("./bot-model-menu");
-    const { HOSTED_CHOICE } = await import("./bot-model-menu-view");
+    const { creditsOptionId } = await import("./bot-model-menu-view");
+    const CREDITS_MODEL = "anthropic/claude-sonnet-5.5", CREDITS = creditsOptionId(CREDITS_MODEL);
     const { freezeBotModel } = await import("./bot-model-selection");
     const { SubscriptionRepository } = await import("./subscription-repository");
-    const { COORDINATOR_MODEL } = await import("./coordinator/model");
 
     const settings = new ExecutionSettings(pool);
     const workspace = randomUUID(), elsewhere = randomUUID();
@@ -87,7 +93,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const bobsModel = await binding("bob", workspace, bobs, "claude-bob-fixture", "claude_cpa");
     const elsewhereModel = await binding("alice", elsewhere, otherWs, "claude-elsewhere-fixture", "claude_cpa");
 
-    // 1. Only credentials usable here: Mikka 默认, then Claude, then ChatGPT; never another person's or a disconnected one.
+    // 1. Only credentials usable here: Mikka 额度, then Claude, then ChatGPT; never another person's or a disconnected one.
     // A subscription is the person's own from any workspace once shared here (decision 2026-10-31-2130), so the
     // Claude account first connected elsewhere is listed too, after this workspace's.
     const menu = await botModelMenu(pool, settings, alice, botA);
@@ -97,7 +103,9 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.notEqual(menu.groups[1].credentialLabel, menu.groups[2].credentialLabel, "same-provider connections remain identifiable");
     assert.equal(menu.current.credentialLabel, "alice-claude@example.test");
     const listed = menu.groups.flatMap((group) => group.options.map((option) => option.id));
-    assert.deepEqual(new Set(listed), new Set([HOSTED_CHOICE, sonnet, opus, gpt, elsewhereModel]));
+    const credits = menu.groups.find((group) => group.kind === "hosted")!.options;
+    assert.deepEqual(credits.map((option) => option.modelId), CATALOG_SNAPSHOT.map((model) => model.id), "Mikka 额度 offers the catalogue");
+    assert.deepEqual(new Set(listed.filter((id) => !id.startsWith("credits:"))), new Set([sonnet, opus, gpt, elsewhereModel]));
     for (const id of [stale, bobsModel]) assert.ok(!listed.includes(id));
     // Nothing picked: the chip shows what the resolver gives the next run (Claude first), not a saved choice.
     assert.equal(menu.current.provider, "claude");
@@ -114,14 +122,66 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(inspected.preferenceState, "absent");
     assert.equal(calls.length, ordinaryQueryCount, "opt-in presence reuses the existing preference read");
     assert.deepEqual(Object.keys(menu).sort(), ["current", "groups"], "ordinary menu wire shape stays unchanged");
+    await t.test("an empty menu reuses raw credential reads in the real points fallback", async () => {
+      await pool.query(`CREATE TABLE model_order_settings ("ownerId" text,"workspaceId" uuid,location text,customized boolean,"preferredHarness" text,"autoModelRouting" boolean)`);
+      await pool.query(`INSERT INTO "user" VALUES ('empty')`);
+      const emptyScope = { ownerId: "empty", workspaceId: workspace };
+      const reads: string[] = [];
+      const snapshotPool = { query: new Proxy(pool.query, { apply(target, _receiver, args) { reads.push(String(args[0])); return Reflect.apply(target, pool, args) } }) } as Pool;
+      readFallback = pointsFallback;
+      try {
+        const empty = await botModelMenu(snapshotPool, new ExecutionSettings(snapshotPool), emptyScope, null);
+        assert.equal(empty.current.kind, "none");
+        assert.deepEqual(empty.groups.map(group => group.kind), ["hosted"]);
+        assert.equal(reads.filter(sql => sql.includes("WITH choices AS")).length, 1);
+        assert.equal(reads.filter(sql => /FROM model_api_keys WHERE/.test(sql)).length, 1);
+        assert.equal(reads.filter(sql => /FROM model_api_key_shares s/.test(sql)).length, 1);
+        assert.equal(reads.filter(sql => /FROM model_order_settings/.test(sql)).length, 1);
+      } finally { readFallback = async () => pointsChoice; }
+    });
+    await t.test("preference and credential reads finish while the hosted catalogue is pending", async () => {
+      const preferenceRead = Promise.withResolvers<void>();
+      const pendingPool = { query: new Proxy(pool.query, { apply(target, _receiver, args) {
+        const result = Reflect.apply(target, pool, args);
+        if (/FROM bot_model_choices\b/.test(String(args[0]))) void result.then(() => preferenceRead.resolve(), preferenceRead.reject);
+        return result;
+      } }) } as Pool;
+      readCatalogue = async () => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([preferenceRead.promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("preference was serialized behind catalogue")), 2000); })]);
+          return [...CATALOG_SNAPSHOT];
+        } finally { clearTimeout(timer); }
+      };
+      try { assert.deepEqual(await botModelMenu(pendingPool, new ExecutionSettings(pendingPool), alice, botA), menu); }
+      finally { readCatalogue = async () => [...CATALOG_SNAPSHOT]; }
+    });
+    await t.test("an unavailable hosted catalogue still returns the unchanged snapshot menu", async () => {
+      const original = { MIKKA_LITELLM_URL: process.env.MIKKA_LITELLM_URL, MIKKA_LITELLM_MASTER_KEY: process.env.MIKKA_LITELLM_MASTER_KEY };
+      process.env.MIKKA_LITELLM_URL = "https://catalogue.example.test";
+      process.env.MIKKA_LITELLM_MASTER_KEY = "fixture-master-key";
+      let requests = 0;
+      catalogServer.resetModelCatalogForTests();
+      readCatalogue = () => catalogServer.modelCatalog(async () => { requests++; throw new Error("catalogue unavailable"); });
+      try {
+        assert.deepEqual(await botModelMenu(pool, settings, alice, botA), menu);
+        assert.equal(requests, 1);
+      } finally {
+        for (const [name, value] of Object.entries(original)) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+        readCatalogue = async () => [...CATALOG_SNAPSHOT];
+        catalogServer.resetModelCatalogForTests();
+      }
+    });
     // Another person's bot is not this person's to pick for.
     await assert.rejects(settings.setBotModel(alice, bobBot, gpt), { code: "botNotFound" });
     await assert.rejects(settings.setBotModel(alice, botA, bobsModel), { code: "executionModelUnknown" });
     await assert.rejects(settings.setBotModel(alice, botA, stale), { code: "executionModelUnknown" });
 
-    // 2. Saved per bot: bot A takes GPT, bot B stays on the default, the Coordinator takes Mikka 默认.
+    // 2. Saved per bot: bot A takes GPT, bot B stays on the default, the Coordinator takes a Mikka 额度 model.
     await settings.setBotModel(alice, botA, gpt);
-    await settings.setBotModel(alice, null, HOSTED_CHOICE);
+    await settings.setBotModel(alice, null, CREDITS);
+    await assert.rejects(settings.setBotModel(alice, null, "credits:acme/not-in-the-catalogue"), { code: "executionModelUnknown" });
+    await assert.rejects(settings.setBotModel(alice, null, "00000000-0000-0000-0000-000000000000"), { code: "executionModelUnknown" }, "the retired 「Mikka 默认」 id is no pick");
     const a = await botModelMenu(pool, settings, alice, botA);
     const optionFor = (menu: Awaited<ReturnType<typeof botModelMenu>>, model: string) => menu.groups.flatMap((group) => group.options).find((option) => option.modelId === model)?.id;
     // The bot runs on its own copy of the binding; the menu ticks the one option for that account and model.
@@ -131,19 +191,19 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.deepEqual([b.current.provider, b.current.chosen], ["claude", false]);
     assert.equal((await botModelMenu(pool, settings, alice, botA, Date.now(), true)).preferenceState, "present");
     const coordinator = await botModelMenu(pool, settings, alice, null);
-    assert.deepEqual([coordinator.current.id, coordinator.current.kind, coordinator.current.chosen], [HOSTED_CHOICE, "hosted", true]);
+    assert.deepEqual([coordinator.current.id, coordinator.current.kind, coordinator.current.chosen, coordinator.current.name], [CREDITS, "hosted", true, "Claude Sonnet 5.5"]);
 
     // 3. The Coordinator's picker chooses a model only: no Agent (harness) in its menu.
     assert.ok(!JSON.stringify(coordinator).includes("harness"));
-    for (const option of coordinator.groups.flatMap((group) => group.options))
-      assert.deepEqual(Object.keys(option).sort(), ["id", "modelId", "provider"]);
+    for (const group of coordinator.groups) for (const option of group.options)
+      assert.deepEqual(Object.keys(option).filter((key) => !(group.kind === "hosted" && ["name", "price", "featured"].includes(key))).sort(), ["id", "modelId", "provider"]);
 
     // 4. The next run freezes the pick; a run already frozen keeps its model.
     const dependencies = { service: () => ({ repository: new SubscriptionRepository(pool) }) as never, workspace: async () => {} };
     const runA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(runA.model, "gpt-fixture");
     assert.equal((runA.modelSelection as { connectionId?: string } | undefined)?.connectionId, codex);
-    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: COORDINATOR_MODEL });
+    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: CREDITS_MODEL });
     await settings.setBotModel(alice, botA, opus);
     assert.equal(runA.model, "gpt-fixture", "the frozen run is not switched");
     const nextA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
@@ -178,6 +238,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const fresh = await connection("alice", workspace, "claude", "connected");
     assert.ok(!(await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-fresh-fixture")));
     const discovering = {
+      botModels: settings.botModels.bind(settings),
       chatModels: settings.chatModels.bind(settings),
       chatBinding: settings.chatBinding.bind(settings),
       connectedSubscriptions: settings.connectedSubscriptions.bind(settings),
@@ -238,17 +299,17 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       harness: "ai_sdk", model: "deepseek-chat",
       modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
     });
-    // Mikka 默认 picked after a key model: it is what the chip shows and what the next turn runs on, not the key
+    // A Mikka 额度 model picked after a key model: it is what the chip shows and what the next turn runs on, not the key
     // (production, 2026-11-02: the pick saved, but the old key choice won on read and the chip went back to the key).
-    const { HOSTED_CHOICE: hostedChoice } = await import("./bot-model-menu-view");
+    const hostedChoice = CREDITS;
     const hostedMenu = await chooseBotModel(pool, settings, alice, null, hostedChoice);
     assert.deepEqual([hostedMenu.current.id, hostedMenu.current.kind, hostedMenu.current.chosen, hostedMenu.current.available], [hostedChoice, "hosted", true, true]);
     assert.notEqual((await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
     assert.equal(hostedMenu.groups.find((group) => group.kind === "hosted")?.points, 98, "the points it can spend in this workspace");
-    // No points in this workspace (decision 2026-11-02-1450): not listed; the pick stays, named and unavailable, so the chat says so before sending.
+    // No points in this workspace: still listed (the picker shows no balance, decision 2026-11-15-1900); the pick stays, named and unavailable.
     hostedPoints = 0;
     const noPoints = await botModelMenu(pool, settings, alice, null);
-    assert.equal(noPoints.groups.some((group) => group.kind === "hosted"), false);
+    assert.equal(noPoints.groups.some((group) => group.kind === "hosted"), true);
     assert.deepEqual([noPoints.current.id, noPoints.current.chosen, noPoints.current.available], [hostedChoice, true, false]);
     pointsChoice = { kind: "api_key", keyId: key.id, model: "deepseek-chat" };
     const pointsMenu = await botModelMenu(pool, settings, alice, null);
@@ -258,11 +319,6 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(pointsMenu.current.credentialLabel, `····${key.last4}`);
     assert.equal((pointsRun.modelSelection as { afterPoints?: boolean })?.afterPoints, true);
     pointsChoice = null;
-    // No card yet but free messages left: listed, the tag names them.
-    hostedTrial = 12;
-    const trial = await botModelMenu(pool, settings, alice, null);
-    assert.deepEqual([trial.groups.find((group) => group.kind === "hosted")?.trialLeft, trial.current.available], [12, true]);
-    hostedTrial = 0;
     hostedPoints = 98;
     // Picking the key again moves back to it.
     keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
@@ -327,90 +383,15 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(lostKeyMenu.current.modelId, lostKeyRun.model);
     assert.equal(lostKeyMenu.current.fallback, "preference");
 
-    // Shared subscriptions are explicit model choices, not an unselectable Claude-first fallback.
+    // A subscription serves its owner only (decision 2026-11-17): a teammate's is neither listed nor choosable.
     const bob = { ownerId: "bob", workspaceId: workspace };
-    await pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]);
     await pool.query(`UPDATE byos_connections SET state='connected', paused=false, epoch=1, "removedAt"=NULL WHERE id=ANY($1::uuid[])`, [[claude, codex]]);
-    const haiku = await binding("alice", workspace, claude, "claude-haiku-5-5", "claude_cpa");
     const luna = await binding("alice", workspace, codex, "gpt-6-luna", "codex_cpa");
-    await pool.query(`UPDATE byos_connections SET "accountLabel"='PRIVATE-LOGIN-SENTINEL', quota=$3::jsonb,
-      "modelCatalog"=jsonb_build_object('revision','1','models',jsonb_build_array($2::text)) WHERE id=$1`, [claude, "claude-haiku-5-5", quota(0.2, FUTURE)]);
     await pool.query(`UPDATE byos_connections SET quota=$3::jsonb,
       "modelCatalog"=jsonb_build_object('revision','1','models',jsonb_build_array($2::text)) WHERE id=$1`, [codex, "gpt-6-luna", quota(0.2, FUTURE, "codex")]);
-    const sharedModels = await botModelMenu(pool, settings, bob, bobBot);
-    const sharedGroups = sharedModels.groups.filter(group => group.kind === "subscription" && group.owner === "Alice");
-    assert.ok(sharedGroups.some(group => group.provider === "claude" && group.options.some(option => option.modelId === "claude-haiku-5-5")));
-    assert.ok(sharedGroups.some(group => group.provider === "codex" && group.options.some(option => option.modelId === "gpt-6-luna")));
-    for (const group of sharedGroups) {
-      assert.equal(group.credentialLabel, "Alice");
-      assert.equal(group.plan, undefined);
-      for (const option of group.options) assert.deepEqual(Object.keys(option).sort(), ["id", "modelId", "provider"]);
-    }
-    assert.ok(!JSON.stringify(sharedGroups).includes("PRIVATE-LOGIN-SENTINEL"));
-    let savedShared = "";
-    for (const [id, model, connectionId, route] of [[haiku, "claude-haiku-5-5", claude, "claude_cpa"], [luna, "gpt-6-luna", codex, "codex_cpa"]]) {
-      const selected = await chooseBotModel(pool, settings, bob, bobBot, id);
-      assert.deepEqual([selected.current.kind, selected.current.modelId, selected.current.chosen, selected.current.credentialLabel], ["subscription", model, true, "Alice"]);
-      assert.equal(selected.current.quota, undefined);
-      const saved = (await pool.query(`SELECT b.* FROM bot_model_choices c JOIN byos_bindings b ON b.id=c."bindingId"
-        WHERE c."ownerId"='bob' AND c."workspaceId"=$1 AND c."botKey"=$2`, [workspace, bobBot])).rows[0];
-      savedShared = saved.id;
-      assert.deepEqual([saved.ownerId, saved.workspaceId, saved.consumerId, saved.connectionId, saved.modelId, saved.route], ["alice", workspace, bobBot, connectionId, model, route]);
-      const frozen = await freezeBotModel({ ...bob, botId: bobBot }, dependencies);
-      assert.equal(frozen.model, model);
-      assert.deepEqual(frozen.modelSelection, { type: "subscription", bindingId: saved.id, ownerId: "alice", runOwnerId: "bob",
-        consumerId: bobBot, workspaceId: workspace, connectionId, connectionRevision: 1, modelId: model, route });
-    }
-    const latestLuna = await binding("alice", workspace, codex, "gpt-6-luna", "codex_cpa");
-    await pool.query('UPDATE byos_bindings SET "createdAt"=now()+interval \'1 day\' WHERE id=$1', [latestLuna]);
-    const deduped = await botModelMenu(pool, settings, bob, bobBot);
-    assert.equal(deduped.current.id, latestLuna);
-    assert.equal(deduped.current.chosen, true);
-    const dedupedSelection = (await freezeBotModel({ ...bob, botId: bobBot }, dependencies)).modelSelection;
-    assert.equal(dedupedSelection?.type, "subscription");
-    assert.equal(dedupedSelection?.type === "subscription" ? dedupedSelection.bindingId : undefined, savedShared);
-
-    await assert.rejects(chooseBotModel(pool, settings, bob, botA, luna), { code: "botNotFound" });
-    await assert.rejects(chooseBotModel(pool, settings, { ...bob, workspaceId: elsewhere }, bobBot, luna), { code: "botNotFound" });
-    const elsewhereBot = randomUUID();
-    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId") VALUES ($1,'bob',$2)`, [elsewhereBot, elsewhere]);
-    await assert.rejects(chooseBotModel(pool, settings, { ...bob, workspaceId: elsewhere }, elsewhereBot, luna), { code: "executionModelUnknown" });
-    await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [bobBot]);
-    await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "botNotFound" });
-    await pool.query('UPDATE bots SET "archivedAt"=NULL WHERE id=$1', [bobBot]);
-
-    for (const [change, restore] of [["paused=true", "paused=false"], ["state='disconnected'", "state='connected'"],
-      ["epoch=2", "epoch=1"], ['"removedAt"=now()', '"removedAt"=NULL']]) {
-      await pool.query(`UPDATE byos_connections SET ${change} WHERE id=$1`, [codex]);
-      assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
-      await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
-      const unavailable = await botModelMenu(pool, settings, bob, bobBot);
-      assert.ok(!unavailable.groups.some(group => group.owner === "Alice" && group.options.some(option => option.modelId === "gpt-6-luna")));
-      await pool.query(`UPDATE byos_connections SET ${restore} WHERE id=$1`, [codex]);
-    }
-    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [codex, quota(1, FUTURE, "codex")]);
-    const exhaustedShared = await botModelMenu(pool, settings, bob, bobBot);
-    assert.equal(exhaustedShared.current.availability, "exhausted");
-    assert.equal(exhaustedShared.current.quota, undefined);
-    assert.ok(!JSON.stringify(exhaustedShared.current).includes(FUTURE));
-    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [codex, quota(0.2, FUTURE, "codex")]);
-
-    for (const owner of ["alice", "bob"]) {
-      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace, owner]);
-      await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna));
-      if (owner === "alice") assert.equal((await settings.pooledBindings(bob)).length, 0);
-      else await assert.rejects(settings.pooledBindings(bob), { code: "workspaceAccessDenied" });
-      await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace, owner]);
-    }
-    await pool.query(`INSERT INTO workspace_personal_policies("workspaceId",subscriptions) VALUES ($1,false)
-      ON CONFLICT("workspaceId") DO UPDATE SET subscriptions=false`, [workspace]);
+    const bobMenu = await botModelMenu(pool, settings, bob, bobBot);
+    assert.ok(!bobMenu.groups.some(group => group.kind === "subscription" && group.options.some(option => option.id === luna)), "no teammate subscription is offered");
     await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
-    assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
-    await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [workspace]);
-    await pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]);
-    await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
-    assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
-    assert.ok(!(await botModelMenu(pool, settings, bob, bobBot)).groups.some(group => group.owner === "Alice"));
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

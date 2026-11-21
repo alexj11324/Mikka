@@ -9,7 +9,7 @@ let password: { hasPassword: boolean } | { error: string } | Error
 let sessions: { sessions: { id: string; label: string; current: boolean; lastActiveAt: string }[] } | { error: string } | Error
 const actions: string[] = []
 let reads = 0
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => () => 'Read failed' } })
 mock.module('@/lib/settings-read', { namedExports: { settingsRead: async (read: string) => {
   if (read === 'sessions') {

@@ -5,6 +5,7 @@ import { act, useSyncExternalStore } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { EnvironmentsView } from '../../app/actions/environments'
+import type { ProjectSetupHistory } from '../../lib/project-resources/contracts'
 import type { saveEnvironment } from '../../app/actions/project-resources'
 
 type SaveInput = Parameters<typeof saveEnvironment>[0]
@@ -18,9 +19,11 @@ const translator = (namespace: string) => Object.assign((key: string, values?: R
   assert.equal(typeof value, 'string', `missing ${namespace}.${key}`)
   return (value as string).replace(/\{(\w+)\}/g, (match, name: string) => values?.[name] === undefined ? match : String(values[name]))
 }, { has: (key: string) => typeof lookup(`${namespace}.${key}`) === 'string' })
-mock.module('next-intl', { namedExports: { useTranslations: translator } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translator } })
 
 let state: { data?: EnvironmentsView; error?: Error }
+let history: ProjectSetupHistory
+const restores: unknown[] = []
 let server: EnvironmentsView
 let read: () => Promise<EnvironmentsView>
 let outcome: 'success' | 'business-denied' | 401 | 403
@@ -36,13 +39,19 @@ const mutate = async (...args: [EnvironmentsView?, { revalidate?: boolean }?]) =
   publish()
   return state.data
 }
-mock.module('swr', { defaultExport: (_key: unknown, fetcher: typeof read) => {
+mock.module('swr', { defaultExport: (key: unknown, fetcher: typeof read) => {
+  if (Array.isArray(key) && key[0] === 'project-setup-history') {
+    const data = useSyncExternalStore(subscribe, () => history)
+    return { data, mutate: async () => history }
+  }
   read = fetcher
   const current = useSyncExternalStore(subscribe, snapshot)
   return { ...current, mutate }
 }, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: () => undefined } })
 mock.module(new URL('../../app/actions/project-resources.ts', import.meta.url).href, { namedExports: {
+  listProjectSetupVersions: async () => { throw new Error('unexpected history read') },
+  rollbackProjectSetup: async (input: unknown) => { restores.push(input); return { id: environmentId, revision: 8 } },
   saveEnvironment: async (input: SaveInput) => {
     writes.push(structuredClone(input))
     if (outcome === 'business-denied') return { error: 'workspaceAccessDenied' }
@@ -68,11 +77,14 @@ before(async () => {
 })
 beforeEach(() => {
   const data: EnvironmentsView = { canManage: true, projects: [], environments: [{
-    id: environmentId, name: 'Private environment fixture', revision: 7, archived: false,
+    id: environmentId, name: 'Private environment fixture', revision: 7, archived: false, defaultMachineSize: null,
     configuration: { runtime: 'local', harness: 'any', variables: {}, secretIds: [], repositoryKeys: [],
       setup: { command: 'node --version', copyFiles: ['fixture.local'], approved: false } },
   }] }
   state = { data }; server = structuredClone(data)
+  restores.length = 0
+  history = { revision: 7, bindingSnapshot: 'a'.repeat(64), totalProjects: 2, before: null,
+    versions: [{ revision: 6, recordedAt: '2026-11-16T07:53:00Z', recipe: { command: 'node --help', copyFiles: [] } }] }
   outcome = 'success'; writes.length = 0; defaultWrites.length = 0
   mock.method(globalThis, 'fetch', async () => Response.json(server))
   container = browser.document.createElement('div') as unknown as HTMLDivElement
@@ -129,7 +141,7 @@ for (const failure of ['business-denied', 401, 403] as const) {
 
 test('restoring an archived environment sends archived false without editing Project defaults', async () => {
   state.data!.environments[0].archived = true
-  state.data!.projects = [{ id: projectId, name: 'Personal Project fixture', revision: 3, environmentId }]
+  state.data!.projects = [{ id: projectId, name: 'Personal Project fixture', revision: 3, environmentId, canEditProperties: true }]
   server = { ...structuredClone(state.data!), environments: [{ ...structuredClone(state.data!.environments[0]), archived: false, revision: 8 }] }
   await render()
   const restore = [...container.querySelectorAll('button')].find(button => button.textContent?.trim() === zh.Settings.environments.restore)
@@ -143,4 +155,42 @@ test('restoring an archived environment sends archived false without editing Pro
   assert.deepEqual(defaultWrites, [], 'restoration never rewrites a Project default')
   assert.equal(state.data?.projects[0].environmentId, environmentId)
   assert.equal(state.data?.environments[0].archived, false)
+})
+
+async function openHistory(canEditProperties: boolean) {
+  state.data!.projects = [{ id: projectId, name: 'Project fixture', revision: 3, environmentId, canEditProperties }]
+  server = structuredClone(state.data!)
+  await render()
+  const label = translator('Settings.environments')('historyFor', { name: 'Project fixture' })
+  const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+  assert.ok(trigger)
+  await act(async () => trigger.click())
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+  assert.ok(dialog)
+  return dialog
+}
+
+test('setup restore confirms the number and binding snapshot shown when the version was selected', async () => {
+  const dialog = await openHistory(true)
+  const t = translator('Settings.environments')
+  const restore = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === t('restoreSetup'))
+  assert.ok(restore)
+  await act(async () => restore.click())
+  const confirm = document.querySelector<HTMLElement>('[role="alertdialog"]')
+  assert.ok(confirm)
+  assert.ok(confirm.textContent?.includes(t('setupImpact', { count: 2 })))
+  history = { ...history, totalProjects: 3, bindingSnapshot: 'b'.repeat(64) }
+  await act(async () => publish())
+  assert.ok(confirm.textContent?.includes(t('setupImpact', { count: 2 })))
+  const submit = [...confirm.querySelectorAll('button')].find(button => button.textContent?.trim() === t('restoreSetup'))
+  assert.ok(submit)
+  await act(async () => submit.click())
+  assert.deepEqual(restores, [{ workspaceId, projectId, environmentId, revision: 7, version: 6, bindingSnapshot: 'a'.repeat(64) }])
+})
+
+test('a Project reader can see setup versions without a restore control', async () => {
+  const dialog = await openHistory(false)
+  assert.ok(dialog.textContent?.includes('node --help'))
+  assert.ok(![...dialog.querySelectorAll('button')].some(button => button.textContent?.trim() === zh.Settings.environments.restoreSetup))
+  assert.deepEqual(restores, [])
 })

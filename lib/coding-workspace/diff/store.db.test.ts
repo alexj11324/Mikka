@@ -57,10 +57,10 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
     const directory = new URL('../../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, directory), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { resolveReviewScope, withReviewTransaction } = await import('./authority')
     const { manifestRevision, retainDiffSnapshot, readDiffSnapshot, latestDiffSnapshot, readDiffFilePage, readStoredDiffFile, retainDiffFilePatch } = await import('./store')
@@ -230,7 +230,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       { selection: { source: 'checkpoint' } })
     const postCheckpoint = (f: CheckpointFixture, checkpoint: RunCheckpoint, token: string | null = f.token) => checkpointPOST(
       new Request(`http://127.0.0.1:3199/v1/runs/${f.runId}/checkpoint`, { method: 'POST',
-        headers: { 'content-type': 'application/json', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION,
+        headers: { 'content-type': 'application/json', 'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION,
           ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(checkpoint) }),
       { params: Promise.resolve({ runId: f.runId }) })
     async function acknowledgeCheckpoint(f: CheckpointFixture, checkpoint: RunCheckpoint, token = f.token) {

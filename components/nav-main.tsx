@@ -16,9 +16,9 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { ChevronRightIcon, type LucideIcon } from "lucide-react"
+import { ChevronRight, type IconGlyph } from "@/components/icons"
 import { Button } from '@/components/ui/button'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 export function NavMain({
   items,
@@ -26,7 +26,7 @@ export function NavMain({
   items: {
     title: string
     onClick: () => void
-    icon: LucideIcon
+    icon: IconGlyph
     isActive?: boolean
     count?: number
     items?: {
@@ -64,7 +64,7 @@ export function NavMain({
                     <SidebarMenuAction className="aria-expanded:rotate-90" />
                   }
                 >
-                  <ChevronRightIcon
+                  <ChevronRight
                   />
                   <span className="sr-only">{t('toggleStatusFilter')}</span>
                 </CollapsibleTrigger>

@@ -1,0 +1,7 @@
+{
+  "components/acceptance-entry.tsx": 1,
+  "components/auth-form.tsx": 1,
+  "components/onboarding/onboarding.tsx": 5,
+  "components/workspace/project-lifecycle-controls.tsx": 1,
+  "components/workspace/task-detail.tsx": 1
+}

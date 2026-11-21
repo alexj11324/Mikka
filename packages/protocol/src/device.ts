@@ -29,7 +29,7 @@ import { skillAssignmentReceiptSchema } from './skill-artifact'
 import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
 import { mailboxCatalogueSchema } from './mailbox'
-import { taskSecretAccessSchema, taskSecretRenewalSchema } from './task-secrets'
+import { taskSecretAccessSchema } from './task-secrets'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -49,35 +49,39 @@ export const runDecisionCatalogueSchema = z.object({
   { message: 'Prepared decision catalogue is bounded' })
 
 /**
- * A device counts as online while its last heartbeat is younger than this.
- * The daemon beats every 15 s, so this tolerates three missed beats.
+ * The daemon's local lease for a run it claimed: how long it keeps the run
+ * without a confirmed session. The server's lease follows the session
+ * ({@link SESSION_LEASE_MS}).
  */
-export const DEVICE_ONLINE_WINDOW_MS = 60_000
-
-/** Lease a claim or heartbeat grants a run (ADR 0012). */
 export const RUN_LEASE_MS = 90_000
 
-export function isDeviceOnline(
-  lastSeenAt: string | number | Date | null | undefined,
-  now = Date.now(),
-): boolean {
-  if (lastSeenAt === null || lastSeenAt === undefined) return false
-  const seen =
-    lastSeenAt instanceof Date
-      ? lastSeenAt.getTime()
-      : typeof lastSeenAt === "number"
-        ? lastSeenAt
-        : Date.parse(lastSeenAt)
-  return Number.isFinite(seen) && seen <= now && now - seen <= DEVICE_ONLINE_WINDOW_MS
+type Instant = string | number | Date | null | undefined
+const instant = (value: Instant) => value === null || value === undefined ? NaN
+  : value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(value)
+
+/** Session columns of a device row, as the gateway last reported them. */
+export interface DeviceSessionState {
+  sessionOpenedAt: Instant
+  sessionClosedAt: Instant
+}
+
+/**
+ * A device is online while its gateway socket is open: the gateway reported
+ * `connected` and has not reported `disconnected` since (decision 2026-11-17-2215).
+ */
+export function isDeviceOnline(device: DeviceSessionState): boolean {
+  const opened = instant(device.sessionOpenedAt)
+  if (!Number.isFinite(opened)) return false
+  const closed = instant(device.sessionClosedAt)
+  return !Number.isFinite(closed) || closed < opened
 }
 
 /** "设备 n/m 在线": how many of the user's devices are online. */
 export function devicesOnline(
-  devices: readonly { lastSeenAt: string | number | Date | null }[],
-  now = Date.now(),
+  devices: readonly DeviceSessionState[],
 ): { online: number; total: number } {
   return {
-    online: devices.filter((d) => isDeviceOnline(d.lastSeenAt, now)).length,
+    online: devices.filter((d) => isDeviceOnline(d)).length,
     total: devices.length,
   }
 }
@@ -88,7 +92,7 @@ const seg = encodeURIComponent
 
 export const DEVICE_ROUTES = {
   register: "/v1/devices/register",
-  heartbeat: "/v1/devices/:deviceId/heartbeat",
+  report: "/v1/devices/:deviceId/report",
   repos: "/v1/devices/:deviceId/repos",
   pendingRuns: "/v1/devices/:deviceId/runs",
   claim: "/v1/devices/:deviceId/runs/:runId/claim",
@@ -101,7 +105,7 @@ export const DEVICE_ROUTES = {
 
 export const devicePaths = {
   register: () => DEVICE_ROUTES.register,
-  heartbeat: (deviceId: string) => `/v1/devices/${seg(deviceId)}/heartbeat`,
+  report: (deviceId: string) => `/v1/devices/${seg(deviceId)}/report`,
   repos: (deviceId: string) => `/v1/devices/${seg(deviceId)}/repos`,
   pendingRuns: (deviceId: string) =>
     `/v1/devices/${seg(deviceId)}/runs?state=queued`,
@@ -186,17 +190,54 @@ export const deviceRegistered = z.object({
 })
 export type DeviceRegistered = z.infer<typeof deviceRegistered>
 
-// --- Heartbeat ------------------------------------------------------------
+// --- Device session --------------------------------------------------------
 
-/** Per-run part of the device heartbeat; the server renews the run's lease. */
-export const heartbeatRunSchema = z.object({
-  runId: id,
-  /** Last tool call, turn boundary or file change (not raw output). */
-  lastProgressAt: isoTime,
-  /** Opaque third-party capabilities, refreshed only with the existing run lease. */
-  secretCapabilities: taskSecretRenewalSchema.optional(),
-})
-export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
+/**
+ * A daemon works only while it holds its device gateway socket (decision
+ * 2026-11-17-2215). The socket is the device's session: the gateway reports
+ * when it opens and closes, and a run's lease lasts as long as that session.
+ * There is no heartbeat and no fallback poll.
+ *
+ * Every device request carries this header. A request without it, or with an
+ * older value, gets 426 `daemonUpgradeRequired`.
+ */
+export const DEVICE_SESSION_HEADER = 'x-mikka-device-session'
+export const DEVICE_SESSION_VERSION = 1
+
+/** The daemon pings its gateway socket this often; the gateway answers without waking. */
+export const DEVICE_GATEWAY_PING_MS = 10_000
+/** No message (pong or work) for this long: the daemon drops and redials the socket. */
+export const DEVICE_GATEWAY_SILENCE_MS = 30_000
+/** Redial backoff: from 0.5 s, doubling, capped at 30 s, with jitter. */
+export const DEVICE_GATEWAY_RETRY_MIN_MS = 500
+export const DEVICE_GATEWAY_RETRY_MAX_MS = 30_000
+/**
+ * The gateway reports a closed socket after this grace, unless a new socket
+ * opens first. The daemon keeps its runs for {@link DEVICE_SESSION_LOCAL_GRACE_MS}
+ * without a socket, which covers this grace plus the report.
+ */
+export const DEVICE_SESSION_CLOSE_GRACE_MS = 30_000
+export const DEVICE_SESSION_LOCAL_GRACE_MS = 60_000
+/** WebSocket close code: this daemon must update before it can be used. */
+export const DEVICE_GATEWAY_UPDATE_REQUIRED_CODE = 4001
+
+/**
+ * Upper bound of a session lease in the database. The lease really ends when
+ * the session closes; each `connected` report extends live leases again.
+ */
+export const SESSION_LEASE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Gateway → application: `POST /v1/internal/device-sessions/:deviceId`, `Bearer` the gateway push secret. */
+export const deviceSessionReportSchema = z.object({
+  state: z.enum(['connected', 'disconnected']),
+  /** When the socket opened, or closed (or last answered a ping). */
+  at: isoTime,
+  /** One value per socket; a report for an older socket never overrides a newer one. */
+  socketId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+}).strict()
+export type DeviceSessionReport = z.infer<typeof deviceSessionReportSchema>
+
+
 
 /**
  * Oldest local daemon the server serves. Older released clients cannot access
@@ -213,64 +254,51 @@ export type DaemonVersions = z.infer<typeof daemonVersionsSchema>
 export const daemonUpdateFailureSchema = z.object({ version: stableVersion, code: z.enum(['install_failed', 'restart_failed']), at: isoTime })
 export type DaemonUpdateFailure = z.infer<typeof daemonUpdateFailureSchema>
 
-/** `POST /v1/devices/:deviceId/heartbeat` */
+/**
+ * `POST /v1/devices/:deviceId/report`: what changed on the device, sent once
+ * when it changes (and once per session after the socket opens). It renews
+ * nothing; leases follow the session.
+ */
 export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update', 'uninstall']) })
 export type DeviceManagementCommand = z.infer<typeof deviceManagementCommand>
-export const deviceHeartbeatSchema = z.object({
+export const deviceReportSchema = z.object({
   completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
-  harnesses: z.array(harnessInfoSchema).max(20),
+  harnesses: z.array(harnessInfoSchema).max(20).optional(),
   computerUse: deviceComputerCapability.optional(),
   runner: deviceRunnerCapability.optional(),
   deviceType: z.enum(["laptop", "server"]).optional(),
-  runs: z.array(heartbeatRunSchema).max(500),
-  worktreeDiskBytes: z.number().int().nonnegative(),
-  /**
-   * Subscription windows read on this device. Absent when the daemon is not
-   * polling. Numbers only, never a vendor credential (ADR 0027).
-   */
+  worktreeDiskBytes: z.number().int().nonnegative().optional(),
+  /** Subscription windows read on this device. Numbers only, never a vendor credential (ADR 0027). */
   quotas: z.array(quotaSnapshotSchema).max(6).optional(),
   /** Null once no automatic update has failed since the last success. */
   updateFailure: daemonUpdateFailureSchema.nullable().optional(),
+  /** A cloud worker asks for its next token once, an hour before the current one expires. */
+  rotateCloudCredential: z.literal(true).optional(),
 })
-export type DeviceHeartbeat = z.input<typeof deviceHeartbeatSchema>
+export type DeviceReport = z.input<typeof deviceReportSchema>
 
-export const heartbeatResultSchema = z.object({
+export const deviceReportResultSchema = z.object({
   deviceCommands: z.array(deviceManagementCommand).max(1).optional(),
-  /** Renewed lease expiry per run id; a run missing here is not renewed. */
-  leases: z.record(z.string(), isoTime),
-  /** No plaintext: only grants for current owner/device/run/claim bindings. */
-  taskSecrets: z.record(z.string(), taskSecretAccessSchema).optional(),
-  /**
-   * Runs the device reported that it no longer holds: they ended on the
-   * server, or went to another attempt after the lease ran out. The daemon
-   * stops them now instead of when their lease runs out.
-   */
-  revoked: z.array(id).max(500).optional(),
   /** Short-lived cloud device token, returned only over its authenticated link. */
   cloudCredential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
-  /** A malformed value is dropped, never a failed heartbeat. */
+  cloudCredentialExpiresAt: isoTime.optional(),
+  /** A malformed value is dropped, never a failed report. */
   daemonVersions: daemonVersionsSchema.optional().catch(undefined),
 })
-export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
+export type DeviceReportResult = z.input<typeof deviceReportResultSchema>
 
-/** `GET /v1/devices/:deviceId/gateway`. Null when this server has no gateway. */
+/**
+ * `GET /v1/devices/:deviceId/gateway`: the ticket for the device session
+ * socket. A server without a gateway answers 503 `deviceGatewayRequired`; it
+ * has no devices. Work, run controls, computer reviews and Coordinator tool
+ * results are always pushed over the socket.
+ */
 export const deviceGatewaySchema = z.object({
-  url: z.string().url().nullable(),
-  protocol: z.string().regex(/^mikka-ticket-[0-9]+-[a-f0-9]{64}$/).nullable(),
-  /** This server wakes the device after every write that can end, pause or
-   * revoke one of its runs (stop, lease, credential, policy, membership), so a
-   * connected daemon needs no periodic run-control check (#1212). Absent from
-   * older servers: the daemon then keeps its one-second check. */
-  runControl: z.literal('push').optional(),
-  /** This server wakes the device when a person decides a computer review in
-   * the web, so a connected daemon syncs pending reviews only on a change or a
-   * push, plus a presence refresh (#1212). Absent from older servers: the
-   * daemon then keeps syncing every second while a review is pending. */
-  computerReviews: z.literal('push').optional(),
-  /** This server wakes the device when it writes a native Coordinator tool
-   * result, so the waiting tool asks once per push, not every 500 ms. */
-  coordinatorResults: z.literal('push').optional(),
+  url: z.string().url(),
+  protocol: z.string().regex(/^mikka-ticket-[0-9]+-[a-f0-9]{64}$/),
+  /** Cloud workers only: when the current device token expires. */
+  cloudCredentialExpiresAt: isoTime.optional(),
 })
 export type DeviceGatewayTicket = z.infer<typeof deviceGatewaySchema>
 
@@ -333,6 +361,8 @@ export const PROJECT_ENVIRONMENT_HEADER = "x-mikka-project-environment"
 
 /** Sent by a daemon that injects `modelCredential`; a run frozen on an API key is handed only to one. */
 export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
+/** Accepts a run-scoped gateway token over the same host's configured HTTP loopback origin. */
+export const MODEL_GATEWAY_LOOPBACK_HEADER = "x-mikka-model-gateway-loopback"
 /** The daemon accepts credentials prepared in the claim response (#1505). */
 export const RUN_CREDENTIALS_HEADER = "x-mikka-run-credentials"
 /** Only the first cloud claim can replace that sync's repository discovery. */
@@ -343,7 +373,8 @@ const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.t
 export const runGitHubCredentialSchema = z.object({ token: credentialKey, expiresAt: isoTime.nullable() }).strip()
 const credentialBaseUrl = z.url().max(500).refine(value => {
   const url = new URL(value)
-  return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash
+  return !url.username && !url.password && !url.search && !url.hash
+    && (url.protocol === "https:" || (url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))
 })
 
 /**
@@ -353,7 +384,13 @@ const credentialBaseUrl = z.url().max(500).refine(value => {
  */
 export const runModelCredentialSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("api_key"), key: credentialKey }).strict(),
-  z.object({ kind: z.literal("provider"), protocol: z.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict(),
+  z.object({ kind: z.literal("provider"), protocol: z.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict().refine(value => {
+    const url = new URL(value.baseUrl)
+    if (url.protocol === "https:") return true
+    const path = value.protocol === "anthropic" ? "/api/model-gateway/anthropic" : "/api/model-gateway/openai/v1"
+    return /^mkg_[A-Za-z0-9_-]{43}$/.test(value.key) && url.pathname.endsWith(path)
+      && /^(?:\/[A-Za-z0-9_-]+)*$/.test(url.pathname.slice(0, -path.length))
+  }),
 ])
 export type RunModelCredential = z.infer<typeof runModelCredentialSchema>
 
@@ -478,7 +515,7 @@ export const runAssignmentSchema = z.object({
   /** Host-owned Factory check mode; the model cannot grant a check or skip verification. */
   factoryCheck: z.object({ stage: z.enum(['review', 'verify']), inferCommand: z.boolean(), reportOnly: z.boolean() }).strict().optional(),
   factoryExecuteKind: z.enum(['repository', 'report', 'deliverable']).optional(),
-  /** Run lease; renewed through the device heartbeat. */
+  /** Run lease in the database: it lasts as long as the device session that claimed the run. */
   leaseExpiresAt: isoTime.optional(),
   /**
    * The Mikka MCP server for the agent inside this run: `report`, `ask` and
@@ -688,14 +725,13 @@ export const runCommandsResponse = z.object({
   /** Owner-scoped reads, delivered only to a daemon advertising protocol v1. */
   workspaceRequests: z.array(workspaceReadCommand).max(4).optional(),
   /**
-   * Runs queued for this device (outside `skip`), so it claims them now
-   * instead of on its next heartbeat. A queued run also ends the long-poll.
-   * Absent from older servers; the heartbeat still claims either way.
+   * Runs queued for this device (outside `skip`), so it claims them as soon
+   * as the gateway signals work.
    */
   queuedRuns: z.array(id).max(100).optional(),
   /** Only for a daemon that sent `COMMANDS_DAEMON_LATEST_PARAM`; a malformed value is dropped. */
   daemonVersions: daemonVersionsSchema.optional().catch(undefined),
-  /** The oldest pending device command (as the heartbeat's), so a person's update reaches the device now. */
+  /** The oldest pending device command, so a person's update reaches the device now. */
   deviceCommands: z.array(deviceManagementCommand).max(1).optional().catch(undefined),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>

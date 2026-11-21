@@ -1,13 +1,73 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { DRIVE_MAX_CHANGES } from './contract'
 const previousBase = process.env.MIKKA_BASE_PATH
 process.env.MIKKA_BASE_PATH = '/mikka'
 const {
   deleteDriveFile, driveFileURL, driveHeadKey, driveHistoryKey, driveVolumesKey, DriveRequestError,
-  readDriveFileHistory, readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
+  readDriveFileHistory, readDriveSkills, readDriveVolumes, readOrganizationDriveScopes, readOrganizationDriveVolumes,
+  restoreDriveVersion, uploadDriveFiles,
 } = await import('./client')
 if (previousBase === undefined) delete process.env.MIKKA_BASE_PATH
 else process.env.MIKKA_BASE_PATH = previousBase
+
+test('Project personal Files keep a separate address and cache for each Project and reader', () => {
+  const location = { workspaceId: 'workspace-a', projectId: 'project-a' }
+  const url = new URL(driveFileURL(location, 'volume', 'notes.txt'), 'https://example.invalid')
+  assert.equal(url.searchParams.get('workspaceId'), location.workspaceId)
+  assert.equal(url.searchParams.get('projectId'), location.projectId)
+  assert.notDeepEqual(driveVolumesKey(location, 'member'), driveVolumesKey('workspace-a', 'member'))
+  assert.notDeepEqual(driveHeadKey(location, 'member', 'volume'), driveHeadKey({ ...location, projectId: 'project-b' }, 'member', 'volume'))
+  assert.notDeepEqual(driveHistoryKey(location, 'member', 'volume'), driveHistoryKey(location, 'owner', 'volume'))
+})
+
+test('shared Project selection has separate request URLs and caches from each person’s Project files', () => {
+  const location = { workspaceId: 'workspace-a', projectId: 'project-a' }
+  const shared = { ...location, driveScope: 'project' as const }
+  assert.equal(new URL(driveFileURL(shared, 'volume', 'a.txt'), 'https://example.invalid').searchParams.get('driveScope'), 'project')
+  assert.equal(new URL(driveFileURL(location, 'volume', 'a.txt'), 'https://example.invalid').searchParams.has('driveScope'), false)
+  assert.notDeepEqual(driveVolumesKey(location, 'member'), driveVolumesKey(shared, 'member'))
+  assert.notDeepEqual(driveHeadKey(location, 'member', 'volume'), driveHeadKey(shared, 'member', 'volume'))
+})
+
+test('Skill metadata pages keep the explicit Drive location and literal continuation path', async () => {
+  const location = { workspaceId: 'workspace', projectId: 'project', driveScope: 'project' as const }
+  await readDriveSkills(location, { volumeId: 'volume', path: 'a #/SKILL.md' }, async target => {
+    const url = new URL(String(target), 'https://example.invalid')
+    assert.equal(url.pathname, '/mikka/api/drive/volumes')
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+      workspaceId: 'workspace', projectId: 'project', driveScope: 'project', view: 'skills', afterVolume: 'volume', afterPath: 'a #/SKILL.md',
+    })
+    return Response.json({ skills: [], nextCursor: null })
+  })
+})
+
+test('organization Drive addresses preserve combined scope filters, paging and explicit archive selection', async () => {
+  const seen: URL[] = []
+  const send: typeof fetch = async (input, init) => {
+    seen.push(new URL(String(input), 'https://example.invalid'))
+    assert.equal(init?.credentials, 'same-origin')
+    return Response.json([])
+  }
+  await readOrganizationDriveVolumes('org', { projectId: 'project', userId: 'user + 1', exactScope: true, archived: false }, send)
+  await readOrganizationDriveVolumes('org', { exactScope: false }, send)
+  await readOrganizationDriveScopes('org', { projectId: 'project', page: 2 }, send)
+  assert.deepEqual(seen.map(url => [url.pathname, Object.fromEntries(url.searchParams)]), [
+    ['/mikka/api/organizations/org/drive', { projectId: 'project', userId: 'user + 1', exactScope: 'true', archived: 'false' }],
+    ['/mikka/api/organizations/org/drive', {}],
+    ['/mikka/api/organizations/org/drive-scopes', { projectId: 'project', page: '2' }],
+  ])
+})
+
+test('Workspace Files select the team location independently of private and Project caches', () => {
+  const location = { workspaceId: 'tenant', driveScope: 'team-workspace' as const }
+  const url = new URL(driveFileURL(location, 'folder', 'notes.md'), 'https://example.invalid')
+  assert.equal(url.searchParams.get('workspaceId'), 'tenant')
+  assert.equal(url.searchParams.get('driveScope'), 'team-workspace')
+  assert.equal(url.searchParams.has('projectId'), false)
+  assert.notDeepEqual(driveVolumesKey(location, 'user'), driveVolumesKey('tenant', 'user'))
+  assert.notDeepEqual(driveVolumesKey(location, 'user'), driveVolumesKey({ workspaceId: 'tenant', projectId: 'project' }, 'user'))
+})
 
 test('file links and caches distinguish the selected tenant, account and immutable version', () => {
   const url = new URL(driveFileURL('workspace-a', 'volume', 'a b/#notes.md', 'version-1'), 'https://example.invalid')
@@ -42,6 +102,25 @@ test('an upload sends actual bytes before publishing one atomic manifest change'
     assert.equal(call.url.searchParams.get('workspaceId'), 'workspace-a')
     assert.equal(call.init.cache, 'no-store')
     assert.equal(call.init.credentials, 'same-origin')
+  }
+})
+
+test('a refused selection sends no file contents and keeps the original error', async () => {
+  const first = new File(['first'], 'notes.txt')
+  const cases = [
+    { files: [first, new File(['second'], 'notes.txt')], status: 422 },
+    { files: [first, new File(['second'], '../notes.txt')], status: 400 },
+    { files: Array<File>(DRIVE_MAX_CHANGES + 1).fill(first), status: 400 },
+  ]
+  for (const { files, status } of cases) {
+    let requests = 0
+    const send: typeof fetch = async () => {
+      requests++
+      return Response.json({ error: 'unexpected_upload' }, { status: 400 })
+    }
+    await assert.rejects(uploadDriveFiles('workspace-a', 'volume', 'head', files, 'mutation-1', send),
+      (error: unknown) => error instanceof DriveRequestError && error.code === 'drive_write_invalid' && error.status === status)
+    assert.equal(requests, 0)
   }
 })
 

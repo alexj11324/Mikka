@@ -69,12 +69,15 @@ export async function requestOrganizationResourceApproval(organizationId: string
     if (!link) throw new GovernanceError('access_denied')
     // An owner cannot erase a denial by submitting the request again.
     const [created] = await tx.insert(organizationResourceApprovals).values({ id: randomUUID(), organizationId, ...value, ownerId: userId }).onConflictDoNothing().returning({ id: organizationResourceApprovals.id })
-    const [existing] = created ? [] : await tx.select({ id: organizationResourceApprovals.id }).from(organizationResourceApprovals).where(and(
+    if (created) {
+      await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.resource_requested', targetId: created.id, metadata: { workspaceId: value.workspaceId } })
+      return created
+    }
+    const [existing] = await tx.select({ id: organizationResourceApprovals.id }).from(organizationResourceApprovals).where(and(
       eq(organizationResourceApprovals.organizationId, organizationId), eq(organizationResourceApprovals.workspaceId, value.workspaceId),
       eq(organizationResourceApprovals.kind, value.kind), eq(organizationResourceApprovals.resourceId, value.resourceId), eq(organizationResourceApprovals.ownerId, userId)))
-    const result = created ?? existing
-    await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.resource_requested', targetId: result.id, metadata: { workspaceId: value.workspaceId } })
-    return result
+    if (!existing) throw new GovernanceError('not_found')
+    return existing
   })
 }
 
@@ -82,8 +85,12 @@ export async function decideOrganizationResourceApproval(organizationId: string,
   const value = z.object({ id: z.uuid(), status: z.enum(['approved', 'denied']) }).strict().parse(input)
   await workspaceDb.transaction(async tx => {
     await requireOrganizationAdmin(tx, organizationId, actorId)
-    const [row] = await tx.update(organizationResourceApprovals).set({ status: value.status, decidedBy: actorId, updatedAt: new Date() }).where(and(eq(organizationResourceApprovals.id, value.id), eq(organizationResourceApprovals.organizationId, organizationId))).returning()
+    const approval = and(eq(organizationResourceApprovals.id, value.id), eq(organizationResourceApprovals.organizationId, organizationId))
+    const [row] = await tx.select({ status: organizationResourceApprovals.status, workspaceId: organizationResourceApprovals.workspaceId, kind: organizationResourceApprovals.kind })
+      .from(organizationResourceApprovals).where(approval).for('update').limit(1)
     if (!row) throw new GovernanceError('not_found')
+    if (row.status === value.status) return
+    await tx.update(organizationResourceApprovals).set({ status: value.status, decidedBy: actorId, updatedAt: new Date() }).where(approval)
     await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.resource_decided', targetId: value.id, metadata: { status: value.status } })
     if (value.status === 'denied') await tx.insert(organizationPolicyOutbox).values({ id: randomUUID(), organizationId, workspaceIds: [row.workspaceId], changes: { modelCredentials: row.kind !== 'mcp', mcp: row.kind === 'mcp', modelProviders: false } })
     armDueTimerAfterCommit(tx, 'audit-retention')
@@ -95,7 +102,6 @@ export async function decideOrganizationResourceApproval(organizationId: string,
 export async function retryOrganizationPolicyOutbox(organizationId?: string) {
   const { workspacePool } = await import('@/lib/workspace-db')
   const { rows } = await workspacePool.query<{ id: string; organizationId: string; workspaceIds: string[]; changes: { modelCredentials: boolean; mcp: boolean; modelProviders: boolean } }>('select id,"organizationId","workspaceIds",changes from mikka_organization_policy_outbox where "deliveredAt" is null and ($1::uuid is null or "organizationId"=$1) order by "createdAt",id limit 50', [organizationId ?? null])
-  const { stopRunsUsingSubscriptions } = await import('@/lib/personal-policy')
   const { stopRunsUsingApiKeys } = await import('@/lib/model-api-key-runs')
   const { workspaceResourcePolicy } = await import('./resource-access')
   const { stopRunsForPolicyChange, notifyStoppedPolicyRuns } = await import('@/lib/run-policy-stop')
@@ -104,7 +110,6 @@ export async function retryOrganizationPolicyOutbox(organizationId?: string) {
       const policy = await workspaceResourcePolicy(workspaceId).catch(() => null)
       if (!policy || policy.organizationId !== receipt.organizationId) continue
       if (receipt.changes.modelCredentials) {
-        await stopRunsUsingSubscriptions(pool, { workspaceId, othersOnly: true })
         await stopRunsUsingApiKeys(pool, { workspaceId, othersOnly: true })
       }
       if (receipt.changes.mcp) {

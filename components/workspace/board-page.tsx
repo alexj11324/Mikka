@@ -7,11 +7,18 @@ import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { InlineLoadError } from '@/components/load-error'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
-import { PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { PanelRightClose, PanelRightOpen, RefreshCw } from '@/components/icons'
 import type { listIssues } from '@/app/actions/issues'
+import { useTaskViewPage } from '@/hooks/use-task-view-page'
+import { countTaskListViews } from '@/app/actions/task-list'
+import { useTaskUnread } from '@/hooks/use-task-unread'
+import { useLiveKey } from '@/hooks/use-live-key'
+import { TASK_LIST_VIEWS, type TaskListView } from '@/lib/task-list-page'
+import { unstable_serialize } from 'swr'
 import { listAgents } from '@/app/actions/agents'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
+import { useIssueStates } from '@/hooks/use-issue-states'
 import type { TaskBlock } from '@/lib/task-blocked'
 import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { useListExpiry } from '@/hooks/use-list-expiry'
@@ -37,16 +44,17 @@ type FilterField = 'status' | 'priority' | 'assignee' | 'creator' | 'labels' | '
 type Filters = Partial<Record<FilterField, string[]>>
 type Sort = 'priority' | 'updated' | 'created'
 type Completed = 'all' | 'week' | 'month'
-type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: BoardColumn[] }
+type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: BoardColumn[]; grouping: 'status' | 'priority'; direction: 'desc' | 'asc'; subtasks: 'show' | 'hide' }
 
 const SIDEBAR_KEY = 'mikka:board-coordinator-open'
 const WIDE = '(min-width: 80rem)'
 const ME = 'me'
 const NONE = 'none'
-const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
+const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS, grouping: 'status', direction: 'desc', subtasks: 'show' }
 /** The Board shows every task of its workspace until the person filters it (2026-11-13-1405). */
 const NO_FILTERS: Filters = {}
-const DEFAULT_SETTINGS = { view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
+/** `listView` is the task list's tab (S1-C), read on the server; `scope` was the retired 全部 / 工作区 / 个人 segment. */
+const DEFAULT_SETTINGS = { view: 'board' as 'board' | 'list', listView: 'all' as TaskListView, display: DEFAULT_DISPLAY }
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: FilterField[] = ['status', 'priority', 'assignee', 'creator', 'labels', 'project', 'agentState']
@@ -97,7 +105,9 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, teamId, presentationRead, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
+export function BoardPage({ issues: allIssues, userId, workspaceId, teamId, presentationRead, onOpen, onUpdated, onBusyChange, onListView }: { stateKey?: string; workspaceId?: string; teamId?: string;
+  /** The task list tab in view; the page's own All paging only applies to All. */
+  onListView?: (view: TaskListView) => void
   presentationRead: { isLoading: boolean; error?: unknown; mutate: () => Promise<unknown> }
   issues: Issue[]
   userId: string
@@ -110,11 +120,24 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const tIssue = useTranslations('Issue')
   const tCommon = useTranslations('Common')
   const tWorkspace = useTranslations('Workspace')
+  const tHostedTasks = useTranslations('HostedTasks')
   const titleId = useId()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
   const { view, display } = settings
+  // The task list's tabs (S1-C). A tab other than All reads its own first page on the server, where the view narrows
+  // before the page limit; the counts span the whole authorized collection. Team boards keep their own scope: no tabs.
+  const tabs = Boolean(workspaceId && !teamId)
+  const listView: TaskListView = tabs && TASK_LIST_VIEWS.includes(settings.listView) ? settings.listView : 'all'
+  const countsKey = tabs ? ['task-list-views', userId, workspaceId!] as const : null
+  const { data: viewCounts } = useSWR(countsKey, ([, , workspace]) => countTaskListViews(workspace), { revalidateOnFocus: false, shouldRetryOnError: false })
+  // A tab other than All pages through its own server list, as All does (load more under the board).
+  const viewPage = useTaskViewPage(userId, tabs ? workspaceId : null, listView)
+  useEffect(() => { onListView?.(listView) }, [listView, onListView])
+  useLiveKey('issue_list', countsKey ? workspaceId : null, countsKey ? [unstable_serialize(countsKey)] : [], workspaceId, { minIntervalMs: 2000 })
+  const { unread, set: setUnread } = useTaskUnread(tabs ? workspaceId : null)
+  const issues = viewPage.active ? viewPage.items : allIssues
   const [legacyFilters] = useViewState<Filters | null>(LEGACY_BOARD_FILTERS_KEY, null)
   const [storedFilters, setFilters] = useViewState<Filters | null>(BOARD_FILTERS_KEY, null)
   const savedFilters = useMemo(() => storedFilters ?? migrateBoardFilters(legacyFilters) ?? NO_FILTERS, [storedFilters, legacyFilters])
@@ -156,7 +179,10 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   }, [sidebar, sheet, setSidebar])
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
-  const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
+  // The board owns the states' live subscription; every card's picker reads the same entry (decision 2026-11-19-2115).
+  useIssueStates(workspaceId, { live: true })
+  const { data: linear, mutate: refreshLinear } = useSWR(workspaceId ? ['linear-board-sync', userId, workspaceId] : null,
+    ([, , workspace]) => getLinearBoardSync(workspace), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
   const { data: agents } = useSWR('agents', () => listAgents())
@@ -211,8 +237,9 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const shown = issues
     .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(value => values.includes(value))))
     .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000)
-    .toSorted((a, b) => display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
-      : +new Date(display.sort === 'created' ? b.createdAt : b.updatedAt) - +new Date(display.sort === 'created' ? a.createdAt : a.updatedAt))
+    .filter(issue => display.subtasks === 'show' || !issue.metadata.parentId)
+    .toSorted((a, b) => (display.direction === 'asc' ? -1 : 1) * (display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
+      : +new Date(display.sort === 'created' ? b.createdAt : b.updatedAt) - +new Date(display.sort === 'created' ? a.createdAt : a.updatedAt)))
   const count = (column: BoardColumn) => shown.filter(issue => column === BLOCKED_COLUMN ? blocks.has(issue.id) : issue.status === column && !blocks.has(issue.id)).length
   const columns = BOARD_COLUMNS.map(column => column.value).filter(column => !display.hidden.includes(column) && (display.showEmpty || count(column) > 0))
 
@@ -240,11 +267,11 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const activeFilters = (Object.entries(filters) as [FilterField, string[]][]).filter(([, values]) => values?.length)
 
   const discuss = (issue: Issue) => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }
-  const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
+  const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated(); void refreshLinear() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
   const panelButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
   // The template's own menus (the `board` slot's BoardScreen) carry the filters and the 显示 options.
-  // No tabs: the board holds every task of its workspace, and one tab that does nothing reads as a broken filter.
-  const scopes: { id: string; label: string; count: number }[] = []
+  // The task list's tabs (S1-C), each narrowed on the server; a team board has none.
+  const scopes: { id: string; label: string; count: number }[] = tabs ? TASK_LIST_VIEWS.map(id => ({ id, label: t(`views.${id}`), count: viewCounts?.[id] ?? 0 })) : []
   const filterItems: BoardMenuItem[] = [
     ...FILTER_FIELDS.map((field): BoardMenuItem => field === 'creator'
       ? { label: t(`filterField.${field}`), checked: filters.creator?.includes(ME) ?? false, onSelect: () => toggleFilter(field, ME) }
@@ -255,6 +282,9 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const sortItems: BoardMenuItem[] = [
     ...(['priority', 'updated', 'created'] as const).map(value => ({ label: t(`sortBy.${value}`), checked: display.sort === value, onSelect: () => setDisplay({ sort: value }) })),
     { label: t('completed'), divider: true, submenu: (['week', 'month', 'all'] as const).map(value => ({ label: t(`completedRange.${value}`), checked: display.completed === value, onSelect: () => setDisplay({ completed: value }) })) },
+    { label: t('grouping'), divider: true, submenu: (['status', 'priority'] as const).map(value => ({ label: t(`groupBy.${value}`), checked: display.grouping === value, onSelect: () => setDisplay({ grouping: value }) })) },
+    { label: t('direction'), submenu: (['desc', 'asc'] as const).map(value => ({ label: t(`directionValue.${value}`), checked: display.direction === value, onSelect: () => setDisplay({ direction: value }) })) },
+    { label: t('subtasks'), submenu: (['show', 'hide'] as const).map(value => ({ label: t(`subtasksValue.${value}`), checked: display.subtasks === value, onSelect: () => setDisplay({ subtasks: value }) })) },
     { label: t('cardProperties'), submenu: CARD_PROPERTIES.map(property => ({ label: t(`property.${property}`), checked: display.properties.includes(property), onSelect: () => setDisplay({ properties: display.properties.includes(property) ? display.properties.filter(item => item !== property) : [...display.properties, property] }) })) },
   ]
 
@@ -265,11 +295,18 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
 
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      <h1 id={titleId} className="sr-only">{t('title')}</h1>
-      {readNotice ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
-        view={view} onView={next => update({ view: next })} scopes={scopes} scope="all" onScope={() => {}}
+      {/* R-100: the page's title, at the size 设置 and the other rail pages use, so switching pages does not move it. */}
+      <h1 id={titleId} className="shrink-0 px-6 pt-4 text-xl font-semibold text-foreground">{t('title')}</h1>
+      {readNotice ?? (viewPage.active && viewPage.error ? <InlineLoadError message={tWorkspace('listError')} retryLabel={tCommon('retry')} onRetry={() => { void viewPage.retry() }} /> : null) ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
+        view={view} onView={next => update({ view: next })} scopes={scopes} scope={listView} onScope={next => { if ((TASK_LIST_VIEWS as readonly string[]).includes(next)) update({ listView: next as TaskListView }) }}
+        grouping={display.grouping} unread={unread} onUnread={tabs ? (task, next) => { void setUnread(task.id, next) } : undefined}
         filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
         onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />}
+      {viewPage.active && !viewPage.error && viewPage.hasMore && <div className="flex shrink-0 justify-center p-2">
+        <Button variant="ghost" size="sm" disabled={viewPage.loading} onClick={() => void viewPage.loadMore()}>
+          {viewPage.failed ? tCommon('retry') : tHostedTasks('loadMore')}
+        </Button>
+      </div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
@@ -286,6 +323,6 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
         <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { setSheet(false); onOpen(id) }} />
       </SheetContent>
     </Sheet>
-    <NewTaskDialog teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} initialIntent="create_only" onCreated={id => { void onUpdated(); onOpen(id) }} />
+    <NewTaskDialog readerId={userId} teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onCreated={id => { void onUpdated(); onOpen(id) }} onAdded={() => { void onUpdated() }} />
   </div>
 }

@@ -57,8 +57,8 @@ function fixture(options = {}) {
   const choice = (bot, override = {}) => ({ id: id(bot.harness === 'codex' ? 21 : 20), provider: bot.harness === 'codex' ? 'codex' : 'claude',
     modelId: bot.harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', kind: 'subscription', chosen: true, available: true, ...override })
   const menu = bot => ({ groups: [
-    { kind: 'subscription', provider: 'claude', owner: 'shared owner private canary', options: [{ id: id(20), provider: 'claude', modelId: 'claude-haiku-5-5' }] },
-    { kind: 'subscription', provider: 'codex', owner: 'shared owner private canary', options: [{ id: id(21), provider: 'codex', modelId: 'gpt-6-luna' }] },
+    { kind: 'subscription', provider: 'claude', options: [{ id: id(20), provider: 'claude', modelId: 'claude-haiku-5-5' }] },
+    { kind: 'subscription', provider: 'codex', options: [{ id: id(21), provider: 'codex', modelId: 'gpt-6-luna' }] },
   ], current: bot.harness ? choice(bot, options.fallbackHarness === bot.harness ? { fallback: 'quota', kind: 'apiKey' } : {}) : { kind: 'hosted' } })
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), path = url.pathname.replace(/^\/mikka/, ''), method = init.method ?? 'GET'
@@ -101,6 +101,14 @@ function fixture(options = {}) {
     if (path.startsWith('/api/bots/')) {
       const bot = bots.get(path.slice('/api/bots/'.length)); assert.ok(bot)
       return response({ id: bot.id, name: options.wrongBotName ? 'not the current fixture' : bot.name })
+    }
+    if (path === '/api/agents/eve/v1/session') {
+      assert.equal(method, 'POST'); assert.equal(selected, TEAM)
+      const bot = bots.get(url.searchParams.get('botId')); assert.ok(bot); assert.notEqual(bot.id, OLD_BOT)
+      assert.deepEqual(body.clientContext, { expectedOwnerId: OWNER, expectedWorkspaceId: TEAM })
+      assert.match(headers.get('x-mikka-submission-id'), /^[a-f0-9-]{36}$/)
+      assert.match(body.message, /不要调用工具/); assert.equal(body.message.includes('MEMORY1821_'), false, 'the model must retrieve the value, not repeat it from the prompt')
+      bot.queued = true; return response(options.invalidSubmitReceipt ? { queued: true } : { ok: true, sessionId: 'wrun_memory', deliveryId: headers.get('x-mikka-submission-id') }, options.submitStatus ?? 202)
     }
     if (path === '/api/coordinator/stream') {
       const bot = bots.get(url.searchParams.get('botId')); assert.ok(bot?.queued); streamReads++
@@ -164,12 +172,6 @@ function fixture(options = {}) {
     if (action === 'execution-settings.chooseBotModel') {
       const bot = bots.get(args[0]); assert.notEqual(bot.id, OLD_BOT); assert.ok([id(20), id(21)].includes(args[1]))
       bot.harness = args[1] === id(21) ? 'codex' : 'claude_code'; return reply({ ok: true, data: menu(bot) })
-    }
-    if (action === 'coordinator.sendCoordinatorMessage') {
-      const bot = bots.get(args[2]); assert.ok(bot); assert.notEqual(bot.id, OLD_BOT)
-      assert.equal(args[9], TEAM); assert.equal(args[4], undefined); assert.equal(args[8], undefined)
-      assert.match(args[0], /不要调用工具/); assert.equal(args[0].includes('MEMORY1821_'), false, 'the model must retrieve the value, not repeat it from the prompt')
-      bot.queued = true; return reply({ ok: true, data: { queued: true } })
     }
     if (action === 'coordinator.pollCoordinatorChat') { const bot = bots.get(args[0]); assert.notEqual(bot.id, OLD_BOT); return reply({ botId: bot.id, working: false, error: bot.error ?? null, items: [] }) }
     if (action === 'coordinator.stopCoordinatorTurn') {
@@ -259,7 +261,7 @@ test('a fixture-only retry reuses both proven subscription cases without another
   const f = fixture({ notificationFixture: true, reusedModels: true }), report = await f.run()
   assert.equal(report.status, 'passed', JSON.stringify(report)); assert.equal(report.completeAcceptance, true)
   assert.deepEqual(report.models.map(row => row.status), ['reused', 'reused'])
-  assert.equal(f.calls.some(row => ['bots.createBot', 'execution-settings.chooseBotModel', 'coordinator.sendCoordinatorMessage'].includes(row.action)), false)
+  assert.equal(f.calls.some(row => ['bots.createBot', 'execution-settings.chooseBotModel'].includes(row.action) || row.path === '/api/agents/eve/v1/session'), false)
   assert.equal(f.state().streamReads, 0); assert.equal(report.pending.status, 'passed')
   assert.equal(report.cleanup.factRemoved, true); privateOutput(report)
 })
@@ -272,7 +274,7 @@ test('expiry after pending scope or rejection blocks approval and paid work whil
     assert.equal(report.pending.status, 'failed'); assert.equal(report.pending.cleaned, true); assert.equal(report.pending.inboxCleaned, true)
     assert.equal(f.calls.some(call => call.action === 'memory.reviewFact' && call.args[0] === NOTIFIED_FACT
       && call.args[1] === 'approve' && call.workspace === PERSONAL), false)
-    assert.equal(f.calls.some(call => ['bots.createBot', 'execution-settings.chooseBotModel', 'coordinator.sendCoordinatorMessage'].includes(call.action)), false)
+    assert.equal(f.calls.some(call => ['bots.createBot', 'execution-settings.chooseBotModel'].includes(call.action) || call.path === '/api/agents/eve/v1/session'), false)
     assert.ok(f.calls.some(call => call.action === 'memory.removeFact' && call.args[0] === NOTIFIED_FACT))
     assert.equal(f.calls.filter(call => call.path === '/api/inbox' && call.method === 'POST').length, 1)
     assert.equal(f.facts.get(NOTIFIED_FACT).state, 'deleted'); assert.equal(f.facts.get(NOTIFIED_FACT).source, null)
@@ -316,7 +318,7 @@ test('an expired selected window prevents the next business write but exact owne
   const f = fixture({ windowExpiredAfterCreate: true }), report = await f.run()
   assert.equal(report.status, 'failed')
   assert.equal(f.calls.filter(row => row.action === 'memory.addFact').length, 1)
-  assert.equal(f.calls.some(row => row.action === 'coordinator.sendCoordinatorMessage'), false)
+  assert.equal(f.calls.some(row => row.path === '/api/agents/eve/v1/session'), false)
   assert.equal(f.facts.get(FACT).state, 'deleted'); assert.equal(f.facts.get(PENDING).reviewStatus, 'pending')
   assert.equal(report.cleanup.factRemoved, true); assert.equal(report.cleanup.workspaceRestored, true)
   assert.equal(report.cleanup.sessionRevoked, true); privateOutput(report)
@@ -325,7 +327,7 @@ test('an expired selected window prevents the next business write but exact owne
 test('a timed-out business budget cannot block stopping an already-created Bot or final owner cleanup', async () => {
   const f = fixture({ budgetExpiredAfterStream: true }), report = await f.run()
   assert.equal(report.status, 'failed')
-  assert.equal(f.calls.filter(row => row.action === 'coordinator.sendCoordinatorMessage').length, 1)
+  assert.equal(f.calls.filter(row => row.path === '/api/agents/eve/v1/session').length, 1)
   assert.equal(f.calls.filter(row => row.action === 'coordinator.stopCoordinatorTurn').length, 1)
   assert.equal(report.models[0].botStopped, true); assert.equal(report.cleanup.factRemoved, true)
   assert.equal(report.cleanup.workspaceRestored, true); assert.equal(report.cleanup.sessionRevoked, true)
@@ -378,7 +380,7 @@ test('a provider code cannot downgrade missing usage after a committed reply to 
 test('an API-key fallback is refused before sending that model path, while the other subscription proceeds', async () => {
   const f = fixture({ fallbackHarness: 'claude_code' }), report = await f.run()
   assert.equal(report.status, 'partial'); assert.deepEqual(report.models.map(row => row.status), ['blocked', 'passed'])
-  assert.equal(f.calls.filter(row => row.action === 'coordinator.sendCoordinatorMessage').length, 1)
+  assert.equal(f.calls.filter(row => row.path === '/api/agents/eve/v1/session').length, 1)
   assert.equal(f.state().streamReads, 1); privateOutput(report)
 })
 
@@ -434,38 +436,42 @@ test('stream success requires a committed exact reply; a tool, provider error or
   assert.deepEqual(value, { committedReply: true, workflowFingerprint: createHash('sha256').update('wrun_Fixture123').digest('hex') })
 })
 
-test('the normal main/Web guard includes the memory issue without a dispatch or credential bypass', async () => {
+test('the main-dispatch live-build guard includes the memory issue without a relabelled event or credential bypass', async () => {
   assert.ok(CORE_ISSUES.includes(1821))
   const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }, api = 'https://api.github.com/repos/alexj11324/Mikka'
   const env = { MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY: repository.full_name, GITHUB_REPOSITORY_OWNER: 'alexj11324',
-    GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_SHA: SHA, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: SHA, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_WORKFLOW_REF: repository.full_name + '/' + CORE_WORKFLOW + '@refs/heads/main', GH_TOKEN: 'synthetic-token' }
-  const release = { id: 51, run_attempt: 1, repository, head_repository: repository, event: 'push', head_branch: 'main', head_sha: SHA,
-    name: 'Web deploy', path: '.github/workflows/web-deploy.yml', status: 'completed', conclusion: 'success', url: api + '/actions/runs/51' }
-  const event = { action: 'completed', repository, workflow_run: release }
+  const event = { repository }
   const fetchImpl = async input => {
     const url = new URL(input), path = url.href.slice(api.length)
     if (url.origin === 'https://app.aspectlylabs.com') return response({ build: SHA })
     if (path.startsWith('/issues/')) { const number = Number(path.slice(8)); return response({ number, url: url.href, repository_url: api, state: number === 1821 ? 'open' : 'closed' }) }
     if (path === '/actions/runs/17') return response({ id: 17, run_attempt: 1, repository, head_repository: repository,
-      url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SHA, status: 'in_progress', conclusion: null })
+      url: url.href, path: CORE_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: SHA, status: 'in_progress', conclusion: null })
     if (path === '/git/ref/heads/main') return response({ ref: 'refs/heads/main', object: { type: 'commit', sha: SHA } })
-    if (path === '/actions/runs/51') return response(release)
-    if (path.endsWith('/attempts/1/jobs?per_page=100')) return response({ total_count: 1, jobs: [{ id: 61, name: 'deploy', run_id: 51, head_sha: SHA,
-      status: 'completed', conclusion: 'success', steps: ['Verify the official runtime stays on the cloud edition',
-        'Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-        'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })) }] })
     assert.fail('unexpected target metadata request')
   }
   const proof = await attestCoreProduction({ env, event, fetchImpl, now: () => NOW })
   assert.equal(proof.status, 'ready'); assert.deepEqual(proof.openIssues, [1821])
-  await assert.rejects(attestCoreProduction({ env: { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch' }, event, fetchImpl, now: () => NOW }))
+  await assert.rejects(attestCoreProduction({ env: { ...env, GITHUB_EVENT_NAME: 'push' }, event, fetchImpl, now: () => NOW }))
   const workflow = yaml.load(await readFile(new URL('../../.github/workflows/self-hosted-production.yml', import.meta.url), 'utf8'))
-  assert.equal(workflow.on.workflow_dispatch, undefined)
+  assert.equal(workflow.on.workflow_run, undefined, 'per-service releases publish no Web deploy run to follow')
+  assert.ok('workflow_dispatch' in workflow.on)
   assert.ok(workflow.concurrency.group.includes('production-smoke-owner-acceptance'))
   assert.equal(workflow.concurrency.queue, 'max'); assert.equal(workflow.concurrency['cancel-in-progress'], false)
   assert.ok(workflow.jobs.guards.steps.some(step => step.run?.includes('memory-production.test.mjs')))
   assert.ok(workflow.jobs.acceptance.steps.some(step => step.run === 'node --import tsx scripts/acceptance/memory-production.mjs'))
   assert.deepEqual(Object.keys(workflow.jobs.acceptance.permissions).sort(), ['actions', 'contents', 'id-token', 'issues', 'pull-requests'])
   assert.equal(workflow.jobs.acceptance.permissions['pull-requests'], 'read')
+})
+
+test('native sends reject non-202 and malformed acceptance receipts', async () => {
+  for (const options of [{ submitStatus: 200 }, { invalidSubmitReceipt: true }]) {
+    const f = fixture(options), report = await f.run()
+    assert.equal(report.models.every(row => row.status === 'failed'), true)
+    assert.equal(f.state().streamReads, 0)
+    assert.equal(report.cleanup.factRemoved, true)
+    privateOutput(report)
+  }
 })

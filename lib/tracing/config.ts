@@ -18,12 +18,12 @@ export function traceEnvironment(env: Env = process.env): TraceEnvironment {
 }
 
 /**
- * Head sampling rate between 0 and 1. Tests, CI and `next build` always get 0
- * (no tracer at all); otherwise MIKKA_TRACE_SAMPLE_RATE, default 10%.
- * Vercel sets CI during its build only, so a deployment's functions still trace.
+ * Head sampling rate between 0 and 1. Tests and CI always get 0 (no tracer at
+ * all); otherwise MIKKA_TRACE_SAMPLE_RATE, default 10%. Vercel sets CI during
+ * its build only, so a deployment's functions still trace.
  */
 export function traceSampleRate(env: Env = process.env): number {
-  if (env.NODE_ENV === 'test' || env.NEXT_PHASE === 'phase-production-build') return 0
+  if (env.NODE_ENV === 'test') return 0
   if (env.CI && !env.VERCEL) return 0
   const raw = env.MIKKA_TRACE_SAMPLE_RATE?.trim()
   if (!raw) return DEFAULT_SAMPLE_RATE

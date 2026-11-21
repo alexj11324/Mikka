@@ -19,7 +19,7 @@ test('NextResponse JSON preserves HTTP status after FastResponse headers and bod
   const NativeResponse = globalThis.Response
   Object.defineProperty(globalThis, 'Response', { configurable: true, writable: true, value: FastResponse })
   try {
-    const { NextResponse } = await import('../compat/server')
+    const { NextResponse } = await import('@/lib/server-runtime/server')
     const { createApiHandler } = await import('./application')
     assert.equal(Object.getPrototypeOf(NextResponse), FastResponse)
     const makeResponse = (entry: typeof cases[number]) => NextResponse.json(entry.body, {

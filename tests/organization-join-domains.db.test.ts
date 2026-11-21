@@ -54,6 +54,24 @@ test('Verified domain admission stays within the chosen Organization', { skip: !
     assert.deepEqual(await domains.listAllowedDomains(a, owner.id), { domains: [one.domain] })
     assert.notEqual((await domains.addAllowedDomain(b, owner, { domain })).domain.id, aDomainId)
   })
+  await t.test('the grant receipt survives audit retention and removal returns the same scoped rule once', async () => {
+    const response = await domains.addAllowedDomain(b, owner, { domain })
+    const id = response.domain.id
+    const { rows: [event] } = await db.query(
+      'select "actorId", "createdAt" from mikka_organization_audit_events where "organizationId"=$1 and "targetId"=$2 and action=$3',
+      [b, id, 'organization.join_domain_added'])
+    assert.equal(response.domain.createdByUserId, event.actorId)
+    assert.equal(response.domain.createdByUserId, owner.id)
+    assert.deepEqual(response.domain.createdAt, event.createdAt)
+    assert.deepEqual(response.domain.updatedAt, response.domain.createdAt)
+    await db.query('delete from mikka_organization_audit_events where "organizationId"=$1 and "targetId"=$2', [b, id])
+    assert.deepEqual((await domains.listAllowedDomains(b, owner.id)).domains, [response.domain])
+    assert.deepEqual(await domains.removeAllowedDomain(a, id, owner.id), { removed: true, domain: null })
+    assert.deepEqual(await domains.removeAllowedDomain(b, id, owner.id), { removed: true, domain: response.domain })
+    assert.deepEqual(await domains.removeAllowedDomain(b, id, owner.id), { removed: true, domain: null })
+    const replacement = await domains.addAllowedDomain(b, owner, { domain })
+    assert.notEqual(replacement.domain.id, id)
+  })
   await t.test('discover only exact matches and independently choose one organization', async () => {
     assert.deepEqual((await domains.listJoinableOrganizations(visitor, sessionId)).organizations.map(row => row.id), [a, b])
     for (const user of [wrong, unverified, webmail, { ...wrong, email: visitor.email }]) {

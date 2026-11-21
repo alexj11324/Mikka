@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useReducer, useRef, useState } from 'react'
-import type { useTranslations } from 'next-intl'
+import type { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import {
   CHAT_FILE_MAX_BYTES,

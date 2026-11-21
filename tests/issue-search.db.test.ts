@@ -1,4 +1,3 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -82,7 +81,8 @@ test('indexed workspace-isolated relation search beyond 101 tasks, paging and gr
       select gen_random_uuid(),$1,$2,'bound','CI haystack '||g,jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',g))),'todo','normal','personal',now() from generate_series(1,12000) g`,[owner,personalWorkspace])
     const add = async (id:string,title:string,scope='personal',meta:Record<string,unknown>={},workspaceId=personalWorkspace) => pool.query('insert into issues (id,"userId","workspaceId","ownershipState",title,content,status,priority,scope,"updatedAt") values ($1,$2,$3,\'bound\',$4,$5,\'todo\',\'normal\',$6,\'2020-01-01T00:00:00.123456Z\')',[id,owner,workspaceId,title,JSON.stringify({type:'doc',attrs:{mikka:{number:14000,...meta}},content:[]}),scope])
     await add(root,'rare-needle 修复 50%_off')
-    await add(child,'child rare-needle','personal',{parentId:root,number:14001})
+    const linked = { url: 'https://github.com/example/issue-search/pull/21/', state: 'open' }
+    await add(child,'child rare-needle','personal',{parentId:root,number:14001,pullRequests:[linked]})
     await add(hidden,'private rare-needle','personal',{parentId:root,number:14002})
     await add(shared,'shared rare-needle','workspace',{number:14003},workspace)
     await add(otherShared,'other workspace rare-needle','workspace',{number:14004},otherWorkspace)
@@ -92,6 +92,9 @@ test('indexed workspace-isolated relation search beyond 101 tasks, paging and gr
     assert.deepEqual((await search({q:'rare-needle'})).items.map(x=>x.id).sort(),[root,child,hidden].sort())
     assert.ok((await search({q:'修'})).items.some(x=>x.id===root))
     assert.deepEqual((await search({q:'50%_off'})).items.map(x=>x.id),[root])
+    assert.deepEqual((await search({q:'https://github.com/EXAMPLE/issue-search/pull/21'})).items.map(x=>x.id),[child])
+    assert.deepEqual((await search({q:linked.url},viewer)).items,[])
+    assert.deepEqual((await search({q:'https://github.com/other/issue-search/pull/21'})).items,[])
     assert.deepEqual((await search({q:'14000'})).items.map(x=>x.id),[root])
     assert.equal((await search({q:'rare-needle'},viewer)).items.length,0)
     await assert.rejects(search({issueId:hidden},viewer),/issueNotFound/)
@@ -156,7 +159,7 @@ test('Telegram command reads retain issued numbers, personal binding and exact h
   const { seedPersonalWorkspace } = await import('./support/workspace-admin-db')
   const { createTranslator } = await import('use-intl/core')
   const messages = JSON.parse(await readFile(new URL('../messages/en.json', import.meta.url), 'utf8'))
-  const translations = mock.module('next-intl/server', { namedExports: {
+  const translations = mock.module('@/lib/intl/i18n-server', { namedExports: {
     getLocale: async () => 'en',
     getTranslations: async () => createTranslator({ locale: 'en', messages, namespace: 'TelegramBot' }),
   } })
@@ -379,7 +382,7 @@ test('identifier reads reuse immutable authorized rows across mixed workspace ba
     // and repository catalog at this UI boundary; database/naming code stays real.
     const { createTranslator } = await import('use-intl/core')
     const messages = JSON.parse(await readFile(new URL('../messages/en.json', import.meta.url), 'utf8'))
-    const translations = mock.module('next-intl/server', { namedExports: {
+    const translations = mock.module('@/lib/intl/i18n-server', { namedExports: {
       getLocale: async () => 'en',
       getTranslations: async () => createTranslator({ locale: 'en', messages, namespace: 'TelegramBot' }),
     } })

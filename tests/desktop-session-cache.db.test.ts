@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -14,14 +13,13 @@ import { safeDesktopSession, withDesktopSession } from '../lib/desktop-rpc/sessi
 import { DESKTOP_SESSION_CACHE_HEADER as cacheHeader, desktopSessionCacheAfter, desktopSessionCacheFromHeaders, validDesktopSessionCache, withDesktopSessionCache } from '../lib/desktop-rpc/session-cache'
 import { decode, encode } from '../lib/desktop-rpc/wire'
 import { withRequestLog } from '../lib/request-log'
+import { createRequestScope, currentRequestScope, runRequestScope } from '../apps/api/src/context'
 
 const url = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Native session cache tests require an isolated loopback *_e2e database')
 
 test('native reads use the same signed cache and complete PostgreSQL budget as the original web action; sensitive reads revalidate', { skip: !url, timeout: 120_000 }, async t => {
   const database = new Pool({ connectionString: url, max: 4 })
-  const requestHeaders = new AsyncLocalStorage<Headers>()
-  const responseCookies = new AsyncLocalStorage<{ name: string; value: string; maxAge?: number }[]>()
   const clients = new Set<PoolClient>()
   const userIds: string[] = []
   const mocks: { restore(): void }[] = []
@@ -38,17 +36,13 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
     return { value, statements: statements - before.statements, bytes: bytes() - before.bytes }
   }
   try {
-    mocks.push(mock.module('next/headers.js', { namedExports: {
-      headers: async () => requestHeaders.getStore() ?? new Headers(),
-      cookies: async () => ({ set: (name: string, value: string, options: { maxAge?: number }) => responseCookies.getStore()?.push({ name, value, maxAge: options.maxAge }), get: () => undefined }),
-    } }))
-    const [{ betterAuth }, { createAuthMiddleware }, { bearer }, { nextCookies }, fresh] = await Promise.all([
-      import('better-auth'), import('better-auth/api'), import('better-auth/plugins'), import('better-auth/next-js'), import('../lib/fresh-session'),
+    const [{ betterAuth }, { createAuthMiddleware }, { bearer }, { mikkaCookies }, fresh] = await Promise.all([
+      import('better-auth'), import('better-auth/api'), import('better-auth/plugins'), import('../lib/auth-cookies'), import('../lib/fresh-session'),
     ])
     const origin = 'http://127.0.0.1:3189', secret = randomBytes(32).toString('hex')
     const make = (maxAge = fresh.SESSION_COOKIE_CACHE_SECONDS, version = '1') => {
       const instance = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', database, secret,
-        emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [bearer(), nextCookies()],
+        emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [bearer(), mikkaCookies()],
         session: { ...fresh.SESSION_OPTIONS, cookieCache: { ...fresh.SESSION_OPTIONS.cookieCache, maxAge, version } },
         advanced: { database: { validateSchema: false } },
         hooks: { after: createAuthMiddleware(async ctx => desktopSessionCacheAfter(ctx)) },
@@ -88,24 +82,24 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
     // Warm the independent SDK connection before counting PG wire bytes. No
     // auth/user response or business query is mocked, and the action is reused.
     await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${alice.token}` }), query: { disableCookieCache: true } })
-    const web = () => withDatabaseClient(business!, () => requestHeaders.run(new Headers({ cookie: alice.cookie }), getPreferences))
+    const web = () => withDatabaseClient(business!, () => runRequestScope(createRequestScope(new Request(origin, { headers: { cookie: alice.cookie } })), getPreferences))
     const route = (instance = auth, oldFreshTransport = false, browser = false) => {
       const sessions = desktopAuthentication(input => instance.api.getSession(input), async () => (await instance.$context).authCookies.sessionData.name)
       const actions = {
         'preferences.getPreferences': { args: z.tuple([]), invoke: getPreferences },
-        'desktop.session': { args: z.tuple([]), invoke: async () => safeDesktopSession((await instance.api.getSession({ headers: requestHeaders.getStore()! }))!) },
+        'desktop.session': { args: z.tuple([]), invoke: async () => safeDesktopSession((await instance.api.getSession({ headers: currentRequestScope()!.headers }))!) },
         'fixture.sensitive': { args: z.tuple([]), invoke: () => fresh.withFreshSession(async () => {
-          const session = await instance.api.getSession({ headers: requestHeaders.getStore()! })
+          const session = await instance.api.getSession({ headers: currentRequestScope()!.headers })
           if (!session) throw new ActionFailureError('authRequired')
           return { userId: session.user.id }
         }) },
         'fixture.explicitFresh': { args: z.tuple([]), invoke: async () => {
-          const session = await instance.api.getSession({ headers: requestHeaders.getStore()!, query: { disableCookieCache: true } })
+          const session = await instance.api.getSession({ headers: currentRequestScope()!.headers, query: { disableCookieCache: true } })
           if (!session) throw new ActionFailureError('authRequired')
           return { userId: session.user.id }
         } },
         'fixture.profile': { args: z.tuple([]), invoke: async () => {
-          await instance.api.updateUser({ headers: requestHeaders.getStore()!, body: { name: 'Updated Cache Fixture', image: '/mikka/avatar-fixture.png' } })
+          await instance.api.updateUser({ headers: currentRequestScope()!.headers, body: { name: 'Updated Cache Fixture', image: '/mikka/avatar-fixture.png' } })
           return { updated: true }
         } },
       }
@@ -113,15 +107,15 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
       if (browser) {
         const browserSessions = browserAuthentication(input => instance.api.getSession(input), async () => (await instance.$context).authCookies.sessionData.name)
         return createBrowserRpc({ actions, error, trustedBaseURL: origin, authenticate: browserSessions.authenticate,
-          scope: (session, work, request) => withDatabaseClient(business!, () => requestHeaders.run(request.headers, () => browserSessions.scope(session, work))),
+          scope: (session, work, request) => withDatabaseClient(business!, () => runRequestScope(createRequestScope(request), () => browserSessions.scope(session, work))),
         })
       }
       if (oldFreshTransport) return createDesktopRpc({ actions, error,
         authenticate: headers => instance.api.getSession({ headers, query: { disableCookieCache: true } }),
-        scope: (session, work, request) => withDatabaseClient(business!, () => requestHeaders.run(request.headers, () => withDesktopSession(session, work))),
+        scope: (session, work, request) => withDatabaseClient(business!, () => runRequestScope(createRequestScope(request), () => withDesktopSession(session, work))),
       })
       return createDesktopRpc({ actions, error, authenticate: sessions.authenticate,
-        scope: (session, work, request) => withDatabaseClient(business!, () => requestHeaders.run(request.headers, () => sessions.scope(session, work))),
+        scope: (session, work, request) => withDatabaseClient(business!, () => runRequestScope(createRequestScope(request), () => sessions.scope(session, work))),
       })
     }
     const rpc = route()
@@ -225,16 +219,16 @@ test('native reads use the same signed cache and complete PostgreSQL budget as t
       assert.equal((await next.value.json()).user.id, alice.id)
       assert.equal(JSON.stringify(logs).includes(proof), false)
       assert.equal(JSON.stringify(logs).includes(signed.token), false)
-      // Older REST routes without withRequestLog still use the real nextCookies
-      // plugin. Model only Next's response-cookie IO, then feed that SDK proof
-      // through the same private header main uses after its cookie fallback.
-      const written: { name: string; value: string; maxAge?: number }[] = []
-      const unwrapped = await measure(() => responseCookies.run(written, () => short.api.getSession({ headers: request(signed).headers })))
+      // Older REST routes without withRequestLog still use the real cookie
+      // plugin. Read the SDK's cookies from the request journal, then feed that
+      // proof through the same private header main uses after its fallback.
+      const scope = createRequestScope(new Request(origin, { headers: { cookie: signed.cookie } }))
+      const unwrapped = await measure(() => runRequestScope(scope, () => short.api.getSession({ headers: scope.headers })))
       assert.equal(unwrapped.statements, 2)
       const cookieOutput = new Headers()
-      for (const cookie of written) cookieOutput.append('set-cookie', `${cookie.name}=${cookie.value}${cookie.maxAge === undefined ? '' : `; Max-Age=${cookie.maxAge}`}`)
+      scope.cookies.commit(cookieOutput)
       const fallbackProof = desktopSessionCacheFromHeaders(cookieOutput, (await short.$context).authCookies.sessionData.name)
-      assert.ok(validDesktopSessionCache(fallbackProof), 'the SDK already supplies the private proof through Next response cookies')
+      assert.ok(validDesktopSessionCache(fallbackProof), 'the SDK already supplies the private proof through the response cookies')
       const fallbackRead = await measure(() => short.api.getSession({ headers: request(signed, 'desktop.session', { [cacheHeader]: fallbackProof }).headers }))
       assert.equal(fallbackRead.statements, 0)
       assert.equal(fallbackRead.bytes, 0)

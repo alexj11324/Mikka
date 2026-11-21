@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { observeEveSession } from './eve-session.mjs'
+import { observeEveSession, submitEveMessage } from './eve-session.mjs'
 /** #1712: normal smoke-owner native Git/gh and both official subscriptions.
  * The additional HTTP leg runs the exact data-plane/bridge source against an
  * isolated random key in a disposable E2B fixture. It is not production-store
@@ -11,7 +11,7 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { chooseSharedChatModel, cleanupCase, createSessionClient, observeChunks, restoreAcceptanceWorkspace,
+import { chooseOwnChatModel, cleanupCase, createSessionClient, observeChunks, restoreAcceptanceWorkspace,
   sampledRequestTrace, selectAcceptanceTeam, smokeAcceptanceAccount, startupFailure, subscriptionProof, watchRun } from './cloud-startup.mjs'
 import { CASES, issueInventory } from './run-observability.mjs'
 import { isExactNativeCommand } from './thread-lifecycle.mjs'
@@ -186,10 +186,9 @@ async function dispatch(client, record, profileId, botId, now, checkpoint, budge
     note: `Execute this test's exact native verification command once, then reply STARTUP_OK_${record.sampleId} if it completes. ${scope} Do not submit to Factory, merge, change main, spawn agents, or retry.` }
   const trace = sampledRequestTrace(); record.requestTraceId = trace.traceId
   record.messageSubmittedAt = new Date(now()).toISOString()
-  await secretMutation(record, 'dispatch', () => client.rpc('coordinator.sendCoordinatorMessage', [
+  await secretMutation(record, 'dispatch', () => submitEveMessage(client, botId,
     `执行已有测试任务 ${record.issueId}，只调用一次 dispatch_run，参数：${JSON.stringify(tool)}。使用指定 Profile，不变更模型、订阅或电脑，不创建另一任务。派发后只汇报 runId。`,
-    null, botId, randomUUID(), { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId,
-  ], { headers: { traceparent: trace.traceparent } }), () => {}, checkpoint, now)
+    randomUUID(), { profileId }, { traceparent: trace.traceparent }), () => {}, checkpoint, now)
   let call, completed = false
   await observeEveSession(client, botId, { timeoutMs: budget.remaining('execution', 120_000), fail: () => { check(false, 'dispatch') },
     onEvent: async event => {
@@ -282,7 +281,7 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
     const chosen = new Map()
     for (const item of cases) {
       const matches = (order.candidates ?? []).filter(candidate => candidate.harness === item.harness && candidate.model === item.model
-        && candidate.source?.kind === 'subscription' && UUID.test(candidate.source.connectionId ?? '') && candidate.credentialOwnerId === scope.adminId)
+        && candidate.source?.kind === 'subscription' && UUID.test(candidate.source.connectionId ?? '') && candidate.credentialOwnerId === scope.ownerId)
       if (matches.length === 1) chosen.set(item.harness, matches[0])
       else report.cases.push({ harness: item.harness, model: item.model, status: 'blocked', failure: 'task_secrets_subscription_unavailable' })
     }
@@ -385,7 +384,7 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
           && profile.model?.mode === 'fixed' && profile.model.model === item.model && profile.model.source?.kind === 'subscription'
           && profile.model.source.connectionId === candidate.source.connectionId, 'profile')
         profiles.push(profile); record.profileId = profile.id
-        await chooseSharedChatModel(client, botId, item.harness)
+        await chooseOwnChatModel(client, botId, item.harness)
         const taskScope = canary ? revocation
           ? '此阶段不操作 Git。脚本只使用任务实际领取的 MIKKA_SECRET_ENDPOINTS 访问本轮合成服务，然后等待 owner 轮换新建测试 Secret 产生的停止事件。停止属于预期验收，绝不重试。'
           : `只允许仓库 ${REPOSITORY} 的分支 ${record.remoteCleanupTarget.branch} 和唯一测试文件；必须创建 draft PR 后关闭、删分支，绝不 merge 或写默认分支。脚本只使用实际领取的 MIKKA_SECRET_ENDPOINTS 验证已轮换的本轮合成 Secret，不修改生产配置。`

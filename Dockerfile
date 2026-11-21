@@ -9,7 +9,7 @@ RUN node scripts/build-subscription-worker.mjs
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /source
-ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 NEXT_TELEMETRY_DISABLED=1 NITRO_PRESET=node-server MIKKA_BUILD_BYOS_WORKER=1
+ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 NITRO_PRESET=node-server MIKKA_BUILD_BYOS_WORKER=1
 RUN npm install --global pnpm@10.34.3
 COPY . .
 COPY --from=subscription-workers /source/packages/subscription-worker/bin/ ./packages/subscription-worker/bin/
@@ -17,6 +17,7 @@ RUN --mount=type=cache,id=mikka-pnpm,target=/pnpm/store \
     --mount=type=secret,id=ffmpeg_github_token,env=FFMPEG_GITHUB_TOKEN,required=false \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 ARG MIKKA_BUILD_REVISION
+ARG MIKKA_TEST_DEPLOYMENT_SHA
 ARG WORKFLOW_TARGET_WORLD
 ENV MIKKA_BUILD_REVISION=${MIKKA_BUILD_REVISION}
 RUN pnpm generate:agent-ui && WORKFLOW_TARGET_WORLD="$WORKFLOW_TARGET_WORLD" pnpm build:server

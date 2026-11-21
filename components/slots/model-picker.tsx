@@ -1,7 +1,7 @@
 'use client'
 
 // The default model-picker slot (docs/ui-overlay.md): the model chip in a bot's composer, the Coordinator's included.
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, RefreshCw } from '@/components/icons'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
 import { Button } from '@/components/ui/button'
@@ -11,14 +11,18 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { HostedModelLabel, ModelLabel } from '@/components/labels/entity-labels'
-import { HOSTED_CHOICE } from '@/lib/bot-model-menu-view'
-import { useBotModelPicker, type ChipModel, type ModelPickerT } from '@/hooks/use-bot-model-picker'
+import { ModelSourceBadge, ModelVendorMark } from '@/components/labels/model-vendor-mark'
+import { modelDisplayName } from '@/lib/model-display-name'
+import { useBotModelPicker, type ChipModel } from '@/hooks/use-bot-model-picker'
 import type { BotModelPickerProps } from '@/components/slots/model-picker-contract'
 import { cn } from '@/lib/utils'
 
-function OptionLabel({ t, option }: { t: ModelPickerT; option: ChipModel }) {
-  return option.id === HOSTED_CHOICE ? <HostedModelLabel name={t('hosted')} /> : <ModelLabel model={option.modelId || t('unknownModel')} source={option.provider} />
+/** A model as the picker names it: its maker's mark, then its name (decision 2026-11-15-1900). */
+function OptionLabel({ option, name }: { option: ChipModel; name: string }) {
+  return <span className="inline-flex min-w-0 items-center gap-1.5">
+    {option.modelId && <ModelVendorMark model={option.modelId} />}
+    <span className="truncate">{option.name || !option.modelId ? name : modelDisplayName(option.modelId).name}</span>
+  </span>
 }
 
 /**
@@ -34,7 +38,7 @@ export function BotModelPicker({ botId, running = false, thread }: BotModelPicke
   // It is the chip's look only, not a control, until the menu it opens has arrived.
   if (!picker.menu) return last ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" data-next-message={running || undefined} aria-label={t('label', { name: picker.optionName(last) })}
     className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full bg-control px-2 text-sm whitespace-nowrap text-foreground [&_svg]:shrink-0 [&>svg]:size-3.5">
-    <span className="flex min-w-0"><OptionLabel t={t} option={last} /></span>
+    <span className="flex min-w-0"><OptionLabel option={last} name={picker.optionName(last)} /></span>
     <ChevronDown className="text-muted-foreground" />
   </span> : null
   const { current, groups } = picker.menu
@@ -42,20 +46,23 @@ export function BotModelPicker({ botId, running = false, thread }: BotModelPicke
   return <DropdownMenu open={picker.open} onOpenChange={picker.setOpen}>
     <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={picker.unavailable || undefined} data-next-message={running || undefined}
       className={cn('max-w-56 rounded-full px-2 font-normal', picker.unavailable ? 'text-muted-foreground' : 'text-foreground')}
-      title={label} aria-label={picker.unavailable ? t('labelUnavailable', { name: label }) : t('label', { name: label })} />}>
-      <span className="flex min-w-0"><OptionLabel t={t} option={current} /></span>
+      title={[label, picker.sourceLabel].filter(Boolean).join(' · ')} aria-label={picker.unavailable ? t('labelUnavailable', { name: label }) : t('label', { name: label })} />}>
+      <span className="flex min-w-0"><OptionLabel option={current} name={picker.optionName(current)} /></span>
+      {current.kind !== 'none' && <ModelSourceBadge kind={current.kind} provider={current.provider} />}
       {picker.failed && <span className="shrink-0 text-xs text-destructive-foreground">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>
     <DropdownMenuContent side="top" align="start" className="w-80">
       <DropdownMenuRadioGroup value={current.id} onValueChange={id => { void picker.choose(String(id)) }}>
         {groups.map((group, index) => <DropdownMenuGroup key={`${group.kind}-${index}`} data-group={group.kind}>
-          {/* A rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
+          {/* A rule under Mikka 额度 only; the person's own groups follow one another under their headings. */}
           {index === 1 && <DropdownMenuSeparator />}
           <DropdownMenuLabel className="truncate font-normal" title={picker.heading(group)}>{picker.heading(group)}</DropdownMenuLabel>
-          {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick onClick={() => picker.chooseItem(option.id)}>
-            <OptionLabel t={t} option={option} />
-            {picker.tag(group) && <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{picker.tag(group)}</span>}
+          {/* Mikka 额度 lists its featured models here; the official picker searches the whole catalogue. */}
+          {group.options.filter(option => group.kind !== 'hosted' || option.featured || option.id === current.id).map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick
+            title={picker.source(group, option)} onClick={() => picker.chooseItem(option.id)}>
+            <OptionLabel option={option} name={picker.optionName(option)} />
+            {(picker.price(option) ?? picker.tag(group)) && <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{picker.price(option) ?? picker.tag(group)}</span>}
           </DropdownMenuRadioItem>)}
         </DropdownMenuGroup>)}
       </DropdownMenuRadioGroup>
