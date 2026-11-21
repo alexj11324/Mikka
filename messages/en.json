@@ -479,6 +479,7 @@
     "retryIn": "Try again in {seconds}s",
     "verifyLinkInvalid": "This verification link is invalid, expired or already used. If your email is not verified yet, send a new link.",
     "verifyEmailLink": "Verify your email or resend the link",
+    "retryVerification": "Retry verification",
     "signupRefusal": {
       "disposableEmail": "Temporary email addresses aren't supported. Please use a regular address.",
       "signupRateLimited": "Too many sign-up attempts. Please try again later.",
