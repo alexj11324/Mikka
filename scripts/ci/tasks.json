@@ -95,12 +95,12 @@
     "env": {}
   },
   "core-22": {
-    "command": "pnpm test:self-hosting",
+    "command": "pnpm test:runtime-config",
     "kind": "core",
     "env": {}
   },
   "core-23": {
-    "command": "pnpm test:self-hosted-byok",
+    "command": "pnpm test:service-config",
     "kind": "core",
     "env": {}
   },
@@ -438,6 +438,11 @@
   },
   "core-drive": {
     "command": "pnpm test:drive",
+    "kind": "core",
+    "env": {}
+  },
+  "core-interop": {
+    "command": "pnpm test:interop",
     "kind": "core",
     "env": {}
   },

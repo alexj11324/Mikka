@@ -44,22 +44,13 @@ Every span has `service.name=mikka-web` and `deployment.environment`
 | `mikka.rpc.action` | A key confirmed present in the shared browser/desktop RPC registry. No arguments or unknown action strings are exported |
 | `error.type`, `mikka.error.code`, `mikka.error.detail` | On a failed request or job: the error's class name, and the code and detail of the first coded error in its cause chain (`@mikka/protocol/tracing`). Never the message |
 
-Each call to the default model (Mikka 默认, `lib/abuse/zerocat.ts`) also writes
-one `model.route` span, and the same values as a `default_model_route` log line:
+Mikka-managed model calls use the AI request span described below, with
+`mikka.ai.route = litellm` and the requested alias in the model field. The
+LiteLLM call ID and response cost connect that request to the proxy's spend
+receipt and Mikka usage ledger. Provider routing is owned by LiteLLM.
+Historical `model.route` spans with ZeroCat/fallback fields describe earlier
+revisions; they are not emitted by the LiteLLM-only model path.
 
-| Attribute | Meaning |
-| --- | --- |
-| `mikka.model.id` | `deepseek/deepseek-v4.1-flash` |
-| `mikka.model.route` | `zerocat` (the main route) or `gateway` (the fallback) |
-| `mikka.model.fallback_reason` | On `gateway` only: `unconfigured`, `endpoint_unexpected`, `route_denied`, `paused` (ZeroCat failed in this instance in the last 60 s and was skipped), `timeout`, `rate_limited`, `quota`, `server_error`, `redirect` (ZeroCat answered with a redirect, which the transport refuses), `network`, `request_rejected` or `stream_error` |
-| `mikka.model.zerocat_error`, `mikka.model.zerocat_error_code` | On a ZeroCat failure: the error names along its cause chain (`AI_APICallError>TypeError>Error`) and the first system code in it (`ECONNRESET`, `UND_ERR_CONNECT_TIMEOUT` …). Never a message |
-| `mikka.model.zerocat_ms` | How long the ZeroCat attempt took, success or failure |
-| `mikka.model.zerocat_status` | ZeroCat's HTTP status, when the failure had one |
-| `mikka.model.gateway_credential` | On `gateway`: `system` (Vercel bills) or `byok` (our own provider key), from Gateway's routing receipt |
-
-Count fallbacks by `attributes['mikka.model.fallback_reason']` on
-`posthog.trace_spans` where `name = 'model.route'` and
-`attributes['mikka.model.route'] = 'gateway'`.
 
 Database spans also have:
 
@@ -284,14 +275,13 @@ compaction, title/profile and daemon agent calls use the same convention.
   numeric fields. Missing provider usage stays absent, not a fabricated zero.
   `$ai_cache_reporting_exclusive=false` records that input totals include
   cached tokens.
-- Tier, effort, their score/confidence and the ZeroCat/Gateway/fallback route
+- Tier, effort, their score/confidence and the LiteLLM route
   are attributes. Prompt content, output content and tool arguments are never
   included.
 - The application sets `$ai_total_cost_usd` and `$ai_cost_passthrough=true`
-  when it supplies a per-call amount. Gateway amounts come from provider
-  metadata. ZeroCat amounts are estimates from token counts and the configured
-  prices in `lib/abuse/zerocat.ts`, rounded up to integer microdollars before
-  conversion to USD. Passthrough alone does not establish an actual charge.
+  when it supplies a per-call amount. Managed model amounts come from the
+  LiteLLM cost receipt, converted to integer microdollars before conversion
+  to USD. Passthrough alone does not establish an actual charge.
   A subscription without a per-call amount omits these fields. PostHog may
   display its own model-catalog estimate from usage; label estimates as such,
   not as the subscription bill or cash charged by a provider. Unknown cost is

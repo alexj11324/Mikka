@@ -108,12 +108,17 @@ export async function applicationPlugin(target, { deploymentId = '', serverPages
       const action = /^@\/app\/actions\/([\w-]+)$/.exec(source)
       if (action) return `${virtualAction}${action[1]}`
       const alias = commonAliases.get(source)
-      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return resolve(clientRuntime, alias)
+      // An alias target goes through the bundler's own resolver, so the file's package format (`"type": "module"`)
+      // is read the same way every time. A bare path returned from here left that to whichever importer reached the
+      // module first, and the CommonJS interop for React (`__toESM(…, 1)`) then differed between two builds of one
+      // tree, changing chunk hashes and the renderer identity (apps/frontend/scripts/build.test.mjs).
+      const bundlerResolved = path => this.resolve(path, importer, { ...options, skipSelf: true })
+      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return bundlerResolved(resolve(clientRuntime, alias))
       const desktopAlias = target === 'desktop' ? desktopAliases.get(source) : undefined
-      if (desktopAlias && importer?.split('?')[0] !== resolve(renderer, desktopAlias)) return resolve(renderer, desktopAlias)
+      if (desktopAlias && importer?.split('?')[0] !== resolve(renderer, desktopAlias)) return bundlerResolved(resolve(renderer, desktopAlias))
       if (source === '@/lib/client-runtime/script') {
         if (target === 'desktop') throw new Error('FRONTEND_DESKTOP_REMOTE_SCRIPT_FORBIDDEN')
-        return resolve(clientRuntime, 'script.tsx')
+        return bundlerResolved(resolve(clientRuntime, 'script.tsx'))
       }
       if (uiSlots.dir && source.startsWith(SLOT_PREFIX)) {
         const name = source.slice(SLOT_PREFIX.length)

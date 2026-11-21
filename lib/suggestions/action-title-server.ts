@@ -2,14 +2,14 @@ import 'server-only'
 import { generateText } from 'ai'
 import { defaultModelAvailable } from '@/lib/default-model'
 import { and, eq, sql } from 'drizzle-orm'
-import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { TITLE_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
 import { attentionSettings, suggestions } from '@/lib/db/schema'
 import { ACTION_BATCH, actionLocale, actionTitlePrompt, parseActionTitles, type ActionLocale, type ActionTitleInput } from './action-title'
 import { withAiMetadata } from '@/lib/tracing/ai'
 
-/** The small text model that writes action lines; the Coordinator's flash model. */
-const ACTION_TITLE_MODEL = COORDINATOR_MODEL
+/** Action titles share the managed title model. */
+const ACTION_TITLE_MODEL = TITLE_MODEL
 const ACTION_TITLE_TIMEOUT_MS = 15_000
 
 /** The language the person last used 建议 in (zh-CN until known). */
@@ -25,9 +25,8 @@ export async function rememberLocale(userId: string, locale: ActionLocale): Prom
 
 /**
  * Writes action lines (R-45) for one person's newly shown items, in batches of
- * ACTION_BATCH, one model call each, on the default model (ZeroCat, with its
- * Gateway fallback; lib/abuse/model.ts); the hosted usage budget caps the
- * spend. With neither credential, or when a call fails, the items keep their raw title.
+ * ACTION_BATCH, one model call each, through LiteLLM; the hosted usage budget caps the spend.
+ * When unavailable, the items keep their raw title.
  * Never throws.
  */
 export async function writeActionTitles(userId: string, items: readonly ActionTitleInput[]): Promise<void> {

@@ -200,17 +200,19 @@ function fullFixture(options = {}) {
             ? POLICY_ADMIN_EMAIL : 'other-admin@example.invalid', role: 'admin', status: 'active' }] })
     }
     if (url.pathname === '/mikka/api/coordinator/messages') assert.equal(teamSelected, true, 'business must use the normal selected team cookie')
-    if (url.pathname === '/mikka/api/coordinator/messages' && method === 'POST') {
-      const body = JSON.parse(init.body); assert.match(body.submissionId, /^[0-9a-f-]{36}$/)
+    if (url.pathname === '/mikka/api/agents/eve/v1/session' && method === 'POST') {
+      const body = JSON.parse(init.body); assert.match(headers.get('x-mikka-submission-id'), /^[0-9a-f-]{36}$/)
+      assert.equal(teamSelected, true); assert.equal(url.searchParams.get('botId'), BOT)
+      assert.deepEqual(body.clientContext, { expectedOwnerId: OWNER, expectedWorkspaceId: id(12) })
       if (submitted) {
-        assert.ok(body.text.includes(SCHEDULE)); assert.ok(body.text.includes('Cancel only'))
+        assert.ok(body.message.includes(SCHEDULE)); assert.ok(body.message.includes('Cancel only'))
         cancelled = true
       } else {
-        definition = JSON.parse(body.text.match(/exact definition: (\{.+\})\. It must/)[1])
+        definition = JSON.parse(body.message.match(/exact definition: (\{.+\})\. It must/)[1])
         assert.deepEqual(definition, reminderDefinition(definition.title, definition.timing.at))
         submitted = true
       }
-      return json({ queued: true, enabled: true }, 202)
+      return json(options.invalidSubmitReceipt ? { queued: true, enabled: true } : { ok: true, sessionId: 'wrun_schedule', deliveryId: headers.get('x-mikka-submission-id') }, options.submitStatus ?? 202)
     }
     if (url.pathname === '/mikka/api/rpc') {
       assert.equal(headers.get('x-mikka-rpc'), '1')
@@ -290,14 +292,14 @@ test('failed due result cancels only the exact tool-proven schedule through the 
   assert.equal(report.status, 'fail'); assert.equal(report.cleanupSubmissionCount, 1)
   assert.equal(report.futureScheduleEvidence, 'normal-owner-schedule-cancel')
   assert.equal(report.futureScheduleConfirmedAbsent, true); assert.equal(report.sessionClosed, true)
-  assert.equal(f.requests.filter(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST').length, 2)
+  assert.equal(f.requests.filter(row => row.path === '/mikka/api/agents/eve/v1/session' && row.method === 'POST').length, 2)
 })
 
 test('closed issue, stale main, denied manager or missing team never submits a task', async () => {
   for (const options of [{ closed: true }, { wrongMain: true }, { managerDenied: true }, { noTeams: true }]) {
     const f = fullFixture(options), report = await f.run()
     assert.notEqual(report.status, 'pass')
-    assert.equal(f.requests.some(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST'), false)
+    assert.equal(f.requests.some(row => row.path === '/mikka/api/agents/eve/v1/session' && row.method === 'POST'), false)
   }
 })
 
@@ -341,7 +343,7 @@ test('target drift still permits only exact known-schedule cleanup and closes th
   assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 1)
   assert.equal(report.futureScheduleConfirmedAbsent, true); assert.equal(report.sessionClosed, true)
   assert.equal(report.futureScheduleEvidence, 'normal-owner-schedule-cancel')
-  assert.equal(f.requests.filter(row => row.path === '/mikka/api/coordinator/messages' && row.method === 'POST').length, 2)
+  assert.equal(f.requests.filter(row => row.path === '/mikka/api/agents/eve/v1/session' && row.method === 'POST').length, 2)
   const logout = f.requests.findLastIndex(row => row.path.endsWith('/sign-out'))
   const lastProof = f.requests.findLastIndex(row => row.path.endsWith('/actions/runs/20'))
   assert.ok(logout >= 0 && lastProof > logout, 'the final target check follows resource and session cleanup')
@@ -867,5 +869,14 @@ test('historical managed evidence accepts locked compiler identifiers and reject
     assert.equal(managedEvidence({ ...p, timer: { ...p.timer, workflowName: rewrite(ids[1]) } }), null)
     assert.equal(managedEvidence({ ...p, events: p.events.map(event => event.eventType === 'step_created'
       ? { ...event, eventData: { stepName: rewrite(ids[2]) } } : event) }), null)
+  }
+})
+
+test('native schedule submissions reject non-202 and malformed admission receipts', async () => {
+  for (const options of [{ submitStatus: 200 }, { invalidSubmitReceipt: true }]) {
+    const f = fullFixture(options), report = await f.run()
+    assert.notEqual(report.status, 'pass')
+    assert.equal(report.code, 'submission_failed')
+    assert.equal(report.sessionClosed, true)
   }
 })

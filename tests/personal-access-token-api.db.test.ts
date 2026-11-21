@@ -160,22 +160,15 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&after=${first.continuation.after}&cursor=${first.continuation.cursor}&prefix=${first.continuation.prefix}`)).status, 200)
     assert.equal((await callMobile(`/api/mobile/chat?bot=${ownBot}&after=1&cursor=1&prefix=nothex`)).status, 400)
     assert.equal((await callMobile(`/api/mobile/chat?bot=${otherBot}&through=1`)).status, 404)
-    assert.equal((await callMobile('/api/mobile/chat', { text: 'PAT mobile message', botId: ownBot })).status, 202)
-    assert.equal((await callMobile('/api/mobile/chat', { text: 'must not send', botId: otherBot })).status, 404)
-    const messages = (await pool.query(`SELECT "userId","botId",payload FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'='PAT mobile message'`, [owner])).rows
-    assert.equal(messages.length, 1)
-    assert.equal(messages[0].botId, ownBot)
+    assert.equal((await callMobile('/api/mobile/chat', { text: 'retired PAT message', botId: ownBot })).status, 410)
+    const messages = (await pool.query(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'='retired PAT message'`, [owner])).rows
+    assert.equal(messages.length, 0)
   })
-  await t.test('mobile photos are stored with the message and read back only by their sender', async () => {
+  await t.test('stored mobile photos can be read back only by their sender', async () => {
     // The smallest valid PNG (1×1), as the app sends a photo.
     const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
     const dataUrl = `data:image/png;base64,${png}`
     const callMobile = (path: string, body?: unknown) => fetch(`${origin}${path}`, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token.token}`, origin, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
-    assert.equal((await callMobile('/api/mobile/chat', { text: '', botId: ownBot, images: [{ dataUrl }] })).status, 202)
-    assert.equal((await callMobile('/api/mobile/chat', { text: '', botId: ownBot })).status, 400)
-    assert.equal((await callMobile('/api/mobile/chat', { text: 'not an image', botId: ownBot, images: [{ dataUrl: 'data:image/png;base64,AAAA' }] })).status, 400)
-    const [event] = (await pool.query(`SELECT payload FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND payload ? 'images'`, [owner, ownBot])).rows
-    assert.equal(event.payload.images[0].dataUrl, dataUrl)
     const own = randomUUID(), others = randomUUID()
     const photoMessage = { role: 'user', content: [{ type: 'text', text: '' }, { type: 'file', data: dataUrl, mediaType: 'image/png' }] }
     await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,$3,9001,$4),($5,$6,NULL,9001,$4)`, [own, owner, ownBot, photoMessage, others, member])

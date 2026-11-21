@@ -361,6 +361,8 @@ export const PROJECT_ENVIRONMENT_HEADER = "x-mikka-project-environment"
 
 /** Sent by a daemon that injects `modelCredential`; a run frozen on an API key is handed only to one. */
 export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
+/** Accepts a run-scoped gateway token over the same host's configured HTTP loopback origin. */
+export const MODEL_GATEWAY_LOOPBACK_HEADER = "x-mikka-model-gateway-loopback"
 /** The daemon accepts credentials prepared in the claim response (#1505). */
 export const RUN_CREDENTIALS_HEADER = "x-mikka-run-credentials"
 /** Only the first cloud claim can replace that sync's repository discovery. */
@@ -371,7 +373,8 @@ const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.t
 export const runGitHubCredentialSchema = z.object({ token: credentialKey, expiresAt: isoTime.nullable() }).strip()
 const credentialBaseUrl = z.url().max(500).refine(value => {
   const url = new URL(value)
-  return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash
+  return !url.username && !url.password && !url.search && !url.hash
+    && (url.protocol === "https:" || (url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))
 })
 
 /**
@@ -381,7 +384,13 @@ const credentialBaseUrl = z.url().max(500).refine(value => {
  */
 export const runModelCredentialSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("api_key"), key: credentialKey }).strict(),
-  z.object({ kind: z.literal("provider"), protocol: z.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict(),
+  z.object({ kind: z.literal("provider"), protocol: z.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict().refine(value => {
+    const url = new URL(value.baseUrl)
+    if (url.protocol === "https:") return true
+    const path = value.protocol === "anthropic" ? "/api/model-gateway/anthropic" : "/api/model-gateway/openai/v1"
+    return /^mkg_[A-Za-z0-9_-]{43}$/.test(value.key) && url.pathname.endsWith(path)
+      && /^(?:\/[A-Za-z0-9_-]+)*$/.test(url.pathname.slice(0, -path.length))
+  }),
 ])
 export type RunModelCredential = z.infer<typeof runModelCredentialSchema>
 

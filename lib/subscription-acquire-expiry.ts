@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { ARTIFACT_CLEANUP_SQL, ORDINARY_CLEANUP_SQL } from './subscription-cleanup-sql.mjs'
 
 // These are reservations that have never acquired an account. Every credential
 // reference (including staging) and every binding is evidence to preserve it.
@@ -8,12 +9,6 @@ const EMPTY_CONNECTION_SQL = `c."providerSubject" IS NULL AND c."accountLabel" I
   AND c."stagedSecretName" IS NULL AND c."stagedDigest" IS NULL
   AND c."stagedAccessName" IS NULL AND c."stagedAccessDigest" IS NULL
   AND NOT EXISTS (SELECT 1 FROM byos_bindings binding WHERE binding."connectionId"=c.id)`
-
-// Account deletion owns its subscriptions and the solo Workspaces in its frozen
-// plan. That plan is in the application database even on split installations.
-const ORDINARY_CLEANUP_SQL = `NOT EXISTS (SELECT 1 FROM account_deletion_jobs deletion
-  WHERE deletion.stage NOT IN ('completed','cancelled')
-    AND (deletion."subjectUserId"=c."ownerId" OR (deletion.plan->'solo') ? lower(c."workspaceId")))`
 
 const EXPIRABLE_CONNECTION_SQL = `c."removedAt" IS NULL AND (
     (c.state='pending' AND c."operationKind"='acquire' AND c."operationDeadline"<now())
@@ -68,10 +63,7 @@ export async function expireSubscriptionAcquisitions(pool: Pick<Pool, 'query'>, 
 
 /** Secret artifacts and enrollment sources the cleanup worker still has to delete (connectionId, last attempt). */
 export const CLEANUP_DUE_SQL = `SELECT a."connectionId",a."deletingAt" AS attempted
-  FROM byos_secret_artifacts a JOIN byos_connections c ON c.id=a."connectionId"
-  WHERE a."deletedAt" IS NULL AND (a."publishedAt" IS NOT NULL OR a."notBefore"<=now())
-    AND a.name NOT IN (coalesce(c."secretName",''),coalesce(c."accessSecretName",''),coalesce(c."stagedSecretName",''),coalesce(c."stagedAccessName",''))
-    AND ${ORDINARY_CLEANUP_SQL}
+  ${ARTIFACT_CLEANUP_SQL}
   UNION ALL SELECT a."connectionId",a."lastAttemptAt"
   FROM byos_enrollment_sources a JOIN byos_enrollment_transfers t ON t."enrollmentId"=a."enrollmentId"
     JOIN byos_connections c ON c.id=a."connectionId"

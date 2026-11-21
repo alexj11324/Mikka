@@ -1,23 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cleanShortTitle, compactTaskTitle, isCjk, parseShortTitle, shortTitlePrompt, SHORT_TITLE_CJK_MAX, SHORT_TITLE_CHARS_MAX, SHORT_TITLE_PROMPT_MAX_BYTES } from './short-title'
+import { cleanShortTitle, compactTaskTitle, isCjk, parseShortTitle, shortTitlePrompt, SHORT_TITLE_CJK_MAX, SHORT_TITLE_PROMPT_MAX_BYTES } from './short-title'
 
 test('the prompt holds the model to the task language and limit, and treats the task as evidence', () => {
   const zh = shortTitlePrompt({ title: 'ALEX-1408: iOS 按 Comma 的布局重做线程页', body: '把线程页改成一行一个' })
-  assert.match(zh.instructions, new RegExp(`at most ${SHORT_TITLE_CJK_MAX} characters`))
-  assert.match(zh.instructions, /untrusted evidence/)
+  assert.match(zh.instructions, new RegExp(`最多 ${SHORT_TITLE_CJK_MAX} 个字符`))
+  assert.match(zh.instructions, /不可信的参考材料/)
   assert.deepEqual(JSON.parse(zh.prompt), { task: { title: 'ALEX-1408: iOS 按 Comma 的布局重做线程页', text: '把线程页改成一行一个' } })
   const en = shortTitlePrompt({ title: 'Fix the OAuth callback on device', body: '' })
-  assert.match(en.instructions, /at most 36 characters and under 5 words/)
-  assert.match(en.instructions, /Start with an imperative verb/, 'Codex names a thread by what to do')
-  assert.match(en.instructions, /Do not answer the request/)
+  assert.match(en.instructions, /最多 36 个字符，尽量少于 5 个单词/)
+  assert.match(en.instructions, /以祈使动词开头/, 'Codex names a thread by what to do')
+  assert.match(en.instructions, /不要回答任务请求/)
   assert.deepEqual(JSON.parse(en.prompt), { task: { title: 'Fix the OAuth callback on device' } })
-  assert.doesNotMatch(en.instructions, /naming instructions/, 'no settings, no section')
+  assert.doesNotMatch(en.instructions, /命名指令/, 'no settings, no section')
 })
 
 test('the workspace\'s and the person\'s title instructions reach the model, workspace first, blanks dropped', () => {
   const { instructions } = shortTitlePrompt({ title: 'Fix login', body: '' }, ['Prefix titles with the customer name', '  ', 'Use English'])
-  assert.match(instructions, /naming instructions[^\n]*\n- Prefix titles with the customer name\n- Use English\n/)
+  assert.match(instructions, /命名指令[^\n]*\n- Prefix titles with the customer name\n- Use English\n/)
 })
 
 test('a usable answer is cleaned of keys, dates, quotes and a full stop', () => {
@@ -61,12 +61,13 @@ test('the language follows the task', () => {
   assert.equal(isCjk('Fix login'), false)
 })
 
-test('compact navigation bounds a task title without changing the task', () => {
+test('compact navigation preserves existing stored-title and citation fallback bounds', () => {
   const task = { title: '完整的任务要求应该仍然保存在详情里面不能被改掉' }
   assert.equal(compactTaskTitle(task), '完整的任务要求应该仍然保')
   assert.equal(task.title, '完整的任务要求应该仍然保存在详情里面不能被改掉')
-  assert.equal(compactTaskTitle({ title: 'one two three four five six seven eight' }), 'one two three four five')
-  assert.equal([...compactTaskTitle({ title: 'x'.repeat(100) })].length, SHORT_TITLE_CHARS_MAX)
+  assert.equal(compactTaskTitle({ title: 'one two three four five six seven eight' }), 'one two three four five six')
+  assert.equal([...compactTaskTitle({ title: 'x'.repeat(100) })].length, 60)
   assert.equal([...compactTaskTitle({ title: '修复😀😀😀😀😀😀😀😀😀😀😀😀😀😀' })].length, SHORT_TITLE_CJK_MAX)
   assert.equal(compactTaskTitle({ title: 'ALEX-12: Fix callback 2026-11-10' }), 'Fix callback')
+  assert.equal(compactTaskTitle({ title: 'Fix the login bug that drops authentication' }), 'Fix the login bug that drops')
 })

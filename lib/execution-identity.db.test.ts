@@ -33,7 +33,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     await pool.query(await readFile(new URL('20261103220200_execution_identity_provenance.sql', directory), 'utf8'))
     mock.module('@/lib/server-runtime/server', { namedExports: { after() {} } })
     const { issueRunToken, verifyRunToken } = await import('./mcp/worker')
-    const { apiKeyForRun } = await import('./model-api-keys')
+    const { validateRunApiKey } = await import('./model-api-keys')
     const { authorizeRunApp } = await import('./run-app-mcp')
     const { submitArtifact, readArtifact } = await import('./artifacts/store')
     appPool = (await import('./db')).pool; workspacePool = (await import('./workspace-db')).workspacePool
@@ -63,7 +63,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
 
     await t.test('explicitly shared key charges its real owner, while Gmail and runtime retain the requester', async () => {
       assert.equal((await claim(requester, device, runId, lease())).length, 1)
-      const credential = await apiKeyForRun(pool, runId, sharedKey, 'codex', env)
+      const credential = await validateRunApiKey(pool, runId, sharedKey)
       assert.equal(credential.ownerId, resourceOwner)
       const verified = await auth(); assert.ok(verified)
       let appUser = ''
@@ -71,13 +71,13 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       assert.equal(scope?.userId, requester); assert.equal(appUser, requester)
       assert.equal(definition.executionIdentity!.billingAccount.model.ownerId, resourceOwner)
       assert.equal(definition.executionIdentity!.billingAccount.runtime.ownerId, requester)
-      await assert.rejects(() => apiKeyForRun(pool, runId, ownKey, 'codex', env), /apiKeyNotFound/)
+      await assert.rejects(() => validateRunApiKey(pool, runId, ownKey), /apiKeyNotFound/)
     })
     await t.test('share withdrawal blocks the next claim, token use and key read even without stop propagation', async () => {
       await reset(); await pool.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1', [sharedKey])
       await assert.rejects(() => claim(requester, device, runId, lease()), ExecutionIdentityError)
       assert.equal(await auth(), undefined)
-      await assert.rejects(() => apiKeyForRun(pool, runId, sharedKey, 'codex', env), /apiKeyNotFound/)
+      await assert.rejects(() => validateRunApiKey(pool, runId, sharedKey), /apiKeyNotFound/)
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')
       await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
     })
@@ -227,15 +227,15 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
         assert.equal(moved.agentDefinition.executionIdentity.requester, requester)
         assert.equal(moved.agentDefinition.executionIdentity.outputOwner, requester)
         await revalidateExecutionIdentity(pool, moved, pool)
-        await apiKeyForRun(pool, nextId, ownKey, 'codex', env)
+        await validateRunApiKey(pool, nextId, ownKey)
         assert.ok(await claimCloudRun(pool, actor, nextId, nextChild.deviceId, new Date(lease()), null, undefined, undefined, false))
       } finally { machines.restore() }
     })
     await t.test('preexisting runs keep the legacy own-resource path without fabricated history', async () => {
       await pool.query('UPDATE agent_runs SET "agentDefinition"=NULL WHERE id=$1', [runId])
       assert.ok(await auth())
-      await assert.rejects(() => apiKeyForRun(pool, runId, sharedKey, 'codex', env), /apiKeyNotFound/)
-      assert.equal((await apiKeyForRun(pool, runId, ownKey, 'codex', env)).ownerId, requester)
+      await assert.rejects(() => validateRunApiKey(pool, runId, sharedKey), /apiKeyNotFound/)
+      assert.equal((await validateRunApiKey(pool, runId, ownKey)).ownerId, requester)
     })
   } finally {
     mock.restoreAll()

@@ -27,7 +27,9 @@ export type IssueActionRequest = { kind: RelationKind | 'createChild' | 'dueDate
 type OperationResult = { issue?: Issue; error?: string }
 
 type ActionsProps = {
-  task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string) => void; onPriority: (value: string) => void
+  task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string, stateId?: string | null) => void; onPriority: (value: string) => void
+  /** The workspace's states as Status items (issue-state-menu.tsx); absent: the seven categories. */
+  statusItems?: TaskMenuItem[]
 }
 
 export function useIssueDetailActions({ task, userId, disabled, request, getCurrent, onSaved, onOpen, onDeleted }: ActionsProps) {
@@ -167,7 +169,7 @@ export function useIssueDetailMenu(props: ActionsProps): { items: TaskMenuItem[]
   const relation = (kind: RelationKind) => () => { setError(''); setRelation(kind) }
   const subscribe = () => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe', enabled: !subscribed })) }
   const items: TaskMenuItem[] = [
-    { id: 'status', label: tMenu('setStatus'), mark: { kind: 'icon', icon: 'status' }, submenu: statusOptions.map(status => ({ id: status.value, label: status.label, mark: { kind: 'status', value: status.value }, checked: task.status === status.value, onSelect: () => onStatus(status.value) })) },
+    { id: 'status', label: tMenu('setStatus'), mark: { kind: 'icon', icon: 'status' }, submenu: props.statusItems ?? statusOptions.map(status => ({ id: status.value, label: status.label, mark: { kind: 'status', value: status.value }, checked: task.status === status.value, onSelect: () => onStatus(status.value) })) },
     { id: 'priority', label: tMenu('setPriority'), mark: { kind: 'icon', icon: 'priority' }, submenu: priorityOptions.map(priority => ({ id: priority.value, label: priority.label, mark: { kind: 'priority', value: priority.value }, checked: task.priority === priority.value, onSelect: () => onPriority(priority.value) })) },
     { id: 'assignee', label: tMenu('assignAssignee'), mark: { kind: 'icon', icon: 'person' }, onSelect: () => onProperty('assignee') },
     { id: 'project', label: tMenu('moveToProject'), mark: { kind: 'icon', icon: 'project' }, onSelect: () => onProperty('project') },

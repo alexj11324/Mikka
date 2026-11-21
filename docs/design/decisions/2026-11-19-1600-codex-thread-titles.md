@@ -1,11 +1,11 @@
-# Conversation titles follow Codex's title generation
+# Thread titles follow Codex's title generation
 
 - Date: 2026-11-19
 - Source: Alex: 「查一下 Codex 的仓库，看看 codex 标题和长度怎么做的，我们采纳 codex 的标题生成的做法，避免太长。」 Reference: openai/codex, `codex-rs/tui/src/app/thread_title.rs`.
 - Rule: R-01; the short-title contract.
-- Replaces: the Latin limit (6 words, 60 characters) in [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md). The CJK limit, the database contract and the deterministic fallback stay as that decision states.
+- Replaces: the generated and manually entered Latin title limit (6 words, 60 characters) in [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md). The CJK limit, database contract, compact display and deterministic fallback stay as that decision states.
 
-The small model that names a conversation now follows Codex's thread titles:
+The small model that names a thread follows Codex's thread titles:
 
 - Latin text: at most 36 characters and under 5 words where possible (Codex's
   `THREAD_TITLE_MAX_CHARS` is 36). CJK text keeps its 12-character bound, since
@@ -25,12 +25,15 @@ The small model that names a conversation now follows Codex's thread titles:
   a word.
 
 Kept from Mikka, unlike Codex: issue keys and dates are still left out of the
-title, because lists draw the task code beside it. The model stays the
-Coordinator's small model (`COORDINATOR_MODEL`); Codex's own title model is
-not used. A manual rename still wins: `WRITE_THREAD_TITLE` never overwrites a
+title, because lists draw the task code beside it. The model uses the independently
+managed LiteLLM alias `mikka-title` (`TITLE_MODEL`); Codex's own title model is
+not used. Instructions are in Chinese; the generated title follows the task
+language. A manual rename still wins: `WRITE_THREAD_TITLE` never overwrites a
 title a person set.
 
 The shorter Latin limit is stricter than the stored-title constraint from
 2026-11-10-1341, so existing rows remain valid and no migration is needed.
-Compact navigation (`compactTaskTitle`) applies the same 5-word / 36-character
-bound to fallbacks and older stored titles.
+The 5-word / 36-character bound applies to newly generated and manually entered
+titles. Compact navigation (`compactTaskTitle`) keeps its existing 6-word /
+60-character display contract for fallbacks and stored titles, including citation
+labels. Stored titles are not rewritten.

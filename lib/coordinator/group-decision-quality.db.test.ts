@@ -5,8 +5,8 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { handleGroupDecisionQuality } from './group-decision-feedback'
-import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupDecisionSteps, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
-import { DECISION_MODEL } from './decision'
+import { initializeGroupDecisionTrace, priceGroupDecisions, recordGroupDecisionRoute, recordGroupDecisionSteps, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
+import { DECISION_MODEL, LEGACY_DECISION_MODEL } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { handleGroupDecisionReplay } from './group-decision-replay-api'
 import { hostedBillingScope } from '@/lib/abuse/context'
@@ -56,6 +56,13 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   await pool.query(`INSERT INTO hosted_usage VALUES ('fixture-generation',$1,'settled',1250),('fixture-generation','another-model','settled',99000),('unsettled-generation',$1,'unknown',99000),('unrelated-generation',$1,'settled',99000)`,[DECISION_MODEL])
   const billed=await handleGroupDecisionQuality(pool,directory,req)
   assert.equal((billed.body as {turns:{decisionCostUsd:number|null}[]}).turns[0].decisionCostUsd,0.00125)
+  await t.test('historical and current receipts price their exact model even with the same provider generation',async()=>{
+    const historical:DecisionExecution={...receipt,executionId:randomUUID(),modelId:LEGACY_DECISION_MODEL}
+    await pool.query(`INSERT INTO hosted_usage VALUES ('fixture-generation',$1,'settled',750)`,[LEGACY_DECISION_MODEL])
+    const steps=[receipt,historical].map((receipt,index)=>({id:`model-${index}`,phase:'legacy_primary' as const,index,status:'complete' as const,failure:null,receipt}))
+    const priced=await priceGroupDecisions(pool,steps)
+    assert.deepEqual(priced.map(step=>step.decisionCostUsd),[0.00125,0.00075])
+  })
   let replayCalls=0
   const replayReq={...req,method:'POST',body:JSON.stringify({caseId:'small-talk',policyVersion:GROUP_BASELINE_VERSION})}
   const invoke:typeof invokeDecision=async(_purpose,_input,questions)=>{

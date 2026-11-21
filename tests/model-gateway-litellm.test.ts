@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { converterCompatibilityRequest } from '../cloudflare/litellm/request.mjs'
 import test from 'node:test'
 import { handleModelGateway, type GatewayDependencies } from '../lib/model-gateway/handler'
 import type { GatewayGrant } from '../lib/model-gateway/token'
@@ -15,10 +16,10 @@ import type { GatewayGrant } from '../lib/model-gateway/token'
 const url = process.env.MIKKA_LITELLM_TEST_URL, masterKey = process.env.MIKKA_LITELLM_TEST_MASTER_KEY, provider = process.env.MIKKA_LITELLM_TEST_PROVIDER
 const skip = !url || !masterKey || !provider
 
-function dependencies(grant: GatewayGrant, settled: (number | null)[]): GatewayDependencies {
+function dependencies(grant: GatewayGrant, settled: (number | null)[], credits = false): GatewayDependencies {
   return {
     fetch, verify: async token => token === 'mkg_litellm' ? grant : null,
-    upstream: async () => ({ upstream: { kind: 'litellm', url: url!, masterKey: masterKey!, chatBaseUrl: provider!, key: 'sk-person-key' } }),
+    upstream: async () => ({ upstream: { url: url!, masterKey: masterKey!, ...(credits ? {} : { credential: { provider: 'openai' as const, apiBase: provider!, key: 'sk-person-key', chatCompletionsOnly: true } }) } }),
     reserve: async () => {}, settle: async (_id, cost) => { settled.push(cost) },
     catalogue: async () => [{ id: grant.model, vendor: 'zai', name: 'GLM', contextWindow: null, maxTokens: null, pricing: { input: 1, output: 2 }, tags: [], reasoning: [] }],
   }
@@ -48,4 +49,48 @@ test('Codex reaches a Chat Completions–only provider through LiteLLM', { skip 
   const text = await response.text()
   assert.match(text, /response\.completed/)
   assert.deepEqual(settled, [11 * 1 + 2 * 2])
+})
+
+for (const protocol of ['anthropic', 'openai'] as const) {
+  test(`Mikka credits preserve vendor/model through the LiteLLM Vercel wildcard and ${protocol} bridge`, { skip }, async () => {
+    const settled: (number | null)[] = []
+    const grant: GatewayGrant = { runId: '10000000-0000-4000-8000-000000000001', ownerId: 'alice', workspaceId: '10000000-0000-4000-8000-000000000002',
+      harness: protocol === 'anthropic' ? 'claude_code' : 'codex', model: 'fixture/provider-model', source: { kind: 'credits' } }
+    const body = protocol === 'anthropic'
+      ? { max_tokens: 50, stream: true, messages: [{ role: 'user', content: 'hi' }] }
+      : { stream: true, input: 'hi' }
+    const response = await handleModelGateway(new Request('https://mikka.test/api/model-gateway', { method: 'POST',
+      headers: { authorization: 'Bearer mkg_litellm', 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      protocol, protocol === 'anthropic' ? 'messages' : 'responses', dependencies(grant, settled, true))
+    assert.equal(response.status, 200)
+    assert.match(await response.text(), protocol === 'anthropic' ? /message_delta/ : /response\.completed/)
+    assert.deepEqual(settled, [11 * 1 + 2 * 2])
+  })
+}
+
+for (const model of ['mikka-title', 'neon/gpt-5-mini']) {
+  test(`LiteLLM requests ${model} with that upstream's credential`, { skip }, async () => {
+    const response = await fetch(url + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + masterKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hi' }] }),
+    })
+    assert.equal(response.status, 200)
+    const result = await response.json()
+    assert.equal(result.choices[0].message.content, 'Hello.')
+    assert.equal(result.usage.prompt_tokens, 11)
+    assert.ok(response.headers.get('x-litellm-call-id'))
+  })
+}
+
+test('the serving API keeps BYOK working while the shared converter is upgraded', { skip }, async () => {
+  const request = new Request(url + '/v1/messages', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + masterKey, 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'zai/glm-5', api_base: provider, api_key: 'sk-person-key', max_tokens: 50,
+      stream: true, messages: [{ role: 'user', content: 'hi' }] }),
+  })
+  const response = await fetch(await converterCompatibilityRequest(request))
+  assert.equal(response.status, 200)
+  assert.match(await response.text(), /message_delta/)
 })

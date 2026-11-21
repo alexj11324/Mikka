@@ -1,41 +1,46 @@
-import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
-import { and,eq } from 'drizzle-orm'
-import { auth,apiWorkspaceAllowed } from '@/lib/api-auth'
-import { db } from '@/lib/db'
+import { and, eq } from 'drizzle-orm'
+import { db, pool, withDatabaseTransaction } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
-import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { updateOwnedBot } from '@/lib/bot-update'
 import { ActionFailureError } from '@/lib/action-error'
+import { BOT_DEFAULT_AGENTS, botRunsOnSchema } from '@/lib/bot-settings'
+import { taskDestinationSchema } from '@/lib/task-destination'
+import { MODEL_ROUTING_EFFORTS } from '@/lib/model-routing'
+import { botBody, botRoute } from '@/lib/bot-route'
 
-const patch=z.object({name:z.string().optional(),color:z.string().optional(),shape:z.string().optional(),publicRole:z.string().max(2000).optional()}).strict()
-const response=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}})
+const patch = z.object({
+  name: z.string().optional(), color: z.string().optional(), shape: z.string().optional(), publicRole: z.string().max(2000).optional(),
+  alias: z.string().max(64).nullable().optional(), environmentId: z.string().nullable().optional(), crewTarget: taskDestinationSchema.nullable().optional(),
+  defaultAgent: z.enum(BOT_DEFAULT_AGENTS).nullable().optional(), defaultProfileId: z.string().nullable().optional(), runsOn: botRunsOnSchema.nullable().optional(),
+  effort: z.enum(MODEL_ROUTING_EFFORTS).nullable().optional(),
+  visibility: z.enum(['shared', 'private']).optional(), subscribers: z.array(z.string().min(1).max(128)).max(200).optional(),
+}).strict()
 
-async function handle(request:Request,{params}:{params:Promise<{botId:string}>}) {
-  const session=await auth.api.getSession({headers:request.headers,query:{disableCookieCache:true}})
-  if (!session) return response({error:'authRequired'},401)
-  const {botId}=await params
-  if (!z.uuid().safeParse(botId).success) return response({error:'botNotFound'},404)
-  if (request.method!=='GET' && request.headers.get('origin')!==new URL(request.url).origin) return response({error:'invalidOrigin'},403)
-  const requested=new URL(request.url).searchParams.get('workspaceId') ?? undefined
-  if (requested !== undefined && !z.uuid().safeParse(requested).success) return response({error:'validationGeneric'},400)
-  let context: Awaited<ReturnType<typeof loadWorkspaceContext>>
-  try {
-    context=await loadWorkspaceContext(requested,session.user)
-  } catch (error) {
-    if (error instanceof WorkspaceError) return response({error:'botNotFound'},404)
-    throw error
-  }
-  const {workspace}=context
-  if (!apiWorkspaceAllowed(session,workspace.id)) return response({error:'botNotFound'},404)
-  if (request.method==='GET') {
-    const [bot]=await db.select({id:bots.id,name:bots.name,color:bots.color,shape:bots.shape,publicRole:bots.publicRole}).from(bots).where(and(eq(bots.id,botId),eq(bots.ownerId,session.user.id),eq(bots.workspaceId,workspace.id))).limit(1)
-    return bot ? response(bot) : response({error:'botNotFound'},404)
-  }
-  const body=patch.safeParse(await request.json().catch(()=>null))
-  if (!body.success) return response({error:'validationGeneric'},400)
-  try {return response(await updateOwnedBot({ownerId:session.user.id,workspaceId:workspace.id},{botId,...body.data}))}
-  catch(error) {if (error instanceof ActionFailureError) return response({error:error.code},error.code==='botNotFound'?404:400);throw error}
+/** The owner's Bot: its look and Captain settings (GET), or a change to them (PATCH). */
+async function handle(request: Request, { params }: { params: Promise<{ botId: string }> }) {
+  return botRoute(request, params, async ({ userId, workspaceId, botId }) => {
+    const owner = { ownerId: userId, workspaceId }
+    const store = await import('@/lib/bot-settings-store')
+    const access = await import('@/lib/bot-access')
+    const actor = { userId, workspaceId }
+    if (request.method === 'PATCH') {
+      const { effort, visibility, subscribers, ...fields } = await botBody(request, patch)
+      if (!Object.keys(fields).length && effort === undefined && !visibility && !subscribers) throw new ActionFailureError('validationGeneric')
+      // One change, one transaction: a refused part leaves the Bot as it was.
+      await db.transaction(tx => withDatabaseTransaction(tx, async () => {
+        if (Object.keys(fields).length) await updateOwnedBot(owner, { botId, ...fields })
+        if (effort !== undefined) await store.setBotModelEffort(owner, botId, effort)
+        if (visibility) await access.setBotVisibility(actor, botId, visibility)
+        if (subscribers) await access.setBotSubscribers(actor, botId, subscribers)
+      }))
+    }
+    const [bot] = await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, publicRole: bots.publicRole }).from(bots)
+      .where(and(eq(bots.id, botId), eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId))).limit(1)
+    const settings = bot ? await store.readOwnedBotSettings(pool, owner, botId) : null
+    if (!bot || !settings) throw new ActionFailureError('botNotFound')
+    return { ...bot, ...settings, ...(await access.botAccess(actor, botId)) }
+  })
 }
-export const GET=handle
-export const PATCH=handle
+export const GET = handle
+export const PATCH = handle

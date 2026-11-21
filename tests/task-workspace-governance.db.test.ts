@@ -228,12 +228,13 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       const message = randomUUID()
       await app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text,origin) VALUES($1,$2,$3,$4,\'Isolated conversation envelope\',\'peer\')', [message, owner, inbox, sender])
       await app.query('UPDATE run_messages SET "acknowledgedAt"=now() WHERE id=$1', [message])
-      for (const invalidSender of [outside, otherOwner]) {
-        await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, inbox, invalidSender]), /taskWorkspaceMismatch/)
-      }
+      // Another tenant's sender never writes here. Another member of the same tenant may
+      // (decision 2026-11-19-2200); the mailbox checks their membership and canSteer first.
+      await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, inbox, outside]), /taskWorkspaceMismatch/)
+      await app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text,origin) VALUES($1,$2,$3,$4,\'Teammate peer envelope\',\'peer\')', [randomUUID(), owner, inbox, otherOwner])
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","runId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, outside, runA]), /taskWorkspaceMismatch/)
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","runId",text) VALUES($1,$2,$3,\'Denied\')', [randomUUID(), owner, runConflict]), /taskWorkspaceUnresolved/)
-      assert.equal((await app.query('SELECT count(*)::int AS total FROM run_messages')).rows[0].total, 1)
+      assert.equal((await app.query('SELECT count(*)::int AS total FROM run_messages')).rows[0].total, 2)
     })
     await t.test('membership is pinned until the app commit and the next read observes suspension', async () => {
       let entered!: () => void, release!: () => void

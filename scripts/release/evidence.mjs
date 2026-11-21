@@ -4,6 +4,7 @@ import { join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { releaseIdentity } from './ci-gate.mjs'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 const MANIFEST = 'mikka-release-manifest.json'
 const SHA = /^[a-f0-9]{40}$/
@@ -82,7 +83,7 @@ export async function verifyArtifact({ directory, sourceSha, sourceLock, expecte
   if (!/^[a-f0-9]{64}$/.test(expectedManifestSha256 ?? '') || hash(bytes) !== expectedManifestSha256) throw Error('releaseManifestMismatch')
   const manifest = json(bytes)
   if (manifest.version !== 1 || !SHA.test(sourceSha) || manifest.sourceSha !== sourceSha ||
-      manifest.repository !== 'alexj11324/Mikka' || manifest.buildRunId !== buildRunId || manifest.buildKind !== buildKind) throw Error('releaseSourceMismatch')
+      !officialMikkaRepository(manifest.repository, publicRepositoryId) || manifest.buildRunId !== buildRunId || manifest.buildKind !== buildKind) throw Error('releaseSourceMismatch')
   if (manifest.sourceLockSha256 !== hash(await readFile(sourceLock))) throw Error('releaseSourceLockMismatch')
   if (typeof manifest.sbom !== 'string' || !/^[A-Za-z0-9._-]+$/.test(manifest.sbom)) throw Error('releaseSbomPathInvalid')
   if (JSON.stringify(manifest.files) !== JSON.stringify(await artifactInventory(directory))) throw Error('releaseArtifactMismatch')

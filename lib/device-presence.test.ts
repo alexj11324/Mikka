@@ -5,6 +5,11 @@ import { test } from 'node:test'
 import { deviceIsOnline, deviceOnlineStates, deviceSessionOpenSql, gatewayDeviceOnline } from './device-presence'
 import { targetDevice } from './dispatch-target'
 
+// These cases mean "no gateway" when DEVICE_GATEWAY_URL is absent. A community installation with
+// BETTER_AUTH_URL and BETTER_AUTH_SECRET would select its built-in gateway instead (lib/builtin-gateway/config.ts),
+// which CI exports for database suites, so the file runs without that origin.
+delete process.env.BETTER_AUTH_URL
+
 const id = '11111111-1111-4111-8111-111111111111'
 const opened = new Date('2026-11-17T10:00:00.000Z')
 const online = { id, sessionOpenedAt: opened, sessionClosedAt: null }

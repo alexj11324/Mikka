@@ -93,6 +93,32 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
       await assert.rejects(store().command(actor,{action:'list',...input}),/invalidScheduleCommand/)
     }
   })
+  await t.test('我的 and 定时 narrow the list on the server, and the first page counts its states', async t => {
+    type Listed = { schedules: { id: string }[]; nextCursor: string | null; counts?: { active: number; paused: number } }
+    const list = (input: Record<string, unknown> = {}) => store().command(actor, { action: 'list', ...input }) as Promise<Listed>
+    const before = await Promise.all([list(), list({ owner: 'me' }), list({ trigger: 'schedule' })])
+    const insert = async (creator: string, bot: string, status: 'active' | 'paused', timing: Definition['timing']) =>
+      (await pool.query<{ id: string }>(`INSERT INTO user_schedules
+        (id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,request_origin,definition,request_definition,status,created_at)
+        VALUES (gen_random_uuid(),$1,$2,$3::uuid,'workspace',$4,gen_random_uuid()::text,'bot:' || $3::uuid::text,$5,$5,$6,'2036-01-01T00:00:00Z') RETURNING id`,
+      [creator, workspace, bot, sourceEventId, { ...def(), timing }, status])).rows[0]!.id
+    const once = def().timing
+    const mineTimed = await insert(owner, botId, 'active', once)
+    const mineManual = await insert(owner, botId, 'paused', { kind: 'manual' })
+    const theirsTimed = await insert(member, memberBot, 'active', once)
+    t.after(async () => { await pool.query('DELETE FROM user_schedules WHERE id=ANY($1::uuid[])', [[mineTimed, mineManual, theirsTimed]]) })
+    const [all, mine, timed, mineAndTimed] = await Promise.all([list(), list({ owner: 'me' }), list({ trigger: 'schedule' }), list({ owner: 'me', trigger: 'schedule' })])
+    const ids = (page: Listed) => page.schedules.map(row => row.id)
+    assert.deepEqual(ids(all).slice(0, 3).sort(), [mineTimed, mineManual, theirsTimed].sort())
+    assert.ok(ids(mine).includes(mineTimed) && ids(mine).includes(mineManual) && !ids(mine).includes(theirsTimed), '我的 lists only the reader’s own')
+    assert.ok(ids(timed).includes(mineTimed) && ids(timed).includes(theirsTimed) && !ids(timed).includes(mineManual), '定时 leaves out manual-only automations')
+    assert.deepEqual(ids(mineAndTimed).filter(id => [mineTimed, mineManual, theirsTimed].includes(id)), [mineTimed])
+    assert.deepEqual(all.counts, { active: before[0].counts!.active + 2, paused: before[0].counts!.paused + 1 })
+    assert.deepEqual(mine.counts, { active: before[1].counts!.active + 1, paused: before[1].counts!.paused + 1 })
+    assert.deepEqual(timed.counts, { active: before[2].counts!.active + 2, paused: before[2].counts!.paused })
+    assert.equal((await list({ scheduleId: mineTimed })).counts, undefined, 'one automation’s read carries no counts')
+    for (const input of [{ owner: 'someone' }, { trigger: 'github' }]) assert.equal(scheduleListInput.safeParse(input).success, false)
+  })
   await t.test('workspace trash restores the same schedule under creator authority without replaying a deleted occurrence', async t => {
     const originalNow = now
     const d = def()

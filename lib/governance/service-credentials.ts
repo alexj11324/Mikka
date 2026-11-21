@@ -90,6 +90,46 @@ async function serviceOrganizationAllowed(tx: PoolClient, organizationId: string
   }, { kind: 'service' })
 }
 
+/**
+ * Authenticate an `mksvc_` bearer as its service identity for the `/api/v1`
+ * interop routes (decision 2026-11-19-2200). Same checks as the Project read:
+ * a live team Workspace, an enabled unexpired credential, the Organization
+ * binding of an `mksvc_org_` key and the Organization's machine-credential
+ * policy. It proves only the nonhuman principal; every resource still needs
+ * that service's explicit grant.
+ */
+export async function authenticateServiceCredential(header: string | null): Promise<{ workspaceId: string; serviceIdentityId: string } | null> {
+  const credentials = /^Bearer +(\S+)$/i.exec(header ?? '')?.[1]
+  const bearer = /^mksvc_(org_)?[A-Za-z0-9_-]{43}$/.exec(credentials ?? '')
+  if (!bearer) return null
+  const [token, organizationBound] = bearer
+  const hash = digest(token)
+  const identity = await workspaceDb.transaction(async workspace => {
+    const { rows: [candidate] } = await workspace.execute<{ id: string; workspaceId: string }>(sql`SELECT id,"workspaceId" FROM mikka_workspace_service_identities
+      WHERE "credentialHash"=${hash}`)
+    if (!candidate) return null
+    const { workspaceId, id } = candidate
+    const { rows: [tenant] } = await workspace.execute(sql`SELECT id FROM mikka_workspaces WHERE id=${workspaceId}::uuid AND kind='team' FOR SHARE`)
+    if (!tenant) return null
+    const { rows: [valid] } = await workspace.execute(sql`SELECT id FROM mikka_workspace_service_identities WHERE id=${id}::uuid
+      AND "workspaceId"=${workspaceId}::uuid AND "credentialHash"=${hash} AND enabled
+      AND ("credentialExpiresAt" IS NULL OR "credentialExpiresAt">clock_timestamp()) FOR SHARE`)
+    if (!valid) return null
+    const link = await organizationLink(workspace, workspaceId)
+    if (link?.archived) return null
+    if (organizationBound) {
+      if (!link) return null
+      const binding = await workspace.execute(sql`SELECT 1 FROM mikka_service_key_organization_bindings
+        WHERE "identityId"=${id}::uuid AND "workspaceId"=${workspaceId}::uuid
+          AND "organizationId"=${link.organizationId}::uuid AND "credentialHash"=${hash} FOR SHARE`)
+      if (!binding.rowCount) return null
+    }
+    if (link && !await writeTransaction(pool, app => serviceOrganizationAllowed(app, link.organizationId))) return null
+    return { workspaceId, serviceIdentityId: id }
+  })
+  return identity
+}
+
 /** The bearer proves only this nonhuman principal. The existing SQL ACL checks its
  * explicit Project grant, expiry and every ancestor on each bounded read. */
 type ProjectRead = { after: string | null } | { projectId: string }

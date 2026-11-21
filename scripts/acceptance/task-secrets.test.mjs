@@ -137,10 +137,19 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
     members: [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] }
   const client = {
     clear() {},
-    async request(path) {
+    async request(path, init = {}) {
       calls.push(path)
       if (path === '/api/auth/sign-in/email' || path === '/api/auth/sign-out') return new Response('{}')
-      if (path === `/api/agents/eve/v1/session?botId=${botId}`) return Response.json({ ok: true, sessionId: 'wrun_secrets' })
+      if (path === `/api/agents/eve/v1/session?botId=${botId}`) {
+        const body = JSON.parse(init.body ?? '{}')
+        if (body.message) {
+          assert.match(init.headers['x-mikka-submission-id'], /^[a-f0-9-]{36}$/)
+          assert.equal(body.clientContext.profileId, profileId)
+          dispatchInput = JSON.parse(body.message.match(/参数：(.*)。使用/)[1]); active = true
+          return Response.json({ ok: true, sessionId: 'wrun_secrets', deliveryId: 'delivery_fixture' }, { status: 202 })
+        }
+        return Response.json({ ok: true, sessionId: 'wrun_secrets' })
+      }
       assert.equal(path, `/api/agents/eve/v1/session/wrun_secrets/stream?botId=${botId}&startIndex=0`)
       return eveResponse(nativeCall('dispatch', dispatchInput, { runId: actualRunId ?? runId }))
     },
@@ -195,7 +204,6 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
       if (name === 'execution-settings.getBotModelMenu') return { groups: [{ kind: 'subscription', provider: 'codex', options: [selected] }] }
       if (name === 'execution-settings.chooseBotModel') return { current: { ...selected, kind: 'subscription', chosen: true, available: true } }
       if (name === 'issues.saveIssue') { issue = { ...args[0], id: issueId, revision: 1 }; return { issue } }
-      if (name === 'coordinator.sendCoordinatorMessage') { dispatchInput = JSON.parse(args[0].match(/参数：(.*)。使用/)[1]); active = true; return {} }
       if (['coordinator.stopCoordinatorTurn', 'issue-operations.setIssueDeleted'].includes(name)) return {}
       if (name === 'user-secrets.createMySecret') {
         privateSecret = { id: privateSecretId, name: args[0].name, note: args[0].note, kind: 'secret', delivery: { mode: 'protected' } }

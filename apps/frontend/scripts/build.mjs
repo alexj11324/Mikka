@@ -33,17 +33,26 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
     const name = relative(outdir, path).split(sep).join('/')
     if (clean && !assets.has(name)) throw new Error(`FRONTEND_ASSET_UNEXPECTED: ${name}`)
   }
-  const fingerprint = createHash('sha256')
   // Incremental desktop development retains old chunks for existing windows,
   // but only this build's emitted assets identify the current application.
+  //
+  // The identity is the emitted *content* alone. A chunk file name already
+  // encodes that chunk's own hash, so folding the name back in counts the same
+  // bytes twice and makes the identity depend on how the bundler happened to
+  // split and order modules; an equivalent chunking split then changes the
+  // identity of an application that did not change. Sorting the per-asset
+  // digests keeps the result independent of emission order as well.
+  const digests = []
   for (const name of [...assets.keys()].sort()) {
     const asset = assets.get(name)
     const content = await readFile(resolve(outdir, name))
     const emitted = Buffer.from(asset.type === 'chunk' ? asset.code : asset.source)
     if (!content.equals(emitted)) throw new Error(`FRONTEND_ASSET_CONTENT_MISMATCH: ${name}`)
-    fingerprint.update(name)
-    fingerprint.update(content)
+    digests.push(createHash('sha256').update(content).digest('hex'))
   }
+  digests.sort()
+  const fingerprint = createHash('sha256')
+  for (const digest of digests) fingerprint.update(digest)
   const rendererBuild = fingerprint.digest('hex')
   const result = { ...inventory, rendererBuild }
   await writeFile(resolve(outdir, 'renderer-build.js'), `export const rendererBuild = ${JSON.stringify(rendererBuild)};\n`)
