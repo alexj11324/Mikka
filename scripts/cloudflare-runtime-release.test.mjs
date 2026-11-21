@@ -305,7 +305,7 @@ set -euo pipefail
   } finally { await rm(work, { recursive: true, force: true }) }
 })
 
-test('maintenance patch is captured from the genuine driver and changes only installed Eve World Postgres 5.4.1', async () => {
+test('maintenance patch is captured from the genuine driver and changes only installed Eve World Postgres 5.2.0', async () => {
   const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
   const steps = workflow.split('\n  publish:\n')[1]
   const step = name => steps.split('      - name: ' + name + '\n')[1].split('\n      - ')[0]
@@ -334,9 +334,9 @@ test('maintenance patch is captured from the genuine driver and changes only ins
     const original = git('rev-parse', 'HEAD')
     const patch = 'diff --git a/dist/storage.js b/dist/storage.js\n--- a/dist/storage.js\n+++ b/dist/storage.js\n@@ -1,3 +1,3 @@\n before\n-old\n+patched\n after\n'
     const sha = createHash('sha256').update(patch).digest('hex')
-    await mkdir(join(work, 'patches'))
-    await writeFile(join(work, 'patches/@workflow__world-postgres@5.4.1.patch'), patch)
-    git('add', 'patches')
+    await mkdir(join(work, 'cloudflare/eve-runtime/backports'), { recursive: true })
+    await writeFile(join(work, 'cloudflare/eve-runtime/backports/@workflow__world-postgres@5.2.0.patch'), patch)
+    git('add', 'cloudflare')
     commit('reviewed startup patch on current main')
     const driver = git('rev-parse', 'HEAD')
     const runnerTemp = join(work, 'node_modules/runner-temp')
@@ -355,7 +355,7 @@ test('maintenance patch is captured from the genuine driver and changes only ins
     const world = join(work, 'node_modules/.pnpm/fixture/node_modules/@workflow/world-postgres')
     await mkdir(join(world, 'dist'), { recursive: true })
     const packageJson = version => JSON.stringify({ name: '@workflow/world-postgres', version, main: 'dist/index.js' })
-    await writeFile(join(world, 'package.json'), packageJson('5.4.1'))
+    await writeFile(join(world, 'package.json'), packageJson('5.2.0'))
     await writeFile(join(world, 'dist/index.js'), '')
     const storage = join(world, 'dist/storage.js')
     await writeFile(storage, 'before\nold\nafter\n')
@@ -368,7 +368,7 @@ test('maintenance patch is captured from the genuine driver and changes only ins
     await writeFile(captured, patch)
     await writeFile(join(world, 'package.json'), packageJson('5.1.0'))
     assert.notEqual(invoke(applyName).status, 0, 'the patch is only valid for the pinned package version')
-    await writeFile(join(world, 'package.json'), packageJson('5.4.1'))
+    await writeFile(join(world, 'package.json'), packageJson('5.2.0'))
     await writeFile(storage, 'changed-context\nold\nafter\n')
     const fuzz = invoke(applyName)
     assert.notEqual(fuzz.status, 0, 'context mismatch must not be accepted with patch fuzz')
