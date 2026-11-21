@@ -18,7 +18,7 @@ import { readPeerFailures } from './diagnostics.mjs'
 import { MVP_SUBSCRIPTION_MODEL, seedMvpSubscription, seedMvpExecutionOrder } from './subscription.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
-import { DESKTOP_RPC_VERSION, encode, decode } from '../../lib/desktop-rpc/wire.ts'
+import { submitEveMessage } from '../../scripts/acceptance/eve-session.mjs'
 import { HostedUsageStore } from '../../lib/abuse/store.ts'
 
 assertMvpEnvironment()
@@ -174,15 +174,9 @@ try {
       await seedMvpExecutionOrder(pool, ownerId, subscription.workspaceId, device.id, subscription.connectionId)
       await service('/scenario/device', { deviceId: device.id })
       checkpoint(`${kind}-http-dispatch`)
-      const response = await accounts.owner.request('/api/rpc', { method: 'POST', headers: {
-        'content-type': 'application/json', accept: 'application/json', 'x-mikka-rpc': '1', traceparent,
-        'x-posthog-session-id': sessionId, 'x-posthog-distinct-id': ownerId,
-      }, body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action: 'coordinator.sendCoordinatorMessage',
-        args: encode([`Create the requested repository task. ${marker} ${privatePrompt}`, null, null, randomUUID(), { kind: 'device', deviceId: device.id }]) }) })
-      assert.equal(response.status, 200, 'HTTP_DISPATCH_FAILED')
-      const envelope = await response.json()
-      assert.equal(envelope.ok, true, 'RPC_DISPATCH_FAILED')
-      assert.deepEqual(decode(envelope.result), { queued: true })
+      await submitEveMessage(accounts.owner, null, `Create the requested repository task. ${marker} ${privatePrompt}`, randomUUID(),
+        { taskDestination: { kind: 'device', deviceId: device.id }, expectedOwnerId: ownerId, expectedWorkspaceId: subscription.workspaceId },
+        { traceparent, 'x-posthog-session-id': sessionId, 'x-posthog-distinct-id': ownerId })
       checkpoint(`${kind}-run-completion`)
       let execution
       const run = await until(async () => {

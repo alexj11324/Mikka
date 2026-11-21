@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { actionsMikkaRepository, hasGitHubOrigin, privateMikkaRepository } from './cloudflare-source.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA = /^[a-f0-9]{40}$/
@@ -23,11 +23,11 @@ const git = (args, cwd = root, env = process.env) => command('git', args, { cwd,
 
 export function sourceContext(env, publicSha, privateSha) {
   if (!SHA.test(publicSha ?? '') || !SHA.test(privateSha ?? '')) fail('CI_SOURCE_SHA_REQUIRED')
-  if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'
-      || env.GITHUB_REPOSITORY_ID !== '1427517699') fail('CI_PUBLIC_GITHUB_CONTEXT_REQUIRED')
+  const repository = actionsMikkaRepository(env)
+  if (env.GITHUB_ACTIONS !== 'true' || !repository) fail('CI_PUBLIC_GITHUB_CONTEXT_REQUIRED')
   if (env.GITHUB_EVENT_NAME !== 'workflow_dispatch' || env.GITHUB_REF !== 'refs/heads/main') fail('CI_MANUAL_MAIN_REQUIRED')
   if (env.GITHUB_SHA !== publicSha || env.GITHUB_WORKFLOW_SHA !== publicSha) fail('CI_PUBLIC_SOURCE_MISMATCH')
-  if (env.GITHUB_WORKFLOW_REF !== 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main') fail('CI_WORKFLOW_REQUIRED')
+  if (env.GITHUB_WORKFLOW_REF !== repository + '/.github/workflows/cloudflare-api-image.yml@refs/heads/main') fail('CI_WORKFLOW_REQUIRED')
   if (env.GITHUB_ACTOR_ID !== '183887963' || env.GITHUB_ACTOR !== 'alexj11324'
       || env.GITHUB_TRIGGERING_ACTOR !== 'alexj11324') fail('CI_RELEASE_OWNER_REQUIRED')
   if (env.OVERLAY_SHA !== privateSha) fail('CI_OVERLAY_SOURCE_MISMATCH')
@@ -72,11 +72,11 @@ export async function withOverlayKey(env, action) {
   }
 }
 
-export function validateReceipt(receipt, context) {
+export function validateReceipt(receipt, context, overlayRepository = 'alexj11324/mikka-hosted-ui') {
   if (receipt?.version !== 1 || receipt.publication !== 'none' || receipt.publicSha !== context.publicSha
       || receipt.privateSha !== context.privateSha || receipt.provider !== context.provider) fail('CI_RECEIPT_INVALID')
   for (const [name, value] of Object.entries(context)) if (receipt.context?.[name] !== value) fail('CI_RECEIPT_SOURCE_MISMATCH')
-  if (receipt.overlayCheckout?.repository !== 'alexj11324/mikka-hosted-ui'
+  if (receipt.overlayCheckout?.repository !== overlayRepository
       || receipt.overlayCheckout.requestedSha !== context.privateSha
       || receipt.overlayCheckout.actualSha !== context.privateSha) fail('CI_OVERLAY_RECEIPT_MISMATCH')
   if (receipt.target !== 'native-api') fail('CI_BUILD_TARGET_INVALID')
@@ -84,9 +84,9 @@ export function validateReceipt(receipt, context) {
   return receipt
 }
 
-async function verifyReceipt(context) {
+async function verifyReceipt(context, overlayRepository) {
   const receipt = JSON.parse(await readFile(join(root, '.cloudflare-ci/receipt.json'), 'utf8'))
-  validateReceipt(receipt, context)
+  validateReceipt(receipt, context, overlayRepository)
   if (git(['rev-parse', 'HEAD']) !== receipt.publicSha || git(['rev-parse', 'HEAD'], join(root, '.hosted-ui')) !== context.privateSha) fail('CI_CHECKOUT_CHANGED')
   for (const directory of [root, join(root, '.hosted-ui')]) git(['diff', '--quiet', 'HEAD', '--'], directory)
   console.log('MIKKA_GITHUB_API_SOURCE_RECEIPT=' + JSON.stringify(receipt))
@@ -97,13 +97,14 @@ export async function runCi({ env = process.env, verify = false } = {}) {
   if (Number(process.versions.node.split('.')[0]) < 22) fail('CI_NODE_22_REQUIRED')
   const publicSha = git(['rev-parse', 'HEAD'])
   const context = sourceContext(env, publicSha, env.OVERLAY_SHA)
-  if (verify) return verifyReceipt(context)
+  const overlayRepository = privateMikkaRepository('mikka-hosted-ui', env)
+  if (verify) return verifyReceipt(context, overlayRepository)
   git(['diff', '--quiet', 'HEAD', '--'])
-  if (!hasGitHubOrigin(git(['remote', 'get-url', 'origin']), 'alexj11324/Mikka')) fail('CI_PUBLIC_REPOSITORY_REQUIRED')
+  if (!hasGitHubOrigin(git(['remote', 'get-url', 'origin']), context.repository)) fail('CI_PUBLIC_REPOSITORY_REQUIRED')
   const overlay = join(root, '.hosted-ui')
   await withOverlayKey(env, async keyEnv => {
     command('git', ['init', '--quiet', overlay], { env: keyEnv })
-    command('git', ['fetch', '--quiet', '--depth=1', 'git@github.com:alexj11324/mikka-hosted-ui.git', context.privateSha], { cwd: overlay, env: keyEnv })
+    command('git', ['fetch', '--quiet', '--depth=1', 'git@github.com:' + overlayRepository + '.git', context.privateSha], { cwd: overlay, env: keyEnv })
     command('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], { cwd: overlay, env: keyEnv })
   })
   if (git(['rev-parse', 'HEAD'], overlay) !== context.privateSha) fail('CI_OVERLAY_SOURCE_MISMATCH')
@@ -124,11 +125,11 @@ export async function runCi({ env = process.env, verify = false } = {}) {
     console.log(JSON.stringify({ stage: BASE_STAGES[index], status: 'passed' }))
   }
   const receipt = { version: 1, context, publicSha, privateSha: context.privateSha, provider: context.provider,
-    overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: context.privateSha, actualSha: context.privateSha },
+    overlayCheckout: { repository: overlayRepository, requestedSha: context.privateSha, actualSha: context.privateSha },
     workRoot: root, target: 'native-api', stages, node: process.version, packageManager: 'pnpm@10.34.3', publication: 'none' }
   await mkdir(join(root, '.cloudflare-ci'), { recursive: true })
   await writeFile(join(root, '.cloudflare-ci/receipt.json'), JSON.stringify(receipt) + '\n', { mode: 0o600 })
-  return verifyReceipt(context)
+  return verifyReceipt(context, overlayRepository)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

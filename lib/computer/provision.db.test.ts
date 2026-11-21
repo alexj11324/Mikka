@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { ensureCloudMachine } from './provision'
+import { E2BKeyError } from '../secrets/flag'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Computer database test URL required')
@@ -20,8 +21,11 @@ test('real PostgreSQL: a gone or out-of-date machine is replaced, unless a run l
   process.env.MIKKA_CLOUD_WORKER_SHA = CURRENT
   try {
     await pool.query(`CREATE TABLE cloud_machines ("workspaceId" uuid NOT NULL, "ownerId" text NOT NULL, "sandboxId" text UNIQUE, "operationId" uuid NOT NULL,
-      "runtimeReady" boolean NOT NULL DEFAULT false, state text NOT NULL DEFAULT 'sleeping', "lastActiveAt" timestamptz NOT NULL DEFAULT now(),
+      "runtimeReady" boolean NOT NULL DEFAULT false, state text NOT NULL DEFAULT 'sleeping', "errorCode" text, "lastActiveAt" timestamptz NOT NULL DEFAULT now(),
       "deviceId" uuid, "provisionLeaseId" uuid, "provisionLeaseUntil" timestamptz, PRIMARY KEY ("workspaceId","ownerId"));
+      CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY);
+      CREATE TABLE workspace_e2b_keys ("createdBy" text);
+      INSERT INTO user_e2b_keys VALUES ('alice');
       CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY, "workspaceId" uuid NOT NULL, "ownerId" text NOT NULL);
       CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY);
@@ -48,6 +52,32 @@ test('real PostgreSQL: a gone or out-of-date machine is replaced, unless a run l
       }
       return { calls, provider, runtime: provider as never }
     }
+
+    const keyless = { userId: 'no-key', workspaceId: randomUUID() }
+    const keylessRuntime = runtime({})
+    await assert.rejects(ensureCloudMachine(pool, keyless, keylessRuntime.runtime), error => error instanceof E2BKeyError && error.code === 'e2b_key_missing')
+    assert.equal(await machine(keyless), undefined, 'missing credentials must not reserve a machine')
+    assert.deepEqual(keylessRuntime.calls.created, [])
+    await pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state) VALUES ($1,$2,$3,\'sleeping\')', [keyless.workspaceId, keyless.userId, randomUUID()])
+    await assert.rejects(ensureCloudMachine(pool, keyless, keylessRuntime.runtime), error => error instanceof E2BKeyError && error.code === 'e2b_key_missing')
+    assert.equal((await machine(keyless)).state, 'sleeping')
+
+    const failedActor = { userId: 'alice', workspaceId: randomUUID() }
+    const failed = runtime({})
+    const providerError = new E2BKeyError('e2b_limit_reached')
+    failed.provider.createComputer = async () => { throw providerError }
+    await assert.rejects(ensureCloudMachine(pool, failedActor, failed.runtime), error => error === providerError)
+    assert.equal((await machine(failedActor)).state, 'error')
+    assert.equal((await machine(failedActor)).errorCode, 'e2b_limit_reached')
+    const recovered = runtime({})
+    const create = recovered.provider.createComputer
+    recovered.provider.createComputer = async (workspaceId, operationId) => {
+      assert.equal((await machine(failedActor)).errorCode, null, 'a new attempt clears its previous error before calling the provider')
+      return create(workspaceId, operationId)
+    }
+    await ensureCloudMachine(pool, failedActor, recovered.runtime)
+    assert.equal((await machine(failedActor)).state, 'running')
+    assert.equal((await machine(failedActor)).errorCode, null)
 
     // Killed at E2B (or expired while paused): a new machine on a new operation id.
     const goneActor = await setup('gone-box')
@@ -103,11 +133,14 @@ test('real PostgreSQL: a gone or out-of-date machine is replaced, unless a run l
     retry.provider.installComputerRuntime = async () => { throw installationError }
     await assert.rejects(ensureCloudMachine(pool, retryActor, retry.runtime), error => error === installationError)
     const interrupted = await machine(retryActor)
+    assert.equal(interrupted.state, 'error')
+    assert.equal(interrupted.errorCode, 'provision_failed')
     assert.equal(interrupted.sandboxId, `new-${retry.calls.created[0]}`)
     assert.equal(interrupted.runtimeReady, false)
     retry.provider.installComputerRuntime = install
     assert.equal((await ensureCloudMachine(pool, retryActor, retry.runtime))?.sandboxId, interrupted.sandboxId)
     assert.deepEqual([retry.calls.created.length, retry.calls.installed], [1, 1])
+    assert.equal((await machine(retryActor)).errorCode, null)
 
     // Out of date but a run is live on its worker: kept until the run ends.
     const deviceId = randomUUID()

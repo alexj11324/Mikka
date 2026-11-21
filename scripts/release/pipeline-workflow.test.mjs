@@ -24,7 +24,7 @@ test('only actual successful same-repository main pushes or explicit recovery ac
     "github.event_name == 'workflow_run'", "github.event.workflow_run.event == 'push'", "github.event.workflow_run.conclusion == 'success'",
     'github.event.workflow_run.head_repository.id == github.event.repository.id']) assert.ok(job.if.includes(required))
   assert.equal(job.environment, 'cloudflare-runtime-release')
-  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read', 'id-token': 'write' })
+  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read', issues: 'read', 'id-token': 'write' })
   const select = job.steps.find(step => step.id === 'select')
   assert.equal(select.run, 'node scripts/release/pipeline-inputs.mjs')
   const token = job.steps.find(step => step.name === 'Read the existing Cloudflare deployment identity')
@@ -34,6 +34,25 @@ test('only actual successful same-repository main pushes or explicit recovery ac
   assert.equal(apply['working-directory'], 'operations')
   assert.equal(apply.if, "steps.select.outputs.status == 'selected'")
   assert.doesNotMatch(source, /GITHUB_EVENT_NAME:\s|GITHUB_REF:\s|GITHUB_ACTOR_ID:\s/)
+})
+
+test('automatic staging accepts the merge queue pair but manual recovery remains owner-only', () => {
+  const allowed = new Function('github', 'inputs', `return ${workflow.jobs.pipeline.if}`)
+  const github = { repository_id: '1427517699', repository_owner_id: '359279274', ref: 'refs/heads/main',
+    actor_id: '118344674', actor: 'github-merge-queue[bot]', triggering_actor: 'github-merge-queue[bot]', event_name: 'workflow_run', event: {
+      repository: { id: 1427517699 }, workflow_run: { event: 'push', head_branch: 'main', conclusion: 'success', head_repository: { id: 1427517699 } } } }
+  assert.equal(allowed(github, {}), true)
+  assert.equal(allowed({ ...github, triggering_actor: 'alexj11324' }, {}), true)
+  assert.equal(allowed({ ...github, actor_id: '183887963', actor: 'alexj11324' }, {}), true)
+  for (const patch of [{ actor_id: '7' }, { actor: 'outsider' }, { actor_id: undefined }, { triggering_actor: 'outsider' },
+    { ref: 'refs/heads/feature' }, { repository_id: '7' }, { repository_owner_id: '7' }])
+    assert.equal(allowed({ ...github, ...patch }, {}), false)
+  for (const patch of [{ event: 'workflow_dispatch' }, { head_branch: 'feature' }, { conclusion: 'failure' }, { head_repository: { id: 7 } }])
+    assert.equal(allowed({ ...github, event: { ...github.event, workflow_run: { ...github.event.workflow_run, ...patch } } }, {}), false)
+  for (const phase of ['pipeline-stage', 'pipeline-rollback']) {
+    assert.equal(allowed({ ...github, event_name: 'workflow_dispatch' }, { phase }), false)
+    assert.equal(allowed({ ...github, actor_id: '183887963', event_name: 'workflow_dispatch' }, { phase }), true)
+  }
 })
 
 test('public records cannot receive the private rollback receipt or runtime credentials', () => {
@@ -100,7 +119,7 @@ test('read-only migration admission precedes candidate preparation and deploymen
     const index = job.steps.indexOf(admission)
     assert.equal(admission['working-directory'], 'operations')
     assert.equal(admission.if, "steps.select.outputs.status == 'selected'")
-    assert.deepEqual(admission.env, { GH_TOKEN: expectedToken, MIKKA_PUBLIC_ACTIONS_TOKEN: expectedToken })
+    assert.deepEqual(admission.env, { GH_TOKEN: expectedToken, MIKKA_PUBLIC_ACTIONS_TOKEN: '${{ github.token }}' })
     assert.equal(admission['continue-on-error'], undefined)
     assert.equal(workflow.env?.CLOUDFLARE_API_TOKEN, undefined)
     assert.equal(job.env?.CLOUDFLARE_API_TOKEN, undefined)

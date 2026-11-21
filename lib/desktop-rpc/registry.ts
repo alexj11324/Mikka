@@ -168,7 +168,6 @@ const functions = {
   'coordinator.coordinatorCitationSources': actions8.coordinatorCitationSources,
   'coordinator.coordinatorReasoning': actions8.coordinatorReasoning,
   'coordinator.pollBotChatSummaries': actions8.pollBotChatSummaries,
-  'coordinator.sendCoordinatorMessage': actions8.sendCoordinatorMessage,
   'coordinator.welcomeCoordinator': actions8.welcomeCoordinator,
   'coordinator.stopCoordinatorTurn': actions8.stopCoordinatorTurn,
   'coordinator.retryCoordinatorTurn': actions8.retryCoordinatorTurn,

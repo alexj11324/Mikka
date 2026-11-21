@@ -11,6 +11,8 @@ import {
   PaidResourceError,
 } from './policy'
 
+const abandonedHold = `"settledAt" IS NULL AND "createdAt" < now() - interval '10 minutes'
+  AND (state='pending' OR (state='unknown' AND "generationId" IS NULL))`
 type Query = Pick<PoolClient, 'query'>
 export type HostedQuotaLease = { limit: number; close(): Promise<void>;
   billingAccount?: { workspaceId: string; organizationId: string | null } }
@@ -59,8 +61,7 @@ export class HostedUsageStore {
   private async releaseAbandoned(tx: Query, workspaceId: string) {
     const reaped = await tx.query<{ reservedFree: string }>(
       `UPDATE hosted_usage SET state='failed',"settledAt"=now()
-       WHERE "workspaceId"=$1 AND "settledAt" IS NULL AND "createdAt" < now() - interval '10 minutes'
-         AND (state='pending' OR (state='unknown' AND "generationId" IS NULL))
+       WHERE "workspaceId"=$1 AND (${abandonedHold})
        RETURNING "reservedFree"`,
       [workspaceId],
     )
@@ -169,7 +170,7 @@ export class HostedUsageStore {
       rows: [row],
     } = await tx.query(
       `SELECT COALESCE(sum("holdMicroUsd"),0)::float8 AS held, count(*) FILTER (WHERE state='pending')::int AS calls
-       FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown')`,
+       FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown') AND NOT (${abandonedHold})`,
       [workspaceId],
     )
     return row as { held: number; calls: number }
@@ -241,7 +242,7 @@ export class HostedUsageStore {
         `INSERT INTO hosted_usage (id,"workspaceId",model,state,"holdMicroUsd","usageWorkspaceId","billingOrganizationId","executionOwnerId","actorId","usageProjectId","usageThreadId","usageRunId","attributionComplete")
           VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [id, workspaceId, model, estimate, attribution.workspaceId, attribution.billingOrganizationId ?? null, attribution.ownerId ?? null,
-          attribution.actorId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
+          attribution.actorId ?? attribution.ownerId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
       )
       return { id, workspaceId }
     }) } finally { await quota?.close() }

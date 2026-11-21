@@ -1,16 +1,12 @@
-import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { NextResponse } from '@/lib/server-runtime/server'
-import { afterJob } from '@/lib/background'
 import { auth } from '@/lib/api-auth'
-import { db } from '@/lib/db'
-import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError, readPersonalSubmissionBody, PersonalSubmissionBodyError } from '@/lib/coordinator-submission'
 import { chatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
 
 
 /** `GET /api/coordinator/messages`: the person's conversation with their Coordinator, oldest first. */
@@ -34,31 +30,6 @@ async function handleGET(request: Request) {
   return NextResponse.json({ ...chat, ...state }, { headers })
 }
 
-/**
- * `POST /api/coordinator/messages` with `{ text?, images?: [{dataUrl}], submissionId? }`: a message to the
- * Coordinator. It lands in the inbox and wakes a turn; the reply shows up in
- * the conversation.
- */
-async function handlePOST(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  noteLogUser(session?.user?.id)
-  if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
-  let body:unknown
-  try{body=await readPersonalSubmissionBody(request)}catch(error){if(error instanceof PersonalSubmissionBodyError)return NextResponse.json({error:'messageRequired'},{status:error.status});throw error}
-  const parsed = personalSubmissionInput.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: 'messageRequired' }, { status: 400 })
-  const userId = session.user.id
-  // A message enters the Coordinator chat of the workspace it was sent in (a token's own workspace): resolved here.
-  const botId = await openChatBotId(session.user, null)
-  try { await recordPersonalSubmission(db, userId, parsed.data.text, { botId, submissionId: parsed.data.submissionId, images:parsed.data.images, ...(!request.headers.has('authorization')&&request.headers.get('cookie')&&request.headers.get('origin')===new URL(request.url).origin?{humanSessionId:session.session.id}:{}) }) }
-  catch (error) {
-    if (error instanceof ChatFileError) return Response.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 400 })
-    if (error instanceof SubmissionConflictError) return NextResponse.json({ error: 'submissionConflict' }, { status: 409 })
-    throw error
-  }
-  afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
-  return NextResponse.json({ queued: true, enabled: await coordinatorEnabled(userId, botId) }, { status: 202 })
-}
-
 export const GET = withRequestLog('/api/coordinator/messages', handleGET)
-export const POST = withRequestLog('/api/coordinator/messages', handlePOST)
+export const POST = withRequestLog('/api/coordinator/messages', () =>
+  Response.json({ error: 'coordinatorSendRetired' }, { status: 410, headers: { 'Cache-Control': 'no-store' } }))

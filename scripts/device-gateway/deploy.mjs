@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 import { affectsWorker } from './select-release.mjs'
 import { parsePromotionRecord, readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 
@@ -125,7 +126,7 @@ export function gitRepository(cwd = ROOT) {
   return {
     async refreshMain() {
       // Public repo, no stored Git credential. Fetch only the reviewed main ref.
-      await git(['fetch', '--quiet', '--no-tags', 'https://github.com/alexj11324/Mikka.git', 'refs/heads/main'])
+      await git(['fetch', '--quiet', '--no-tags', 'https://github.com/' + (actionsMikkaRepository(process.env) || 'alexj11324/Mikka') + '.git', 'refs/heads/main'])
       return git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'])
     },
     async contains(ancestor, descendant) {
@@ -213,7 +214,7 @@ async function wranglerDeploy(sourceCommit, { accountId, cloudflareToken }) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'
+    if (process.env.GITHUB_ACTIONS !== 'true' || !actionsMikkaRepository(process.env)
       || process.env.GITHUB_REF !== 'refs/heads/main' || !['push', 'workflow_dispatch'].includes(process.env.GITHUB_EVENT_NAME)) fail('reviewed_main_workflow_required')
     const report = await deployGateway({ sourceCommit: process.env.GITHUB_SHA, accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
       cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN })

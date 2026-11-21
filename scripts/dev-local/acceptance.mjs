@@ -1,3 +1,4 @@
+import { submitEveMessage } from '../acceptance/eve-session.mjs'
 // HTTP + real daemon acceptance. Never import Playwright or impersonate CI.
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
@@ -115,11 +116,6 @@ async function command(args) {
 }
 async function json(account, path, body, method = body ? 'POST' : 'GET') {
   await assertTestModelRequest(new Request(`http://127.0.0.1${path}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }))
-  if (method === 'POST' && ['/api/coordinator/messages', '/api/mobile/chat'].includes(path)) {
-    const modelResponse = await account.request(`/api/mobile/model${body?.botId ? `?bot=${body.botId}` : ''}`)
-    assert.ok(modelResponse.ok, 'Cannot verify the test bot model before submitting a prompt')
-    assertFlashTestModel((await modelResponse.json()).current?.modelId)
-  }
   const response = await account.request(path, { method, ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) })
   if (!response.ok) {
     const value = await response.json().catch(() => null)
@@ -131,6 +127,12 @@ async function json(account, path, body, method = body ? 'POST' : 'GET') {
   }
   return response.json()
 }
+async function sendMessage(account, text, submissionId) {
+  const modelResponse = await account.request('/api/mobile/model')
+  assert.ok(modelResponse.ok, 'Cannot verify the test bot model before submitting a prompt')
+  assertFlashTestModel((await modelResponse.json()).current?.modelId)
+  return submitEveMessage(account, null, text, submissionId, { expectedOwnerId: account.userId })
+}
 const query = async (sql, values = []) => (await pool.query(sql, values)).rows
 const run = async id => {
   const current = (await query('SELECT r.*,p.status AS publication,p."pullRequest" FROM agent_runs r LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1 AND r."userId"=$2', [id, accounts.owner.userId]))[0]
@@ -140,7 +142,7 @@ const run = async id => {
 
 async function dispatch(name, text, signal) {
   const since = new Date()
-  await json(accounts.owner, '/api/coordinator/messages', { text: `${text}\n验收标记：${runId}-${name}`, submissionId: randomUUID() })
+  await sendMessage(accounts.owner, `${text}\n验收标记：${runId}-${name}`, randomUUID())
   const created = await until(signal, async () => (await query('SELECT id FROM agent_runs WHERE "userId"=$1 AND "createdAt">=$2 AND prompt LIKE $3 ORDER BY "createdAt" DESC LIMIT 1', [accounts.owner.userId, since, `%${runId}-${name}%`]))[0])
   await progress(name, 'run-created', created.id)
   return created.id
@@ -446,7 +448,7 @@ async function accept(device) {
     let issue = (await query('SELECT id FROM issues WHERE "userId"=$1 ORDER BY "createdAt" DESC LIMIT 1', [accounts.owner.userId]))[0]
     if (!issue) {
       const title = `Inbox ${runId}`
-      await json(accounts.owner, '/api/coordinator/messages', { text: `请只创建一个标题为“${title}”的个人任务，描述为“收件箱验收”。不要派发、不要启动线程、不要调用任何电脑。`, submissionId: randomUUID() })
+      await sendMessage(accounts.owner, `请只创建一个标题为“${title}”的个人任务，描述为“收件箱验收”。不要派发、不要启动线程、不要调用任何电脑。`, randomUUID())
       issue = await until(signal, async () => (await query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [accounts.owner.userId, title]))[0])
     }
     // The web inbox is the subscribed task list. Exercise its real preference

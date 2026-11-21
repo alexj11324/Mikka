@@ -25,7 +25,9 @@ export async function startLocalCloudImage({ release, ca, env = {}, root = resol
   const binary = await realpath(join(dirname(sdkRequire.resolve('@anthropic-ai/claude-agent-sdk-linux-x64/package.json')), 'claude'))
   const binaryHash = createHash('sha256').update(await readFile(binary)).digest('hex')
   const modules = await Promise.all(['pino', '@anthropic-ai/claude-agent-sdk'].map(async name => {
-    const source = await realpath(dirname(require.resolve(`${name}/package.json`))), path = relative(dependencyRoot, source)
+    let entry
+    try { entry = require.resolve(`${name}/package.json`) } catch { entry = require.resolve(name) }
+    const source = await realpath(dirname(entry)), path = relative(dependencyRoot, source)
     assert.ok(path && !path.startsWith('..'), 'LOCAL_CLOUD_DEPENDENCY_OUTSIDE_INSTALL')
     return { name, target: `/mikka-dependencies/${path}` }
   }))

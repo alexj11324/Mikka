@@ -604,7 +604,11 @@ export async function runModelProviderAcceptance({ env = process.env, fetchImpl 
       // Required Flash policy check is also executed by the workflow before
       // this driver starts. Keep it at the precise API-key send boundary too.
       if (item.kind === 'api_key') assertFlashTestModel(item.model)
-      await json('/api/mobile/chat', { botId: bot.id, text, submissionId: deterministicId(marker) })
+      const submitted = await request('/api/agents/eve/v1/session?botId=' + bot.id, { message: text, clientContext: { expectedOwnerId: ownerId, expectedWorkspaceId: workspaceId } }, 'POST', { 'x-mikka-submission-id': deterministicId(marker) })
+      const receipt = await submitted.json().catch(() => null)
+      check(submitted.status === 202, 'http_refused', 'blocked', { httpStatus: submitted.status })
+      check(receipt?.ok === true && /^wrun_[A-Za-z0-9_-]+$/.test(receipt.sessionId ?? '')
+        && typeof receipt.deliveryId === 'string' && receipt.deliveryId.length > 0, 'response_invalid')
       const deadline = now() + timeoutMs
       let accepted, rootDetail
       while (now() < deadline) {

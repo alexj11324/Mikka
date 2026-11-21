@@ -5,7 +5,7 @@ import { dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { childEnvironment } from './cloudflare-ci.mjs'
 import { command, releaseId, validateArtifacts } from './cloudflare-native-oci.mjs'
-import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { actionsMikkaRepository, hasGitHubOrigin, officialMikkaRepository } from './cloudflare-source.mjs'
 import { isValidDeploymentId } from '../lib/deployment-id.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -25,8 +25,8 @@ function maintenanceRelease(value, apiRelease) {
 
 export function releaseIdentity(env, workload, api) {
   assert.ok(Object.hasOwn(workflows, workload))
-  assert.equal(env.GITHUB_REPOSITORY, 'alexj11324/Mikka')
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699')
+  const repository = actionsMikkaRepository(env)
+  assert.ok(repository, 'Official Mikka workflow repository required')
   assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch')
   assert.equal(env.GITHUB_REF, 'refs/heads/main')
   assert.match(env.GITHUB_SHA ?? '', sha)
@@ -34,14 +34,13 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(env.GITHUB_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
-  assert.equal(env.GITHUB_WORKFLOW_REF, 'alexj11324/Mikka/.github/workflows/' + workflows[workload] + '@' + env.GITHUB_REF)
+  assert.equal(env.GITHUB_WORKFLOW_REF, repository + '/.github/workflows/' + workflows[workload] + '@' + env.GITHUB_REF)
   for (const value of [env.GITHUB_RUN_ID, env.GITHUB_RUN_ATTEMPT]) assert.match(value ?? '', /^[1-9][0-9]*$/)
   assert.equal(api.version, 1)
   assert.equal(api.provider, 'github-actions')
-  assert.equal(api.repository, 'alexj11324/Mikka')
-  assert.equal(api.repositoryId, '1427517699')
+  assert.ok(officialMikkaRepository(api.repository, api.repositoryId), 'Original API build repository required')
   assert.equal(api.ref, 'refs/heads/main')
-  assert.equal(api.workflowRef, 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main')
+  assert.equal(api.workflowRef, api.repository + '/.github/workflows/cloudflare-api-image.yml@refs/heads/main')
   assert.equal(api.workflowSha, api.publicSha)
   assert.equal(api.actor, 'alexj11324')
   assert.equal(api.actorId, '183887963')
@@ -69,7 +68,8 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(api.publicBuildSettings.publication, 'registry-only')
   assert.match(api.image, /^registry\.cloudflare\.com\/[a-f0-9]{32}\/mikka-api@sha256:[a-f0-9]{64}$/)
   assert.equal(api.image.split('@')[1], api.digest)
-  assert.deepEqual(api.overlayCheckout, { repository: 'alexj11324/mikka-hosted-ui', requestedSha: api.privateSha, actualSha: api.privateSha })
+  assert.ok(['alexj11324/mikka-hosted-ui', 'aspectly-labs/mikka-hosted-ui'].includes(api.overlayCheckout?.repository))
+  assert.deepEqual(api.overlayCheckout, { repository: api.overlayCheckout.repository, requestedSha: api.privateSha, actualSha: api.privateSha })
   assert.equal(api.offlineVerification, 'buildkit-network-none')
   const maintenance = env.MAINTENANCE_OWNER_RELEASE
   if (maintenance) assert.equal(workload, 'eve')
@@ -190,7 +190,7 @@ function identity(env, workload) {
   const receipt = releaseIdentity(env, workload, api)
   const tools = { ...childEnvironment(env, receipt.publicSha, receipt.overlaySha), DOCKER_CONFIG: env.DOCKER_CONFIG }
   assert.equal(output('git', ['rev-parse', 'HEAD'], { env: tools, stage: 'RUNTIME_SOURCE' }), receipt.publicSha)
-  assert.ok(hasGitHubOrigin(output('git', ['remote', 'get-url', 'origin'], { env: tools, stage: 'RUNTIME_ORIGIN' }), 'alexj11324/Mikka'))
+  assert.ok(hasGitHubOrigin(output('git', ['remote', 'get-url', 'origin'], { env: tools, stage: 'RUNTIME_ORIGIN' }), env.GITHUB_REPOSITORY))
   assert.equal(output('git', ['diff', '--name-only', 'HEAD', '--'], { env: tools, stage: 'RUNTIME_CLEAN_SOURCE' }), '')
   output('git', ['fetch', '--no-tags', 'origin', 'main'], { env: tools, stage: 'RUNTIME_MAIN_HISTORY' })
   output('git', ['merge-base', '--is-ancestor', receipt.publicSha, 'FETCH_HEAD'], { env: tools, stage: 'RUNTIME_REVIEWED_SOURCE' })
