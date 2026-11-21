@@ -2,12 +2,15 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { sendSuggestion } from '@/app/actions/coordinator'
+import type { ChatMessageProps } from '@/components/slots/chat-message-contract'
 
 let submit: typeof sendSuggestion
 const refresh = mock.fn(async () => {})
 const refreshRelated = mock.fn(async (_key: unknown) => {})
 mock.module('@/app/actions/coordinator', { namedExports: { sendSuggestion: (id: string) => submit(id) } })
 mock.module('@/components/coordinator/coordinator-chat', { namedExports: { coordinatorChatKey: () => ['coordinator-chat'] } })
+// These hook tests keep message presentation at the slot boundary; send and readback remain real below.
+mock.module('@ui-slot/chat-message', { namedExports: { ChatMessage: ({ lead, body }: ChatMessageProps) => <>{lead}{body}</> } })
 mock.module('swr', { defaultExport: () => ({ mutate: refresh }), namedExports: { useSWRConfig: () => ({ mutate: refreshRelated }) } })
 mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
 

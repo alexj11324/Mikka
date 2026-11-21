@@ -114,6 +114,20 @@ test('group replies use the existing Markdown HTML and URL protections', async (
   assert.deepEqual([...reply.querySelectorAll('a[href]')].filter(link => link.getAttribute('href')).map(link => link.getAttribute('href')), [taskHref, threadHref, threadHref])
 })
 
+test('another person\'s grouped messages keep plain text and one author line', async () => {
+  await render([1, 2].map(position => ({ ...message('user', position, handoff), authorId: 'peer' })))
+  const rows = [...container.querySelectorAll('ol[aria-label="messages"] > li')]
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].textContent?.match(/member/g)?.length, 1)
+  const words = [...rows[0].querySelectorAll('[data-slot="user-message-text"]')]
+  assert.equal(words.length, 2)
+  for (const text of words) {
+    assert.equal(text.textContent, handoff)
+    assert.equal(text.querySelector('a'), null)
+  }
+  assert.equal(rows[0].querySelectorAll('[data-slot="bubble"][data-align="start"]').length, 2)
+})
+
 test('the chat reads its newest page and members on the group key, never on a timer (#1212)', async () => {
   liveKeys.length = 0
   pages = [{ messages: [message('user', 1, 'hello')], nextBefore: null, agentStatus: { status: 'running' } }]

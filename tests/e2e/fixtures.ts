@@ -229,7 +229,11 @@ export function watchRuntime(context: BrowserContext, expectedConsoleErrors: Exp
       const matches = (error: ExpectedConsoleError) => message.text() === error.message && message.location().url === `${new URL(page.url()).origin}${error.path}`
       const index = expected.findIndex(matches)
       if (index >= 0) expected.splice(index, 1)
-      else if (!allowedConsoleErrors.some(matches)) failures.push(`console.error: ${message.text()}`)
+      else if (!allowedConsoleErrors.some(matches)) {
+        const source = message.location().url
+        const path = source && URL.canParse(source) ? new URL(source).pathname : undefined
+        failures.push(`console.error${path ? ` (${path})` : ''}: ${message.text()}`)
+      }
     })
     page.on('response', response => {
       if (response.status() >= 500 && new URL(response.url()).origin === new URL(page.url()).origin) {
@@ -290,15 +294,15 @@ export async function captureAuthenticationCookies(context: BrowserContext) {
 
 /**
  * A new account opens on the first-run guide, which only the workspace root
- * shows. Tests about other flows mark it done and skip it in place, without a
- * reload that would refetch the page's data; tests/e2e/onboarding.spec.ts
- * covers the guide.
+ * shows. Tests about other flows mark it done, then reload so the current web
+ * bootstrap reads that state whether or not the guide mounted before the write.
+ * tests/e2e/onboarding.spec.ts covers the guide.
  */
 export async function skipOnboarding(page: Page, email: string) {
   await database().query('insert into user_onboarding ("userId") select id from "user" where email = $1 on conflict do nothing', [email])
   if (new URL(page.url()).pathname.replace(/\/$/, '') !== app('/').replace(/\/$/, '')) return
+  await page.reload()
   const guide = page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true })
-  await guide.getByRole('button', { name: '跳过引导', exact: true }).click()
   await expect(guide).toHaveCount(0)
 }
 

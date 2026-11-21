@@ -2,7 +2,8 @@
 
 import { useTranslations } from '@/lib/intl/i18n-client'
 import type { SuggestionSource } from '@/lib/db/schema'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
+import { ChatMessage } from '@ui-slot/chat-message'
+import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { GitHubIcon, GmailIcon, LinearIcon, NotionIcon, SlackIcon } from '@/components/icons/brand-icons'
 import { cardExtras, cardParts, SOURCE_NAMES, type SuggestionCard } from '@/lib/suggestions/card'
 import { cn } from '@/lib/utils'
@@ -41,17 +42,14 @@ export const CARD_FRAME = 'rounded-[16px] border border-border bg-background px-
  * same card, then a bubble only for what the card does not already show (the
  * source's own words, the link). With nothing to add, the card stands alone.
  */
-export function SentSuggestion({ card, compact }: { card: SuggestionCard; compact: boolean }) {
+export function SentSuggestion({ card, compact, speaker }: { card: SuggestionCard; compact: boolean; speaker: ChatSpeaker }) {
   const t = useTranslations('SuggestionsPage')
   const { original, url } = cardExtras(card)
   const width = compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]'
-  return <>
-    <div data-slot="suggestion-card" className={cn(CARD_FRAME, 'self-end', width)}><SuggestionCardBody card={card} /></div>
-    {(original || url) && <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', width)}>
-      <BubbleContent size="roomy" className="flex flex-col gap-1.5 break-words">
-        {original && <span>{t('original', { title: original })}</span>}
-        {url && <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">{url}</a>}
-      </BubbleContent>
-    </Bubble>}
-  </>
+  return <ChatMessage from="person" speaker={speaker} compact={compact} presentation="suggestion"
+    lead={<div data-slot="suggestion-card" className={cn(CARD_FRAME, 'self-end', width)}><SuggestionCardBody card={card} /></div>}
+    body={(original || url) && <>
+      {original && <span>{t('original', { title: original })}</span>}
+      {url && <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">{url}</a>}
+    </>} />
 }

@@ -19,13 +19,12 @@ import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertTitle } from '@/components/ui/alert'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { CircleAlert, CircleHelp } from '@/components/icons'
+import { CircleHelp } from '@/components/icons'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
@@ -57,7 +56,6 @@ import { useConversationPanels, useWorkTabs } from '@/components/coordinator/con
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { factoryQuestionUnavailable, useFactoryQuestions } from '@/hooks/use-factory-questions'
 import { noteChipText } from '@/lib/browser/note'
-import { PERSON_BUBBLE } from '@/components/slots/chat-message'
 import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
 import { runThreadName, runTitle } from '@/lib/coordinator/citations'
@@ -739,7 +737,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
                   : item.line ? <ChatEventLine line={item.line} citations={citations} /> : null
                 : <ChatMessage from={item.from === 'person' ? 'person' : 'bot'} speaker={speaker} compact={compact} streaming={Boolean(live && live.committedThrough === undefined)}
                     // A tapped 建议 card: the same card, then only what it adds (R-21, R-40).
-                    lead={item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
+                    lead={item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} speaker={speaker} />}
                     // Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
                     // The same rows live and stored, so storing keeps them in place.
                     body={item.welcome ? null : item.from === 'coordinator'
@@ -771,16 +769,10 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
             </MessageScrollerItem>
             </Fragment>)}
             {localMessages.map(row => <MessageScrollerItem key={row.id} messageId={row.id} data-testid={row.phase === 'failed' ? 'failed-message' : 'local-message'} className="[content-visibility:visible]">
-              <Message align="end"><MessageContent>
-                <span className="flex w-full min-w-0 items-center justify-end gap-2">
-                  {row.phase === 'failed' && <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />}
-                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent size="roomy" className="flex flex-col gap-1.5 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
-                </span>
-                <span role={row.phase === 'failed' ? 'alert' : 'status'} className="flex items-center justify-end gap-1 self-end text-xs text-muted-foreground">
-                  {row.phase === 'sending' ? tNavAll('HostedThread.sending') : row.error}
-                  {row.phase === 'failed' && <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(row.text, false, undefined, row) }}>{tCommon('retry')}</Button>}
-                </span>
-              </MessageContent></Message>
+              <ChatMessage from="person" speaker={speaker} compact={compact}
+                body={<><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</>}
+                delivery={{ phase: row.phase, label: row.phase === 'sending' ? tNavAll('HostedThread.sending') : row.error,
+                  retry: row.phase === 'failed' && <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(row.text, false, undefined, row) }}>{tCommon('retry')}</Button> }} />
             </MessageScrollerItem>)}
             {/* Before the reply has anything to show: the Trace's Thinking row. Once the reply streams, its own Trace takes
                 over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the

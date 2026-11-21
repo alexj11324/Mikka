@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
@@ -8,7 +8,6 @@ import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
 import { namedConversationModelBot } from '@/lib/named-conversation-model'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
 import { GroupLeaveAction } from './group-leave-action'
@@ -242,15 +241,12 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
                         {!mine && (bot ? <BotAvatar {...memberAvatar(bot)} size="message" still /> : <LetterAvatar name={name} size="message" />)}
                         <div className={cn('flex min-w-0 flex-col gap-1', mine ? 'max-w-[min(26rem,80%)] items-end' : 'max-w-[min(35rem,85%)]')}>
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
-                          {/* The person's own words are drawn by the chat-message slot, as in a 1:1 chat. */}
+                          {/* The chat-message slot draws each message inside its existing author group. */}
                           {run.messages.map(message => mine
                             ? <ChatMessage key={message.id} from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage>} after={<MessageReactions reactions={reactions[message.id]} align="end" />} />
-                            : <Fragment key={message.id}>
-                              <Bubble variant="muted" align="start" className="max-w-full">
-                                <BubbleContent size="roomy" className="whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
-                              </Bubble>
-                              <MessageReactions reactions={reactions[message.id]} align="start" />
-                            </Fragment>)}
+                            : <ChatMessage key={message.id} from={run.authorType === 'user' ? 'person' : 'bot'} speaker={speaker} presentation="group-received"
+                                body={run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}
+                                after={<MessageReactions reactions={reactions[message.id]} align="start" />} />)}
                         </div>
                       </li>
                     })}
