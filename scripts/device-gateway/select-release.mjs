@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 import { readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 
 const gatewayInputs = new Set([
@@ -20,7 +21,7 @@ export function affectsWorker(workload, path) {
 
 export async function selectRelease(workload, env = process.env, fetchImpl = fetch) {
   if (!['device', 'cron'].includes(workload) || !['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)
-    || env.GITHUB_REF !== 'refs/heads/main' || env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'
+    || env.GITHUB_REF !== 'refs/heads/main' || !actionsMikkaRepository(env)
     || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '')) throw Error('reviewed_main_workflow_required')
   if (env.GITHUB_EVENT_NAME === 'push') {
     if (!/^[a-f0-9]{40}$/.test(env.RELEASE_BEFORE ?? '') || /^0+$/.test(env.RELEASE_BEFORE)) throw Error('unknown_push_base')
