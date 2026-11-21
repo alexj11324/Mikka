@@ -1,7 +1,23 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
 import assert from 'node:assert/strict'
+import { after } from 'node:test'
 import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core'
+
+// Match an actual local server without inheriting CI's Cloud-only gateway omission.
+// This existing loader captures response scheduling below; no live delivery is claimed.
+const gatewayEnvironment = { MIKKA_EDITION: 'community', BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+  BETTER_AUTH_SECRET: 'synthetic-claim-commit-fixture', DEVICE_GATEWAY_URL: undefined,
+  DEVICE_GATEWAY_PUSH_SECRET: undefined, VERCEL: undefined }
+const previousGatewayEnvironment = Object.fromEntries(Object.keys(gatewayEnvironment).map(key => [key, process.env[key]]))
+for (const [key, value] of Object.entries(gatewayEnvironment)) {
+  if (value === undefined) delete process.env[key]; else process.env[key] = value
+}
+after(() => {
+  for (const [key, value] of Object.entries(previousGatewayEnvironment)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+})
 
 const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 function expandMembershipAliases(sql) {
@@ -164,6 +180,15 @@ export async function environmentSecretSnapshot(...args){
 `
 const dbSource = `import assert from 'node:assert/strict'
 import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+import {observeCommitEffects} from ${JSON.stringify(new URL('../../lib/db/commit-effects.ts', import.meta.url).href)}
+
+// Failure updates below are autocommitted. Keep their real notification scope
+// distinct from the separately checked-out, read-only claim transaction.
+const committedWriter={async query(command){
+  assert.equal(command,'UPDATE')
+  return {command,rows:[]}
+}}
+observeCommitEffects(committedWriter)
 
 function query(columns){
   let table
@@ -187,6 +212,7 @@ function update(value){
       const same=(a,b)=>a instanceof Date||b instanceof Date?a!=null&&b!=null&&new Date(a).getTime()===new Date(b).getTime():a===b
       const changed=table==='agent_runs'&&terms.every(([,column,index])=>same(p.run[column],rendered.params[Number(index)-1]))&&nulls.every(([,column])=>p.run[column]==null)
       if(changed)Object.assign(p.run,values)
+      await committedWriter.query('UPDATE')
       return changed?[{id:p.run.id}]:[]
     }
     let result
@@ -195,7 +221,7 @@ function update(value){
   }}}}
 }
 let checkedOutClient
-export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
+export const db={session:{client:committedWriter},select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
   if (sql === 'SELECT 1 FROM thread_reply_versions WHERE "resultRunId"=$1 AND "userId"=$2 AND "workspaceId"=$3') {
@@ -355,7 +381,7 @@ registerHooks({
   },
   load(url,context,next){
     if(url==='claim-fixture:empty')return {format:'module',source:'export {}',shortCircuit:true}
-    if(url==='claim-fixture:next-server')return {format:'module',source:`export {NextResponse,NextRequest} from ${JSON.stringify(nextServer)};export function after(){}`,shortCircuit:true}
+    if(url==='claim-fixture:next-server')return {format:'module',source:`export {NextResponse,NextRequest} from ${JSON.stringify(nextServer)};export function after(work){const p=globalThis.claimResponseProbe;if(!p)throw new Error('Claim scheduling requires its fixture');(p.scheduledAfter??=[]).push(work)}`,shortCircuit:true}
     if(url.startsWith('claim-fixture:'))return {format:'module',source:decodeURIComponent(url.slice('claim-fixture:'.length)),shortCircuit:true}
     return next(url,context)
   },

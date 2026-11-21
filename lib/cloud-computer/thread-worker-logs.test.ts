@@ -5,12 +5,20 @@ import { once } from 'node:events'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test, { mock } from 'node:test'
+import test, { before, mock } from 'node:test'
 import { promisify } from 'node:util'
 import { threadResourcePreflight, withThreadProjectResources } from '../../tests/support/thread-project-resources-fixture'
 import { ActionFailureError } from '../action-error'
 import { CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '../computer/worker-command'
-import { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } from './thread-worker-logs'
+import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from '../db/commit-effects'
+
+let { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } = {} as typeof import('./thread-worker-logs')
+const scheduledAfter = captureFixtureLiveEffects()
+before(async () => {
+  ;({ logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } = await import('./thread-worker-logs'))
+})
 
 const mask = (text: string) => text.replaceAll('sekret', '[secret:TOKEN]')
 // Admit only the parent-locked sandbox registration statement, not arbitrary CTEs.
@@ -58,11 +66,14 @@ test('the tail is read back bounded; a failing or hanging read gives null withou
 
 test('the tail is saved masked with the machine; as an error only where the run has none', async () => {
   const calls: [string, unknown[]][] = []
-  const query = { query: async (sql: string, values: unknown[]) => { calls.push([sql, values]); return { rows: [], rowCount: 1 } } } as never
+  const scheduledBefore = scheduledAfter.length
+  const query = { query: async (sql: string, values: unknown[]) => { calls.push([sql, values]); return { command: 'UPDATE', rows: [], rowCount: 1 } } } as never
+  observeCommitEffects(query)
   await saveWorkerTail(query, 'run-3', null, mask, 'ignored')
   assert.equal(calls.length, 0, 'nothing read, nothing written')
   await saveWorkerTail(query, 'run-3', 'boom sekret', mask)
   await saveWorkerTail(query, 'run-3', 'boom sekret', mask, 'Thread worker did not register')
+  assert.ok(scheduledAfter.length > scheduledBefore, 'the autocommitted error registers the real live invalidation')
   assert.deepEqual(calls.map(([sql, values]) => [sql.split(' WHERE')[0], values]), [
     ['UPDATE thread_machines SET "logTail"=$2', ['run-3', 'boom [secret:TOKEN]']],
     ['UPDATE thread_machines SET "logTail"=$2', ['run-3', 'boom [secret:TOKEN]']],
@@ -125,6 +136,7 @@ test('runtime refresh failures name their actual phase without logging provider 
       let released = false
       const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { command: sql, rows: [], rowCount: 0 }
         const preflight = threadResourcePreflight(sql, values, run)
         if (preflight) return preflight
         if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
@@ -147,6 +159,8 @@ test('runtime refresh failures name their actual phase without logging provider 
       }
       const client = { query, release: () => { released = true } }
       const pool = { query, connect: async () => client } as never
+      observeCommitEffects(client as unknown as PoolClient, pool)
+      observeCommitEffects(pool)
       const sandbox = { sandboxId: machine.sandboxId,
         files: { read: async () => { if (phase === 'read_worker') throw fault; return 'a'.repeat(40) }, write: async () => assert.fail('no bootstrap credential may be published') },
         commands: { run: async (command: string) => {
@@ -213,6 +227,7 @@ test('question wake failures identify the rejecting boundary without exposing pr
       })
       const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { command: sql, rows: [], rowCount: 0 }
         const preflight = threadResourcePreflight(sql, values, run)
         if (preflight) return preflight
         if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
@@ -239,6 +254,8 @@ test('question wake failures identify the rejecting boundary without exposing pr
       }
       const client = { query, release: () => { released = true } }
       const pool = { query, connect: async () => client } as never
+      observeCommitEffects(client as unknown as PoolClient, pool)
+      observeCommitEffects(pool)
       const provider = {
         state: async () => { if (phase === 'provider_state') throw fault; return 'paused' },
         connect: async () => {
@@ -312,6 +329,7 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
   const result = (rows: unknown[]) => ({ rows, rowCount: rows.length })
   const query = async (sql: string, values: unknown[] = []) => {
     queries.push(sql)
+    if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { command: sql, rows: [], rowCount: 0 }
     const preflight = threadResourcePreflight(sql, values, run)
     if (preflight) return preflight
     if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') return result([{ issueId: run.issueId }])
@@ -356,6 +374,8 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
   }
   const client = { query, release: () => { released = true } }
   const pool = { query, connect: async () => client } as never
+  observeCommitEffects(client as unknown as PoolClient, pool)
+  observeCommitEffects(pool)
   const box = { sandboxId: 'bootstrap-fixture-vm', files: {
     read: async () => 'a'.repeat(40),
     write: async (files: { path: string; data: string }[], options: unknown) => {

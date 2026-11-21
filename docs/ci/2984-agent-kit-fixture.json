@@ -1,0 +1,610 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-21T03:39:44.941761+00:00",
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "workItem": "SDLC-012",
+  "pullRequest": "https://github.com/aspectly-labs/Mikka/pull/3009",
+  "repository": "aspectly-labs/Mikka",
+  "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+  "redCommit": "cb767add72dc7c5f64025ac899d81ffa7c0b74e4",
+  "redTree": "0d16306ccdfe5e1bf45a2ca170a25957aaed6606",
+  "greenCodeCommit": "bdec301935a3ad2b07e14e7a24d03adcd16d5434",
+  "greenCodeTree": "b0b9b655d9e3245b54ab21a635d3a266c2593d37",
+  "branch": "feat/sdlc-2984-agent-kit-fixture",
+  "status": "Draft; focused regression and owning unit entry passed; full local gate, independent review, protected CI, merge and exact-main verification remain outstanding at this snapshot.",
+  "problem": {
+    "failure": "Commit effects require an observed node-postgres executor",
+    "failingCases": [
+      "cloud queue captures exact worker and parent snapshot in the same transaction as binding",
+      "with versioned definitions off, a cloud run still freezes its Agent and credential source",
+      "a cloud subscription run must name its model explicitly with versioned definitions disabled"
+    ],
+    "trigger": "Default Community with synthetic local BETTER_AUTH_URL/BETTER_AUTH_SECRET selects the built-in gateway. The original compatibility fixture has a plain fake PostgreSQL client.",
+    "rootCause": "The fake client was never attached to observeCommitEffects, and its transaction results omitted the PostgreSQL command tag. Real live changed() correctly refuses that unobserved executor. Workflow-level Cloud configuration previously made the built-in gateway absent and concealed this local-test failure.",
+    "owningContract": "Original Agent-kit claim/queue compatibility fixture; product commit admission, worker freezing, permissions and delivery contracts are unchanged."
+  },
+  "ownership": {
+    "headInventoryCapturedAt": "2026-11-21T03:23:08Z",
+    "headInventorySha256": "5802025af3692e207c4aaacca74251c72e5887311d2e218f351bc778a2c87746",
+    "prCount": 54,
+    "fileEntryCount": 2677,
+    "unchangedHeadAndBaseReused": 53,
+    "newPRFileFetch": [
+      3008
+    ],
+    "rawAuditPath": "research/agent-kit-fixture-2984/owner-dedupe.json",
+    "rawAuditSha256": "65dad3e1cdddbd5983eff4d293effb58d907fc5fe5ce9e142c81704c14bfea6a",
+    "boundary": "Compare both head and base across captured 54 PRs against the original 53-PR raw inventory; 53 inputs identical, only new PR3008 fetched native files once. Reuse is not a newly fetched 54-file inventory. PR3009 was subsequently created and is outside that 54-PR discovery snapshot.",
+    "targetPaths": [
+      "lib/agent-kit/main-compat.test.ts",
+      "lib/builtin-gateway/config.ts",
+      "lib/computer/queue-run.ts",
+      "lib/db/commit-effects.test.ts",
+      "lib/db/commit-effects.ts",
+      "lib/live/chats.ts",
+      "lib/live/lists.ts",
+      "lib/live/notify.ts",
+      "lib/live/project-map.ts",
+      "lib/live/scope.ts"
+    ],
+    "overlapDisposition": [
+      {
+        "pr": 2977,
+        "head": "8b8e5d8b465e3b1dcfbab39a3022897986fc6878",
+        "path": "lib/live/lists.ts",
+        "patchSha256": "546030f4825417d176156bf59f71b1eef5785cc5bc0a9d7cd1d4977ccd5af25a",
+        "assessment": "Adds keyboard-setting targets; leaves changed()/afterDatabaseCommit and queue fixture unchanged."
+      },
+      {
+        "pr": 2974,
+        "head": "6c84f2c92bc546a2c57b150c1dd7f760b643d16f",
+        "path": "lib/computer/queue-run.ts",
+        "patchSha256": "d1c1ed59da069dbce048081f77e6a5e672e14933c75ea819169c636dd1adfec8",
+        "assessment": "Adds work-visibility initialization to the product queue; no commit observer or fixture repair."
+      },
+      {
+        "pr": 2973,
+        "head": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+        "path": "lib/agent-kit/main-compat.test.ts",
+        "patchSha256": "cc707c5f1dc8fd44923263550e4e2eb23a8edd45cf99f8febc8a811abc72d1ac",
+        "assessment": "Custom task-branch header and frozen released-parser compatibility cases; no commit observer or transaction result tags."
+      },
+      {
+        "pr": 2968,
+        "head": "80ddaa5ede4fa05642396911c6aa25c389f540a0",
+        "path": "lib/live/lists.ts",
+        "patchSha256": "2a56834de4f53fa056a7c624be04006387fc3aa2451e088e171aca87a74ecb03",
+        "assessment": "Adds directory settings targets; preserves commit observer boundary."
+      },
+      {
+        "pr": 2959,
+        "head": "181c19e525af32481832836d57c3228aeb503d4d",
+        "path": "lib/live/lists.ts",
+        "patchSha256": "dbe8a5520cf97e63bf164eafcc41b39c1714e392ba92fa98029e3de995441619",
+        "assessment": "Splits model/integration settings targets; preserves commit observer boundary."
+      },
+      {
+        "pr": 2825,
+        "head": "dbe28eba7834ae05f8cd192a046b3dee894a09c7",
+        "path": "lib/live/lists.ts",
+        "patchSha256": "c98d8e555253084d00170725df877e51a7d29400d93b8cdfeb254a003956f22f",
+        "assessment": "Adds Linear owner workspace settings targets; preserves commit observer boundary."
+      },
+      {
+        "pr": 1853,
+        "head": "672de2559817192f1024f723fa480d23877b775d",
+        "path": "lib/agent-kit/main-compat.test.ts",
+        "patchSha256": "f12ed283fcf3715b634294768e8964a0185b136e0ef0d7545b2229de13c849f2",
+        "assessment": "Adds personal-context admission/product isolation and related workspace/subscription mocks; no observed queue-client or PostgreSQL command-tag repair."
+      },
+      {
+        "pr": 1853,
+        "head": "672de2559817192f1024f723fa480d23877b775d",
+        "path": "lib/computer/queue-run.ts",
+        "patchSha256": "423cdff053b4885a5b89a131a57b28037fcc8eb01a4b7fea8aebe9dad0751afc",
+        "assessment": "Adds personal-context admission/product isolation and related workspace/subscription mocks; no observed queue-client or PostgreSQL command-tag repair."
+      }
+    ],
+    "conclusion": "No captured open PR implements this commit-observation fixture repair. Existing product changes and other owners remain untouched.",
+    "responseSchedulerBoundaryAddendum": {
+      "path": "research/agent-kit-fixture-2984/owner-boundary-addendum.json",
+      "sha256": "8a0309334424d0e462752ce178c25c1fb55454dbbddc351d99e0f1f44c0b6608",
+      "boundary": "Same 54-head snapshot and exactly matching 53 old head/base + fresh3008 file payload; no new API inventory.",
+      "targetPaths": [
+        "apps/api/src/after.ts",
+        "apps/api/src/context.ts",
+        "lib/background.ts",
+        "lib/live/panels.ts",
+        "lib/server-runtime/server.ts",
+        "lib/thread-title-schedule.ts"
+      ],
+      "matches": [
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "path": "lib/background.ts",
+          "patchSha256": "704934c936f7d3a9748668b6fc95a5d09d194e7381d63cbbcf681e3bcb3f5d65",
+          "assessment": "Existing original framework import relocation to public server-runtime (already present in main); no queue fake-client or transaction observer repair."
+        },
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "path": "lib/server-runtime/server.ts",
+          "patchSha256": "0c5977ad8c5c1c76fa5cc80427b0a7c569d02da0f97cb4ccad0a9b1cf6842ece",
+          "assessment": "Existing original framework import relocation to public server-runtime (already present in main); no queue fake-client or transaction observer repair."
+        },
+        {
+          "pr": 2825,
+          "head": "dbe28eba7834ae05f8cd192a046b3dee894a09c7",
+          "path": "lib/live/panels.ts",
+          "patchSha256": "9bb09985fe9c208ac09c802cc27088ff483f947b00ac511eac2ac78dcc11a050",
+          "assessment": "Adds run-publication wake token; retains real committed writer and observer."
+        }
+      ]
+    }
+  },
+  "originalFullLocalGate": {
+    "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+    "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+    "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+    "node": "v22.22.1",
+    "pnpm": "10.34.3",
+    "postgres": "postgres (PostgreSQL) 17.12",
+    "command": [
+      "pnpm",
+      "local:ready",
+      "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "--test=check",
+      "--no-product-change=tooling: make existing synthetic Cloud billing fixtures explicit; product behavior and all original business assertions unchanged"
+    ],
+    "originalChildCommand": [
+      "pnpm",
+      "run",
+      "check"
+    ],
+    "startedAt": "2026-11-21T03:18:07.677319+00:00",
+    "finishedAt": "2026-11-21T03:21:24.384838+00:00",
+    "seconds": 196.70767176299705,
+    "exitCode": 1,
+    "countsAtAgentKitCompatibilityFailure": {
+      "tests": 59,
+      "pass": 56,
+      "fail": 3,
+      "skip": 0
+    },
+    "priorAbuseUnitCounts": {
+      "tests": 37,
+      "pass": 37,
+      "fail": 0,
+      "skip": 0
+    },
+    "laterModelLegExecuted": false,
+    "receiptPath": "research/billing-fixture-2984/small-check-2026-11-21T03-17-28.499Z/receipt.json",
+    "receiptSha256": "ec1a191340026ed3248d84e2ecf5bc0cc32ea7a4cbf6ad0ef151b0a99be8233f",
+    "stdoutSha256": "6af1d2d971f599ddc2309839c99dcdb07dac06eb8c9a33f65523aee6f1f139a7",
+    "stderrSha256": "5a6510707e4fe1e2ca2d9eeae88d463907ffe25f8099b2cb9202fb49f4c036de",
+    "endingHead": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+    "endingTree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+    "endingClean": true,
+    "cleanup": {
+      "postgresStopExit": 0,
+      "postgresStatusExit": 3,
+      "pidfilePresent": false,
+      "orderlyStopConfirmed": true
+    },
+    "boundary": "N=1 complete original gate attempt; failure at this stage is not success of the unexecuted remainder. This run is Node22 on Small; focused Node24 runs are not a whole-gate duration comparison."
+  },
+  "focusedOriginalRed": {
+    "path": "research/agent-kit-fixture-2984/red-7d/receipt.json",
+    "sha256": "27dd6a4952619cc1eb2d650c86b7e67237b2964e3bca31bd72efa1182af83d73",
+    "observed": {
+      "source": "7d9381ec6411873ba5c9864b65811c16b97e5e26",
+      "tree": "6f7a9116174e5d7adf0e5c680b7c9fb6f5e33e2c",
+      "startedAt": "2026-11-21T03:29:18.039050+00:00",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/agent-kit/main-compat.test.ts"
+      ],
+      "node": "v24.22.3",
+      "environment": {
+        "inherited": "toolchain/locale/home and native sandbox guards only",
+        "edition": "absent; default Community",
+        "ci": "absent",
+        "betterAuthUrl": "http://127.0.0.1:3000",
+        "betterAuthSecret": "ephemeral synthetic value, not recorded",
+        "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+        "requireDb": "1",
+        "localAccounts": "1",
+        "providerCredentialsInherited": false
+      },
+      "callerSha256": "4ba7c8c7c4196958d8adc29a00ccd00ad998a38b60a6bf619af9b1a5452b6bec",
+      "status": "completed",
+      "files": {
+        "lib/agent-kit/main-compat.test.ts": {
+          "blob": "c28d61621d4c133c9f6260a8d43c48fe39a856fb",
+          "sha256": "b8554bc3ab36632c1a76c86fb7ed18d49c625e65b003e8d93ad23c063df01d1b",
+          "sameAsMain59b": true
+        },
+        "lib/db/commit-effects.ts": {
+          "blob": "ac1702b18e5daeaa816ce728c639d425e38cb5ba",
+          "sha256": "3b5631853ac5d0af0798e9cf4cf7871e1fee41fd7fd58008c3f8155df8d5115d",
+          "sameAsMain59b": true
+        },
+        "lib/live/lists.ts": {
+          "blob": "3a278590aefd985260056ed781ca5f8eed3261b5",
+          "sha256": "6fe118ebc969213a8749a2fc1b3b07d03f05871f0dcc11f4224ef94b677d8f09",
+          "sameAsMain59b": true
+        },
+        "lib/live/scope.ts": {
+          "blob": "ad11944179110564d37459f88318c87a946bc987",
+          "sha256": "9dbbe5161c3e16425012d1a95cb48fe351fb215b7752914d23c50ecb785ab644",
+          "sameAsMain59b": true
+        },
+        "lib/builtin-gateway/config.ts": {
+          "blob": "6305b4023a5d7dcc22fee92555267b556579ee98",
+          "sha256": "b867c942d5a076351716c27657359db817a7d16b638b8c6fcb89915212d82a69",
+          "sameAsMain59b": true
+        },
+        "lib/computer/queue-run.ts": {
+          "blob": "591b17686fed3dbaeb6ab637c9750984d4dd52af",
+          "sha256": "f48bb1eddf343bd10ba635e9c052ea35ea6eff81a5ecf22be4957b9a4f36bf0b",
+          "sameAsMain59b": true
+        },
+        "pnpm-lock.yaml": {
+          "blob": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+          "sha256": "b69a4eeb908bf0dc817da0095f7a3b1d7066ae593e50367d8c28dd767b4b578d",
+          "sameAsMain59b": true
+        }
+      },
+      "completedAt": "2026-11-21T03:29:21.613158+00:00",
+      "seconds": 3.5181951980011945,
+      "exitCode": 1,
+      "stdoutSha256": "d1ff062acf4287c6f56c13564f08acf1a4e7c65afc605c0191c9ee16a4bfcadc",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "endingClean": true,
+      "summaryLines": [
+        "ℹ tests 27",
+        "ℹ suites 0",
+        "ℹ pass 24",
+        "ℹ fail 3",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 3478.993697"
+      ],
+      "guardErrorOccurrences": 3
+    }
+  },
+  "explicitGatewayRegressionRed": {
+    "path": "research/agent-kit-fixture-2984/red-explicit-gateway/receipt.json",
+    "sha256": "d6c63dbb50c814c7a8738b5aad38ce67bf0b5c850596980fe5f6fc4f69b42626",
+    "observed": {
+      "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "sourceFileBlob": "7aa927cfbc5f5deeac3c257f5aae3a5c17d7bc26",
+      "sourceFileSha256": "12d18424dd538f93e75e8a6e99cc735dffb1379bb5a79c038d83047633c416ce",
+      "command": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/agent-kit/main-compat.test.ts"
+      ],
+      "node": "v24.22.3",
+      "environment": "Caller Cloud; test explicitly establishes synthetic Community builtin gateway and restores original inputs. No external credentials or real PG.",
+      "startedAt": "2026-11-21T03:32:44.618712+00:00",
+      "endedAt": "2026-11-21T03:32:49.570079+00:00",
+      "seconds": 4.9513744129981205,
+      "exitCode": 1,
+      "stdoutSha256": "017a1c797d5cc862038dc4e7da94cec0da0cd24550f99ba58d2382aeb38fd171",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaryLines": [
+        "ℹ tests 27",
+        "ℹ suites 0",
+        "ℹ pass 24",
+        "ℹ fail 3",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 4893.764815"
+      ],
+      "guardErrorOccurrences": 3
+    }
+  },
+  "repair": {
+    "changedCodePaths": [
+      "lib/agent-kit/main-compat.test.ts"
+    ],
+    "productionCodeChanges": 0,
+    "details": [
+      "The fixture explicitly establishes the built-in gateway with synthetic local values and restores each affected environment variable.",
+      "The existing response scheduler after entry collects callbacks without running title/model or delivery work; actual background registration, live change functions and afterDatabaseCommit remain real.",
+      "The original queue fake client uses the existing observeCommitEffects before BEGIN and returns native transaction command tags.",
+      "Existing queue writes assert no response callback before COMMIT; successful queue reaches the scheduler, and the existing refusal leaves it empty.",
+      "All original business assertions, permission/source negatives and timeout/skip behavior remain."
+    ],
+    "preservedInputs": [
+      {
+        "path": "lib/agent-kit/main-compat.test.ts",
+        "baseBlob": "c28d61621d4c133c9f6260a8d43c48fe39a856fb",
+        "greenBlob": "c6c67a21ac391a05eae748cf3e00ed0f2518d5c6",
+        "sha256": "52f814e9e0a7af2af67eda0fa759ac291ce3ed53f6d146f36ddcb90c6ed29af7"
+      },
+      {
+        "path": "lib/db/commit-effects.ts",
+        "baseBlob": "ac1702b18e5daeaa816ce728c639d425e38cb5ba",
+        "greenBlob": "ac1702b18e5daeaa816ce728c639d425e38cb5ba",
+        "sha256": "3b5631853ac5d0af0798e9cf4cf7871e1fee41fd7fd58008c3f8155df8d5115d"
+      },
+      {
+        "path": "lib/db/commit-effects.test.ts",
+        "baseBlob": "818660f7d819009fd739296e79145a1f5f37d4b8",
+        "greenBlob": "818660f7d819009fd739296e79145a1f5f37d4b8",
+        "sha256": "2d51cdb87e7cff23676b4edb28b26f80c24957b9391d72ab295a7ecdb3686f0b"
+      },
+      {
+        "path": "lib/background.ts",
+        "baseBlob": "7f33e1c45020cdbd1572c19726128e9dcde4e472",
+        "greenBlob": "7f33e1c45020cdbd1572c19726128e9dcde4e472",
+        "sha256": "e0e4e9e473037ec9e4f7e1fbe803efb1fac70106d9fc27aa1b48c13efc23b0f6"
+      },
+      {
+        "path": "lib/server-runtime/server.ts",
+        "baseBlob": "a83b0c966a63db3ff253bc5a17ce50dd58276772",
+        "greenBlob": "a83b0c966a63db3ff253bc5a17ce50dd58276772",
+        "sha256": "782672e430acee9d21d2cfd30c2ce12f9094c3ffa5c34d6b83e53322ee7a46a2"
+      },
+      {
+        "path": "lib/live/lists.ts",
+        "baseBlob": "3a278590aefd985260056ed781ca5f8eed3261b5",
+        "greenBlob": "3a278590aefd985260056ed781ca5f8eed3261b5",
+        "sha256": "6fe118ebc969213a8749a2fc1b3b07d03f05871f0dcc11f4224ef94b677d8f09"
+      },
+      {
+        "path": "lib/live/chats.ts",
+        "baseBlob": "494cef743decc9840c7de31903c0728cab5da17f",
+        "greenBlob": "494cef743decc9840c7de31903c0728cab5da17f",
+        "sha256": "53277d1340fc36769a82c639f1b55ff2f534863df7c189788568632a5b985e36"
+      },
+      {
+        "path": "lib/live/project-map.ts",
+        "baseBlob": "16855cea20cc95f619987614765d17469184cee0",
+        "greenBlob": "16855cea20cc95f619987614765d17469184cee0",
+        "sha256": "a90f01a91c0c2f504df85dd2d5e1b0346d3d5c82adf6975a6cb754349a15be1b"
+      },
+      {
+        "path": "lib/live/panels.ts",
+        "baseBlob": "5ffda8d9ea1ff0fc06df8d52bb22b5b4af3f13c7",
+        "greenBlob": "5ffda8d9ea1ff0fc06df8d52bb22b5b4af3f13c7",
+        "sha256": "bac26674f46cd4cf1c7a2dd3bd6c7c7044a510d5ebfb72b01866fb2582edfb58"
+      },
+      {
+        "path": "lib/live/scope.ts",
+        "baseBlob": "ad11944179110564d37459f88318c87a946bc987",
+        "greenBlob": "ad11944179110564d37459f88318c87a946bc987",
+        "sha256": "9dbbe5161c3e16425012d1a95cb48fe351fb215b7752914d23c50ecb785ab644"
+      },
+      {
+        "path": "lib/builtin-gateway/config.ts",
+        "baseBlob": "6305b4023a5d7dcc22fee92555267b556579ee98",
+        "greenBlob": "6305b4023a5d7dcc22fee92555267b556579ee98",
+        "sha256": "b867c942d5a076351716c27657359db817a7d16b638b8c6fcb89915212d82a69"
+      },
+      {
+        "path": "lib/computer/queue-run.ts",
+        "baseBlob": "591b17686fed3dbaeb6ab637c9750984d4dd52af",
+        "greenBlob": "591b17686fed3dbaeb6ab637c9750984d4dd52af",
+        "sha256": "f48bb1eddf343bd10ba635e9c052ea35ea6eff81a5ecf22be4957b9a4f36bf0b"
+      },
+      {
+        "path": "lib/thread-title-schedule.ts",
+        "baseBlob": "ba9e9e6e43deb807e9b12bb1fee9e030e2ed75e2",
+        "greenBlob": "ba9e9e6e43deb807e9b12bb1fee9e030e2ed75e2",
+        "sha256": "25176466035f6764e94f17ed0935d5b9ce628867bbf35d8dc0fd07e4f4bf6698"
+      },
+      {
+        "path": "package.json",
+        "baseBlob": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+        "greenBlob": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+        "sha256": "922077414fe8047f60a01d46c1a47dac32400a72d15f3d256e13a156d0ee1417"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "baseBlob": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+        "greenBlob": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+        "sha256": "b69a4eeb908bf0dc817da0095f7a3b1d7066ae593e50367d8c28dd767b4b578d"
+      }
+    ]
+  },
+  "owningEntryGreen": {
+    "path": "research/agent-kit-fixture-2984/green-local-check/receipt.json",
+    "sha256": "dec8dc406bbe2b235c9f96ea0835f38cb354120605e05bd462eb0a8108857671",
+    "observed": {
+      "head": "cb767add72dc7c5f64025ac899d81ffa7c0b74e4",
+      "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "sourceFileBlob": "c6c67a21ac391a05eae748cf3e00ed0f2518d5c6",
+      "sourceFileSha256": "52f814e9e0a7af2af67eda0fa759ac291ce3ed53f6d146f36ddcb90c6ed29af7",
+      "command": [
+        "pnpm",
+        "local:check",
+        "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "--test=test:agent-kit-compat"
+      ],
+      "node": "v24.22.3",
+      "environment": "Caller Cloud; original test mocks/fakes only; main fixture explicitly covers synthetic built-in gateway and captures response callbacks. No inherited provider or production credentials. No real DB required by these unit scripts.",
+      "startedAt": "2026-11-21T03:35:14.982374+00:00",
+      "status": "completed",
+      "endedAt": "2026-11-21T03:35:40.866075+00:00",
+      "seconds": 25.883705242998985,
+      "exitCode": 0,
+      "stdoutSha256": "81cff94c2bc270884c3003f887e872d50182bd7d380f11221e4d0b6451140c89",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaryLines": [
+        "ℹ tests 59",
+        "ℹ suites 0",
+        "ℹ pass 59",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 5029.733184",
+        "ℹ tests 168",
+        "ℹ suites 0",
+        "ℹ pass 168",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 9483.683746"
+      ]
+    }
+  },
+  "owningEntryCounters": [
+    {
+      "entry": "test:agent-kit-compat first Node process",
+      "tests": 59,
+      "pass": 59,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "entry": "original downstream test:agent-kit-model Node process",
+      "tests": 168,
+      "pass": 168,
+      "fail": 0,
+      "skip": 0
+    }
+  ],
+  "commitObserverRegression": {
+    "path": "research/agent-kit-fixture-2984/commit-observer-regression/receipt.json",
+    "sha256": "ad2c6550e0f360c329034c09123dc193c0f1ec4d8f82bd083942b760cd7f34b0",
+    "observed": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/db/commit-effects.test.ts"
+      ],
+      "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "observerBlob": "ac1702b18e5daeaa816ce728c639d425e38cb5ba",
+      "testBlob": "818660f7d819009fd739296e79145a1f5f37d4b8",
+      "startedAt": "2026-11-21T03:35:47.076484+00:00",
+      "endedAt": "2026-11-21T03:35:47.466198+00:00",
+      "seconds": 0.3897180150015629,
+      "exitCode": 0,
+      "stdoutSha256": "494c9e4d44ac5c60656bd20ebf0d54f9e7be9cced2feb92abf96ea78c6957dfc",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaryLines": [
+        "ℹ tests 5",
+        "ℹ suites 0",
+        "ℹ pass 5",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 340.179678"
+      ]
+    }
+  },
+  "commitObserverCounters": {
+    "tests": 5,
+    "pass": 5,
+    "fail": 0,
+    "skip": 0
+  },
+  "commitObserverRetainedContracts": [
+    "No effects before the outer COMMIT; duplicate keys coalesce.",
+    "ROLLBACK and PostgreSQL COMMIT-as-ROLLBACK do not publish.",
+    "Savepoint rollback removes reverted effects while retaining others.",
+    "Failed COMMIT cannot leak effects to the next transaction.",
+    "Callback and query-config forms keep their original behavior."
+  ],
+  "rollbackEvidenceBoundary": "The compatibility refusal case rolls back before registering live effects; it is not proof of the pending-effect rollback branch. The unchanged five-case commit-effects owner suite supplies that independent proof. No complete PostgreSQL live-delivery behavior is claimed by these unit runs.",
+  "lint": {
+    "path": "research/agent-kit-fixture-2984/lint/receipt.json",
+    "sha256": "337d1021ba0b578b02b7161e1d665c1acd7d8b235aed99aff3c33701da5e34f6",
+    "observed": {
+      "command": [
+        "pnpm",
+        "exec",
+        "oxlint",
+        "lib/agent-kit/main-compat.test.ts"
+      ],
+      "startedAt": "2026-11-21T03:36:14.448883+00:00",
+      "endedAt": "2026-11-21T03:36:14.942636+00:00",
+      "seconds": 0.49380053800268797,
+      "exitCode": 0,
+      "sourceFileBlob": "c6c67a21ac391a05eae748cf3e00ed0f2518d5c6",
+      "stdoutSha256": "07bfa578c641f799d9da1f623e6842c00e0206fec037e53ec9703ec322357b98",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "localFirstRecord": {
+    "sha256": "27adf885e8726459a9257098d1663991ac536023cdaa98463ae9f954b6693142",
+    "sha": "cb767add72dc7c5f64025ac899d81ffa7c0b74e4",
+    "identity": "08cd5756a96eca2ce804a805382e3d88015e91133181d868c25ba62061f4e0ed",
+    "clean": false,
+    "ready": false,
+    "checks": [
+      {
+        "script": "test:agent-kit-compat",
+        "exitCode": 0,
+        "durationMs": 15281
+      }
+    ],
+    "acceptance": null,
+    "waiver": null,
+    "observedAt": "2026-11-21T03:35:40.828Z",
+    "boundary": "local:check ran during editing on the committed RED head with the recorded GREEN test blob. Its ignored record correctly remains dirty/not Ready. The later ordinary GREEN commit has that same complete source state; no second execution on its commit SHA is invented."
+  },
+  "greenSourceBinding": {
+    "path": "research/agent-kit-fixture-2984/green-code-inputs.json",
+    "sha256": "aff9eb4ee2718b9e2f8cce7cff1abee03c3034e36c8084cf6e8d910a63c3651a",
+    "observed": {
+      "recordedAt": "2026-11-21T03:37:16.036284+00:00",
+      "source": "bdec301935a3ad2b07e14e7a24d03adcd16d5434",
+      "tree": "b0b9b655d9e3245b54ab21a635d3a266c2593d37",
+      "parent": "cb767add72dc7c5f64025ac899d81ffa7c0b74e4",
+      "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "changedPaths": [
+        "lib/agent-kit/main-compat.test.ts"
+      ],
+      "changedBlob": "c6c67a21ac391a05eae748cf3e00ed0f2518d5c6",
+      "endingStatus": "",
+      "method": "Native Git Data ordinary parent commit; native fetch confirms exact code blob and full tree match tested source. Local branch only fast-forwarded after identical index verification; no reset/rebase/force push.",
+      "regressionInputMatch": true
+    }
+  },
+  "metrics": {
+    "originalCompleteGateSamples": 1,
+    "originalFocusedRedSamples": 1,
+    "explicitGatewayRedSamples": 1,
+    "owningEntryGreenSamples": 1,
+    "observerRegressionSamples": 1,
+    "actualImprovement": "The three original queue compatibility failures become passing cases in the original owning entry with the local gateway branch explicitly enabled, while native commit safety stays unchanged.",
+    "performanceImprovementClaimed": false,
+    "reason": "Different test scopes, environments and Node versions; wall-time values describe their own samples only."
+  },
+  "boundaries": {
+    "fullLocalGateOnGreen": null,
+    "independentReview": null,
+    "protectedReadyCI": null,
+    "mergeSHA": null,
+    "exactMainVerification": null,
+    "productionAcceptance": null,
+    "realModelCalls": 0,
+    "productionDatabaseChanges": 0,
+    "productBrowserJourneys": 0,
+    "privateSourceOrCredentialsIncluded": false,
+    "next": "Review exact GREEN source, integrate only demonstrated fixture dependencies with normal merges if required to satisfy the unchanged complete local gate, then obtain actual protected CI and exact-main verification."
+  }
+}

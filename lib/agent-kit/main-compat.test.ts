@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto'
 import {afterEach, before, beforeEach, mock, test} from 'node:test'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
+import type { PoolClient } from 'pg'
 import {defaultRunPolicy} from '@mikka/protocol/agent-policy'
 import {REPO_ORIGIN_HEADER} from '@mikka/protocol/device'
 import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
@@ -10,6 +11,8 @@ import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
+import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
+import { observeCommitEffects } from '../db/commit-effects'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const otherWorkspace=randomUUID()
@@ -32,6 +35,8 @@ const publicationAssignment={pushBranch:'mikka/mik-42',policy:publicationPolicy}
 const prepared=mock.fn(async(..._args:Parameters<typeof import('../run-publications').prepareRunPublication>)=>structuredClone(publicationAssignment))
 const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a run')})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
+const scheduledAfter = captureFixtureLiveEffects()
+beforeEach(()=>{scheduledAfter.length=0})
 const compactSql = (sql: string) => sql.replace(/\s+/g, ' ').trim()
 const fixtureRows = <T>(rows: T[]) => ({ rows, rowCount: rows.length })
 // Keep real identity freezing. Every storage response names its exact query,
@@ -253,10 +258,11 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
   release(){assert.equal(connected,true);assert.equal(transactionOpen,false);connected=false;releases++},
   async query(raw:string,args:unknown[]=[]){
    const sql=compactSql(raw);calls.push({sql:raw,args})
+   assert.equal(scheduledAfter.length,0,'a queue write cannot schedule response work before its COMMIT')
    assert.equal(connected,true);assert.equal(memberLease,true);requireResourceLease(owner,workspace)
-   if(sql==='BEGIN'){assert.deepEqual(args,[]);assert.equal(transactionOpen,false);transactionOpen=true;return fixtureRows([])}
+   if(sql==='BEGIN'){assert.deepEqual(args,[]);assert.equal(transactionOpen,false);transactionOpen=true;return {...fixtureRows([]),command:sql}}
    assert.equal(transactionOpen,true,'every queue read/write uses the same APP transaction')
-   if(sql==='COMMIT'||sql==='ROLLBACK'){assert.deepEqual(args,[]);transactionOpen=false;return fixtureRows([])}
+   if(sql==='COMMIT'||sql==='ROLLBACK'){assert.deepEqual(args,[]);transactionOpen=false;return {...fixtureRows([]),command:sql}}
    if(sql==='SELECT pg_advisory_xact_lock(hashtextextended($1,0))'){
     assert.equal(args.length,1)
     assert.ok(args[0]===`computer-policy:${workspace}`||(priorRun&&typeof args[0]==='string'&&/^computer-task:[0-9a-f]{64}$/.test(args[0])))
@@ -320,6 +326,7 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    throw new Error(`Unexpected cloud queue SQL: ${sql}`)
   },
  }
+ observeCommitEffects(client as unknown as PoolClient)
  const pool={
   connect:async()=>{assert.equal(connected,false);assert.equal(memberLease,true);requireResourceLease(owner,workspace);connected=true;connections++;return client},
   query:async(raw:string,args:unknown[])=>{
@@ -425,6 +432,7 @@ test('cloud queue captures exact worker and parent snapshot in the same transact
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
  assert.deepEqual(snapshot.projectExecution,{version:1,workspaceId:workspace,projectId:null,projectRevision:null,policyRevision:0,repositoryKey:queueRepository.repoPath,baseBranch:queueRepository.baseBranch,environment:null})
  assert.deepEqual(resourceReads,['policy','project']);fixture.assertClosed()
+ assert.ok(scheduledAfter.length>0,'the committed queue reaches the real response scheduler')
 })
 
 
@@ -456,6 +464,7 @@ test('cloud request replay cannot substitute another parent execution',async()=>
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await assert.rejects(queue(fixture.pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId,execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
  assert.equal(fixture.calls.some(call=>call.sql.startsWith('INSERT INTO ')),false);assert.equal(fixture.calls.at(-1)?.sql,'ROLLBACK');fixture.assertClosed()
+ assert.equal(scheduledAfter.length,0,'a refused queue schedules no response work')
 })
 
 test('current Workspace repository refusal blocks local/cloud claims before credentials or leases',async()=>{
