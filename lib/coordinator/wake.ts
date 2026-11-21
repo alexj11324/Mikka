@@ -1,7 +1,7 @@
 import { defaultModelAvailable } from '@/lib/default-model'
 import 'server-only'
 import { releaseAttention } from '@/lib/attention/store'
-import { claimTriageAttempt, completeTriageAttempt, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
+import { claimTriageAttempt, completeTriageAttempt, recordTriageFailure, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
 import { invokeDecision } from '@/lib/coordinator/decide'
 import { tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
 import { runTestFixture } from '@/lib/run-test-fixture'
@@ -12,6 +12,7 @@ import { coordinatorBot } from './coordinator-bot'
 import { COORDINATOR_WAKE_SCOPES_SQL } from './wake-recovery'
 import { deliverRunCompletion } from './run-completion-delivery'
 import { verifiedCiSuiteTransport } from './ci-suite-transport'
+import { decisionFailureScope, recordDecisionFailure, type DecisionFailureReason } from './decision-failure'
 
 
 /**
@@ -23,7 +24,7 @@ export async function coordinatorEnabled(ownerId?: string, botId: string | null 
   return ownerId ? (await import('./model-ready')).botModelReady(ownerId, botId) : false
 }
 
-/** No answer leaves the event pending; it does not become background, result or a request for human approval. */
+/** Missing model answers stay pending except for host-verified failed run completions. */
 export async function triageInbox(userId: string, botId: string): Promise<void> {
   'use step'
   const { hostedBillingScope } = await import('@/lib/abuse/context')
@@ -39,9 +40,16 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
     deliverCiSuite: event => verifiedCiSuiteTransport(event)
       ? setEventTier(event.id, 'result', scope) : Promise.resolve(false),
     classify: async (event, signal) => {
-      const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId),ownerId:userId},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
-      return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }
+      const diagnostics: { reason?: DecisionFailureReason } = {}
+      try {
+        const result = await decisionFailureScope.run(diagnostics, async () => hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId),ownerId:userId},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal)))
+        return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null, errorReason: diagnostics.reason }
+      } catch {
+        if (!diagnostics.reason) recordDecisionFailure('triage', 'classification_failed')
+        return { tier: null, execution: null, errorReason: diagnostics.reason ?? 'classification_failed' as const }
+      }
     },
+    recordFailure: (event, attemptedAt, reason) => recordTriageFailure(event, scope, attemptedAt, reason),
     complete: (event, attemptedAt, judgment) => completeTriageAttempt(event, scope, attemptedAt, judgment),
     observe: (event, judgment, application) => console.info('Coordinator model judgment observed', { eventId: event.id, ...judgment.execution, application }),
   }, budget)
