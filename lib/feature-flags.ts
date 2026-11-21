@@ -43,6 +43,25 @@ export const PRODUCTION_FLAG_DEFAULTS: Readonly<Record<string, boolean>> = {
 }
 export const productionFlagDefault = (key: string) => PRODUCTION_FLAG_DEFAULTS[key] ?? false
 
+/** Local server acceptance can exercise both flag states without a PostHog key.
+ * Production ignores this setting before reading or parsing it. */
+export function localFlagOverride(key: string): boolean | undefined {
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') return undefined
+  const configured = process.env.MIKKA_FLAG_OVERRIDES
+  if (!configured) return undefined
+  let overrides: unknown
+  try {
+    overrides = JSON.parse(configured)
+  } catch (error) {
+    throw new Error('MIKKA_FLAG_OVERRIDES_INVALID_JSON', { cause: error })
+  }
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)
+    || Object.values(overrides).some(value => typeof value !== 'boolean')) {
+    throw new Error('MIKKA_FLAG_OVERRIDES_REQUIRE_BOOLEANS')
+  }
+  return Object.hasOwn(overrides, key) ? (overrides as Record<string, boolean>)[key] : undefined
+}
+
 /**
  * Who gets proactive work (R-73, docs/design/proactive.md § 3), checked on the
  * server per person (lib/posthog-server.ts) and only once the deployment's

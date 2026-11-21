@@ -10,7 +10,7 @@ import { assertMvpEnvironment } from './isolated-env.mjs'
 // Keep the enrolled local MVP path; all requests use native Eve, with no UI or model turn.
 assertMvpEnvironment()
 
-test('native Eve creates and replays one scoped session without granting another owner or Bot access', async () => {
+test('native Eve creates and replays one scoped session without granting another owner or Bot access', { tag: ['@p0', '@journey'] }, async () => {
   const testInfo = test.info()
   const environment = await loadEnvironment()
   const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 2 })

@@ -23,6 +23,11 @@ export default {
       if (typeof env.GITHUB_WEBHOOK?.fetch !== 'function') {
         return new Response(null, { status: 503, headers: { 'cache-control': 'no-store' } })
       }
+      // This public POST route keeps the API dispatcher's anonymous method
+      // discovery contract even when its signed delivery has a separate owner.
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: { allow: 'OPTIONS, POST', 'cache-control': 'no-store' } })
+      }
       if (path === url.pathname) return forward(request, env.GITHUB_WEBHOOK)
       url.pathname = path
       return forward(request, env.GITHUB_WEBHOOK, url)

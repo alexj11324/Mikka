@@ -1,6 +1,6 @@
 import 'server-only'
 import { PostHog } from 'posthog-node'
-import { gatedFeatureEnabled, productionFlagDefault } from '@/lib/feature-flags'
+import { gatedFeatureEnabled, localFlagOverride, productionFlagDefault } from '@/lib/feature-flags'
 import { posthogConfig } from '@/lib/posthog-config'
 import { registerTelemetryFlush } from '@/lib/tracing/flush'
 import { safeErrorAttributes } from '@mikka/protocol/tracing'
@@ -45,12 +45,16 @@ const flagCache = new Map<string, { enabled: boolean; at: number }>()
  * Whether the person's flag is exactly true, cached for FLAG_CACHE_MS so the
  * ingest and cron paths do not ask PostHog per message. Fails closed: no
  * configured client error, timeout or nonboolean answer reads off. An installation
- * without a project uses the explicit production defaults. Never throws.
+ * without a project uses the explicit production defaults. Invalid local
+ * override configuration throws before contacting PostHog; remote failures do not.
  */
-export async function serverFlagEnabled(key: string, userId: string, { posthog = serverPostHog(), now = Date.now(), timeoutMs = FLAG_TIMEOUT_MS }: { posthog?: ServerPostHog | null; now?: number; timeoutMs?: number } = {}): Promise<boolean> {
+export async function serverFlagEnabled(key: string, userId: string, { posthog, now = Date.now(), timeoutMs = FLAG_TIMEOUT_MS }: { posthog?: ServerPostHog | null; now?: number; timeoutMs?: number } = {}): Promise<boolean> {
+  const local = localFlagOverride(key)
+  if (local !== undefined) return local
   const cacheKey = `${key}|${userId}`
   const cached = flagCache.get(cacheKey)
   if (cached && now - cached.at < FLAG_CACHE_MS) return cached.enabled
+  if (posthog === undefined) posthog = serverPostHog()
   let enabled = posthog ? false : productionFlagDefault(key)
   if (posthog) {
     let timer: ReturnType<typeof setTimeout> | undefined
