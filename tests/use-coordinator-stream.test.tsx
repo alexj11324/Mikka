@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { before, test } from 'node:test'
 import { act } from 'react'
 import { Window } from 'happy-dom'
+import { turn } from 'eve/events'
 import { useCoordinatorAgent } from '../components/coordinator/use-coordinator-agent'
 
 const browser = new Window({ url: 'https://mikka.example/' })
@@ -86,5 +87,48 @@ test('eve bootstraps the mapped session and owns replay, stop, and cancellation 
     await act(async () => { root.unmount() })
     globalThis.fetch = original
     container.remove()
+  }
+})
+
+test('a first-turn no-model refusal is not a thread load error, but transport failures remain visible', async () => {
+  const original = globalThis.fetch
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  let failRead = false
+  globalThis.fetch = async (_input, init) => {
+    if (init?.method === 'POST') return Response.json({ ok: true, sessionId: 'wrun_first_send' })
+    if (failRead) return Response.json({ error: 'unavailable' }, { status: 503 })
+    return new Response(new ReadableStream<Uint8Array>({ start(value) { controller = value } }), { headers })
+  }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  let output!: ReturnType<typeof useCoordinatorAgent>
+  function Probe() {
+    output = useCoordinatorAgent({ botId: null, enabled: true, revalidate: async () => undefined })
+    return <>{output.error ? 'Could not load the conversation.' : null}</>
+  }
+  try {
+    await act(async () => { root.render(<Probe />) })
+    await until(() => !!controller)
+    assert.equal(output.error, undefined, 'an empty chat loads normally')
+    await act(async () => {
+      controller.enqueue(new TextEncoder().encode(JSON.stringify({ at: '2026-11-11T00:00:00.000Z', facts: [
+        { type: 'session.started', data: {} },
+        { type: 'turn.started', data: { turnId: 'first', cause: { deliveryId: 'd1' }, follows: null } },
+        { type: 'turn.settled', data: { turnId: 'first', outcome: 'failed', error: { code: 'HOOK_FAILED', message: 'executionModelUnknown' } } },
+      ] }) + '\n'))
+    })
+    await until(() => turn(output.view, 'first')?.status === 'settled')
+    assert.equal(turn(output.view, 'first')?.outcome, 'failed', 'the refusal remains in native history')
+    assert.equal(container.textContent, '', 'a settled refusal must not show the load banner')
+    assert.equal(output.error, undefined)
+    failRead = true
+    await act(async () => { await output.resume().catch(() => undefined) })
+    await until(() => !!output.error)
+    assert.match(container.textContent ?? '', /Could not load the conversation/)
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    globalThis.fetch = original
   }
 })

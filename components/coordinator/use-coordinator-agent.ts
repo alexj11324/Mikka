@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useEveAgent } from 'eve/react'
-import { idle } from 'eve/events'
+import { idle, turns } from 'eve/events'
 import { coordinatorAgentUrl } from '@/lib/eve/client'
 import { coordinatorAgentReplies } from '@/lib/eve/chat-view'
 
@@ -33,5 +33,8 @@ export function useCoordinatorAgent({ botId, enabled, persistedStreamIds, revali
     if (enabled && agent.session) void resume().catch(() => undefined)
   }, [enabled, agent.session?.sessionId, resume])
   const replies = useMemo(() => coordinatorAgentReplies(agent.messages, persistedStreamIds, agent.session?.sessionId), [agent.messages, persistedStreamIds, agent.session?.sessionId])
-  return { ...agent, replies, reconnect }
+  // Settled turn failures have their own transcript refusal, not a failed history read.
+  const turnError = turns(agent.view).at(-1)?.error
+  const error = turnError && agent.error?.name === turnError.code && agent.error.message === turnError.message ? undefined : agent.error
+  return { ...agent, error, replies, reconnect }
 }
