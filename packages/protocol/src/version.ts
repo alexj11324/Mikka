@@ -23,6 +23,8 @@ export const HOSTED_API_HEADERS = { [HOSTED_API_VERSION_HEADER]: String(HOSTED_A
  * minimum per series (MIN_CLIENT_VERSION / MIN_MOBILE_CLIENT_VERSION).
  */
 export const CLIENT_KIND_HEADER = "x-mikka-client"
+const LEGACY_MOBILE_KIND_HEADER = 'x-mikka-client-kind'
+const INSTALLED_CLIENT_KINDS = new Set(['desktop', 'mobile', 'daemon', 'cli'])
 /** The relay handshake carries the same value as a query parameter. */
 export const CLIENT_KIND_PARAM = "client_kind"
 
@@ -76,8 +78,8 @@ export function hostedApiUpgradeRequired(headers: Headers, minimum = HOSTED_API_
   if (!Number.isSafeInteger(minimum) || minimum < 0) throw new RangeError('Invalid hosted API floor')
   const value = headers.get(HOSTED_API_VERSION_HEADER)
   const installed = value !== null || headers.has(CLIENT_VERSION_HEADER)
-    || ['desktop', 'mobile', 'daemon', 'cli'].includes(headers.get(CLIENT_KIND_HEADER) ?? '')
-    || headers.get('x-mikka-client-kind') === 'mobile'
+    || INSTALLED_CLIENT_KINDS.has(headers.get(CLIENT_KIND_HEADER) ?? '')
+    || headers.get(LEGACY_MOBILE_KIND_HEADER) === 'mobile'
   if (!installed) return null
   const parsed = value === null ? 0 : /^(0|[1-9]\d*)$/.test(value) ? Number(value) : NaN
   const version = Number.isSafeInteger(parsed) ? parsed : null
