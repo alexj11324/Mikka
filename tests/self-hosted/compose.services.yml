@@ -20,9 +20,8 @@ x-application: &application
   S3_ACCESS_KEY_ID: selfhost-ci
   S3_SECRET_ACCESS_KEY: ${SELF_HOSTED_FIXTURE_KEY:?Generate a disposable fixture key}
   S3_REGION: us-east-1
-  MIKKA_DEFAULT_MODEL_BASE_URL: http://model:8080/v1
-  MIKKA_DEFAULT_MODEL_API_KEY: synthetic-selfhost-only
-  MIKKA_DEFAULT_MODEL_ID: selfhost-ci
+  MIKKA_LITELLM_URL: http://litellm:4000
+  MIKKA_LITELLM_MASTER_KEY: synthetic-selfhost-litellm
 services:
   dependency-postgres:
     image: postgres:17
@@ -84,6 +83,15 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
+  litellm:
+    environment:
+      LITELLM_MASTER_KEY: synthetic-selfhost-litellm
+      LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+    volumes:
+      - ./tests/self-hosted/litellm.yaml:/app/config.yaml:ro
+    depends_on:
+      model:
+        condition: service_healthy
   model:
     image: node:24-bookworm-slim
     environment:

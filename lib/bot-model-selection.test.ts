@@ -25,6 +25,11 @@ mock.module('./enabled-models', { namedExports: { hostedModelEnabled: async () =
 const hostedCalls: unknown[][] = []
 const hostedModel = { modelId: 'hosted-fixture' }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool: null } })
+let savedEffort: string | null = null
+const effortReads: unknown[][] = []
+mock.module(new URL('./bot-model-effort.ts', import.meta.url).href, { namedExports: {
+  botModelEffort: async (...args: unknown[]) => { effortReads.push(args.slice(1)); return savedEffort },
+} })
 mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
   workspaceDb: { select: () => ({ from: () => ({ where: async () => [{ userId: 'bob', name: 'Public teammate' }] }) }) },
 } })
@@ -83,6 +88,8 @@ const noSubscription = {
   workspace: async () => { throw new Error('subscription authority must not be requested') },
 }
 beforeEach(() => {
+  savedEffort = null
+  effortReads.length = 0
   selected = undefined
   available = []
   savedBinding = undefined
@@ -129,6 +136,15 @@ test('Coordinator on a Mikka 额度 model freezes and resolves that catalogue mo
   assert.equal(workspaceCalls, 1)
   assert.equal(await resolveFrozenHostedModel(scope, frozen, noSubscription), hostedModel)
   assert.deepEqual(hostedCalls, [[scope, CREDITS_MODEL]])
+})
+
+test('the Bot\'s saved effort is frozen with the turn\'s model, read once in the turn\'s workspace', async () => {
+  selected = CREDITS
+  savedEffort = 'high'
+  const frozen = await freezeBotModel({ ...scope, workspaceId: null }, noSubscription)
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL, effort: 'high' })
+  assert.equal(workspaceCalls, 1, 'the workspace is resolved once for the model and its effort')
+  assert.deepEqual(effortReads, [[{ ownerId: 'alice', workspaceId: id(2) }, null]])
 })
 
 test('a saved choice whose account is gone, with nothing bound, asks for a model instead of a silent default', async () => {

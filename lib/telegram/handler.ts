@@ -2,7 +2,7 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 
 import { createHash } from 'node:crypto'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import type { Message, SlashCommandEvent, Thread } from 'chat'
 import type { TelegramMessage } from '@chat-adapter/telegram'

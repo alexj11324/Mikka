@@ -17,7 +17,7 @@ let savedAutoRouting = true
 const changes: OrderChange[] = []
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
 mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => {
   events.push(value ? 'order-cache' : 'order')
   if (value) data = value
@@ -29,7 +29,7 @@ mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderV
 } }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 const liveKeys: unknown[] = []
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
-mock.module('next/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
+mock.module('@/lib/client-runtime/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
 mock.module(new URL('../../app/actions/model-order.ts', import.meta.url).href, { namedExports: {
   changeModelOrder: async (change: typeof changes[number], workspace: string) => {
     assert.equal(workspace, workspaceId)

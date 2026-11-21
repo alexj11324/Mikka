@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { findParentNodeClosestToPos, type Editor } from "@tiptap/react"
 import { toast } from "sonner"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 import {
   AlertDialog,

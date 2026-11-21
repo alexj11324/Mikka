@@ -4,7 +4,6 @@ import { cronUnauthorized } from '@/lib/cron-auth'
 import { reconcileSuggestions } from '@/lib/suggestions/reconcile'
 import { runFactoryMonitorCron } from '@/lib/factory/monitor-cron'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /** Leaves time to answer before maxDuration; whoever is left is read by the next run. */

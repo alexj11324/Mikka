@@ -1,7 +1,6 @@
 import { sharedArtifact } from '@/lib/artifacts/store'
 import { withRequestLog } from '@/lib/request-log'
 
-export const dynamic = 'force-dynamic'
 const privateHeaders = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' }
 
 /** The public share token is the permission, exactly as on /a/<token>.

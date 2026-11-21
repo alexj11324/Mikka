@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "issue": 2984,
+  "scope": "Site search same-job typecheck duplication",
+  "capturedAt": "2026-11-20T21:46:07.541Z",
+  "sourceUrls": {
+    "job": "https://github.com/alexj11324/Mikka/actions/runs/44806487915/job/136531732826",
+    "attemptJobs": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44806487915/attempts/1/jobs?per_page=100"
+  },
+  "source": {
+    "pullRequest": 2958,
+    "head": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+    "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+    "testedMerge": "f1626b50383731a0947bc72e36d0dd06888bae14",
+    "node": "v24.22.3",
+    "runnerImage": "ubuntu-26.04"
+  },
+  "before": {
+    "denominator": 1,
+    "runId": 44806487915,
+    "attempt": 1,
+    "jobId": 136531732826,
+    "conclusion": "success",
+    "createdAt": "2026-11-20T19:54:31Z",
+    "startedAt": "2026-11-20T20:04:48Z",
+    "completedAt": "2026-11-20T20:12:53Z",
+    "queueSeconds": 617,
+    "executionSeconds": 485,
+    "typecheckInvocations": 2,
+    "steps": [
+      {
+        "number": 8,
+        "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T20:07:10Z",
+        "completedAt": "2026-11-20T20:08:12Z"
+      },
+      {
+        "number": 9,
+        "name": "Provision only the isolated application test database from existing schema",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T20:08:12Z",
+        "completedAt": "2026-11-20T20:08:14Z"
+      },
+      {
+        "number": 10,
+        "name": "Provision only the separate workspace test database from existing schema",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T20:08:14Z",
+        "completedAt": "2026-11-20T20:08:16Z"
+      },
+      {
+        "number": 11,
+        "name": "Run pnpm build",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T20:08:16Z",
+        "completedAt": "2026-11-20T20:12:26Z"
+      },
+      {
+        "number": 12,
+        "name": "Real compiled HTTP, Better Auth and PG title read regression (HTTP API only, no browser, no providers)",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T20:12:26Z",
+        "completedAt": "2026-11-20T20:12:47Z"
+      }
+    ],
+    "typecheckLogLines": [
+      "2026-11-20T20:07:11.4789225Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+      "2026-11-20T20:11:46.4290528Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+    ]
+  },
+  "after": null,
+  "limitations": [
+    "The 62-second preparation step combines route checking, typechecking and lint; it is not a standalone typecheck duration.",
+    "The same root typecheck command appears both before build and inside the existing root pnpm build in one job.",
+    "Do not compare this PR's whole-job wall time as an identical workload to PR #2958; only invocation removal is the direct controlled change.",
+    "Actual after-run source, job, typecheck count and retained HTTP result must be recorded separately."
+  ]
+}

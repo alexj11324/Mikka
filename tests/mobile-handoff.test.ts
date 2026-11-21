@@ -3,10 +3,9 @@ import { mock, test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { bearer, oneTimeToken } from 'better-auth/plugins'
-import { nextCookies } from 'better-auth/next-js'
+import { mikkaCookies } from '../lib/auth-cookies'
 import { openHandoff, sealHandoff } from '../lib/mobile-handoff'
 
-const ambientCookies: string[] = []
 const taskReaders = new Map<string, string>()
 mock.module(new URL('../lib/issue-access.ts', import.meta.url).href, { namedExports: {
   issueForUser: async (user: { id: string }, issue: string) => taskReaders.get(issue) === user.id
@@ -17,14 +16,13 @@ const ownedBots = new Map<string, { ownerId: string; workspaceId: string }>()
 mock.module(new URL('../lib/workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: { transaction: async (operation: (tx: unknown) => unknown) => operation({}) } } })
 mock.module(new URL('../lib/workspace-access.ts', import.meta.url).href, { namedExports: { requireWorkspace: async (_tx: unknown, workspaceId: string, userId: string) => { if (!members.get(userId)?.has(workspaceId)) throw new Error('workspaceAccessDenied') } } })
 mock.module(new URL('../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (_sql: string, [botId, userId]: string[]) => ({ rows: ownedBots.get(botId)?.ownerId === userId ? [{ workspaceId: ownedBots.get(botId)!.workspaceId }] : [] }) } } })
-mock.module('next/headers.js', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set: (name: string) => { ambientCookies.push(name) } }) } })
 
 // Real Better Auth with isolated in-memory storage; no accounts or provider calls leave this process.
 const data: Record<string, any[]> = { user: [], session: [], account: [], verification: [] }
 const auth = betterAuth({
   baseURL: 'https://handoff.test', secret: 'isolated-test-secret-123456789012345678901234',
   database: memoryAdapter(data), emailAndPassword: { enabled: true },
-  plugins: [bearer(), oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }), nextCookies()],
+  plugins: [bearer(), oneTimeToken({ expiresIn: 1, storeToken: 'hashed' }), mikkaCookies()],
 })
 mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth } })
 mock.module(new URL('../lib/mcp/resource.ts', import.meta.url).href, { namedExports: { appOrigin: 'https://handoff.test' } })
@@ -40,7 +38,6 @@ async function issue(cookie: string) {
 }
 async function open(token: string, cookie?: string, target = '/?section=coordinator') {
   const { GET } = await route
-  ambientCookies.length = 0
   return GET(new Request(`https://handoff.test/api/mobile/open?${new URLSearchParams({ token, to: target })}`, { headers: cookie ? { cookie } : {} }))
 }
 async function session(cookie: string) {
@@ -56,7 +53,11 @@ test('handoff binds browser to issuing account, consumes token and rejects expir
   const response = await open(token)
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('referrer-policy'), 'strict-origin')
-  assert.equal(ambientCookies.length, 0, 'nextCookies must not sign in before confirmation')
+  // The exchange runs through `auth.handler`, which marks the call as a router
+  // dispatch; the cookie plugin skips those, so the confirmation page carries
+  // only its own pending cookie and never a session.
+  assert.deepEqual(response.headers.getSetCookie().filter(value => value.includes('session_token')), [],
+    'the cookie plugin must not sign in before confirmation')
   assert.equal((await session(cookieHeader(response.headers))), null)
   const confirmed = await confirm(response)
   assert.equal(confirmed.status, 303)
@@ -91,7 +92,8 @@ test('induced GET does not switch accounts; confirmation requires same origin an
   const response = await open(await issue(alice.cookie), bob.cookie)
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('referrer-policy'), 'strict-origin')
-  assert.equal(ambientCookies.length, 0, 'nextCookies must not sign in before confirmation')
+  assert.deepEqual(response.headers.getSetCookie().filter(value => value.includes('session_token')), [],
+    'the cookie plugin must not sign in before confirmation')
   assert.equal((await session(bob.cookie))?.user.id, bob.id)
   assert.equal((await session(cookieHeader(response.headers))), null)
   assert.match(await response.clone().text(), /alice2@example.test/)

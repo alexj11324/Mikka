@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { SidebarProvider } from '@/components/ui/sidebar'

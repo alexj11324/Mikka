@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { pool } from '@/lib/db'
 import { getApiSession } from '@/lib/api-auth'
@@ -9,7 +9,6 @@ import { ensureComposioTriggers } from '@/lib/suggestions/sources'
 import { listSuggestions, recordTimeZone, todaysBriefing } from '@/lib/suggestions/store'
 import { manualTimeZone } from '@/lib/suggestions/time-zone'
 
-export const runtime = 'nodejs'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 

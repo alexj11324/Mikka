@@ -155,10 +155,11 @@ and deliver stops, without a permission round trip before each tool or model cal
   slots come from the actual Agent installed on that runner. A failed cloud
   boot self-check marks the runner unhealthy so its runs can be placed again.
 - **Tools and providers.** Claude Code uses `bypassPermissions`; Codex uses
-  approvals `never`. Only the real selected provider credential goes to the CLI:
-  Claude Code talks to Anthropic and Codex to OpenAI directly. No placeholder,
-  provider proxy or extra permission-preflight request is inserted before a
-  call. Connected apps still make their normal authenticated operation through
+  approvals `never`. API-key runs hold a run-bound Mikka gateway token;
+  the gateway admits and meters requests, then sends them through backend
+  LiteLLM. Internal models use LiteLLM aliases. Official subscription OAuth
+  keeps the explicit independent path pending compatibility proof and Alex's
+  separate decision ([0530](decisions/2026-11-20-0530-litellm-only-model-egress.md)). Connected apps still make their normal authenticated operation through
   Mikka's MCP entry; that operation does not acquire another permission gate
   first. Third-party API Secrets use the separate [non-readable capability
   boundary](decisions/2026-11-08-0240-credential-exposure-boundary.md) where
@@ -382,8 +383,9 @@ checks are superseded.
    protected path on its actual runner. Never log credentials or bake them
    into a reusable image.
 3. **Execution and renewal.** The assigned machine has the authority to run
-   the task. Official CLIs call their providers directly; no Mikka model proxy
-   or extra server authorization request precedes each model or tool call.
+   the task. API-key model requests use the run-bound Mikka gateway and
+   backend LiteLLM; official subscription OAuth retains its explicit separate
+   path. Connected tools keep their existing authorization boundary.
    Refresh naturally expiring provider tokens in the background before expiry
    and update the live CLI's normal credential mechanism. A healthy Claude Code
    run does not end merely because an old access token expires. Routine
@@ -461,7 +463,7 @@ external bill.
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
-| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, an ordinary worktree, direct provider credentials and no sandbox; cloud machines on additive official E2B templates | — |
+| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, an ordinary worktree, run-bound model gateway tokens or official subscription credentials and no sandbox; cloud machines on additive official E2B templates | — |
 | A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 优先使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One cloud VM per task, retained across authorized attempts; leases and heartbeats; selected credentials prepared once, background renewal and pushed stops | — |

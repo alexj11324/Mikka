@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, upcomingFeatures, type GatedFeature, type UpcomingFeature } from '@/lib/feature-flags'
 import { getClientConfiguration, subscribeClientConfiguration } from './client-configuration'
 

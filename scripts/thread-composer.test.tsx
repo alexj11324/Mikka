@@ -6,7 +6,7 @@ import type { Root } from 'react-dom/client'
 import type { State } from 'swr'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Window } from 'happy-dom'
-import { IntlProvider } from 'next-intl'
+import { IntlProvider } from '@/lib/intl/i18n-client'
 import * as actualViewState from '../lib/hooks/view-state'
 import * as actualAppBuild from '../lib/app-build'
 import type { FactoryTask } from '../components/workspace/factory-acceptance-pane'
@@ -20,7 +20,8 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 let draftText = ''
 let draftQuote: string | null = null
-let storedMessages: { id: string; text: string; at: Date }[] = []
+let storedMessages: { id: string; text: string; at: Date; mine: boolean }[] = []
+let runContext: import('../lib/context-usage').ContextUsage | undefined
 let shownThread: import('../components/slots/thread-contract').ThreadScreenProps | undefined
 let pageChecks = 0
 let buildGate: Promise<boolean> | undefined
@@ -50,7 +51,7 @@ mock.module('swr', {
   )
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
-    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: storedMessages }, mutate: () => {} }
+    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: storedMessages, context: runContext }, mutate: () => {} }
     // Where the thread runs is its own read (thread-run-place.tsx); none here.
     : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
     : Array.isArray(key) && key[0] === 'thread-changes' ? { data: changesRead, mutate: () => {} }
@@ -59,7 +60,7 @@ mock.module('swr', {
     : { data: [], mutate: () => {} },
   namedExports: { useSWRConfig: () => liveRead ? actualSWR.useSWRConfig() : ({ mutate: () => {}, cache: new Map() }), unstable_serialize: actualSWR.unstable_serialize },
 })
-mock.module('next/dynamic', { defaultExport: () => () => null })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => () => null })
 mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : key.endsWith(':quote') && draftQuote ? draftQuote as T : initial),
@@ -76,7 +77,7 @@ mock.module(at('app/actions/agents.ts'), { namedExports: {
   if (readFailure) throw readFailure
   return { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [], chunksAppend: false }
 }, getThreadChanges: async () => { changesReads++; return { state: 'none' } }, getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async (request: { requestId: string; text: string }) => { replyCalls++; return postReply(request) }, stopRun: async () => ({}) } })
-mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
+mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [], listTaskArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
     acceptance?.issueId === issueId && acceptance.candidateRunId === runId ? acceptance : null,
@@ -99,7 +100,15 @@ const { ChatComposer } = await import('../components/coordinator/chat-composer')
 mock.module(at('components/slots/thread.tsx'), { namedExports: {
   ThreadScreen: (props: import('../components/slots/thread-contract').ThreadScreenProps) => {
     shownThread = props
-    return <section data-required-thread-screen=""><ChatComposer {...props.composer} />{props.notices}</section>
+    return <section data-required-thread-screen="">
+      <div ref={props.scrollRef}><ol>{props.entries?.map(entry => <li key={entry.id} data-delivery-status={entry.role === 'person' ? entry.status : undefined}>
+        {entry.role === 'person' ? <>{entry.attachments?.map(item => <span key={item.id} data-slot={item.id} aria-label={item.name}>{item.name}</span>)}{entry.body ?? entry.text}
+          {entry.deliveryMessage && <span role="alert">{entry.deliveryMessage}</span>}{entry.onRetry && <button onClick={entry.onRetry}>Retry</button>}</>
+          : entry.parts.map((part, index) => part.kind === 'text' ? <div key={index}>{part.node}</div> : null)}
+        {entry.actions}
+      </li>)}</ol></div>
+      {!props.readOnly && <div data-slot="thread-composer"><ChatComposer {...props.composer} />{props.notices}</div>}
+    </section>
   },
 } })
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
@@ -117,6 +126,18 @@ after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
   <IssueThreadPanel bare issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
+
+test('a recorded model stays available to the composer without a context estimate in the thread', () => {
+  runContext = { used: 6, promptUsed: 6, promptBudget: 25_000, estimated: true, segments: [], unmeasured: [], model: null,
+    compactAtTokens: null, windowTokens: null, composerModel: { selected: 'gpt-5.1', served: null } }
+  try {
+    const html = render({ issueId: null })
+    assert.doesNotMatch(html, /data-slot="thread-context-usage"|25K/)
+    assert.match(renderToStaticMarkup(shownThread?.composer.model), /GPT-5\.1/)
+  } finally {
+    runContext = undefined
+  }
+})
 
 function ReadControl() {
   const { mutate } = actualSWR.useSWRConfig()
@@ -259,7 +280,7 @@ test('an open thread ends in the composer whether it runs or has ended', () => {
 })
 
 test('the Artifact window and the thread column keep the composer', () => {
-  assert.match(render({ bare: true }), /data-composer=""/, 'Artifact window (bare)')
+  assert.match(render({ bare: true }), /data-required-thread-screen=""[\s\S]*data-composer=""/, 'Artifact window uses the same screen')
   assert.match(render({ bare: false, issueId: null, onOpenTask: undefined }), /data-required-thread-screen=""[\s\S]*data-composer=""/, 'the full thread column without a Task uses the required screen')
 })
 
@@ -269,8 +290,10 @@ test('a thread the viewer cannot read in full has no composer', () => {
 })
 
 test('every conversation container draws the shared composer, directly or through the thread panel', () => {
-  const direct = ['components/coordinator/coordinator-chat.tsx', 'components/workspace/group-chat-view.tsx', 'components/workspace/issue-thread-panel.tsx']
-  for (const file of direct) assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /<ChatComposer\b/, file)
+  for (const file of ['components/coordinator/coordinator-chat.tsx', 'components/workspace/issue-thread-panel.tsx']) {
+    assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /<ThreadScreen\b/, file)
+  }
+  assert.match(readFileSync(new URL('../components/workspace/group-chat-view.tsx', import.meta.url), 'utf8'), /<ChatComposer\b/)
   const threads = ['components/artifacts/artifact-window.tsx', 'components/workspace/task-thread-pane.tsx', 'components/workspace/thread-column.tsx']
   for (const file of threads) assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /<IssueThreadPanel\b/, file)
   // The task page's thread is TaskThreadPane: the run panel, or the task-conversation slot built from it.
@@ -293,7 +316,7 @@ test('an open thread lets the agent’s words be quoted and every message be cop
 
 test('the full thread labels a selected quote and restores its words separately from the saved follow-up', () => {
   draftQuote = 'Selected words'
-  storedMessages = [{ id: 'follow-up', text: '> Selected words\n\nContinue here.', at: new Date(1) }]
+  storedMessages = [{ id: 'follow-up', text: '> Selected words\n\nContinue here.', at: new Date(1), mine: true }]
   render({ bare: false })
   assert.equal(shownThread?.pending.find(item => item.id === 'reply-quote')?.meta, messages.AiElements.message.quote)
   const followUp = shownThread?.entries?.find(item => item.role === 'person' && item.text === 'Continue here.')
@@ -321,7 +344,7 @@ test('a historical failure does not offer Retry while the latest continuation wo
 
 test('an ended independent check hides generic Retry and preserves an editable composer with Send disabled', () => {
   draftText = 'Keep this unsent draft'
-  thread = { ...base, status: 'failed', error: 'The selected Agent Profile changed or is no longer available.', replyAvailable: false, retryAvailable: false }
+  thread = { ...base, kind: 'factory_verify', status: 'failed', error: 'The selected Agent Profile changed or is no longer available.', replyAvailable: false, retryAvailable: false }
   const html = render()
   assert.match(html, /data-slot="thread-failure"/)
   assert.doesNotMatch(html, /<button[^>]*>Retry<\/button>/)
@@ -360,10 +383,14 @@ test('a failed queued question wake retains its explicit Retry without reopening
 
 test('the ordinary producer and a current check question keep their composer controls', () => {
   for (const question of [null, 'waiting']) {
-    thread = { ...base, status: question ? 'stopped' : 'failed', error: question ? null : 'Execution failed', question, replyAvailable: true, retryAvailable: !question }
+    thread = { ...base, kind: question ? 'factory_verify' : 'implement', status: question ? 'stopped' : 'failed', error: question ? null : 'Execution failed', question, replyAvailable: true, retryAvailable: !question }
+    for (const bare of [true, false]) {
+      const html = render({ bare })
+      assert.match(html, /data-composer-send=""(?! disabled="")/)
+      assert.match(html, /aria-label="Tell Claude Code what to do next…"/)
+      assert.equal(shownThread?.readOnly, false)
+    }
     const html = render()
-    assert.doesNotMatch(html, /data-composer-send="" disabled=""/)
-    assert.match(html, /aria-label="Tell Claude Code what to do next…"/)
     if (!question) assert.match(html, /<button[^>]*>Retry<\/button>/)
   }
 })
@@ -375,6 +402,15 @@ const acceptedTask = (patch: Partial<FactoryTask> = {}): FactoryTask => ({
 function expectStatusBadge(html: string, group: string, message?: string) {
   assert.match(html, new RegExp(`<span\\b(?=[^>]*data-slot="badge")(?=[^>]*data-group="${group}")[^>]*>`), message)
 }
+
+test('finished work without a request for input shows its duration without a waiting badge', () => {
+  for (const kind of ['implement', 'acceptance']) {
+    thread = { ...base, kind, finishedAt: new Date(12_000) }
+    const html = render()
+    assert.match(html, /Worked for 12s/)
+    assert.doesNotMatch(html, /data-group="waiting"/)
+  }
+})
 
 test('acceptance resolves the current producer badge without rewriting its outcome or disabling its ordinary composer', () => {
   draftText = 'Keep this producer follow-up draft'
@@ -466,7 +502,7 @@ test('an offline bundled renderer still submits its thread reply once', async t 
   await act(async () => composer!.onChange('thread delivery'))
   await act(async () => composer!.onSubmit())
   assert.equal(replyCalls, 1)
-  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sent"]').length, 1)
 })
 
 test('Thread releases the draft before version preflight and retries an unknown ACK using the same immutable command', async () => {
@@ -484,11 +520,11 @@ test('Thread releases the draft before version preflight and retries an unknown 
   await act(async () => composer!.onChange('same words'))
   await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
   assert.equal(composer!.value, '')
-  assert.equal(container.querySelectorAll('[data-delivery-phase="sending"]').length, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sending"]').length, 1)
   assert.equal(replyCalls, 0)
   await act(async () => composer!.onChange('next draft'))
   await act(async () => release(true))
-  const failed = container.querySelector<HTMLElement>('[data-delivery-phase="failed"]')
+  const failed = container.querySelector<HTMLElement>('[data-delivery-status="failed"]')
   assert.match(failed?.textContent ?? '', /same words/)
   const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
   assert.ok(retry, 'the retry belongs to this failed message')
@@ -497,7 +533,7 @@ test('Thread releases the draft before version preflight and retries an unknown 
   assert.equal(writes[0].requestId, writes[1].requestId)
   assert.equal(writes[1].text, 'same words')
   assert.equal(composer!.value, 'next draft')
-  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sent"]').length, 1)
 })
 
 test('Review retries the original candidate and event in place after the approval response is lost', async t => {
@@ -522,11 +558,11 @@ test('Review retries the original candidate and event in place after the approva
   assert.equal(composer!.value, '')
   assert.equal(canceled, 1)
   assert.equal(calls.length, 0)
-  assert.equal(container.querySelectorAll('[data-delivery-phase="sending"]').length, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sending"]').length, 1)
   await act(async () => release(true))
   await renderLive('owner:workspace', { runId })
   await act(async () => composer!.onChange('Separate next draft'))
-  const failed = container.querySelector('[data-delivery-phase="failed"]')
+  const failed = container.querySelector('[data-delivery-status="failed"]')
   assert.match(failed?.textContent ?? '', /Fix the original candidate/)
   const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
   assert.ok(retry)
@@ -540,7 +576,7 @@ test('Review retries the original candidate and event in place after the approva
   assert.deepEqual(calls[1].input.binding, binding)
   assert.equal(calls[1].input.note, 'Fix the original candidate')
   assert.equal(composer!.value, 'Separate next draft')
-  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-status="sent"]').length, 1)
 })
 
 test('Inbox waiting replies keep the original thread, viewer, workspace and request ID across an unknown result and remount', async () => {
@@ -573,7 +609,7 @@ test('Inbox waiting replies keep the original thread, viewer, workspace and requ
   await renderLive(viewer.ownerId + ':' + viewer.workspaceId, { issueId, runId })
   await act(async () => composer!.onChange('Draft on an old build'))
   await act(async () => { composer!.onSubmit() })
-  const reason = container.querySelector('[data-delivery-phase="failed"] [role="alert"]')?.firstChild?.textContent
+  const reason = container.querySelector('[data-delivery-status="failed"] [role="alert"]')?.firstChild?.textContent
   assert.equal(reason, messages.Coordinator.sendUpdateRequired)
   await renderInbox(viewer)
   await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Draft on an old build'), { status: 'failed', error: reason }) })

@@ -49,7 +49,7 @@ export function expectedRelease(env, event) {
   require(integer(run?.id) && integer(run?.run_attempt) && integer(run?.workflow_id)
     && SHA.test(run?.head_sha ?? '') && run.name === RELEASE_NAME
     && run.status === 'completed' && run.conclusion === 'success'
-    && ['push', 'workflow_dispatch'].includes(run.event) && run.head_branch === 'main'
+    && ['push', 'workflow_dispatch', 'workflow_run'].includes(run.event) && run.head_branch === 'main'
     && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY, 'trigger')
   require(env.EXPECTED_SOURCE_SHA === run.head_sha
     && env.EXPECTED_UPSTREAM_RUN_ID === String(run.id)
@@ -64,7 +64,7 @@ export function assertReleaseIdentity(expected, workflow, run) {
   require(run?.id === expected.runId && run.run_attempt === expected.runAttempt
     && run.workflow_id === expected.workflowId && run.path === RELEASE_WORKFLOW && run.name === RELEASE_NAME
     && run.status === 'completed' && run.conclusion === 'success' && run.event === expected.event
-    && ['push', 'workflow_dispatch'].includes(run.event) && run.head_branch === 'main'
+    && ['push', 'workflow_dispatch', 'workflow_run'].includes(run.event) && run.head_branch === 'main'
     && run.head_sha === expected.sourceCommit && run.repository?.full_name === REPOSITORY
     && run.head_repository?.full_name === REPOSITORY, 'upstream')
 }

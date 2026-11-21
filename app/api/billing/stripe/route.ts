@@ -1,9 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z, ZodError } from 'zod'
 import { applyStripeEvent } from '@/lib/billing/service'
 import { stripeConfig, verifyStripeSignature } from '@/lib/billing/stripe'
 
-export const runtime = 'nodejs'
 
 /** Stripe webhook: subscription state, purchased points and refunds. Signature-checked. */
 export async function POST(request: Request) {

@@ -17,7 +17,6 @@ import { threadQuotaView } from '@/lib/run-quota-view'
 import { threadLiveReferences } from '@/lib/live/panels'
 import { workspacePool } from '@/lib/workspace-db'
 
-export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
 

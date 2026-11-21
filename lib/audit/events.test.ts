@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { admitModelRoute, modelAdmissionRevision, parseModelAdmissionPolicy } from '../model-admission/contract'
 import { AUDIT_ACTIONS, AUDIT_CATEGORIES, AuditEventError, auditCategory, auditRequestContext, looksLikeSecretValue, toAuditRow, type AuditEvent, type AuditMetadata } from './events'
 
 const ws = '7b0f3c9e-2d4a-4e1b-9c3d-5f6a7b8c9d0e'
@@ -149,4 +150,16 @@ test('credential and Agent approval metadata excludes credential content and too
   assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_decided', metadata: { ...metadata, revision: 'unknown' } }), /allowlist/)
   assert.deepEqual(toAuditRow({ ...base, action: 'agent.approval_consumed', metadata: { runId: ws, revision: metadata.revision } }).metadata, { runId: ws, revision: metadata.revision })
   assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_consumed', metadata }), /allowlist/)
+})
+
+test('an admitted LiteLLM route becomes an audit row without widening its route or logging credentials', () => {
+  const route = { provider: 'litellm', model: 'mikka-default', endpoint: 'https://models.example.test/v1',
+    servingProviders: ['litellm'], principalIds: ['u1'], dataRegions: ['unknown'] }
+  const policy = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
+  const admitted = admitModelRoute(policy, { ownerId: 'u1', ...route })
+  const metadata = { revision: modelAdmissionRevision(policy), provider: admitted.provider, model: admitted.model,
+    endpoint: admitted.endpoint, dataRegion: admitted.dataRegion }
+  assert.deepEqual(toAuditRow({ ...base, action: 'model.admitted', metadata }).metadata, metadata)
+  for (const endpoint of ['https://key@models.example.test/v1', 'https://models.example.test/v1?token=private', 'ftp://models.example.test/v1'])
+    assert.throws(() => toAuditRow({ ...base, action: 'model.admitted', metadata: { ...metadata, endpoint } }), AuditEventError)
 })

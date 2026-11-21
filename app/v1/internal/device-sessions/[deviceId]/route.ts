@@ -4,8 +4,6 @@ import { verifyBearer } from '@/lib/cron-auth'
 import { gatewayConfig } from '@/lib/builtin-gateway/config'
 import { applyDeviceSessionReport } from '@/lib/device-session'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 const headers = { 'Cache-Control': 'no-store' }
 const MAX_BODY_BYTES = 1024

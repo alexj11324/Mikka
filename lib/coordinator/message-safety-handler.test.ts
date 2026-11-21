@@ -7,7 +7,7 @@ import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'driz
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, runMessages } from '../db/schema'
 import { sourcedEventMessage } from './message-safety'
 import { createApiHandler } from '../../apps/api/src/application'
-import * as apiServer from '../../apps/api/compat/server'
+import * as apiServer from '../../lib/server-runtime/server'
 
 // Real exported POST, mcp-handler/MCP SDK, OAuth verification function, MCP
 // actions/tools and transactional run-control code. Only persistence, wake and
@@ -159,7 +159,7 @@ stub('../../app/actions/issue-operations.ts', { updateIssueRelation: () => {} })
 stub('../../app/actions/projects.ts', { listProjects: () => {}, listWorkspaceProjects: () => {}, moveIssueToProject: () => {} })
 // Production resolves next/server through this compatibility layer and gives
 // every tool callback a request-owned after() queue.
-mock.module('next/server', { namedExports: apiServer })
+mock.module('@/lib/server-runtime/server', { namedExports: apiServer })
 let POST: typeof import('../../app/api/mcp/route')['POST']
 before(async () => {
   const module = await import('../../app/api/mcp/route')

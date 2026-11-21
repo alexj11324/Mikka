@@ -75,8 +75,15 @@ test("reads only the authenticated owner’s selected repository and returns pri
   assert.deepEqual(calls[1], [
     "read",
     "owner",
-    { repo: "Owner/Repo", cursor: null, view: "open" },
+    { repo: "Owner/Repo", cursor: null, view: "open", since: null },
   ]);
+  await route.GET(request("?repo=Owner%2FRepo&view=all&since=2026-11-01T00%3A00%3A00Z"));
+  assert.deepEqual(calls.at(-1), [
+    "read",
+    "owner",
+    { repo: "Owner/Repo", cursor: null, view: "all", since: "2026-11-01T00:00:00Z" },
+  ]);
+  assert.equal((await route.GET(request("?repo=Owner%2FRepo&since=yesterday"))).status, 400);
 });
 
 test("requires a human session and rejects malformed or attacker-added request fields", async () => {

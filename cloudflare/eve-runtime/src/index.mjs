@@ -1,4 +1,3 @@
-import { bindWorkersAi, configureWorkersAi } from '../../workers-ai/binding.mjs'
 import { Container } from '@cloudflare/containers'
 import { hostConfiguration, nativeRequest, singletonContainerName } from '../runtime/config.mjs'
 
@@ -22,12 +21,12 @@ export class EveRuntime extends Container {
     }
     this.envVars = { ...this.configuration.runtimeEnv, MIKKA_EVE_PRODUCT_TOKEN: productCapability,
       NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt' }
-    if (env.WORKERS_AI) configureWorkersAi(this, ctx, env.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID)
+    if (env.LITELLM) this.envVars.MIKKA_LITELLM_URL = 'https://litellm.internal'
     this.labels = { component: 'eve-runtime', release: this.configuration.releaseId }
   }
 
   async bindOutboundServices() {
-    if (this.envVars.MIKKA_WORKERS_AI_CAPABILITY) await bindWorkersAi(this.ctx, this.envVars)
+    if (this.env.LITELLM) await this.ctx.container.interceptOutboundHttps('litellm.internal', this.ctx.exports.LiteLlmOutbound)
     await this.ctx.container.interceptOutboundHttps('product.internal',
       this.ctx.exports.EveProductOutbound({ props: { capability: this.envVars.MIKKA_EVE_PRODUCT_TOKEN } }))
   }

@@ -3,8 +3,8 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } fro
 import { useCallback, useRef } from 'react'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Puzzle } from 'lucide-react-native'
-import { SourceIcon, Spinner } from '@/components/icons'
+import { Puzzle, Sparkles } from 'lucide-react-native'
+import { SourceIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { shortWhen } from '@/lib/clock'
@@ -18,10 +18,13 @@ import { useDecisionSubmission } from '../../../../../hooks/use-decision-submiss
 import { useApi, useRefresh } from '@/lib/useApi'
 import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 import { ListSectionHeader } from '@/shared/components/list-section'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 
-const VERB: Record<string, string> = { reply: '回复', review: '审阅', handle: '处理', read: '查看' }
-const APP: Record<string, string> = { gmail: 'Gmail', slack: 'Slack', notion: 'Notion', github: 'GitHub', linear: 'Linear' }
+const VERB: Record<string, string> = mobileMessages.SuggestionsPage.action
+const APP: Record<string, string> = mobileMessages.Shell.suggestions.source
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+/** One and many are two keys, as thread-steps.ts does: the phone has no ICU formatter. */
+const counted = (count: number) => (count === 1 ? mobileMessages.MobileCore.item : mobileMessages.MobileCore.items).replace('{count}', String(count))
 
 /**
  * 建议 (Comma design 16): a row of cards, one per app with today's count, then today's items, each led by its app's
@@ -59,31 +62,31 @@ export default function SuggestionsScreen() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title="建议" topTitle
-        right={{ icon: 'puzzlepiece.extension', label: '插件', web: <Puzzle size={20} color={colors.ink} strokeWidth={2} />, onPress: () => router.push('/suggestions/plugins') }} />
+      <NavBar title={mobileMessages.Nav.suggestions} topTitle
+        right={{ icon: 'puzzlepiece.extension', label: mobileMessages.Nav.plugins, web: <Puzzle size={20} color={colors.ink} strokeWidth={2} />, onPress: () => router.push('/suggestions/plugins') }} />
       <FlatList
         data={items}
         keyExtractor={item => item.id}
         {...underBar}
         refreshControl={<RefreshControl {...refresh} />}
         ListHeaderComponent={<>
-          {loading ? <View style={styles.center}><Spinner /></View> : null}
-          <ReadNotice error={error} hasData={Boolean(data)} label="建议" onRetry={reload} />
+          {loading ? <ListLoading /> : null}
+          <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.suggestions} onRetry={reload} />
           {groups.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
               {groups.map(group => (
-                <View key={group.source} style={styles.card} accessible accessibilityLabel={`${APP[group.source] ?? group.source}，${group.items.length} 条`}>
+                <View key={group.source} style={styles.card} accessible accessibilityLabel={mobileMessages.Common.propertyValue.replace('{label}', APP[group.source] ?? group.source).replace('{value}', counted(group.items.length))}>
                   <View style={styles.cardHead}>
                     <View style={styles.badge}><SourceIcon source={group.source} size={16} /></View>
                     <Text style={styles.cardName} numberOfLines={1}>{APP[group.source] ?? group.source}</Text>
                   </View>
-                  <Text style={styles.cardCount}>{group.items.length} 条</Text>
+                  <Text style={styles.cardCount}>{counted(group.items.length)}</Text>
                 </View>
               ))}
             </ScrollView>
           ) : null}
-          {items.length ? <ListSectionHeader title="今天" /> : null}
-          {!loading && !error && data && !items.length ? <Text style={styles.note}>今天没有建议</Text> : null}
+          {items.length ? <ListSectionHeader title={mobileMessages.AgentCopy.today} /> : null}
+          {!loading && !error && data && !items.length ? <EmptyState icon={<Sparkles size={20} color={colors.secondary} strokeWidth={1.8} />} title={mobileMessages.Shell.suggestions.noneToday} /> : null}
         </>}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         renderItem={({ item }) => {
@@ -109,8 +112,6 @@ export default function SuggestionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  center: { paddingTop: 40, alignItems: 'center' },
-  note: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   cards: { paddingHorizontal: LIST_INSET, paddingTop: 4, paddingBottom: 4, gap: 10 },
   card: { width: 168, gap: 10, padding: 12, borderRadius: 16, borderCurve: 'continuous', backgroundColor: colors.bubble },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },

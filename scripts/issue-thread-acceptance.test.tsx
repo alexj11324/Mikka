@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { before, beforeEach, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { IntlProvider } from 'next-intl'
+import { IntlProvider } from '@/lib/intl/i18n-client'
 import type { IssueThread } from '../lib/issue-threads'
 import type { FactoryTask } from '../components/workspace/factory-acceptance-pane'
 

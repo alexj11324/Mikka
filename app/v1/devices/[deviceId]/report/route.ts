@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { deviceReportSchema, type DeviceReportResult } from '@mikka/protocol/device'
 import { pool, db } from '@/lib/db'
 import { ensureDeviceAgents } from '@/lib/device-agents'
@@ -10,7 +10,6 @@ import { daemonVersions } from '@/lib/daemon-release'
 import { ownerListChanged } from '@/lib/live/lists'
 import { withDeviceReportBody } from '@/lib/device-report-body'
 
-export const dynamic = 'force-dynamic'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 

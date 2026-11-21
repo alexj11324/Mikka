@@ -4,9 +4,8 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { filterAffected } from 'nx/src/project-graph/affected/affected-project-graph.js'
 import { buildGraph, dbId, taskId } from './graph.mjs'
-import { isSelfHostedBackendInput } from './self-hosted-requirements.mjs'
 import { isDocsOnly } from '../ci-docs-only.mjs'
-import tasks from './tasks.json' with { type: 'json' }
+import { frozenUnitInventory } from './frozen-inventory.mjs'
 
 export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
 // Keep the expression readable without a trailing whitespace token.
@@ -17,10 +16,9 @@ export function area(file) {
   if (file.startsWith('packages/daemon/')) return 'daemon'
   if (file.startsWith('packages/subscription-worker/')) return 'e2b/runtime'
   if (file.startsWith('packages/')) return 'protocol/shared'
-  if (/^(?:components|hooks|i18n|messages|public|apps\/frontend)\/|^app\/(?:\[locale\]|fonts|globals)/.test(file)) return 'frontend/web'
+  if (/^(?:components|hooks|i18n|messages|public|apps\/frontend)\/|^app\/(?:fonts|globals)/.test(file)) return 'frontend/web'
   if (/^(?:lib|app|apps\/api)\//.test(file)) return 'api/factory/coordinator'
   if (file.startsWith('drizzle/')) return 'database/migrations'
-  if (/^(?:Dockerfile|docker-compose|tests\/self-hosted)/.test(file)) return 'self-hosted/image'
   if (file.startsWith('scripts/e2b/')) return 'e2b/runtime'
   if (globalPath(file)) return 'ci/release/security'
   if (isDocsOnly([file])) return 'docs-only'
@@ -33,6 +31,7 @@ export function diffRange(env, event) {
   return [] // Manual, nightly, tag and unsupported events always run all checks.
 }
 export async function select(plan, changes, { force = false } = {}) {
+  const { tasks } = plan
   const files = changes.map(c => c.file)
   const areas = [...new Set(files.map(area))].sort()
   const reasons = []
@@ -69,8 +68,7 @@ export async function select(plan, changes, { force = false } = {}) {
     source: !docs, daemon: !docs && (full || selected.has('@mikka/daemon') || areas.includes('daemon')),
     mobile: !docs && (full || selected.has('@mikka/mobile') || areas.includes('mobile')),
     desktop: !docs && (full || selected.has('@mikka/desktop') || areas.includes('desktop')),
-    image: !docs && (full || areas.includes('self-hosted/image') || files.some(isSelfHostedBackendInput) || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
-    analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/\[locale\]\/layout/.test(f))),
+    analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/globals/.test(f))),
   }
   return { version: 1, full, docs_only: docs, areas, reasons, affected, units,
     unit_tasks: units.map(id => ({ project: id, target: `ci-tasks:${id.slice(3)}`, command: tasks[id.slice(3)].command.trim(), reason: full ? 'full validation' : always.test(tasks[id.slice(3)].command) || id === 'ci-core-triage' ? 'mandatory source/security policy' : 'Nx reverse dependency' })),
@@ -88,8 +86,14 @@ export function emit(result, env = process.env) {
 }
 export async function main(env = process.env) {
   const root = env.CI_CANDIDATE_ROOT || process.cwd()
-  const plan = buildGraph(root) // Always validates the entire candidate DB inventory.
   const event = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH)) : {}
+  const provenance = diffRange(env, event)
+  let frozen = null
+  if (env.CI_POLICY_FALLBACK === 'true' && ['pull_request', 'merge_group'].includes(env.GITHUB_EVENT_NAME)) {
+    if (env.CI_FORCE_FULL !== 'true' || provenance.length !== 2) throw Error('frozenCiFullCoverageRequired')
+    frozen = frozenUnitInventory(root, { policy: env.CI_POLICY_SHA, base: provenance[0], head: provenance[1], checkout: env.GITHUB_SHA })
+  }
+  const plan = buildGraph(root, frozen?.tasks) // Always validates the entire candidate DB inventory.
   const range = env.CI_BASE && env.CI_HEAD ? [env.CI_BASE, env.CI_HEAD] : diffRange(env, event)
   let changes = [], force = env.CI_FORCE_FULL === 'true'
   try {
@@ -102,6 +106,10 @@ export async function main(env = process.env) {
     }
   } catch { force = true }
   const result = await select(plan, changes, { force })
+  if (frozen) {
+    result.unit_inventory = frozen.proof
+    result.reasons.push('frozen dependency: complete unit inventory from reviewed main ancestor')
+  }
   if (env.CI_SELECTION_FILE) writeFileSync(env.CI_SELECTION_FILE, JSON.stringify(result, null, 2) + '\n')
   emit(result, env)
 }

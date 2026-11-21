@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runErrorLine } from '../lib/run-error.ts'
-import messages from '../../../messages/zh-CN.json' with { type: 'json' }
+// The phone reads the device's catalog (R-42), so read the expected words back from the same one.
+import { mobileMessages as messages } from '../lib/messages.ts'
 
 test('a registered code reads as its words, by detail when it has one', () => {
   assert.equal(runErrorLine('run_network_error').line, messages.RunErrors.run_network_error.default)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { retryCoordinatorTurn } from '@/app/actions/coordinator'
 import { Button } from '@/components/ui/button'
 import { useActionError } from '@/lib/use-action-error'

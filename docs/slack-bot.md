@@ -18,7 +18,7 @@ The ambient pipeline asks one `eve/ai` decision question before admitting a mess
 
 ## Slack app settings and acceptance
 
-1. Add the OAuth scopes requested by the installation flow: `app_mentions:read`, `chat:write`, `users:read`, `channels:read`, `channels:history`, `groups:read`, `groups:history`, `im:read` and `im:history`. Reinstall after a scope change.
+1. Add the OAuth scopes requested by the installation flow: `app_mentions:read`, `chat:write`, `chat:write.customize` (an automation's posts under the name and picture of the person it runs as), `users:read`, `channels:read`, `channels:history`, `groups:read`, `groups:history`, `im:read` and `im:history`. Reinstall after a scope change.
 2. In Event Subscriptions, enable events and use `https://<deployment-host>/mikka/api/webhooks/slack`. Slack must be able to reach this URL at its stable deployment origin. The signed verification challenge works before the first installation.
 3. Subscribe to `app_mention`, `message.channels`, `message.groups` `message.im`, `app_uninstalled`, `tokens_revoked` and `user_change` for the configured surfaces and revocation events. Set Interactivity's Request URL to the same webhook so eve's approval/question controls work. Socket Mode must be disabled for HTTP events. The app webhook forwards the signed bytes to eve's `/eve/v1/slack` route.
 4. Invite Mikka into a test channel, then send `@Mikka list my agents and their devices`. Confirm a same-thread response with only the bound user's devices. Next, explicitly request a run for an existing issue and agent; confirm its run id in Mikka. An offline device may keep the run queued until it connects.

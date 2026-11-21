@@ -34,7 +34,8 @@ test('scopes: public-only input, unique and non-empty; legacy and v1 audiences n
   assert.equal(legacyTokenInput.safeParse({ name: 'x', scopes: ['tasks:read'] }).success, false)
   assert.deepEqual(legacyTokenInput.parse({ name: ' old ', expiresAt: null }), { name: 'old', expiresAt: null })
   assert.equal(rotateTokenInput.safeParse({ id: 'nope' }).success, false)
-  assert.deepEqual(API_SCOPES, ['tasks:read', 'tasks:write', 'runs:read', 'runs:write'])
+  assert.deepEqual(API_SCOPES, ['tasks:read', 'tasks:write', 'runs:read', 'runs:write',
+    'threads:read', 'threads:write', 'artifacts:read', 'drive:read', 'drive:write', 'bots:read', 'bots:write', 'grants:read', 'grants:write'])
   assert.deepEqual(publicTokenScopes([LEGACY_SCOPE]), [])
   assert.deepEqual(publicTokenScopes([...DEFAULT_API_SCOPES]), [...DEFAULT_API_SCOPES])
   assert.equal(audienceAllows([LEGACY_SCOPE], 'legacy'), true)

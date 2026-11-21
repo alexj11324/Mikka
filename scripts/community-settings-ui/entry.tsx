@@ -1,7 +1,7 @@
 // Screenshot composition only: the existing SettingsView owns workspace reads,
 // edition filtering, legacy-section fallback and every Preferences control.
 import { createRoot } from 'react-dom/client'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import { ThemeProvider } from 'next-themes'
 import { SWRConfig } from 'swr'
 import { AppFrame } from '@/components/app-shell'

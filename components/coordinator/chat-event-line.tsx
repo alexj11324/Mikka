@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { AgentCitationsContext, CitationChip, type AgentCitations } from '@/components/workspace/agent-citations'
 import type { EventLine } from '@/lib/coordinator/event-line'
 
@@ -24,6 +24,9 @@ export function ChatEventLine({ line, citations }: { line: EventLine; citations:
   const issueStatus = line.status && tIssue.has(`status.${line.status}` as never) ? tIssue(`status.${line.status}` as never) : null
   const [subject, what] = line.kind === 'runFinished' ? [thread, line.status && RUN_ENDED.has(line.status) ? t(`runEnded.${line.status as 'succeeded'}`) : t('runEnded.other')]
     : line.kind === 'issueStatus' ? [task, issueStatus ? t('issueMoved', { status: issueStatus }) : t('issueChanged')]
+    : line.kind === 'issueCommented' ? [task, line.status ? t('issueCommented', { name: line.status }) : t('issueCommentedSomeone')]
+    : line.kind === 'issueMentioned' ? [task, line.status ? t('issueMentioned', { name: line.status }) : t('issueMentionedSomeone')]
+    : line.kind === 'issueAssigned' ? [task, line.status ? t('issueAssigned', { name: line.status }) : t('issueAssignedYou')]
     : line.kind === 'issueSnapshot' ? [task, issueStatus ? t('issueSnapshot', { status: issueStatus }) : t('issueChanged')]
     : line.kind === 'scheduleRan' ? [schedule, line.status && SCHEDULE_ENDED.has(line.status) ? t(`scheduleEnded.${line.status as 'succeeded'}`) : t('scheduleEnded.other')]
     : line.kind === 'scheduleDue' ? [schedule, t('scheduleDue')]

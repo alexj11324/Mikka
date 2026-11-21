@@ -14,7 +14,7 @@ mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedEx
   setIssueScope: input => write(input),
 } })
 mock.module('swr', { defaultExport: (key, fetcher) => { reads.push({ key, fetcher }); return { data: cache } } })
-mock.module('next-intl', { namedExports: { useTranslations: () => key => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => key => key } })
 mock.module('sonner', { namedExports: { toast: { error: message => notices.push(['error', message]), success: message => notices.push(['success', message]) } } })
 mock.module(new URL('../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => code => code } })
 const { useTaskOwnershipRows } = await import('../components/workspace/issue-scope-control.tsx')

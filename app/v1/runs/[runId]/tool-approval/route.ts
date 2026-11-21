@@ -5,7 +5,6 @@ import { authenticateDevice } from '@/lib/device-link'
 import { isDeviceAuthorityError, isDeviceAuthorityRevoked } from '@/lib/db/device-scope'
 import { AgentToolApprovalStore, ApprovalUnavailable } from '@/lib/agent-tool-approval/store'
 
-export const dynamic = 'force-dynamic'
 const payload = z.object({ operation: z.literal('check'), deviceId: z.uuid(), policyRevision: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 
 /** Why a check answered as it did. Never the revisions, policy, token or body. */

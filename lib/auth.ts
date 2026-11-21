@@ -1,7 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
 import { bearer, deviceAuthorization, multiSession } from 'better-auth/plugins'
-import { nextCookies } from 'better-auth/next-js'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
 import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
@@ -10,6 +9,7 @@ import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
 import { authOAuthProxyOptions, authEffectiveTrustedOrigins, authSignInMethods, authAppleOptions, requireAppleSignInNonce } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
+import { mikkaCookies } from '@/lib/auth-cookies'
 import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
 import { githubSignInClient } from '@/lib/github/app-config'
@@ -130,7 +130,7 @@ export const auth = betterAuth({
       disableJwtPlugin: true,
       prefix: { opaqueAccessToken: 'mka_', refreshToken: 'mkr_' },
     }),
-    nextCookies(),
+    mikkaCookies(),
   ],
   hooks: {
     before: createAuthMiddleware(async ctx => {

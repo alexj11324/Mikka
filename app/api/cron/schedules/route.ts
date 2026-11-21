@@ -3,7 +3,6 @@ import { cronJob } from '@/lib/background'
 import { scheduleNextDue, sweepSchedules } from '@/lib/schedules/runtime'
 import { armDueTimer } from '@/lib/due-timer'
 
-export const runtime='nodejs'
 export const maxDuration=60
 const headers={'cache-control':'no-store'}
 /** The minute Worker calls this every 10 minutes (#1212): the schedules due timer (lib/due-timer.ts) does the

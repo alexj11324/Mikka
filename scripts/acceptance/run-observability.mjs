@@ -22,6 +22,7 @@ import { liveInvalidation, liveReadiness } from '../../lib/live/events.ts'
 import en from '../../messages/en.json' with { type: 'json' }
 import zh from '../../messages/zh-CN.json' with { type: 'json' }
 import { responseCookieJar } from './response-cookie-jar.mjs'
+import { submitEveMessage } from './eve-session.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
 export const CASES = Object.freeze([
@@ -388,7 +389,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     return value
   }
   async function rpc(action, args, options = {}) {
-    check(['coordinator.sendCoordinatorMessage', 'issues.getIssue', 'agents.getIssueThread', 'task-runs.pollThreads',
+    check(['issues.getIssue', 'agents.getIssueThread', 'task-runs.pollThreads',
       'task-runs.pollTaskRuns', 'model-api-keys.updateApiKeyAfterQuota', 'workspace.switchWorkspace'].includes(action), 'configuration_required')
     const value = await read('/api/rpc', { ...options, body: { version: DESKTOP_RPC_VERSION, action, args: encode(args) },
       headers: { 'x-mikka-rpc': '1', ...options.headers } })
@@ -868,9 +869,14 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
         const traceId = randomBytes(16).toString('hex'), parentSpanId = randomBytes(8).toString('hex')
         result.requestTrace = { traceId, parentSpanId, source: 'w3c_client_parent', backendObserved: false }
         submitted = true
-        const queued = await rpc('coordinator.sendCoordinatorMessage', [input, undefined, botId, fixture.profileId,
-          { kind: 'cloud' }, undefined, undefined, undefined, fixture.profileId], { headers: { traceparent: '00-' + traceId + '-' + parentSpanId + '-01' } })
-        check(queued.queued === true, 'submission_refused')
+        try {
+          await submitEveMessage({ request: (path, options) => request(path, { ...options, body: JSON.parse(options.body) }) },
+            botId, input, fixture.profileId, { botId, profileId: fixture.profileId, taskDestination: { kind: 'cloud' },
+              expectedOwnerId: ownerId, expectedWorkspaceId: workspaceId }, { traceparent: '00-' + traceId + '-' + parentSpanId + '-01' })
+        } catch (cause) {
+          if (cause instanceof AcceptanceError) throw cause
+          const error = new AcceptanceError('submission_refused', { cause }); error.httpStatus = cause.httpStatus; throw error
+        }
       }
       for (;;) {
         if (signal?.aborted) throw new AcceptanceError('interrupted')

@@ -12,7 +12,7 @@ let pages: GroupMessagePage[] = []
 let hasMemberPage = true
 let groupMembers: GroupMember[] = []
 let membersError: Error | undefined
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
   useMessages: () => ({ AgentCopy: {} }),
   useFormatter: () => ({}),
@@ -31,7 +31,7 @@ mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { nam
   useLiveKey: (...args: unknown[]) => { liveKeys.push(args) },
 } })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: { listAgents: async () => [] } })
-mock.module(new URL('../../app/actions/link-preview.ts', import.meta.url).href, { namedExports: { getLinkPreview: async () => null } })
+mock.module(new URL('../../app/actions/link-preview.ts', import.meta.url).href, { namedExports: { getLinkPreview: async () => null, getLinkPreviews: async () => ({}) } })
 mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { namedExports: {
   useViewState: <T,>(_key: string, initial: T) => useState(initial),
   useViewScroll: () => useRef(null),

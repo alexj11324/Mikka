@@ -17,14 +17,14 @@ if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Workspace governanc
 test('workspace ownership: real split-database migration, ACL, immutable provenance and membership races', { skip: !url, timeout: 240_000 }, async t => {
   let selectedWorkspace: string | undefined
   let requestBearer: string | undefined
-  const framework = await import('next/headers')
-  const requestContext = mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  const requestContext = mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }),
     headers: async () => new Headers(requestBearer ? { authorization: `Bearer ${requestBearer}` } : undefined),
   } })
   t.after(() => requestContext.restore())
-  const localization = await import('next-intl/server')
-  const localeContext = mock.module('next-intl/server', { namedExports: { ...localization, getLocale: async () => 'en' } })
+  const localization = await import('@/lib/intl/i18n-server')
+  const localeContext = mock.module('@/lib/intl/i18n-server', { namedExports: { ...localization, getLocale: async () => 'en' } })
   t.after(() => localeContext.restore())
   const admin = new Pool({ connectionString: url, max: 1 })
   const suffix = randomUUID().replaceAll('-', '')
@@ -94,7 +94,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const { issueForUser } = await import('../lib/issue-access')
     const { activeTaskWorkspaces, withTaskWorkspace } = await import('../lib/task-workspace')
     const { tokenWorkspace } = await import('../lib/tokens/principal')
-    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
+    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, listTaskArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
     const { artifactOutsideToken, runOutsideToken } = await import('../lib/tokens/scope')
     const { actAs } = await import('../lib/acting-user')
     const { enterprisePrincipal } = await import('../lib/enterprise/principal')
@@ -216,6 +216,9 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.deepEqual((await listRunArtifacts(alphaReader, runA)).map(row => row.id), [artifact])
       assert.deepEqual(await listRunArtifacts(betaReader, runA), [])
       assert.deepEqual(await listArtifacts({ id: member, [tokenWorkspace]: alpha }), [], 'Workspace membership does not widen the artifact owner ACL')
+      assert.deepEqual((await listTaskArtifacts(alphaReader, bound)).map(row => row.id), [artifact])
+      assert.deepEqual(await listTaskArtifacts(betaReader, bound), [])
+      assert.deepEqual(await listTaskArtifacts({ id: member, [tokenWorkspace]: alpha }, bound), [])
     })
     await t.test('conversation envelopes use persisted mailbox tenancy; mismatched run or sender writes leave no message', async () => {
       const inbox = randomUUID(), sender = randomUUID(), outside = randomUUID(), otherOwner = randomUUID()
@@ -225,12 +228,13 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       const message = randomUUID()
       await app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text,origin) VALUES($1,$2,$3,$4,\'Isolated conversation envelope\',\'peer\')', [message, owner, inbox, sender])
       await app.query('UPDATE run_messages SET "acknowledgedAt"=now() WHERE id=$1', [message])
-      for (const invalidSender of [outside, otherOwner]) {
-        await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, inbox, invalidSender]), /taskWorkspaceMismatch/)
-      }
+      // Another tenant's sender never writes here. Another member of the same tenant may
+      // (decision 2026-11-19-2200); the mailbox checks their membership and canSteer first.
+      await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, inbox, outside]), /taskWorkspaceMismatch/)
+      await app.query('INSERT INTO run_messages(id,"userId","mailboxId","senderMailboxId",text,origin) VALUES($1,$2,$3,$4,\'Teammate peer envelope\',\'peer\')', [randomUUID(), owner, inbox, otherOwner])
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","runId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, outside, runA]), /taskWorkspaceMismatch/)
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","runId",text) VALUES($1,$2,$3,\'Denied\')', [randomUUID(), owner, runConflict]), /taskWorkspaceUnresolved/)
-      assert.equal((await app.query('SELECT count(*)::int AS total FROM run_messages')).rows[0].total, 1)
+      assert.equal((await app.query('SELECT count(*)::int AS total FROM run_messages')).rows[0].total, 2)
     })
     await t.test('membership is pinned until the app commit and the next read observes suspension', async () => {
       let entered!: () => void, release!: () => void

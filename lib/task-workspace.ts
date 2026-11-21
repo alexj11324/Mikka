@@ -23,7 +23,7 @@ const readerMember = alias(workspaceMembers, 'm')
 const readerOrganization = alias(organizationWorkspaces, 'o')
 
 type Reader = string | { id: string; [tokenWorkspace]?: string; [enterprisePrincipal]?: EnterprisePrincipal }
-type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
+export type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 export type TaskWorkspace = { id: string; kind: 'personal' | 'team' }
 
 type HeldTaskWorkspace = {

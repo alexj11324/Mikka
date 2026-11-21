@@ -55,7 +55,9 @@ test('GitHub App registration enforces server authority, session binding and sin
     cookie = `${GITHUB_MANIFEST_COOKIE}=${state}`
     assert.equal(response.headers.get('cache-control'), 'private, no-store')
     const setCookie = response.headers.get('set-cookie')!
-    assert.match(setCookie, /HttpOnly/); assert.match(setCookie, /Secure/); assert.match(setCookie, /SameSite=lax/)
+    // The SameSite value is case-insensitive; `mikkaCookies` re-serialises through
+    // the cookie journal and writes the canonical `Lax` where Next wrote `lax`.
+    assert.match(setCookie, /HttpOnly/); assert.match(setCookie, /Secure/); assert.match(setCookie, /SameSite=lax/i)
     assert.ok(setCookie.includes(`Path=${GITHUB_MANIFEST_CALLBACK}`))
   }
   const callback = (inputState = state, inputCookie = cookie, inputOrigin = origin) => handlers.callback(new Request(`${inputOrigin}${GITHUB_MANIFEST_CALLBACK}?${new URLSearchParams({ code, state: inputState })}`, { headers: { cookie: inputCookie } }))

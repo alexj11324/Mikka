@@ -1,7 +1,6 @@
 import { MVP_SERVICES } from '../../tests/mvp/isolated-env.mjs'
-import { MVP_DECISION_KEY } from '../../tests/mvp/transport.mjs'
 import { assertDevLocal } from './guard.mjs'
-import { LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './services.mjs'
+import { LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY, LOCAL_LITELLM_URL } from './services.mjs'
 import { assertTestModelRequest } from '../test-model-policy.mjs'
 
 const marker = Symbol.for('mikka.dev-local.loopback-fetch.v1')
@@ -14,7 +13,7 @@ function binding(env) {
     assertDevLocal(env)
     const value = globalThis[marker]
     return value && Object.isFrozen(value) && value.version === 1 && value.endpoint === MVP_SERVICES
-      && value.gatewayKey === env.AI_GATEWAY_API_KEY && value.mailKey === env.RESEND_API_KEY
+      && value.gatewayKey === env.MIKKA_LITELLM_MASTER_KEY && value.modelUrl === env.MIKKA_LITELLM_URL && value.mailKey === env.RESEND_API_KEY
       && typeof value.verify === 'function' && typeof value.isCurrent === 'function' ? value : null
   } catch { return null }
 }
@@ -27,18 +26,13 @@ export function hasBoundDevLocalTransport(env = process.env) {
   return binding(env)?.isCurrent() === true
 }
 
-/**
- * Where a server request goes in dev:local. GitHub's API always goes to the
- * local fake (tests/mvp/services.mjs). The AI Gateway (model and Decisions) and
- * ZeroCat (Mikka 默认's model) and Resend go to their local substitutes (scripts/dev-local/services.mjs) only
- * when scripts/dev-local.mjs set the placeholder because no real key was set.
- * Everything else, a workspace's own model key included, is left alone.
- */
+/** GitHub and synthetic LiteLLM/mail calls stay on the guarded loopback fixtures.
+ * An operator-configured LiteLLM service keeps its actual address and key. */
 export function devLocalTarget(href, env) {
   const url = new URL(href)
   if (url.origin === 'https://api.github.com') return `${MVP_SERVICES}/github${url.pathname}${url.search}`
-  if (url.origin === 'https://ai-gateway.vercel.sh' && env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY) return `${MVP_SERVICES}/gateway${url.pathname}${url.search}`
-  if (url.href === 'https://zero.cat/v1/chat/completions' && env.ZEROCAT_API_KEY === LOCAL_ZEROCAT_KEY) return `${MVP_SERVICES}/zerocat/v1/chat/completions`
+  if (env.MIKKA_LITELLM_URL === LOCAL_LITELLM_URL && env.MIKKA_LITELLM_MASTER_KEY === LOCAL_LITELLM_KEY
+    && url.href.startsWith(LOCAL_LITELLM_URL + '/v1/')) return url.href
   if (url.href === 'https://api.resend.com/emails' && env.RESEND_API_KEY === LOCAL_RESEND_KEY) return `${MVP_SERVICES}/resend/emails`
   return null
 }
@@ -65,7 +59,7 @@ export function installDevLocalTransport(env = process.env, upstreamFetch = glob
     return target ? upstreamFetch(new Request(target, request), { redirect: 'error' }) : upstreamFetch(request)
   }
   const installed = Object.freeze({
-    version: 1, endpoint: MVP_SERVICES, gatewayKey: env.AI_GATEWAY_API_KEY, mailKey: env.RESEND_API_KEY,
+    version: 1, endpoint: MVP_SERVICES, gatewayKey: env.MIKKA_LITELLM_MASTER_KEY, modelUrl: env.MIKKA_LITELLM_URL, mailKey: env.RESEND_API_KEY,
     isCurrent: () => verifiedFetch !== null && verifiedFetch === globalThis.fetch,
     async verify() {
       const current = globalThis.fetch

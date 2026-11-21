@@ -7,8 +7,9 @@ import type { ChatTarget } from './bot-list'
  * `id` lets the frame pick the item's icon; `label` is already in the person's language.
  */
 export type ChatNavActionId = 'openNewTab' | 'copyLink' | 'profile' | 'pin' | 'unpin' | 'mute' | 'unmute' | 'markRead' | 'markUnread' | 'viewAll'
-  | 'rename' | 'hide' | 'unhide' | 'leave' | 'archive' | 'unarchive' | 'delete'
-export type ChatNavAction = { id: ChatNavActionId; label: string; danger?: boolean; run: () => void }
+  | 'rename' | 'hide' | 'unhide' | 'leave' | 'archive' | 'unarchive' | 'delete' | 'share' | 'moveTo' | 'unfollow' | 'choice'
+/** `children` opens to the side (Share ›, Move to ›); `checked` marks the current choice among them. */
+export type ChatNavAction = { id: ChatNavActionId; label: string; danger?: boolean; checked?: boolean; children?: ChatNavAction[]; run: () => void }
 
 /** The place a chat opens at, as an address (the same one the row opens). */
 export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null {
@@ -18,11 +19,11 @@ export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null
   return null
 }
 
-/** A sidebar thread row's place: a Bot's conversation opens as its group page, a run as the thread beside the centre, a task with no run as the task. */
+/** A sidebar thread row's place: a group opens its chat, a run opens the main conversation, and a task with no run opens the task. */
 export function threadPlace(work: { kind?: 'run' | 'chat'; id: string; issueId: string | null; runs: readonly { id: string }[] }): Partial<WorkspaceLocation> {
   if (work.kind === 'chat') return { section: 'group', group: work.id }
   if (!work.kind && work.issueId === work.id && !work.runs.length) return { task: work.issueId }
-  return { thread: work.kind ? work.id : work.runs[0]?.id ?? work.id }
+  return { section: 'coordinator', mainThread: work.kind ? work.id : work.runs[0]?.id ?? work.id }
 }
 
 /** The address of a place in this app, as a link to copy or open. */

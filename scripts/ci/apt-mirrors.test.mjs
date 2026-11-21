@@ -96,7 +96,7 @@ test('every workflow APT callsite has mirror preparation in the same Linux job a
     }
   }
   for (const file of ['desktop.yml', 'analytics-ssr.yml', 'unattended-sandbox.yml',
-    'self-hosted-image.yml', 'run-trace-acceptance.yml', 'self-hosting-ui.yml', 'cloud-computer.yml',
+    'run-trace-acceptance.yml', 'cloud-computer.yml',
     'issue1415-deployed-production.yml', 'ui-policy.yml']) assert.ok(covered.has(file), file)
   const tasks = await readFile(new URL('./tasks.json', import.meta.url), 'utf8')
   assert.ok(tasks.includes('node --test scripts/ci/*.test.mjs'), 'the existing CI inventory executes these offline guards')

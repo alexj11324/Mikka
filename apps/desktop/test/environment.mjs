@@ -35,7 +35,7 @@ Object.assign(process.env, {
   MIKKA_TEST_DEPLOYMENT_SHA: sha,
   MIKKA_TEST_ENVIRONMENT_FILE: process.env.MIKKA_TEST_ENVIRONMENT_FILE || '.cache/e2e/environment.json',
   AUTH_TRUSTED_ORIGINS: `${origin},http://127.0.0.1:${port + 1},http://localhost:${port + 1}`,
-  NEXT_TELEMETRY_DISABLED: '1', DEVICE_GATEWAY_PUSH_SECRET: secret,
+  DEVICE_GATEWAY_PUSH_SECRET: secret,
 })
 
 await mkdir('.cache/e2e', { recursive: true, mode: 0o700 })

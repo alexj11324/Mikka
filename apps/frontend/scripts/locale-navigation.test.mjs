@@ -15,7 +15,7 @@ async function navigation(url, callback) {
     export { createElement } from 'react'
     export { createRoot } from 'react-dom/client'
     export { flushSync } from 'react-dom'
-    export { NextIntlClientProvider } from 'next-intl'
+    export { NextIntlClientProvider } from '@/lib/intl/i18n-client'
     export { useRouter } from './apps/desktop/src/renderer/i18n-navigation.tsx'
     export { isClientRoute } from './apps/desktop/src/renderer/location.ts'
   `)

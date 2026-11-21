@@ -3,7 +3,6 @@ import { freshSessionRoute } from '@/lib/fresh-session'
 import { attachOrganizationWorkspace, detachOrganizationWorkspace } from '@/lib/governance/organizations'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { organizationSession } from '@/lib/enterprise/http'
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 const input = z.object({ workspaceId: z.uuid() }).strict()
 

@@ -19,6 +19,7 @@ env:
   MIKKA_RUNTIME_SOURCE: ${{ inputs.source_sha }}
 jobs:
   recheck:
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -204,7 +205,7 @@ jobs:
           RUNTIME_REPORT_SHA256: ${{ steps.publish.outputs.release-sha256 }}
   cleanup:
     needs: [recheck, validate, await-web, templates]
-    if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.recheck.result == 'success' && needs.recheck.outputs.skip != 'true'
+    if: always() && (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.recheck.result == 'success' && needs.recheck.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

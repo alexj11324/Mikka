@@ -7,7 +7,6 @@ import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { ComputerStore } from '@/lib/computer/store'
 import { createComputerPolicyHandler } from '@/lib/computer/policy-route'
 
-export const runtime = 'nodejs'
 export const maxDuration = 120
 const handle = createComputerPolicyHandler({
   enabled: () => cloudComputerTasksEnabled(),

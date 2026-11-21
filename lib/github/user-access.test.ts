@@ -122,6 +122,52 @@ test('branch pages use the admitted repository ID and return only names and comm
   assert.equal(paths().filter(path => path.endsWith('/branches')).length, 2)
 })
 
+test('a pull request’s files are read inside the admitted repository ID and come back as the review page’s diff', async () => {
+  connected = { token: expectedToken, githubAccountId: '42' }
+  const original = answer
+  const baseSha = 'b'.repeat(40), headSha = 'c'.repeat(40)
+  answer = url => {
+    if (url.pathname === '/repositories/91/pulls/7') return json({
+      number: 7, title: 'Any PR, not only ours', state: 'closed', merged: true, merged_at: '2026-11-18T00:00:00Z',
+      html_url: 'https://github.com/Owner/Project/pull/7',
+      base: { ref: 'main', sha: baseSha, repo: repository }, head: { ref: 'feature', sha: headSha },
+    })
+    if (url.pathname !== '/repositories/91/pulls/7/files') return original(url)
+    return url.searchParams.get('page') === '1'
+      ? json([{ filename: 'src/app.ts', status: 'modified', patch: '@@ -1,1 +1,2 @@\n kept\n+added\n' }], true)
+      : json([
+        { filename: 'assets/logo.png', status: 'modified' },
+        { filename: 'src/new.ts', status: 'renamed', previous_filename: 'src/old.ts', patch: '@@ -1,1 +1,1 @@\n-old\n+new\n' },
+        { filename: '.github/workflows/ci.yml', status: 'added', patch: '@@ -0,0 +1,1 @@\n+on: push\n' },
+      ])
+  }
+  const { GET } = await import('../../app/api/integrations/github/repositories/pulls/files/route')
+  const call = (query: string) => GET({ url: 'https://mikka.test/api/integrations/github/repositories/pulls/files?' + query, headers: requestHeaders, signal: new AbortController().signal } as Request)
+  const response = await call('repo=Owner/Project&number=7')
+  assert.equal(response.status, 200)
+  const files = await response.json()
+  assert.equal(files.url, 'https://github.com/Owner/Project/pull/7')
+  assert.equal(files.state, 'merged')
+  assert.deepEqual([files.base, files.head], [{ ref: 'main', sha: baseSha }, { ref: 'feature', sha: headSha }])
+  assert.deepEqual(files.changes.files.map((file: { path: string; previousPath: string | null; status: string; binary: boolean }) =>
+    [file.path, file.previousPath, file.status, file.binary]), [
+    ['src/app.ts', null, 'modified', false],
+    ['assets/logo.png', null, 'modified', true],
+    ['src/new.ts', 'src/old.ts', 'renamed', false],
+    // A dotfile path is an ordinary changed file, not something to hide.
+    ['.github/workflows/ci.yml', null, 'added', false],
+  ])
+  assert.deepEqual([files.changes.additions, files.changes.deletions], [3, 1])
+  // A file GitHub sent no patch for lists and draws no lines; the rest of the change is not claimed.
+  assert.deepEqual([files.patchUnavailable, files.moreFiles], [1, false])
+  assert.equal(paths().filter(path => path.endsWith('/pulls/7/files')).length, 2)
+  // Another repository than the admitted one never receives a pull request read.
+  assert.equal((await call('repo=Other/Repo&number=7')).status, 403)
+  assert.equal((await call('repo=Owner/Project&number=0')).status, 400)
+  user = null
+  assert.equal((await call('repo=Owner/Project&number=7')).status, 401)
+})
+
 test('an exact repository read uses one viewer token for live user/App intersection and the final repository identity', async () => {
   connected = { token: 'private-test-token', githubAccountId: '42' }
   const budget = { deadline: Date.now() + 25_000, signal: new AbortController().signal }

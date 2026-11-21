@@ -5,7 +5,7 @@ import { Window } from 'happy-dom'
 import type { InboxPage } from '../lib/inbox/contract'
 
 const params = new URLSearchParams()
-mock.module('next/navigation', { namedExports: { useSearchParams: () => params } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => params } })
 
 test('returning from a detail revalidates the visible Inbox and retires unusable rows until Retry', async () => {
   const browser = new Window()

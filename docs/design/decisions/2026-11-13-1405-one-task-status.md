@@ -11,6 +11,7 @@
   - The board's default filter 「负责人：我」 and its 全部 / 工作区 / 个人 segment (Figma 77:2), with the lock on a personal task's card.
   - The 任务 page (`?section=tasks`, [2026-11-09-2330](2026-11-09-2330-overview-as-work-area-tab.md)'s 「看板 is a view of 任务」): the board is the entry.
   - [2026-11-10-0659](2026-11-10-0659-task-code-chips-and-work-area-tabs.md), 「A thread … is its title … The title is the task's title without its code」 and 「It has no icon … and no state badge」: a thread is named by the conversation's own short title, with one small activity mark after it while it is working, waiting or failed.
+- Superseded in part by: [2026-11-18-0300](2026-11-18-0300-one-status-icon-set.md) (the status icons are lucide in one table with the run states; 受阻 wears the shared octagon; the exception covers the task page's status menu).
 - Unchanged: [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md). A task's title is whatever the person or the model wrote, with no limit, and the task detail keeps the full title.
 
 ## One status
@@ -33,14 +34,15 @@ The model is Linear's: an issue has one state, and what an agent is doing is bes
 
 | Status | Icon | Colour (R-34) |
 | --- | --- | --- |
-| 待整理 | dashed circle (lucide `CircleDashed`) | grey |
-| 待办 | circle (lucide `Circle`) | grey |
-| 进行中 | ring with a hand at twelve | warning |
-| 评审中 | ring around a check | info |
-| 已完成 | filled disc with the check cut out | success |
-| 已取消 / 重复 | lucide `CircleX` / `CircleSlash2` | grey |
+| 待整理 | dashed ring (`dashed`) | grey |
+| 待办 | open ring (`empty`) | grey |
+| 进行中 | ring, right half filled (`half`) | warning |
+| 评审中 | ring with the done work as an arc (`progress`) | info |
+| 已完成 | filled disc with the check cut out (`check`) | success |
+| 已取消 | filled disc with the cross cut out (`x`) | grey |
+| 重复 | ring struck through (`slash`) | grey |
 
-进行中, 评审中 and 已完成 are Orca's ConductorProgress, ConductorReview and ConductorDone shapes ([stablyai/orca](https://github.com/stablyai/orca) at `b18029ef`, MIT, © 2026 Lovecast Inc.; notice in `NOTICE`), drawn in `components/workspace/status-icons.tsx`. 待整理 and 待办 already matched Orca's defaults. Orca fills the ring with its page colour; ours leaves it open so it sits on any surface, and the check in 已完成 is cut in `--status-icon-surface` (the page background by default). Orca colours review green and done a muted tan; we keep R-34's colours so a status reads the same in its icon, its menu and its badge. The 受阻 column keeps its own icon ([2026-11-07-2300](2026-11-07-2300-one-conversation-per-task.md)).
+**Updated 2026-11-19 (shapes only; every colour above still stands).** The icons are drawn from one status registry, `components/workspace/mark.tsx`: `MARK_SHAPE_NAMES` names the closed shape vocabulary, `MARK_TONE_CLASS` maps a tone to its semantic text token, `ISSUE_STATUS_MARKS` is the table above, and `statusMarkOf` is the resolver a surface calls. `status-icons.tsx` now draws the three statuses that used to be Orca's ConductorProgress, ConductorReview and ConductorDone shapes ([stablyai/orca](https://github.com/stablyai/orca) at `b18029ef`, MIT, © 2026 Lovecast Inc.) through that registry, so no Orca-derived path remains and its notice left `NOTICE`. Geometry is one 14 box, `currentColor` at stroke 1.25, circles r=5 around (7, 7); a mark takes its size from `sm` (14) / `md` (16) / `lg` (18) and its colour from its tone, never from a call site's `className`. The check and the cross in a filled disc are cut in `--status-icon-surface` (the page background by default). Colours are now Capy 0.9.2's order, read live on 2026-11-19: 评审中 success (green) and 已完成 info (the violet `--info`), which is Linear's order too — see [2026-11-19-1630](2026-11-19-1630-one-mark-registry.md), which also gives a thread the same marks. Every surface still takes the colour from `stateMarkTone`, so a status reads the same in its icon, its menu and its badge. The 受阻 column keeps its own icon ([2026-11-07-2300](2026-11-07-2300-one-conversation-per-task.md)).
 
 **Exception to the as-shipped rule** ([2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md)), approved by Alex on 2026-11-13: a paid block's own status glyph may be replaced by this shared icon, so one status has one icon everywhere. The exception is the glyph only; the block keeps its size, position, spacing and colour tokens for it. It applies to the Kanban's column heads (board and list), the Agent mark on its card and list-row status line, and the task card in the hosted thread. 受阻 and 已隐藏 are not statuses and keep the block's glyphs. Because the block's colour tokens stay, 进行中 is the block's purple on the board and R-34's warning colour in a chat chip: the shape is the same, the colour is the surface's.
 

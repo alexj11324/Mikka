@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Google } from '@/components/ui/svgs/google'

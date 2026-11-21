@@ -20,8 +20,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('bot chat keys reach only the owner in the bot workspace, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const nextServer = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   // Run writers also wake thread panels; panels.db.test.ts covers those keys.
   const panels = await import('./panels')
   mock.module(new URL('./panels.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(panels).map(([name, value]) =>

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { test } from 'node:test'
-import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactGet, putArtifactObject } from './storage'
+import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactGet, presignArtifactPut, putArtifactObject } from './storage'
 
 test('cloud production requires object storage on an explicit deployment stage', t => {
   const keys = ['MIKKA_DEPLOYMENT_STAGE', 'VERCEL_ENV', 'MIKKA_EDITION', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_REGION', 'R2_ACCOUNT_ID', 'CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
@@ -110,6 +110,24 @@ test('S3 configuration signs a private bucket, round-trips bytes and keeps commu
   assert.equal(stored.length, 0)
   delete process.env.S3_SECRET_ACCESS_KEY
   assert.throws(() => artifactStorage(), /S3 configuration is incomplete/, 'a partial bucket configuration never silently stores data elsewhere')
+})
+
+test('a presigned upload signs the announced byte length, so the bucket refuses any other body', async t => {
+  const names = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_ARTIFACTS_BUCKET'] as const
+  const previous = names.map(name => process.env[name])
+  for (const name of names) delete process.env[name]
+  t.after(() => names.forEach((name, index) => { if (previous[index] === undefined) delete process.env[name]; else process.env[name] = previous[index] }))
+  Object.assign(process.env, { R2_ACCOUNT_ID: 'fixture', R2_ACCESS_KEY_ID: 'fixture', R2_SECRET_ACCESS_KEY: 'fixture-secret', R2_ARTIFACTS_BUCKET: 'fixture-bucket' })
+  const signed = await presignArtifactPut('capture-uploads/folder/file.png', 'image/png', 900, 4096)
+  assert.deepEqual(signed.headers, { 'content-type': 'image/png', 'content-length': '4096' })
+  const url = new URL(signed.url)
+  assert.equal(url.pathname, '/fixture-bucket/capture-uploads/folder/file.png')
+  // The length rides in the signed headers, so a body of another size fails the
+  // signature instead of being stored: R2 and S3 both verify this list.
+  assert.deepEqual(url.searchParams.get('X-Amz-SignedHeaders')?.split(';'), ['content-length', 'content-type', 'host'])
+  assert.ok(url.searchParams.get('X-Amz-Signature'))
+  const other = new URL((await presignArtifactPut('capture-uploads/folder/file.png', 'image/png', 900, 4095)).url)
+  assert.notEqual(other.searchParams.get('X-Amz-Signature'), url.searchParams.get('X-Amz-Signature'), 'another announced length is another signature')
 })
 
 test('deadline-bound object writes pass cancellation to fetch and do not enter unbounded retry backoff', async t => {

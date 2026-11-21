@@ -4,8 +4,6 @@ import { improvementStore, skillAssignments, improvementFactory, skillRegistry, 
 import { handleImprovement } from '@/lib/self-improvement/http'
 import { improvementRecordOutsideToken } from '@/lib/tokens/scope'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 async function handle(request: Request) {
   const user = (await getApiSession({ headers: request.headers }))?.user

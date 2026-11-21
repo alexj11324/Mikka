@@ -17,7 +17,7 @@ Web 和桌面通过 [`apps/frontend`](../../apps/frontend/vite.config.mjs) 编�
 
 `renderer-manifest.json` 记录目标、`rendererBuild`、实际使用的 `usedActions` 和输入图。构建插件只把真实导入的显式注册动作转换成 RPC，不自动暴露一个模块的全部导出；浏览器图出现服务端运行依赖会失败。Vite 复用根目录 `public`，Web 静态内容随后挂到 `/mikka`。`index.html` 由页面策略返回，不作为绕过语言、安全头的静态文件发布；API、`/v1`、`.well-known` 的未知路径不能得到 SPA 的 200 响应。
 
-CSS 继续经过共享 Tailwind 与 Next 的构建期 Lightning CSS 引擎及目标；Vite 不再进行第二轮 CSS 压缩。Web 保留原 `instrumentation-client`、PostHog 和 VersionGuard；桌面保留原本的本地认证和主进程能力边界。开发模式使用真实 development React 与 React Fast Refresh。
+CSS 继续经过共享 Tailwind 与 Lightning CSS 的构建期处理及冻结的浏览器目标（`apps/frontend/scripts/css-targets.mjs`）；Vite 不再进行第二轮 CSS 压缩。Web 保留原 `instrumentation-client`、PostHog 和 VersionGuard；桌面保留原本的本地认证和主进程能力边界。开发模式使用真实 development React 与 React Fast Refresh。
 
 前端配置禁止自动公开任意 `VITE_*` 或服务端环境。只显式编译原来使用的公开值：Computer 的 acceptance/deployment/enabled/mock、应用 build、daemon package、PostHog key、Stripe publishable key、Turnstile site key。其中 Computer deployment 来自显式 `MIKKA_DEPLOYMENT_STAGE`；缺失时保持未设置。
 
@@ -32,25 +32,25 @@ CSS 继续经过共享 Tailwind 与 Next 的构建期 Lightning CSS 引擎及目
 
 Wire 使用 `{version, action, args}`；结果为 `{version, ok, result}` 或 `{version, ok: false, error: {code}}`。版本接受范围由现有协议常量控制。共享组件的 server action 调用通过这个边界转发，普通 REST handler 的方法、鉴权、Origin 检查和错误语义继续有效。
 
-Web 的请求内会话复用绑定同一 Cookie 身份；敏感操作仍通过原 fresh-session 路径升级验证。原 Better Auth `nextCookies` 写入经请求 Cookie journal 提交到响应，不能把 `Set-Cookie` 当普通逗号分隔列表。Web 的 SDK 会话仍是身份权威；bootstrap 只提供安全投影。账号切换递增请求代次，旧账号迟到的 401 或响应不得清掉新账号界面。明确切换语言时，Web 恢复原 `NEXT_LOCALE` 的一年有效期、`Path=/mikka`、`SameSite=Lax`；桌面不写这个浏览器 Cookie。
+Web 的请求内会话复用绑定同一 Cookie 身份；敏感操作仍通过原 fresh-session 路径升级验证。Better Auth 的响应 Cookie 由 `mikkaCookies`（`lib/auth-cookies.ts`）写进请求 Cookie journal，再由传输边界提交到响应，不能把 `Set-Cookie` 当普通逗号分隔列表。Web 的 SDK 会话仍是身份权威；bootstrap 只提供安全投影。账号切换递增请求代次，旧账号迟到的 401 或响应不得清掉新账号界面。明确切换语言时，Web 恢复原 `NEXT_LOCALE` 的一年有效期、`Path=/mikka`、`SameSite=Lax`；桌面不写这个浏览器 Cookie。
 
 生产构建同时固定源提交、应用 build 和 deployment ID。Web HTML/资源使用同一 deployment ID，静态资源 URL 带 `dpl`，同源 API 自定义请求带 `x-deployment-id`；`/api/version` 保持不绑定旧部署，以供 VersionGuard 检测更新。没有新增全页面 `__vdpl` Cookie。桌面继续使用自身 API 兼容协议，不固定到某个 Web deployment。
 
-## 现有路由与 Next 兼容范围
+## 现有路由与请求适配层
 
-[`generate-routes.mjs`](../../apps/api/scripts/generate-routes.mjs) 通过 TypeScript AST 读取 `app/**/route.ts` 的导出、re-export 与解构 handler，不执行路由模块。当前 [`routes.json`](../../apps/api/generated/routes.json) 为 version 1、basePath `/mikka`，包含 **240 条路由记录**（2026-11-08 源码快照）；每次增删路由后以生成清单为准。此数量只描述源码清单。它记录方法、源文件 hash、动态参数和 `maxDuration`，另有独立 browser RPC 与 OAuth consent 安全投影入口。
+[`generate-routes.mjs`](../../apps/api/scripts/generate-routes.mjs) 通过 TypeScript AST 读取 `app/**/route.ts` 的导出、re-export 与解构 handler，不执行路由模块。当前 [`routes.json`](../../apps/api/generated/routes.json) 为 version 1、basePath `/mikka`，包含 **368 条路由记录**（2026-11-18 源码快照）；每次增删路由后以生成清单为准。此数量只描述源码清单。它记录方法、源文件 hash、动态参数和 `maxDuration`，另有独立 browser RPC 与 OAuth consent 安全投影入口。
 
 Hono 根据静态优先的匹配规则延迟载入原 handler，保留参数、请求体、流和取消信号。未显式实现的 OPTIONS 返回 204 与 Allow；不支持的方法返回 405。HEAD 可选用 GET handler，但仍传入原 HEAD Request，最终取消并移除响应 body；这不保证业务 handler 自己会接受 HEAD。机器接口没有 SPA fallback。页面的 basePath、语言、尾斜杠、旧域名和安全头由 [`http-policy.mjs`](../../apps/api/runtime/http-policy.mjs) 处理。
 
-服务端 [`compat-aliases.mjs`](../../apps/api/compat-aliases.mjs) 只实现当前业务实际使用的接口：
+服务端请求适配层是仓库自己的模块，不再有任何框架 specifier 的别名：
 
-- `next/server`：Request/Response、带 basePath 的 URL、Cookie、redirect 与 `after`。
-- `next/headers`：当前请求的只读 headers 与可提交 Cookie journal。
-- `next/navigation`：redirect、permanentRedirect、notFound。
-- `next-intl/server` 与本地化导航：原中英文消息、请求 locale 和翻译接口。
+- `@/lib/server-runtime/server`：Request/Response、带 basePath 的 URL、Cookie、redirect 与 `after`。
+- `@/lib/server-runtime/headers`：当前请求的只读 headers 与可提交 Cookie journal。
+- `@/lib/server-runtime/navigation`：redirect、permanentRedirect、notFound。
+- `@/lib/intl/i18n-server` 与 `@/lib/server-runtime/localized-navigation`：原中英文消息、请求 locale 和翻译接口。服务端**不要** import `@/i18n/navigation`——那是客户端实现（React hooks 与 `window` 路由），且它的 `getPathname` 在根路径上会保留尾斜杠，触发一次多余的 308。
 - React `cache`：当前请求内的 memo；其他 React 导出继续使用真实 React。
 
-这些适配器不是完整的 Next 实现。Next 仍保留在依赖中，服务于兼容源码、既有测试和 CSS 构建；产品入口不启动 Next server，也不依赖 Flight 传输。新增服务端 Next API 必须先明确其语义和适配测试，不能因类型能编译就假定运行兼容。
+[`compat-aliases.mjs`](../../apps/api/compat-aliases.mjs) 因此只剩 `server-only`、`mikka-real-react`、`react` 和 `@` 四个键，[`build-contract.mjs`](../../apps/api/build-contract.mjs) 会拒绝任何残留的框架别名。Next.js 不是依赖；`scripts/next-free.test.mjs` 守住这条线。新增服务端能力时直接扩这些模块，不要重新引入框架 specifier。
 
 ## 请求结束、Workflow 与 tracing
 

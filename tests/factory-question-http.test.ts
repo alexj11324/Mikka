@@ -72,9 +72,10 @@ test(
         name: "HTTP fixture",
       });
       assert.equal(r.status, 200);
-      return r.body.user.id;
+      assert.equal(typeof r.body.token, "string");
+      return { userId: r.body.user.id as string, token: r.body.token as string };
     };
-    const userId = await signup(owner);
+    const { userId, token: ownerToken } = await signup(owner);
     await signup(other);
     const pool = new Pool({
       connectionString: target.toString(),
@@ -174,32 +175,26 @@ test(
         questionId: f.questionId,
         humanSessionId: "model-forged-session",
       };
-      // The existing Coordinator contract accepts only text/submissionId. Reject
-      // injected question/provenance fields before they can become a user event;
-      // the Factory answer endpoint below separately enforces same-origin 403.
-      for (const requestOrigin of ["https://untrusted.example", "", origin]) {
-        assert.equal(
-          (
-            await owner("/api/coordinator/messages", "POST", message, {
-              origin: requestOrigin,
-            })
-          ).status,
-          400,
-        );
-      }
-      assert.equal(
-        (
-          await pool.query(
-            "SELECT count(*)::int AS n FROM coordinator_events WHERE payload->>'text'=$1",
-            [message.text],
-          )
-        ).rows[0].n,
-        0,
-      );
-      assert.equal(
-        (await owner("/api/coordinator/messages", "POST", {text: message.text})).status,
-        202,
-      );
+      const { authenticateEveRequest } = await import("../lib/eve/auth");
+      const { scopeFromAuth } = await import("../lib/eve/scope");
+      const { acceptEveMessage } = await import("../lib/eve/submission");
+      const nativeRequest = new Request(origin + "/eve/v1/session", {
+        method: "POST",
+        headers: { authorization: "Bearer " + ownerToken, "x-mikka-submission-id": randomUUID() },
+      });
+      const nativeOwner = await authenticateEveRequest(nativeRequest);
+      assert.ok(nativeOwner);
+      const scope = scopeFromAuth(nativeOwner);
+      assert.equal(scope.ownerId, userId);
+      assert.equal((await owner("/api/coordinator/messages", "POST", message)).status, 410);
+      await assert.rejects(acceptEveMessage(scope, message.text, {
+        questionId: message.questionId, humanSessionId: message.humanSessionId,
+      }, nativeRequest));
+      assert.equal((await pool.query(
+        "SELECT count(*)::int AS n FROM coordinator_events WHERE payload->>'text'=$1",
+        [message.text],
+      )).rows[0].n, 0);
+      await acceptEveMessage(scope, message.text, {}, nativeRequest);
       const attested = (
         await pool.query(
           "SELECT payload FROM coordinator_events WHERE payload->>'text'=$1",

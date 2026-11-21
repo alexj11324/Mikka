@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { GroupMessagesRequestError, leaveGroupConversation, type GroupSummary } from '@/lib/group-messages'

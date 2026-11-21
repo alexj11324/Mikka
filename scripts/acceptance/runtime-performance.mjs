@@ -126,6 +126,9 @@ export async function preflight(config) {
     assert.equal(target.origin, origin.origin, 'Specify the exact origin without a trailing slash')
     assert.ok(Array.isArray(target.command) && target.command.every(value => typeof value === 'string'))
     assert.equal(await realpath(target.command[0]), await realpath(process.execPath), 'Both commands must use the same explicit Node binary as this driver')
+    // The `next` kind measures a checkout from before the framework was
+    // removed: point snapshotsRoot at that historical commit. It is the
+    // baseline this migration is compared against, not a product dependency.
     const suffix = target.kind === 'next'
       ? ['node_modules/next/dist/bin/next', 'dev', '--webpack', '--hostname', origin.hostname, '--port', origin.port]
       : ['apps/api/scripts/dev.mjs', '--host', origin.hostname, '--port', origin.port]

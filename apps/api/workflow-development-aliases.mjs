@@ -35,9 +35,11 @@ export function developmentWorkflowAliases({ buildDir, replace = {} }) {
         // Protocol owns semver; pnpm does not expose that private dependency
         // beside the generated application bundle. Keep its native instance.
         builder.onResolve({ filter: /^semver$/ }, () => ({ path: protocolRequire.resolve('semver'), external: true }))
-        // Exact framework aliases must not rewrite unrelated subpaths such as
+        // Exact aliases must not rewrite unrelated subpaths such as
         // react/jsx-runtime. Only the application's @/ prefix is a prefix map.
-        builder.onResolve({ filter: /^(?:@\/|@mikka\/protocol(?:\/|$)|next(?:\/|$)|next-intl\/|react$|mikka-real-react$|server-only$)/ }, async args => {
+        // Application code imports `@/lib/server-runtime/*` and `@/lib/intl/*`
+        // through that prefix; no framework specifier is aliased anymore.
+        builder.onResolve({ filter: /^(?:@\/|@mikka\/protocol(?:\/|$)|react$|mikka-real-react$|server-only$)/ }, async args => {
           const target = args.path === '@mikka/protocol' || args.path.startsWith('@mikka/protocol/')
             ? require.resolve(args.path)
             : apiAliases[args.path] ?? (args.path.startsWith('@/') ? join(apiAliases['@'], args.path.slice(2)) : undefined)

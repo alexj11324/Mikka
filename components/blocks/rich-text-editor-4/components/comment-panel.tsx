@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/tooltip"
 import { CommentThread, DraftThread } from "./comment-thread"
 import type { ThreadRecord } from "./rich-text-comments"
-import { CheckCheckIcon, XIcon } from "lucide-react"
+import { CheckCheck, X } from "@/components/icons"
 
 export interface OpenThread {
   thread: ThreadRecord
@@ -177,7 +177,7 @@ export function CommentPanel({
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
-            <CheckCheckIcon aria-hidden="true" />
+            <CheckCheck aria-hidden="true" />
           </EmptyMedia>
           <EmptyTitle>No Open Comments</EmptyTitle>
           <EmptyDescription>
@@ -221,7 +221,7 @@ export function CommentPanel({
                 />
               }
             >
-              <XIcon aria-hidden="true" />
+              <X aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent>Close</TooltipContent>
           </Tooltip>

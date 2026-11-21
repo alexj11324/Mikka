@@ -287,10 +287,9 @@ describe('sampling and settings', () => {
     assert.throws(() => traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'prod' }), /MIKKA_DEPLOYMENT_STAGE_INVALID/)
     assert.equal(traceSampleRate({ MIKKA_DEPLOYMENT_STAGE: 'production', CI: 'true' }), 0, 'CI remains untraced')
   })
-  test('tests, CI and builds never trace; 10% by default; 1 allowed in dev', () => {
+  test('tests and CI never trace; 10% by default; 1 allowed in dev', () => {
     assert.equal(traceSampleRate({ NODE_ENV: 'test', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
     assert.equal(traceSampleRate({ CI: 'true', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
-    assert.equal(traceSampleRate({ NEXT_PHASE: 'phase-production-build' }), 0)
     assert.equal(traceSampleRate({ VERCEL: '1', CI: '1', VERCEL_ENV: 'production' }), 0)
     assert.equal(traceSampleRate({}), 0.1)
     assert.equal(traceSampleRate({ NODE_ENV: 'development', MIKKA_TRACE_SAMPLE_RATE: '1' }), 1)

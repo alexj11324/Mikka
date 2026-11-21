@@ -6,7 +6,7 @@ import { serverRunFailure } from '@/lib/run-failure-details'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { runListChanged } from '@/lib/live/lists'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -15,19 +15,22 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { MIN_DAEMON_VERSION, SESSION_LEASE_MS, isDeviceOnline, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, SESSION_LEASE_MS, isDeviceOnline, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
 import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
-import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
+import { assertLiteLLMModelTransport, assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
+import { liteLLMBaseUrl } from '@/lib/model-gateway/litellm-client'
 import { db, pool } from '@/lib/db'
 import { runChanged } from '@/lib/live/panels'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
+import { resolveAppOrigin } from '@/lib/auth-config'
+import { isLoopbackHost } from '@/lib/loopback'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { RUN_DECISION_CATALOGUE } from '@/lib/project-map/mcp-tool'
@@ -68,7 +71,6 @@ import { deviceSessionHeld } from '@/lib/device-session'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/devices/:deviceId/runs/:runId/claim`: hands the daemon everything
@@ -217,16 +219,24 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   const frozenKey = run.agentDefinition?.apiKey
   // Paid by Mikka 额度: the CLI reaches the model only through the Mikka model gateway (decision 2026-11-15-2000).
   const frozenCredits = run.agentDefinition?.credits
+  const requestUrl = new URL(request.url)
+  const loopbackGateway = requestUrl.protocol === 'http:' && isLoopbackHost(requestUrl.hostname)
+    && device.kind === 'local' && requestUrl.origin === resolveAppOrigin(process.env)
   if ((frozenKey || frozenCredits) && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
-  if ((frozenKey || frozenCredits) && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
+  if ((frozenKey || frozenCredits) && (request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1'
+    || loopbackGateway && request.headers.get(MODEL_GATEWAY_LOOPBACK_HEADER) !== '1')) return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try {
     cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
     for (const workspaceId of Array.from(new Set([...cliPolicy.workspaceIds, ...(subscription ? [subscription.workspaceId] : [])]))) {
       const scope = { workspaceId, ownerId: caller.userId }
-      const model = run.agentDefinition?.model ?? subscription?.modelId ?? 'native-default'
+      const model = frozenKey?.model ?? frozenCredits?.model ?? run.agentDefinition?.model ?? subscription?.modelId ?? 'native-default'
       if (subscription) await assertSubscriptionModelTransport(scope, model, subscription.route, request.signal)
-      else await assertUnmanagedModelTransport(scope, model, request.signal)
+      else if (frozenKey || frozenCredits) {
+        const endpoint = liteLLMBaseUrl()
+        if (!endpoint) throw new ModelAdmissionError('modelRouteDenied')
+        await assertLiteLLMModelTransport(scope, model, endpoint, request.signal)
+      } else await assertUnmanagedModelTransport(scope, model, request.signal)
     }
   }
   catch (error) { return NextResponse.json({ error: error instanceof ModelAdmissionError ? error.code : 'Agent policy unavailable.' }, { status: 409 }) }
@@ -261,13 +271,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       factoryToken = await withDatabaseClient(tx, () => issueRunToken(run))
     }
   }
-  // The key is opened here, at claim, for this run only (orchestration.md § 6): `apiKeyForRun` checks the
-  // run is active and the key still usable by its owner in its workspace, and records the run so
-  // withdrawing the key stops it. A key that is gone ends the run; it never switches credential.
+  // The gateway token is minted at claim for this run only. Key validation records the run so
+  // withdrawing the key stops it. The provider key stays on the server.
   let modelCredential: RunModelCredential | undefined
   const openRunKey = async (): Promise<NextResponse | null> => {
     if (!frozenKey && !frozenCredits) return null
-    const [{ apiKeyForRun, validateRunApiKey }, { WorkspaceError }] = await Promise.all([import('@/lib/model-api-keys'), import('@/lib/workspace-error')])
+    const [{ validateRunApiKey }, { WorkspaceError }] = await Promise.all([import('@/lib/model-api-keys'), import('@/lib/workspace-error')])
     const refuse = async () => {
       const { persistRunCompletion } = await import('@/lib/run-publications')
       await persistRunCompletion(caller.userId, runId, { stopReason: 'blocked', report: { summary: 'API key unavailable.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
@@ -275,38 +284,22 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
     if (harness !== 'claude_code' && harness !== 'codex') return refuse()
-    // The Mikka model gateway under this server's own HTTPS origin: the CLI holds only a run-bound token.
+    // HTTP is only for a local runner on this server's configured loopback origin.
     const { GATEWAY_PATHS } = await import('@/lib/model-gateway/config')
     const gatewayUrl = new URL(withBasePath(harness === 'claude_code' ? GATEWAY_PATHS.anthropic : GATEWAY_PATHS.openai), request.url)
-    if (gatewayUrl.protocol === 'https:') {
-      if (frozenKey) {
-        try { await validateRunApiKey(pool, runId, frozenKey.keyId) }
-        catch (error) {
-          if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
-          return refuse()
-        }
+    if (gatewayUrl.protocol !== 'https:' && !loopbackGateway) return refuse()
+    if (frozenKey) {
+      try { await validateRunApiKey(pool, runId, frozenKey.keyId) }
+      catch (error) {
+        if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
+        return refuse()
       }
-      const { mintGatewayToken } = await import('@/lib/model-gateway/token')
-      const { token } = await mintGatewayToken(pool, { runId, ownerId: caller.userId, workspaceId: run.workspaceId ?? null, harness,
-        model: frozenKey?.model ?? frozenCredits!.model, source: frozenKey ? { kind: 'api_key', keyId: frozenKey.keyId } : { kind: 'credits' } })
-      const parsed = runModelCredentialSchema.safeParse({ kind: 'provider', protocol: harness === 'claude_code' ? 'anthropic' : 'openai', baseUrl: gatewayUrl.toString(), key: token })
-      if (!parsed.success) return refuse()
-      modelCredential = parsed.data
-      return null
     }
-    // Mikka 额度 has no other way to the model; a key falls back to direct delivery on a server without HTTPS.
-    if (!frozenKey) return refuse()
-    let opened: Awaited<ReturnType<typeof apiKeyForRun>>
-    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId, harness) }
-    catch (error) {
-      // Secrets briefly unreadable: the run stays queued. A key that is gone, or no longer usable here: the run ends.
-      if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
-      return refuse()
-    }
-    const parsed = opened.harness === harness ? runModelCredentialSchema.safeParse(opened.harness === 'claude_code'
-      ? { kind: 'provider', protocol: 'anthropic', baseUrl: opened.env.ANTHROPIC_BASE_URL, key: opened.env.ANTHROPIC_API_KEY }
-      : { kind: 'provider', protocol: 'openai', baseUrl: opened.codex.model_providers.mikka.base_url, key: opened.env.MIKKA_MODEL_API_KEY }) : null
-    if (!parsed?.success) return refuse()
+    const { mintGatewayToken } = await import('@/lib/model-gateway/token')
+    const { token } = await mintGatewayToken(pool, { runId, ownerId: caller.userId, workspaceId: run.workspaceId ?? null, harness,
+      model: frozenKey?.model ?? frozenCredits!.model, source: frozenKey ? { kind: 'api_key', keyId: frozenKey.keyId } : { kind: 'credits' } })
+    const parsed = runModelCredentialSchema.safeParse({ kind: 'provider', protocol: harness === 'claude_code' ? 'anthropic' : 'openai', baseUrl: gatewayUrl.toString(), key: token })
+    if (!parsed.success) return refuse()
     modelCredential = parsed.data
     return null
   }
@@ -583,8 +576,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         ...githubCredential,
         ...(publication?.pushBranch && ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly ? { branch: publication.pushBranch } : {}) } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
-    ...((run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort)
-      ? { effort: run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort } : {}),
+    ...((run.agentDefinition?.modelDispatch?.effort ?? run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort)
+      ? { effort: run.agentDefinition?.modelDispatch?.effort ?? run.agentDefinition?.agentProfile?.effort ?? run.agentDefinition?.modelDispatch?.routing?.effort } : {}),
     ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(subscriptionLease ? { subscriptionLease } : {}),

@@ -3,12 +3,11 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
-import { NextResponse } from 'next/server'
 
 const dbUrl = process.env.MIKKA_DATABASE_URL ?? process.env.DATABASE_URL
 let sessionUser: string | null = null
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports } as never)
-mock.module('next/headers', { namedExports: { headers: async () => new Headers() } } as never)
+mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers() } } as never)
 stub('../lib/request-log.ts', { noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('../lib/auth.ts', { auth: { api: {
   getSession: async () => sessionUser ? { user: { id: sessionUser } } : null,
@@ -184,5 +183,4 @@ test('begin rejects a missing challenge and a foreign origin', { skip: !dbUrl },
   assert.equal((await routes.begin(json('/api/desktop/begin', { state, callback }))).status, 400)
   const foreign = new Request(`${origin}/api/desktop/begin`, { method: 'POST', headers: { origin: 'https://evil.example' }, body: '{}' })
   assert.equal((await routes.begin(foreign)).status, 403)
-  void NextResponse
 })

@@ -1,11 +1,10 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { readUnderDeviceAuthority } from '@/lib/db'
 import { readRepositoryDaemonSettings } from '@/lib/device-repositories'
 import { authenticateDevice } from '@/lib/device-link'
 
-export const dynamic = 'force-dynamic'
 
 /** Repository records and owner-scoped settings, never a local path allow-list. */
 async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {

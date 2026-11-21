@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, ACTIVE_TURN_STEER_HEADER, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { daemonVersions } from '@/lib/daemon-release'
 import { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice } from '@/lib/device-link'
@@ -12,7 +12,6 @@ import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { z } from 'zod'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `GET /v1/devices/:deviceId/commands`: messages people sent this device's

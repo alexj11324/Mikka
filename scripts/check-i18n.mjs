@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
+import { frozenMobileFiles } from './mobile-i18n-baseline.mjs'
 
 const ROOT = process.cwd()
 const LOCALES = ['zh-CN', 'en']
@@ -122,6 +123,22 @@ function resolveImport(specifier, fromFile) {
     if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate
   }
   return null
+}
+
+/** Every mobile source file, as absolute paths: the app's own entry points, not a web import graph. */
+function collectMobileFiles() {
+  const root = path.join(ROOT, 'apps', 'mobile')
+  const found = []
+  const walk = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'tests') continue
+      const full = path.join(directory, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.(tsx?|jsx?)$/.test(entry.name) && !/\.test\.|\.d\.ts$/.test(entry.name)) found.push(full)
+    }
+  }
+  if (fs.existsSync(root)) walk(root)
+  return found
 }
 
 function collectEntryPoints() {
@@ -313,6 +330,23 @@ export function checkRepository() {
     if (!/\.(tsx?|jsx?)$/.test(file)) continue
     const source = fs.readFileSync(file, 'utf8')
     problems.push(...findHardcodedText(file, source))
+    problems.push(...findMissingTranslationKeys(file, source, reference))
+  }
+  // The mobile app is a second entry point into the same catalog (R-42). It was
+  // written before this check covered it, so mobile-i18n-baseline.mjs freezes how many
+  // hardcoded strings each file still holds. The count only shrinks: a frozen file that
+  // gains one fails, and one that reaches zero must leave the list.
+  const frozen = frozenMobileFiles()
+  for (const file of collectMobileFiles()) {
+    const source = fs.readFileSync(file, 'utf8')
+    const relative = path.relative(ROOT, file)
+    const hits = findHardcodedText(file, source)
+    const allowed = frozen.get(relative)
+    if (allowed === undefined) problems.push(...hits)
+    else if (hits.length > allowed) problems.push(...hits, `${relative} holds ${hits.length} hardcoded strings; the baseline allows ${allowed} (migrate the new one, never raise the number)`)
+    // A frozen file that shrank must lower its count, or the allowance slowly loosens
+    // and a later new string slips in under it. At zero the entry goes.
+    else if (hits.length < allowed) problems.push(`scripts/mobile-i18n-baseline.mjs: "${relative}" is down to ${hits.length} (from ${allowed}); ${hits.length ? 'lower its number' : 'remove its entry'}`)
     problems.push(...findMissingTranslationKeys(file, source, reference))
   }
   return problems

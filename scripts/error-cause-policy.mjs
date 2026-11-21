@@ -105,14 +105,12 @@ export function findDroppedCauses(file, source) {
  * entry). Fix a drop by passing `{ cause: error }`; do not add files here.
  */
 export const droppedCauseAllowlist = {
-  'app/actions/coordinator.ts': 4,
+  'app/actions/coordinator.ts': 1,
   'app/api/factory/tasks/[taskId]/approval/route.ts': 1,
   'lib/abuse/card-checkout.ts': 1,
   'lib/agent-runs.ts': 2,
   'lib/audit/authentication.ts': 1,
   'lib/billing/points-purchase.ts': 1,
-  'lib/bot-create.ts': 2,
-  'lib/bot-update.ts': 1,
   'lib/chat-attachments/extract.ts': 2,
   'lib/chat-attachments/transcribe.ts': 1,
   'lib/cloud-computer/thread-machines.ts': 1,
@@ -167,7 +165,6 @@ export const droppedCauseAllowlist = {
   'packages/daemon/src/adapters/codex-mailbox.ts': 2,
   'packages/daemon/src/agents/chat-files.ts': 2,
   'packages/daemon/src/agents/github-runtime.ts': 1,
-  'packages/daemon/src/api-key-broker.ts': 1,
   'packages/daemon/src/lock.ts': 1,
   'packages/daemon/src/main.ts': 1,
   'packages/daemon/src/quota/parse.ts': 1,

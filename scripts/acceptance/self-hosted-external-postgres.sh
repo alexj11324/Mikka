@@ -1,27 +1,36 @@
 #!/usr/bin/env bash
 # Use the CI job's disposable local PG17 as a separately administered database.
-# The customer installation itself contains only the unmodified published app service.
+# The installation runs the published app and mandatory LiteLLM with a synthetic upstream.
 set -euo pipefail
 : "${GITHUB_ACTIONS:?requires the disposable image CI job}"
 : "${POSTGRES_PASSWORD:?requires the generated CI credential}"
 : "${MIKKA_IMAGE:?requires the image built by this CI job}"
 : "${GITHUB_SHA:?requires the exact revision being tested}"
+: "${MIKKA_LITELLM_MASTER_KEY:?requires the generated CI proxy credential}"
 docker compose up -d --wait --wait-timeout 120 postgres
 db_container=$(docker compose ps -q postgres)
+docker compose up -d --wait --wait-timeout 120 model
+model_container=$(docker compose ps -q model)
 umask 077
 installation=$(mktemp -d)
 project=mikka-external-ci
 network=${project}_default
 compose=(docker compose --env-file "$installation/.env" -p "$project" -f "$installation/docker-compose.neon.yml")
 cleanup() {
+  docker network disconnect "$network" "$model_container" >/dev/null 2>&1 || true
   docker network disconnect "$network" "$db_container" >/dev/null 2>&1 || true
   "${compose[@]}" down --volumes --remove-orphans >/dev/null
   rm -rf -- "$installation"
 }
 cp docker-compose.neon.yml "$installation/"
+mkdir -p "$installation/deploy"
+cp -R deploy/litellm "$installation/deploy/"
+cp tests/self-hosted/litellm.yaml "$installation/deploy/litellm/config.yaml"
 driver=postgresql
 cat > "$installation/.env" <<VARS
 MIKKA_IMAGE=$MIKKA_IMAGE
+MIKKA_LITELLM_MASTER_KEY=$MIKKA_LITELLM_MASTER_KEY
+LITELLM_LOCAL_MODEL_COST_MAP=True
 MIKKA_PORT=3097
 BETTER_AUTH_URL=http://localhost:3097
 MIKKA_DATABASE_URL=$driver://mikka_external_query:$POSTGRES_PASSWORD@pooled:6432/external_fixture
@@ -72,15 +81,16 @@ CONFIG
 pgbouncer -d "$dir/config"
 POOL
 
-"${compose[@]}" create app
+"${compose[@]}" create --build app litellm
 docker network connect --alias pooled --alias direct "$network" "$db_container"
+docker network connect --alias model "$network" "$model_container"
 if [[ "${PUBLISH_IMAGE:-false}" != true ]]; then
   "${compose[@]}" run --rm --no-deps --entrypoint node \
     --volume "$PWD:/source:ro" app \
     /source/apps/eve/node_modules/@workflow/world-postgres/bin/setup.js
 fi
 "${compose[@]}" up -d --wait --wait-timeout 240
-test "$("${compose[@]}" ps --services --status running)" = app
+test "$("${compose[@]}" ps --services --status running | sort)" = "$(printf 'app\nlitellm\n')"
 node --input-type=module <<'JS'
 import assert from 'node:assert/strict'
 const response = await fetch('http://localhost:3097/mikka/api/server', { signal: AbortSignal.timeout(10_000) })
@@ -89,7 +99,7 @@ const server = await response.json()
 assert.equal(server.kind, 'mikka-server')
 assert.equal(server.status.database, 'ready')
 assert.equal(server.version, process.env.GITHUB_SHA)
-console.log(JSON.stringify({ revision: server.version, database: server.status.database, services: ['app'] }))
+console.log(JSON.stringify({ revision: server.version, database: server.status.database, services: ['app', 'litellm'] }))
 JS
 # Confirm ordinary SQL really connected through the restricted query role.
 test "$(docker exec "$db_container" psql -XAtq -U mikka -d external_fixture \

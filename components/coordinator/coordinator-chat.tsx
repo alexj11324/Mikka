@@ -6,7 +6,7 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { coordinatorHistory, retryCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
@@ -25,7 +25,7 @@ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, Message
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { CircleAlert, CircleHelp } from 'lucide-react'
+import { CircleAlert, CircleHelp } from '@/components/icons'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
@@ -98,7 +98,7 @@ import { RetryReplyButton } from './retry-reply-button'
 import { COMPOSER_NOTICE } from './composer-notice'
 
 /** A new message's enter: a short fade (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md). */
-const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
+const ENTER = 'animate-in fade-in-0 duration-(--motion-base) motion-reduce:animate-none'
 
 /**
  * The band under the header pill (top 12px, 36px tall): nothing shows down to 56px, 8px below the pill, then rows fade
@@ -171,9 +171,6 @@ function FollowSentMessages({ count }: { count: number | null }) {
  */
 /** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-82). */
 const showThread = ({ runId }: { runId: string }) => openThread(runId)
-
-/** Starting goals offered in an empty Coordinator chat (coordinator's choice, 2026-11-08). */
-const STARTERS = ['fixBug', 'reviewPullRequests', 'summarizeToday', 'dailyBriefing'] as const
 
 function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, pill = true }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string
   /** A floating title pill sits over the chat on wide screens (ConversationPill): the layer's screen starts below it. */
@@ -650,10 +647,9 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [liveFailurePart] })
     const empty = data && !items.length && !stream.replies.length && !data.error && !welcomeRequestFailed ? (data.enabled
       ? <p role="status">{tNav('writingWelcome')}</p>
-      : <div className="flex flex-col gap-3"><p>{t('empty', { name })}</p>
-        {!bot && <div className="flex flex-wrap gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => setDraft(t(`starters.${key}`))}>{t(`starters.${key}`)}</Button>)}</div>}</div>) : undefined
+      : <p>{t('empty', { name })}</p>) : undefined
     const notices = <>
-      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
+      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{tCommon('retry')}</Button></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
       <EveInteractions agent={stream} />
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
@@ -728,13 +724,6 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <div className="m-auto flex flex-col items-center gap-3">
                 <p className="text-sm text-muted-foreground">{t('empty', { name })}</p>
-                {/* The Coordinator's first chat offers a starting move: a chip fills the composer, the person sends it (states-05). */}
-                {!bot && !embedded && <div className="flex max-w-md flex-wrap justify-center gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => {
-                  const text = t(`starters.${key}`)
-                  setDraft(text)
-                  const input = inputRef.current
-                  if (input) { input.focus(); input.setSelectionRange(text.length, text.length) }
-                }}>{t(`starters.${key}`)}</Button>)}</div>}
               </div>)}
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
@@ -785,7 +774,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
                   {row.phase === 'failed' && <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />}
-                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
+                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent size="roomy" className="flex flex-col gap-1.5 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
                 </span>
                 <span role={row.phase === 'failed' ? 'alert' : 'status'} className="flex items-center justify-end gap-1 self-end text-xs text-muted-foreground">
                   {row.phase === 'sending' ? tNavAll('HostedThread.sending') : row.error}
@@ -810,7 +799,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
-      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
+      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{tCommon('retry')}</Button></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
       <EveInteractions agent={stream} />
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}

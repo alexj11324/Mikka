@@ -20,6 +20,7 @@ function configuration(overrides = {}) {
     MIKKA_DATABASE_URL: pooled,
     MIKKA_DATABASE_URL_UNPOOLED: direct,
     MIKKA_IMAGE: 'mikka-self-hosted:fixture',
+    MIKKA_LITELLM_MASTER_KEY: 'synthetic-compose-litellm',
     ...overrides,
   }
   const result = spawnSync('docker', ['compose', '-f', 'docker-compose.neon.yml', 'config', '--format', 'json'], {
@@ -32,8 +33,8 @@ test('external PostgreSQL Compose passes distinct pooled and direct URLs without
   const result = configuration()
   assert.equal(result.status, 0, 'external PostgreSQL Compose must parse on the pinned CI Docker installation')
   const parsed = JSON.parse(result.stdout)
-  assert.deepEqual(Object.keys(parsed.services), ['app'])
-  const { app } = parsed.services
+  assert.deepEqual(Object.keys(parsed.services), ['app', 'litellm'])
+  const { app, litellm } = parsed.services
   assert.equal(app.environment.MIKKA_DATABASE_URL, pooled)
   assert.equal(app.environment.DATABASE_URL, pooled)
   assert.equal(app.environment.MIKKA_DATABASE_URL_UNPOOLED, direct)
@@ -42,7 +43,11 @@ test('external PostgreSQL Compose passes distinct pooled and direct URLs without
   assert.equal(app.ports.length, 1)
   assert.equal(app.ports[0].host_ip, '127.0.0.1')
   assert.ok(app.volumes.some(volume => volume.target === '/data' && volume.type === 'volume'))
-  assert.equal(app.depends_on, undefined)
+  assert.equal(app.depends_on.litellm.condition, 'service_started')
+  assert.equal(app.environment.MIKKA_LITELLM_URL, 'http://litellm:4000')
+  assert.equal(app.environment.MIKKA_LITELLM_MASTER_KEY, 'synthetic-compose-litellm')
+  assert.equal(litellm.environment.LITELLM_MASTER_KEY, 'synthetic-compose-litellm')
+  assert.equal(litellm.ports, undefined)
   assert.equal(parsed.services.postgres, undefined)
 })
 
@@ -56,4 +61,10 @@ test('external PostgreSQL Compose fails closed without direct connection URL', (
   const result = configuration({ MIKKA_DATABASE_URL_UNPOOLED: '' })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /MIKKA_DATABASE_URL_UNPOOLED/)
+})
+
+test('external PostgreSQL Compose fails closed without the LiteLLM master key', () => {
+  const result = configuration({ MIKKA_LITELLM_MASTER_KEY: '' })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /MIKKA_LITELLM_MASTER_KEY/)
 })

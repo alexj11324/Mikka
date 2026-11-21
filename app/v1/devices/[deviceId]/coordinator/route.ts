@@ -1,8 +1,6 @@
 import {withDeviceRoute} from '@/lib/device-route'
-import {NextResponse} from 'next/server'
+import {NextResponse} from '@/lib/server-runtime/server'
 import {authenticateDevice,ownsDevice} from '@/lib/device-link'
-
-export const dynamic='force-dynamic'
 
 /** Old device messages authenticate normally, but cannot restart a retired
  * model job. Stored turns and tool-scope checks remain compatibility data. */

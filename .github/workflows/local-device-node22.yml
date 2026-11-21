@@ -43,7 +43,6 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_LOCAL_TEST_ACCOUNTS: '1'
-      NEXT_TELEMETRY_DISABLED: '1'
       NITRO_PRESET: node-server
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -73,7 +72,7 @@ jobs:
         run: node scripts/runtime-compatibility-smoke.mjs
       - name: Startup contracts and Eve unit tests
         run: |
-          node --test scripts/start-app.test.mjs scripts/self-hosted-start.test.mjs scripts/node22-test-compat.test.mjs scripts/node-runtime-compat.test.mjs
+          node --test scripts/start-app.test.mjs scripts/node22-test-compat.test.mjs scripts/node-runtime-compat.test.mjs
           pnpm test:eve
       - name: Daemon and installer on the selected Node runtime
         run: |

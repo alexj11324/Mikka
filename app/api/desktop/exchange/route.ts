@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, gt, isNotNull, isNull } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
@@ -10,7 +10,6 @@ import { auth } from '@/lib/auth'
 import { safeDesktopSession } from '@/lib/desktop-rpc/session'
 import { DESKTOP_SESSION_CACHE_HEADER, desktopSessionCacheFromHeaders } from '@/lib/desktop-rpc/session-cache'
 
-export const dynamic = 'force-dynamic'
 
 const noStore = { 'Cache-Control': 'no-store' }
 

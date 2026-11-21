@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import { useSWRConfig } from 'swr'
 import { inboxCountKey } from './use-inbox-count'

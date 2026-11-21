@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useRouter } from '@/i18n/navigation'
 import { SettingsView } from '@/components/settings/settings-view'
 import { SettingsFrame } from '@/components/settings/settings-shell'

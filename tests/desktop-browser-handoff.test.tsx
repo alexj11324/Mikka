@@ -23,7 +23,7 @@ const browser = new Window({ url: `${origin}/mikka/en/sign-in` })
 const assigned: string[] = []
 let createRoot: typeof import('react-dom/client')['createRoot']
 let AuthForm: typeof import('../components/auth-form')['AuthForm']
-let IntlProvider: typeof import('next-intl')['NextIntlClientProvider']
+let IntlProvider: typeof import('@/lib/intl/i18n-client')['NextIntlClientProvider']
 let messages: Record<string, unknown>
 before(async () => {
   for (const [key, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator, location: browser.location, history: browser.history, sessionStorage: browser.sessionStorage, IS_REACT_ACT_ENVIRONMENT: true, Element: browser.Element, HTMLElement: browser.HTMLElement, Node: browser.Node, ShadowRoot: browser.ShadowRoot, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: browser.requestAnimationFrame.bind(browser), cancelAnimationFrame: browser.cancelAnimationFrame.bind(browser) })) {
@@ -32,7 +32,7 @@ before(async () => {
   Object.defineProperty(browser.location, 'assign', { configurable: true, value: (url: string) => { assigned.push(url) } })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ AuthForm } = await import('../components/auth-form'))
-  ;({ NextIntlClientProvider: IntlProvider } = await import('next-intl'))
+  ;({ NextIntlClientProvider: IntlProvider } = await import('@/lib/intl/i18n-client'))
   messages = (await import('../messages/en.json')).default
 })
 after(() => browser.close())

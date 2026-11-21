@@ -20,8 +20,8 @@ const action = 'append_notion_paragraph'
 
 test('approved writes publish only committed owner-personal invalidations through the real service', { skip: !url, timeout: 180_000 }, async t => {
   const queued: (() => Promise<void>)[] = []
-  const next = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
+  const next = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
   const sent: { path: string; events: unknown }[] = []
   const receiver = createServer(async (request, response) => {
     let body = ''

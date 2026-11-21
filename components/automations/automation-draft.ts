@@ -1,8 +1,9 @@
 import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/wall-time'
-import type { Definition, DispatchTask, EventTrigger, GitHubTriggerEvent, LinearTriggerEvent, SlackTriggerEvent } from '@/lib/schedules/contract'
+import type { AutomationEffort, Definition, DispatchTask, EventTrigger, GitHubTriggerEvent, LinearTriggerEvent, SlackTriggerEvent } from '@/lib/schedules/contract'
 import { slackUserId } from '@/lib/slack/user-id'
 import type { TaskDestination } from '@/lib/task-destination'
 import type { TaskAgent } from '@/lib/task-create-command'
+import type { MachineSize } from '@/lib/cloud-computer/machine-pricing'
 
 export type ScheduleKind = 'once' | 'interval' | 'daily' | 'cron'
 /** One GitHub event trigger as the editor holds it; lists are comma-separated text. */
@@ -15,6 +16,10 @@ const UNIT_MINUTES: Record<IntervalUnit, number> = { minutes: 1, hours: 60, days
 /** What the 自动化 editor holds: the definition as fields, local times in the automation's own time zone. */
 export type AutomationDraft = {
   title: string
+  /** What it is for, under its name; '' is none. */
+  description: string
+  /** The Environment each run uses; null is the Project's default. */
+  environmentId: string | null
   botId: string | null
   /** 'auto' (workspace default), 'cloud', 'cloudflare' or a device ID. */
   machine: string
@@ -41,8 +46,17 @@ export type AutomationDraft = {
   concurrent: number
   /** 0 is 不限. */
   perDay: number
-  /** 每次运行: a new task, or added to the first run's task. */
-  eachRun: 'new_task' | 'same_task'
+  /** Runs in: a new thread each run, one standing thread (the first run's), or an existing thread. */
+  eachRun: 'new_task' | 'same_task' | 'existing_thread'
+  /** Runs in 'existing_thread': the thread's root run. */
+  singleThreadId: string | null
+  /** The model each run asks for (one of 优先使用的模型 on the Agent), and its effort; null is the Agent's default. */
+  model: string | null
+  effort: AutomationEffort | null
+  /** The machine size; null is the Environment's default, else Mikka's. */
+  machineSize: MachineSize | null
+  /** Pin each run's new thread. */
+  pin: boolean
   /** 满足任一条件就运行: GitHub event triggers beside the timing. */
   github: GitHubTriggerDraft[]
   /** 满足任一条件就运行: Linear event triggers, on teams of the person's own Linear connection. */
@@ -50,7 +64,7 @@ export type AutomationDraft = {
   /** 满足任一条件就运行: Slack event triggers, on channels of the workspace's Slack installation. */
   slack: SlackTriggerDraft[]
   /** 运行后发到 Slack: the channel and the locale the posts are written in; null is off. */
-  notify: { channel: string; locale: 'zh-CN' | 'en' } | null
+  notify: { channel: string; locale: 'zh-CN' | 'en'; postAsRunner?: boolean; quiet?: boolean } | null
   /** Webhook: its own URL starts a run; null is off, otherwise the minutes requests are gathered into one run. */
   webhook: number | null
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */
@@ -76,7 +90,7 @@ export function instant(wall: string, zone: string): string | null {
 export function emptyDraft(timezone: string, now = new Date()): AutomationDraft {
   const soon = new Date(Math.ceil((now.getTime() + 3600_000) / 3600_000) * 3600_000)
   return {
-    title: '', botId: null, machine: 'auto', profileId: 'auto', agent: null, timezone,
+    title: '', description: '', environmentId: null, singleThreadId: null, model: null, effort: null, machineSize: null, pin: false, botId: null, machine: 'auto', profileId: 'auto', agent: null, timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
     prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], linear: [], slack: [], notify: null, webhook: null, otherTask: null,
@@ -92,6 +106,13 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
   return {
     ...draft,
     title: definition.title,
+    description: definition.description ?? '',
+    environmentId: definition.environmentId ?? null,
+    singleThreadId: definition.singleThreadId ?? null,
+    model: definition.model?.id ?? null,
+    effort: definition.model?.effort ?? null,
+    machineSize: definition.machineSize ?? null,
+    pin: definition.runs?.pin === true,
     botId: task.kind === 'dispatch_task' ? task.botId : null,
     machine: !destination ? 'auto' : destination.kind === 'device' ? destination.deviceId : destination.provider === 'cloudflare' ? 'cloudflare' : 'cloud',
     profileId: task.kind === 'dispatch_task' ? task.profileId ?? 'auto' : 'auto',
@@ -151,11 +172,12 @@ export function foldNeeded(draft: Pick<AutomationDraft, 'scheduleOn' | 'schedule
 }
 
 /** The definition to save, or the first field that keeps it from saving. */
-export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'agent' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' | 'slackAuthors' } {
+export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'agent' | 'thread' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' | 'slackAuthors' } {
   const title = draft.title.trim()
   if (!title) return { missing: 'title' }
   if (!draft.otherTask && !draft.prompt.trim()) return { missing: 'prompt' }
   if (!draft.otherTask && !draft.agent) return { missing: 'agent' }
+  if (!draft.otherTask && draft.eachRun === 'existing_thread' && !draft.singleThreadId) return { missing: 'thread' }
   if (draft.github.some(trigger => !trigger.repositories.length)) return { missing: 'repository' }
   if (draft.linear.some(trigger => !trigger.teams.length)) return { missing: 'team' }
   if (draft.slack.some(trigger => !trigger.channels.length)) return { missing: 'channel' }
@@ -193,7 +215,17 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(draft.agent ? { agent: draft.agent } : {}),
   }
   const events = draft.otherTask ? [] : [...draft.github.map(eventTrigger), ...draft.linear.map(linearTrigger), ...draft.slack.map(slackTrigger)]
-  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}), ...(!draft.otherTask && draft.notify ? { notify: { slack: draft.notify } } : {}) } }
+  const description = draft.description.trim()
+  // Run settings belong to a dispatched task; a chat-made automation's own task keeps none.
+  const run: Partial<Definition> = draft.otherTask ? {} : {
+    ...(draft.environmentId ? { environmentId: draft.environmentId } : {}),
+    ...(draft.eachRun === 'existing_thread' && draft.singleThreadId ? { singleThreadId: draft.singleThreadId } : {}),
+    ...(draft.model ? { model: { id: draft.model, ...(draft.effort ? { effort: draft.effort } : {}) } } : {}),
+    ...(draft.machineSize ? { machineSize: draft.machineSize } : {}),
+    ...(draft.pin ? { runs: { pin: true as const } } : {}),
+    ...(draft.eachRun !== 'new_task' ? { eachRun: draft.eachRun } : {}),
+  }
+  return { definition: { title, ...(description ? { description } : {}), timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...run, ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}), ...(!draft.otherTask && draft.notify ? { notify: { slack: draft.notify } } : {}) } }
 }
 
 /** 5-field cron forms the list can name: every day, weekdays, one weekday, one day of the month. Anything else shows the expression. */

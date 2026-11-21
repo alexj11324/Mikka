@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { archiveProject, deleteProject, getProjectLifecycleImpact, restoreProject } from '@/app/actions/projects'
 import { Button } from '@/components/ui/button'

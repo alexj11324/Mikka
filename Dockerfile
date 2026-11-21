@@ -9,7 +9,7 @@ RUN node scripts/build-subscription-worker.mjs
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /source
-ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 NEXT_TELEMETRY_DISABLED=1 NITRO_PRESET=node-server MIKKA_BUILD_BYOS_WORKER=1
+ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 NITRO_PRESET=node-server MIKKA_BUILD_BYOS_WORKER=1
 RUN npm install --global pnpm@10.34.3
 COPY . .
 COPY --from=subscription-workers /source/packages/subscription-worker/bin/ ./packages/subscription-worker/bin/

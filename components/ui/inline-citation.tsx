@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card"
-import { ArrowUpRight, Globe } from "lucide-react"
+import { ArrowUpRight, Globe } from "@/components/icons"
 import { cn } from "cn"
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"

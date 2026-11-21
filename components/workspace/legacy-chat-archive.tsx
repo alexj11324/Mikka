@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { fetchAgentHistory, useAgentHistory } from '@/hooks/use-agent-history'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { Button } from '@/components/ui/button'

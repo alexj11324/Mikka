@@ -3,7 +3,6 @@ import { freshSessionRoute } from '@/lib/fresh-session'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { restoreOrganizationMember } from '@/lib/governance/organizations'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string; userId: string }> }
 
 export const POST = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

@@ -3,9 +3,9 @@ import { isBotListKey } from '@/lib/live/list-read'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from 'motion/react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import useSWR, { useSWRConfig } from 'swr'
-import { CheckIcon } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { createBot, listBots, type BotView } from '@/app/actions/bots'
 import { completeOnboarding } from '@/app/actions/onboarding'
 import { BOT_MOOD_SECONDS, BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotMood, type BotShape } from '@/components/nav/bot-avatar'
@@ -338,9 +338,9 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
       {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 w-full flex-col gap-4 overflow-y-auto">
         <AnimatePresence initial={false}>
           {lines.map(line => line.from === 'bot'
-            ? <motion.p key={line.id} className="text-base" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
+            ? <motion.p key={line.id} className="text-md" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
             : <motion.div key={line.id} className="flex justify-end" initial={{ opacity: 0, y: reduce ? 0 : 40, scale: reduce ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduce ? { duration: 0 } : BUBBLE_SPRING}>
-              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent className="rounded-2xl px-4 py-3">{line.text}</BubbleContent></Bubble>
+              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent size="roomy">{line.text}</BubbleContent></Bubble>
             </motion.div>)}
         </AnimatePresence>
       </div>}
@@ -437,7 +437,7 @@ function AppRow({ app, connected, pending, disabled, onConnect }: { app: StoreAp
     </ItemContent>
     <ItemActions>
       {connected
-        ? <span className="flex items-center gap-1 text-sm text-muted-foreground"><CheckIcon aria-hidden="true" className="size-4" />{t('connected')}</span>
+        ? <span className="flex items-center gap-1 text-sm text-muted-foreground"><Check aria-hidden="true" className="size-4" />{t('connected')}</span>
         : <Button size="sm" variant="outline" disabled={disabled} onClick={onConnect}>{pending && <Spinner data-icon="inline-start" />}{t('connect')}</Button>}
     </ItemActions>
   </Item>
