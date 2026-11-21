@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { ownLiveRuntime } from '../../tests/support/live-runtime'
 import { HostedUsageStore } from './store'
 
 const target = process.env.E2E_DATABASE_URL
@@ -31,6 +32,13 @@ mock.module(new URL('../model-gateway/litellm-client.ts', import.meta.url).href,
 mock.module(new URL('./alerts.ts', import.meta.url).href, { namedExports: { checkAbuseAlerts: async () => {} } })
 
 test('hosted calls check positive balance, debit only after receipts, and resume after credit', { skip: !target }, async t => {
+  // Keep the real local fan-out covered when CI defaults to the cloud edition.
+  const environment: Record<string, string | undefined> = {
+    MIKKA_EDITION: 'community', BETTER_AUTH_URL: 'http://127.0.0.1:3000', BETTER_AUTH_SECRET: randomUUID(),
+    MIKKA_DATABASE_URL_UNPOOLED: target, DEVICE_GATEWAY_URL: undefined, DEVICE_GATEWAY_PUSH_SECRET: undefined, VERCEL: undefined,
+  }
+  const previous = Object.fromEntries(Object.keys(environment).map(name => [name, process.env[name]]))
+  let live: Awaited<ReturnType<typeof ownLiveRuntime>> | undefined
   const pool = new Pool({ connectionString: target })
   store = new HostedUsageStore(pool)
   let providerCalls = 0, cost = '0.000002', releaseFirst = () => {}, signalArrival = () => {}
@@ -46,12 +54,24 @@ test('hosted calls check positive balance, debit only after receipts, and resume
     }))
   })
   t.after(async () => {
-    releaseFirst()
-    server.closeAllConnections()
-    await new Promise<void>(resolve => server.close(() => resolve()))
-    const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
-    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
+    try {
+      releaseFirst()
+      server.closeAllConnections()
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      try { await live?.close() }
+      finally {
+        const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+        await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
+      }
+    } finally {
+      for (const [name, value] of Object.entries(previous))
+        if (value === undefined) delete process.env[name]; else process.env[name] = value
+    }
   })
+  for (const [name, value] of Object.entries(environment))
+    if (value === undefined) delete process.env[name]; else process.env[name] = value
+  assert.equal((await import('../builtin-gateway/config')).builtinGatewayConfig()?.mode, 'builtin')
+  live = await ownLiveRuntime(t)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
   const receive = async () => (await fetch(`http://127.0.0.1:${address.port}`, { method: 'POST' })).json()
