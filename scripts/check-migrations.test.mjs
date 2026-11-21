@@ -34,6 +34,8 @@ test('扩展迁移通过，新的删列必须独立说明已退役旧读写方',
   for (const sql of [
     'ALTER TABLE items DROP COLUMN old_title;',
     'ALTER TABLE items DROP old_title;',
+    'ALTER TABLE items DROP identity;',
+    'ALTER TABLE items DROP expression;',
     'ALTER TABLE "items" ADD COLUMN "title" text, DROP COLUMN IF EXISTS "oldTitle";',
     'DO $$ BEGIN ALTER TABLE items DROP COLUMN old_title; END $$;',
     "INSERT INTO notes(body) VALUES ('-- not a comment'); ALTER TABLE items DROP COLUMN old_title;",
@@ -44,6 +46,10 @@ test('扩展迁移通过，新的删列必须独立说明已退役旧读写方',
   assert.match(run([{ name, content: '-- migrate: contract\nALTER TABLE items DROP COLUMN old_title;' }]).join(), /新增迁移删除列/)
   assert.match(run([{ name, content: "SELECT '-- migrate: contract #2896 not a header';\nALTER TABLE items DROP COLUMN old_title;" }]).join(), /新增迁移删除列/)
   assert.deepEqual(run([{ name, content: '-- DROP COLUMN is documentation\nALTER TABLE items DROP CONSTRAINT old_constraint;' }]), [])
+  for (const action of ['IDENTITY', 'EXPRESSION', 'DEFAULT', 'NOT NULL']) {
+    assert.deepEqual(run([{ name, content: `ALTER TABLE items ALTER COLUMN id DROP ${action};` }]), [])
+    assert.match(run([{ name, content: `ALTER TABLE items ALTER COLUMN id DROP ${action}, DROP identity;` }]).join(), /新增迁移删除列/)
+  }
   assert.deepEqual(run([{ name, content: "INSERT INTO notes(body) VALUES ('ALTER TABLE items DROP COLUMN old_title');" }]), [])
   assert.deepEqual(run([{ name, content: 'ALTER TABLE "DROP COLUMN old_title" ADD COLUMN "new--title" text;' }]), [])
   const old = { name, content: 'ALTER TABLE items DROP COLUMN old_title;' }

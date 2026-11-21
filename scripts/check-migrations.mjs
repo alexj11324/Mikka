@@ -61,7 +61,8 @@ export function removesColumn(sql) {
   for (const match of statements.matchAll(/\bALTER\s+TABLE\b[^;]*/gi)) {
     // COLUMN is optional in PostgreSQL. Other DROP actions do not remove a
     // column; retain the ordinary migration checks for those operations.
-    if (/\bDROP\s+(?!(?:CONSTRAINT|DEFAULT|NOT\s+NULL|IDENTITY|EXPRESSION)\b)(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?(?:"(?:""|[^"])+"|[A-Za-z_][\w$]*)/i.test(match[0])) return true
+    const actions = match[0].replace(/\bALTER\s+(?:COLUMN\s+)?(?:"identifier"|[A-Za-z_][\w$]*)\s+DROP\s+(?:DEFAULT|NOT\s+NULL|IDENTITY(?:\s+IF\s+EXISTS)?|EXPRESSION(?:\s+IF\s+EXISTS)?)\b/gi, ' ')
+    if (/\bDROP\s+(?!CONSTRAINT\b)(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?(?:"(?:""|[^"])+"|[A-Za-z_][\w$]*)/i.test(actions)) return true
   }
   return false
 }
