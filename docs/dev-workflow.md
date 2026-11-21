@@ -99,7 +99,10 @@ provides:
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).
   If the box has no server, start one locally — e.g.
   `docker run -d --name mikka-pg -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e-local-only -e POSTGRES_DB=mikka_e2e -p 127.0.0.1:5432:5432 postgres:17`
-  — then `pnpm migrate`. A missing local dependency is installed, never a
+  — point the application URLs at it
+  (`export E2E_DATABASE_URL=postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e`
+  with `MIKKA_DATABASE_URL` and `DATABASE_URL` set to the same value), then
+  `pnpm migrate`. A missing local dependency is installed, never a
   reason to leave a database suite to CI.
 - **Chromium** for UI screenshots: the container's
   `/opt/pw-browsers/chromium`. Never run `playwright install`.
