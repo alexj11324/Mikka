@@ -595,7 +595,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     // line, with 重试 under it; a failure with its own reason (cloud, refusal, subscription, API balance) keeps its notice.
     const plainFailure = Boolean(data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance)
     const liveFailurePart: ThreadEntryPart = plainFailure
-      ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : t('failedTitle'), actions: <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
+      ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : noModel ? t('modelPicker.noModelSetUp') : t('failedTitle'), actions: noModel ? <><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button>{liveRaw && <RunErrorDetails code={liveRaw} />}</> : <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
       : { kind: 'error', text: t('failedTitle'), actions: failureNotice }
     const rows = [...items.filter(item => !staleEvents.has(item.position) && item.line?.kind !== 'runQuestion').map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
       ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))]
