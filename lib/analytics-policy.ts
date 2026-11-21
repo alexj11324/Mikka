@@ -130,6 +130,25 @@ function sanitizeExceptionEvent<T extends { event: string; properties: Record<st
   })
 }
 
+/** Acquisition metadata worth keeping on an event: tagged UTM values and the
+ * referring domain. Raw referring URLs (which can carry auth tokens) and
+ * arbitrary UTM values are never sent. */
+function acquisitionMetadata(properties: Record<string, unknown>) {
+  const kept: Record<string, unknown> = {}
+  const safeTag = (value: unknown) => typeof value === 'string' && value.length <= 80
+    && /^[a-z0-9][a-z0-9._-]*$/i.test(value) ? value.toLowerCase() : null
+  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']) {
+    const tag = safeTag(properties[key])
+    if (tag) kept[key] = tag
+  }
+  const referringDomain = properties.$referring_domain
+  if (typeof referringDomain === 'string' && referringDomain.length <= 253
+    && /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(referringDomain)) {
+    kept.$referring_domain = referringDomain.toLowerCase()
+  }
+  return kept
+}
+
 export function sanitizeAnalyticsEvent<T extends { event: string; properties: Record<string, unknown> }>(event: T | null): T | null {
   if (!event) return null
   if (event.event === '$exception') return sanitizeExceptionEvent(event)
@@ -145,5 +164,5 @@ export function sanitizeAnalyticsEvent<T extends { event: string; properties: Re
     for (const key of ['$set', '$set_once', '$unset']) Reflect.deleteProperty(snapshot, key)
     return snapshot
   }
-  return narrow(event)
+  return narrow(event, acquisitionMetadata(event.properties))
 }
