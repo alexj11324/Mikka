@@ -286,7 +286,7 @@ checks that the second leg still runs after the first fails.
 The94 task IDs and87 database-task inventory remain. All original1603 direct
 inputs survive, with runtime-off restoring the total to1604; the transitive
 path union is unchanged. All13 overlapping business-file blobs are unchanged.
-Of94 tasks,91 expanded input sets remain unchanged. This is a necessity
+Of94 tasks,91 direct-input sets remain unchanged. This is a necessity
 classification of the complete literal check, not an arbitrary deduplication
 target.
 
@@ -933,11 +933,15 @@ They were returned to Draft at05:26:54Z and05:26:56Z after the mismatch was
 observed and verified. The native actor does not identify the initiating
 person, session or configuration; later bot comments do not prove causation.
 
-The two triggered runs are44867361635/1,21jobs=19success/2skip, and
-44869057419/1,14jobs=11success/3skip. Each normal re-Draft event has11 job
-records: four observed runs and57 jobs total. Ready intervals are2707s and
-1403s, each n=1. These runs remain historical evidence, not permission to use
-an incomplete local handoff.
+The two sampled Ready CI runs are44867361635/1,21jobs=19success/2skip, and
+44869057419/1,14jobs=11success/3skip. The sampled re-Draft CI runs,
+44870930388/1 and44870933081/1, each have11 jobs=1success/2failure/8skip.
+These are **four sampled CI workflow runs and57 CI jobs**, not all workflows
+triggered by these state changes. Ready intervals are2707s and1403s, each n=1.
+The two separately observed Browser gate runs44867361613/1 and44869057436/1
+each contain one successful policy job and are excluded from that57-job
+sample; they do not establish real browser E2E. These historical CI results
+do not authorize an incomplete local handoff.
 
 At fixed main59b, the sole production Ready writer is the existing mark-ready
 script and it verifies its original receipt. The54 workflows have no Devin
@@ -946,6 +950,23 @@ repair. No new state toggler, polling agent or permission change is justified
 by the available evidence. The trigger remains an external integration Owner
 dependency. Separately proposed #3025 policy is unmerged and does not
 supersede current-main instructions or waive GitGuardian.
+
+A later independent sample is #3012 at unchanged
+`bd0a4fabb367406609ca30c87870d25ac10bf75b`: native Ready event36841805354
+at06:07:31Z names the same integration actor. Native correction event36843739516
+at06:50:54Z restores Draft, without a source change. That is2603s of Ready
+state, n=1, not delivery time. The observed Ready CI44874052817/1 has21 jobs:
+1 successful classifier,18 cancelled and2 skipped. The18 cancelled jobs have
+no steps and no allocated runner, so API start/end fields do not establish
+actual execution. Classifier136754710190 queues2067s and occupies a53s job
+interval; it is not effective source/test feedback. Browser gate44874052743/1,
+job136754709539, queues2094s and completes its4s policy job successfully;
+the existing echo gate does not execute browser tests. No first effective
+source/test feedback is observed in this sample. The automatic re-Draft
+CI44877476694/1 is queued when first read, with no completed result claimed.
+This third state observation is separate from the earlier two-PR/four-CI/57-job
+sample and does not establish the underlying external trigger or total
+workflow cost.
 
 ## F. One procedure and remaining acceptance
 
@@ -1061,9 +1082,13 @@ this remediation to change App settings, credentials or the original gate.
 
 Native main was refreshed at06:33 UTC:
 `7b68ba333e89b9d4e36ed3f69553b7c9bd28d2f4`, the normal#3014 merge.
-Its only changed files are lib/computer/store.ts and lib/computer/store.db.test.ts. The
-original#1752 and#1954 window/ownership records remain authoritative; no
-production action is performed by this remediation.
+Its only changed files are lib/computer/store.ts and lib/computer/store.db.test.ts.
+A later06:51 native refresh observes
+`6370dd8d522f480adbfa2e2a5443cc2849528f44`, normal#3027, with only the
+existing test-login decision changed. These are time-bound observations,
+not a claim that an earlier main remains current. Original#1752/#1954
+window and ownership records remain authoritative; no production action
+is performed by this remediation.
 
 The execution host is marked unavailable before workspace tests could start.
 One read-only host recovery attempt times out after45s. Native GitHub reads
