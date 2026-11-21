@@ -582,3 +582,13 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   3. 拦 AI 爬虫要区分训练 UA 和检索 UA：OpenAI（GPTBot / OAI-SearchBot）、
      Anthropic（ClaudeBot / Claude-SearchBot / Claude-User）都有两套，拦前者无损；
      **Perplexity 只有一个索引爬虫 PerplexityBot**，拦掉等于退出它的检索面。
+
+## 2026-11-19 · Figma 对照稿
+- 画 Mikka 设计稿前，先去「Mikka 三栏布局草图 v0」（zPe5LKycb2XuT1ivCLRw07）找现有约定和已接入的 shadcn 库，不要新建文件、自建组件。`get_libraries` 显示为空不代表没有库：直接 `search_design_system` 搜 "Button - Nova"，就能命中 Obra shadcn/ui kit 与 ReUI shadcn。
+- 抓竞品页面只用内置浏览器，不要切到 chrome-devtools 或别的浏览器。内置浏览器截图的分辨率受面板宽度限制，要高清图就请用户把面板拉宽，不要往页面里注入外部脚本。
+
+## 2026-11-19 · Figma 对照稿要画交互，并以 main 的实际界面为准
+- 用户纠正：只画了一张静态页面，没画右键菜单、筛选、显示设置、状态选择器、新建弹窗等交互状态；sidebar 入口也还是旧稿。
+- 规则：对照 Capy 画任何页面时，先在内置浏览器里把这一页的每个弹出层点一遍、截图（右键、⋯、筛选、显示、新建、二级菜单），再一页一页画 Mikka 版。
+- 规则：画之前先读 main 上的实际实现。侧栏的真实实现在私有层 `.hosted-ui`（capy-sidebar / app-frame），公开仓库的 `components/app-sidebar.tsx` 和 `nav-main.tsx` 已是死代码。文案取 `messages/en.json`。
+- 规则：Figma 里用 `resize()` 改过尺寸的 auto-layout 容器，主轴会被锁成 FIXED，要再设 `primaryAxisSizingMode="AUTO"`，否则内容会被裁掉。
