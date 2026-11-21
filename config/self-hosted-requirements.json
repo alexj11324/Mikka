@@ -125,6 +125,20 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/archive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply the selected archive state under current Organization, Workspace and Project authority and return the original immutable-head Volume.",
+    "test": "lib/drive/organization-archive-http.db.test.mjs",
+    "suite": "test:drive-db"
+  },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/unarchive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply the selected archive state under current Organization, Workspace and Project authority and return the original immutable-head Volume.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive/[volumeId]/file-versions/route.ts": {
     "mode": "built-in",
     "environment": [],

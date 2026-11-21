@@ -4,6 +4,8 @@ import { pool } from '@/lib/db'
 import { withOrganizationDriveRead, type OrganizationDriveProject } from './organization-read'
 import type { DriveScope } from './contract'
 import { listOrganizationVolumeSkills } from './skills'
+import { organizationVolumeSelect, serializeOrganizationVolume, type OrganizationVolumeRow } from './volumes'
+export type { OrganizationDriveVolume } from './volumes'
 
 const optionalId = z.string().min(1).max(200).optional()
 const scopeDirectoryQuery = z.object({
@@ -45,23 +47,15 @@ const scopedVolumes = `WITH project_scopes AS MATERIALIZED (
     SELECT * FROM scopes WHERE ($5::uuid IS NULL OR project_id=$5) AND ($6::text IS NULL OR user_id=$6)
       AND (NOT $7::boolean OR ((project_id IS NULL)=($5::uuid IS NULL) AND (user_id IS NULL)=($6::text IS NULL)))
   ), volumes AS MATERIALIZED (
-    SELECT v.id,v.name,v."headVersionId",v."headDigest",v."entryCount",v."totalBytes",v."archivedAt",
-      v."ownerId",s.workspace_id,s.scope,s.project_id,s.user_id,h."createdAt" AS head_at
-    FROM selected_scopes s JOIN drive_volumes v ON v."workspaceId"=s.workspace_id AND v."driveScope"=s.scope
+    ${organizationVolumeSelect}
+    JOIN selected_scopes s ON v."workspaceId"=s.workspace_id AND v."driveScope"=s.scope
       AND v."scopeId"=s.scope_id AND v."ownerId"=s.owner_id
       AND v."scopeUserId" IS NOT DISTINCT FROM (CASE WHEN s.scope='project-user' THEN s.user_id END)
-    JOIN drive_volume_versions h ON h.id=v."headVersionId" AND h."volumeId"=v.id AND h."ownerId"=v."ownerId"
     WHERE (v."archivedAt" IS NOT NULL)=$8::boolean
   )`
 
 function scopeParams(workspaces: string[], reader: string, projects: OrganizationDriveProject[], projectId?: string, userId?: string, exact = false, archived = false) {
   return [workspaces, reader, projects.map(p => p.id), projects.map(p => p.workspaceId), projectId ?? null, userId ?? null, exact, archived]
-}
-
-export type OrganizationDriveVolume = {
-  id: string; namespace: string; name: string; workspaceId: string; driveScope: DriveScope; projectId: string | null; userId: string | null
-  automationId: null; description: null; archived: boolean; headVersionId: string; headDigest: string
-  fileCount: number; totalBytes: number; headUpdatedAt: string
 }
 
 export function listOrganizationDriveVolumes(organizationId: string, reader: string, sessionId: string, search: URLSearchParams) {
@@ -71,12 +65,9 @@ export function listOrganizationDriveVolumes(organizationId: string, reader: str
     (ws, actor) => unsupported || filters.exactScope && !filters.projectId ? Promise.resolve([]) : readableProjects(ws, actor, filters.projectId),
     async (app, workspaces, projects) => {
       if (unsupported) return []
-      const result = await app.query<Omit<OrganizationDriveVolume, 'headUpdatedAt'> & { headUpdatedAt: Date }>(`${scopedVolumes}
-        SELECT id,name,"ownerId" AS namespace,workspace_id AS "workspaceId",scope AS "driveScope",project_id AS "projectId",
-          user_id AS "userId",NULL AS "automationId",NULL AS description,"archivedAt" IS NOT NULL AS archived,
-          "headVersionId","headDigest","entryCount" AS "fileCount","totalBytes"::float8 AS "totalBytes",head_at AS "headUpdatedAt"
-        FROM volumes ORDER BY head_at DESC,id`, scopeParams(workspaces, reader, projects, filters.projectId, filters.userId, !!filters.exactScope, filters.archived === 'true'))
-      return result.rows.map(volume => ({ ...volume, headUpdatedAt: volume.headUpdatedAt.toISOString() }))
+      const result = await app.query<OrganizationVolumeRow>(`${scopedVolumes} SELECT * FROM volumes ORDER BY "headUpdatedAt" DESC,id`,
+        scopeParams(workspaces, reader, projects, filters.projectId, filters.userId, !!filters.exactScope, filters.archived === 'true'))
+      return result.rows.map(serializeOrganizationVolume)
     })
 }
 
@@ -109,10 +100,10 @@ export function organizationDriveScopeDirectory(organizationId: string, reader: 
       // Sum its admitted Workspaces before paging so selecting the row returns the same volumes.
       const result = await app.query<Omit<OrganizationDriveScopePage,'storage'>>(`${scopedVolumes}, grouped AS (
           SELECT s.scope AS "driveScope",s.project_id AS "projectId",s.user_id AS "userId",
-            NULL::text AS "automationId",coalesce(sum(v."entryCount"),0)::float8 AS "fileCount",
-            coalesce(sum(v."totalBytes"),0)::float8 AS "totalBytes",max(v.head_at) AS "headUpdatedAt"
-          FROM selected_scopes s LEFT JOIN volumes v ON v.workspace_id=s.workspace_id AND v.scope=s.scope
-            AND v.project_id IS NOT DISTINCT FROM s.project_id AND v.user_id IS NOT DISTINCT FROM s.user_id
+            NULL::text AS "automationId",coalesce(sum(v."fileCount"),0)::float8 AS "fileCount",
+            coalesce(sum(v."totalBytes"),0)::float8 AS "totalBytes",max(v."headUpdatedAt") AS "headUpdatedAt"
+          FROM selected_scopes s LEFT JOIN volumes v ON v."workspaceId"=s.workspace_id AND v."driveScope"=s.scope
+            AND v."projectId" IS NOT DISTINCT FROM s.project_id::text AND v."userId" IS NOT DISTINCT FROM s.user_id
           GROUP BY s.scope,s.project_id,s.user_id
         ), tally AS (
           SELECT count(*)::integer AS "totalScopes",greatest(1,ceil(count(*)::numeric/50)::integer) AS "pageCount" FROM grouped

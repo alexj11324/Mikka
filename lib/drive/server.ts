@@ -16,7 +16,7 @@ import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
 import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
-import { createDriveVolume, findDriveVolumeLocation, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
+import { createDriveVolume, findDriveVolumeLocation, listDriveVolumes, readDriveVolume, setOrganizationDriveArchive, setPersonalDriveArchive } from './volumes'
 import { driveFileLocation, organizationDriveVersionFileUrl } from './location'
 import { driveErrorBody, driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
@@ -61,8 +61,9 @@ export async function driveResponse(request: Request, operation: Operation, para
     const viewId = operation === 'shareView' ? z.uuid().parse(params.shareId) : null
     if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
     let located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
+    const organizationArchive = !!params.organizationId && (operation === 'archive' || operation === 'unarchive')
     const organizationVolumeOperation = params.organizationId && (operation === 'version' || operation === 'history' || operation === 'restore' || operation === 'links')
-    if (organizationVolumeOperation && search.size) throw new DriveError('drive_write_invalid', 400)
+    if ((organizationArchive || organizationVolumeOperation) && search.size) throw new DriveError('drive_write_invalid', 400)
     const versionFile = operation === 'organizationVersionFile'
       ? { versionId: versionId.parse(params.versionId), sha256: digest.parse(params.sha256), organizationId: z.uuid().parse(params.organizationId) } : null
     if (versionFile && (search.size > 1 || search.size === 1 && !search.has('download'))) throw new DriveError('drive_write_invalid', 400)
@@ -71,7 +72,9 @@ export async function driveResponse(request: Request, operation: Operation, para
       if ([...search.keys()].some(key => key !== 'path') || search.getAll('path').length !== 1) throw new DriveError('drive_write_invalid', 400)
       historyPath = z.string().refine(isDrivePath).parse(search.get('path'))
     }
-    if (historyPath !== undefined || organizationVolumeOperation || versionFile) located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id)
+    if (historyPath !== undefined || organizationArchive || organizationVolumeOperation || versionFile) {
+      located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id, organizationArchive)
+    }
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
     if (located) {
       const selected = workspaceSelection(request.headers)
@@ -152,6 +155,11 @@ export async function driveResponse(request: Request, operation: Operation, para
       }
       if (operation === 'archive' || operation === 'unarchive') {
         const archived = operation === 'archive'
+        if (organizationArchive && located) {
+          const result = await setOrganizationDriveArchive(pool, actor, located.volumeId, archived)
+          changed = result.changed
+          return json(result.volume)
+        }
         changed = await setPersonalDriveArchive(pool, actor, params.volumeId, archived)
         return json({ archived })
       }

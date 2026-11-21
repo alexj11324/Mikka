@@ -131,13 +131,34 @@ export async function listDriveVolumes(
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
+export type OrganizationDriveVolume = {
+  id: string; namespace: string; name: string; workspaceId: string; driveScope: DriveScope; projectId: string | null; userId: string | null
+  automationId: null; description: null; archived: boolean; headVersionId: string; headDigest: string
+  fileCount: number; totalBytes: number; headUpdatedAt: string
+}
+
+export type OrganizationVolumeRow = Omit<OrganizationDriveVolume, 'headUpdatedAt'> & { headUpdatedAt: Date }
+
+/** Both the directory and an archive transition describe the same stored volume
+ * and immutable head. Visibility and scope filters belong to the calling read or writer. */
+export const organizationVolumeSelect = `SELECT v.id,v.name,v."ownerId" AS namespace,v."workspaceId",v."driveScope",
+  CASE WHEN v."driveScope" IN ('project','project-user') THEN v."scopeId" END AS "projectId",
+  CASE WHEN v."driveScope"='user' THEN v."scopeId" ELSE v."scopeUserId" END AS "userId",
+  NULL::text AS "automationId",NULL::text AS description,v."archivedAt" IS NOT NULL AS archived,
+  v."headVersionId",v."headDigest",v."entryCount" AS "fileCount",v."totalBytes"::float8 AS "totalBytes",h."createdAt" AS "headUpdatedAt"
+  FROM drive_volumes v JOIN drive_volume_versions h ON h.id=v."headVersionId" AND h."volumeId"=v.id AND h."ownerId"=v."ownerId"`
+
+export function serializeOrganizationVolume(volume: OrganizationVolumeRow): OrganizationDriveVolume {
+  return { ...volume, headUpdatedAt: volume.headUpdatedAt.toISOString() }
+}
+
 /** Resolve only the location. Workspace admission, Organization attachment,
  * and the original volume and Project authorization still precede any data. */
-export async function findDriveVolumeLocation(database: Pick<PoolClient, 'query'>, volumeId: string, reader: string): Promise<DriveVolumeLocation> {
+export async function findDriveVolumeLocation(database: Pick<PoolClient, 'query'>, volumeId: string, reader: string, includeArchived = false): Promise<DriveVolumeLocation> {
   const { rows: [location] } = await database.query<DriveVolumeLocation>(`SELECT id AS "volumeId","workspaceId","driveScope",
       CASE WHEN "driveScope" IN ('project','project-user') THEN "scopeId" END AS "projectId"
-    FROM drive_volumes WHERE id=$1 AND "workspaceId" IS NOT NULL AND "archivedAt" IS NULL
-      AND ("driveScope" IN ('team-workspace','project') OR "ownerId"=$2 AND "driveScope" IN ('user','project-user'))`, [volumeId, reader])
+    FROM drive_volumes WHERE id=$1 AND "workspaceId" IS NOT NULL AND ($3::boolean OR "archivedAt" IS NULL)
+      AND ("driveScope" IN ('team-workspace','project') OR "ownerId"=$2 AND "driveScope" IN ('user','project-user'))`, [volumeId, reader, includeArchived])
   if (!location) throw new DriveVolumeError('drive_not_found', 404)
   return location
 }
@@ -170,13 +191,29 @@ export async function readDriveVolume(
   return { ...row, totalBytes: Number(row.totalBytes) }
 }
 
-/** The row lock also serializes this transition with the content store's CAS. */
-export async function setPersonalDriveArchive(
-  database: { connect: Pool['connect'] },
-  actor: VolumeReader & { workspaceId: string },
+type ArchiveDatabase = { connect: Pool['connect'] }
+type ArchiveActor = VolumeReader & { workspaceId: string }
+
+export function setPersonalDriveArchive(database: ArchiveDatabase, actor: ArchiveActor, volumeId: string | undefined, archived: boolean): Promise<boolean> {
+  return withDriveArchive(database, actor, volumeId, archived, (_client, changed) => changed)
+}
+
+export function setOrganizationDriveArchive(database: ArchiveDatabase, actor: ArchiveActor, volumeId: string, archived: boolean) {
+  return withDriveArchive(database, actor, volumeId, archived, async (client, changed) => {
+    const { rows: [volume] } = await client.query<OrganizationVolumeRow>(`${organizationVolumeSelect} WHERE v.id=$1 AND v."ownerId"=$2`, [volumeId, actor.ownerId])
+    if (!volume) throw new DriveVolumeError('drive_not_found', 404)
+    return { changed, volume: serializeOrganizationVolume(volume) }
+  })
+}
+
+/** The row lock serializes archive, its response and the content store's CAS. */
+async function withDriveArchive<T>(
+  database: ArchiveDatabase,
+  actor: ArchiveActor,
   volumeId: string | undefined,
   archived: boolean,
-): Promise<boolean> {
+  result: (client: PoolClient, changed: boolean) => T | Promise<T>,
+): Promise<T> {
   if (!isVolumeId(volumeId)) throw new DriveVolumeError('drive_not_found', 404)
   const client = await database.connect()
   try {
@@ -191,8 +228,9 @@ export async function setPersonalDriveArchive(
     if (changed) await client.query(
       `UPDATE drive_volumes SET "archivedAt"=CASE WHEN $2::boolean THEN now() END, "updatedAt"=now() WHERE id=$1`,
       [volumeId, archived])
+    const value = await result(client, changed)
     await client.query('COMMIT')
-    return changed
+    return value
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {})
     throw error

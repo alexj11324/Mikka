@@ -98,6 +98,8 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     ['/api/drive/shares', ['GET']],
     ['/api/drive/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive-shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['PATCH', 'DELETE']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/archive', ['POST']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/unarchive', ['POST']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/restore', ['POST']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000', ['GET']],

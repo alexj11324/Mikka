@@ -168,6 +168,12 @@ export function readArchivedDriveVolumes(location: DriveLocation, before?: strin
   return request<DriveVolumePage>(url(location, '', { archived: 'true', before }), {}, send)
 }
 
+export function setOrganizationDriveArchived(organizationId: string, volumeId: string, archived: boolean, send?: typeof fetch) {
+  const operation = archived ? 'archive' : 'unarchive'
+  const target = withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/${operation}`)
+  return request<OrganizationDriveVolume>(target, { method: 'POST' }, send)
+}
+
 export function setPersonalDriveArchive(location: DriveLocation, volumeId: string, archived: boolean, send?: typeof fetch) {
   const operation = archived ? 'archive' : 'unarchive'
   return request<{ archived: boolean }>(url(location, `/${encodeURIComponent(volumeId)}/${operation}`), { method: 'POST' }, send)
