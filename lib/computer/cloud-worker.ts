@@ -9,6 +9,7 @@ import { CloudWorkerError } from './worker-error'
 import { CLOUD_WORKER_COMMAND } from './worker-command'
 import { desktopGitHubConfig, installDesktopGitHub } from './desktop-github'
 import { deviceIsOnline } from '../device-presence'
+import { DEVICE_REGISTRATION_CHANNEL, subscribeShared } from '../db/listen'
 
 type Actor = { userId: string; workspaceId: string }
 
@@ -50,13 +51,22 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
     // variable set in the claim response (taskEnv) and the hosted runner passes only that into the task container.
     await sandbox.commands.run(`{ ${CLOUD_WORKER_COMMAND}; } > /home/user/.mikka/worker-bootstrap.log 2>&1`, { user: 'user', background: true, timeoutMs: 0 })
     const deadline = Date.now() + 30_000
-    do {
-      const ready = await pool.query(`SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id
-        WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND d."lastSeenAt">=$3
-          AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3`, [credential.deviceId, actor.userId, started, hash])
-      if (ready.rowCount) return { deviceId: credential.deviceId }
-      await new Promise(resolve => setTimeout(resolve, 500))
-    } while (Date.now() < deadline)
+    // Subscribe before the first read so a heartbeat during that read is retained.
+    const registration = await subscribeShared(pool, DEVICE_REGISTRATION_CHANNEL, [credential.deviceId]).catch(() => null)
+    try {
+      let ready = false
+      do {
+        registration?.reset()
+        ready = Boolean((await pool.query(`SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id
+          WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND d."lastSeenAt">=$3
+            AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3`, [credential.deviceId, actor.userId, started, hash])).rowCount)
+        if (ready) return { deviceId: credential.deviceId }
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) break
+        if (!registration || registration.lost) await new Promise(resolve => setTimeout(resolve, Math.min(500, remaining)))
+        else await registration.next(remaining)
+      } while (Date.now() < deadline)
+    } finally { registration?.close() }
     throw new CloudWorkerError('worker_not_registered', sandbox.sandboxId)
   } finally {
     // A generation-specific path prevents a stale handoff deleting a newer one.

@@ -148,8 +148,6 @@ export interface DaemonOptions {
    * Subscription-quota reader. Omitted or `null`: no polling.
    */
   quotaSource?: QuotaSource | null
-  /** Ignored when it is below the poller's minimum interval. */
-  quotaPollMs?: number
   /**
    * How real agent CLIs start; they run directly by default (decision
    * 2026-11-01-2335). `null` offers only the mock harness.
@@ -677,14 +675,10 @@ export class Daemon {
     sweepModelProbeHomes(paths.dataDir)
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
-    // The person's own logins are never read (devices are runners), so only
-    // an injected source polls.
+    // The person's own logins are never read at startup. Provider quota is
+    // fetched only when the desktop explicitly requests a snapshot.
     if (!hosted && this.options.quotaSource) {
-      this.quota = new QuotaPoller(
-        this.options.quotaSource,
-        { log: this.log, intervalMs: this.options.quotaPollMs }
-      )
-      this.quota.start()
+      this.quota = new QuotaPoller(this.options.quotaSource, { log: this.log })
     }
     this.log.info(
       {
@@ -1873,7 +1867,11 @@ export class Daemon {
   private handlers(): RpcHandlers {
     return {
       "daemon.status": () => this.status(),
-      "quota.snapshot": () => this.quota?.snapshot() ?? unknownQuotaReport(),
+      "quota.snapshot": async () => {
+        if (!this.quota) return unknownQuotaReport()
+        await this.quota.refresh()
+        return this.quota.snapshot()
+      },
       "daemon.drain": () => {
         this.draining = true
         // Give the response time to reach the caller before sockets close.

@@ -7,7 +7,7 @@ import { Daemon } from "../src/main"
 import type { QuotaSource } from "../src/quota/poller"
 import { connectDaemonInDataDir } from "../src/rpc/client"
 import { MemoryServer } from "../src/server-link"
-import { cleanupTempDirs, tempDir, waitFor } from "./helpers"
+import { cleanupTempDirs, tempDir } from "./helpers"
 
 const SECRET = "sk-ant-api03-daemonheartbeatleak"
 const CLIENT = { name: "test", version: "0" }
@@ -30,9 +30,11 @@ describe("quota on the daemon", () => {
         },
       }
     )
+    let reads = 0
     const source: QuotaSource = {
       id: "local_credentials",
       read() {
+        reads += 1
         return Promise.reject(new Error(`Bearer ${SECRET}`))
       },
     }
@@ -49,13 +51,10 @@ describe("quota on the daemon", () => {
       quotaSource: source,
     }).start()
     daemons.push(daemon)
-    await waitFor(() =>
-      lines.some((line) => line.includes("quota refresh failed"))
-    )
-    expect(lines.join("\n")).not.toContain(SECRET)
-    expect(lines.join("\n")).toContain("[REDACTED]")
-
     await daemon.syncWithServer()
+    expect(reads).toBe(0)
+    expect(lines.join("\n")).not.toContain("quota refresh failed")
+    expect(lines.join("\n")).not.toContain(SECRET)
     const sent = server.devices.get("device-1")?.reports.at(-1)
     expect(JSON.stringify(server.devices.get("device-1")?.reports)).not.toContain(SECRET)
     const quotas = sent?.quotas ?? []
@@ -66,6 +65,9 @@ describe("quota on the daemon", () => {
 
     const client = await connectDaemonInDataDir(dataDir, CLIENT)
     const report = await client.request("quota.snapshot")
+    expect(reads).toBe(1)
+    expect(lines.join("\n")).toContain("quota refresh failed")
+    expect(lines.join("\n")).toContain("[REDACTED]")
     expect(report.quotas.every((quota) => quota.status === "unknown")).toBe(
       true
     )

@@ -637,6 +637,8 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.scripts.includes('test:coordinator-native'))
   assert.ok(plan.files.includes('lib/coordinator/native-store.test.ts'))
   assert.ok(plan.scripts.includes('test:eve-db'))
+  assert.ok(plan.scripts.includes('test:eve-graphile-db'))
+  assert.ok(plan.files.includes('tests/eve-runtime-graphile-event-driven.db.test.mjs'))
   for (const file of ['approval-bridge', 'scheduled-read', 'scope', 'settlement', 'sandbox', 'evaluation-store']) assert.ok(plan.files.includes(`lib/eve/${file}.db.test.ts`))
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   assert.ok(plan.scripts.includes('test:factory'))

@@ -1,5 +1,5 @@
 'use server'
-import { ownerIssueListsChanged } from '@/lib/live/lists'
+import { ownerIssueListsChanged, ownerWorkspaceSettingsChanged, workspaceListChanged } from '@/lib/live/lists'
 
 import { cookies } from '@/lib/server-runtime/headers'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
@@ -85,6 +85,7 @@ export async function enableLinearTeam(input: { teamId: string; workspaceId?: st
     if (current) await tx.update(linearTeamSyncs).set({ workspaceId: context.workspace.id, linearTeamKey: team.key, linearTeamName: team.name, active: true, lastError: null, lastErrorAt: null, updatedAt: now }).where(eq(linearTeamSyncs.id, current.id))
     else await tx.insert(linearTeamSyncs).values({ id: crypto.randomUUID(), ownerId: user.id, workspaceId: context.workspace.id, linearTeamId: team.id, linearTeamKey: team.key, linearTeamName: team.name, active: true, updatedAt: now })
     if (!existing || existing.linearTeamKey !== team.key) await ownerIssueListsChanged(tx, user.id)
+    await workspaceListChanged(tx, context.workspace.id, ['workspace_settings'])
   }))
   return { success: true as const }
 }
@@ -94,14 +95,17 @@ export async function disableLinearTeam(id: string, workspaceId?: string) {
   const context = await loadWorkspaceContext(workspaceId, user)
   const parsed = z.uuid().safeParse(id)
   if (!parsed.success) return { error: 'linearTeamInvalid' as const }
-  return withTaskWorkspace(user, context.workspace.id, async () => {
+  return withTaskWorkspace(user, context.workspace.id, async () => db.transaction(async tx => {
     const binding = and(eq(linearTeamSyncs.id, parsed.data), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id))
-    const [changed] = await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() })
+    const [changed] = await tx.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() })
       .where(and(binding, eq(linearTeamSyncs.active, true))).returning({ id: linearTeamSyncs.id })
-    if (changed) return { success: true as const }
-    const [row] = await db.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs).where(binding).limit(1)
+    if (changed) {
+      await workspaceListChanged(tx, context.workspace.id, ['workspace_settings'])
+      return { success: true as const }
+    }
+    const [row] = await tx.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs).where(binding).limit(1)
     return row ? { success: true as const } : { error: 'linearTeamUnavailable' as const }
-  })
+  }))
 }
 
 export async function retryLinearIssue(issueId: string) {
@@ -133,6 +137,7 @@ export async function retryLinearIssue(issueId: string) {
       else await tx.insert(linearSyncOutbox).values({ id: crypto.randomUUID(), issueId: issue.id, scopeVersion: latest.scopeVersion }).onConflictDoNothing()
     }
     await tx.update(linearIssueLinks).set({ syncStatus: 'pending', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.issueId, issue.id))
+    if (latest.workspaceId) await workspaceListChanged(tx, latest.workspaceId, ['workspace_settings'])
     return { success: true as const }
   })
   if ('error' in result) return result
@@ -149,7 +154,10 @@ export async function retryLinearDelivery(deliveryId: string) {
     .innerJoin(linearConnections, and(eq(linearConnections.organizationId, linearSyncInbox.organizationId), eq(linearConnections.userId, user.id)))
     .where(and(eq(linearSyncInbox.deliveryId, parsed.data), eq(linearSyncInbox.status, 'failed'), isNull(linearConnections.revokedAt))).limit(1)
   if (!delivery) return { error: 'linearDeliveryUnavailable' as const }
-  await db.update(linearSyncInbox).set({ status: 'queued', attempts: 0, availableAt: new Date(), lastError: null }).where(eq(linearSyncInbox.deliveryId, delivery.id))
+  await db.transaction(async tx => {
+    await tx.update(linearSyncInbox).set({ status: 'queued', attempts: 0, availableAt: new Date(), lastError: null }).where(eq(linearSyncInbox.deliveryId, delivery.id))
+    await ownerWorkspaceSettingsChanged(tx, user.id)
+  })
   dispatchLinearWebhook(delivery.id)
   return { success: true as const }
 }

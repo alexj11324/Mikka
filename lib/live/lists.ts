@@ -200,6 +200,17 @@ export async function ownerSettingsTargets(_database: Database, workspaceDatabas
 /** Best effort: an action that already succeeded never fails on its invalidation (the page's own response updates it). */
 export const ownerSettingsChanged = (executor: object, ownerId: string) => changed(executor, `owner-settings:${ownerId}`, (database, workspace) => ownerSettingsTargets(database, workspace, ownerId))
   .catch(() => console.warn('[live] settings invalidation unavailable'))
+/** A Linear connection is owner-specific, but its settings appear in each of
+ * that owner's active workspaces. Publish only a content-free settings event
+ * to those owner channels after the connection transaction commits. */
+export async function ownerWorkspaceSettingsTargets(_database: Database, workspace: Database, ownerId: string): Promise<Target[]> {
+  const { rows } = await workspace.query<LiveScope>(`SELECT m."userId" AS "ownerId",w.id AS "workspaceId"
+    FROM mikka_workspaces w JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m.status='active'
+    WHERE m."userId"=$1 AND (w.kind='team' OR w."userId"=$1)`, [ownerId])
+  return rows.map(scope => target(scope, ['workspace_settings']))
+}
+export const ownerWorkspaceSettingsChanged = (executor: object, ownerId: string) => changed(executor, `owner-workspace-settings:${ownerId}`, (database, workspace) => ownerWorkspaceSettingsTargets(database, workspace, ownerId))
+  .catch(() => console.warn('[live] workspace settings invalidation unavailable'))
 
 /** The account's workspace directory and personal issue identifiers are read
  * across selected workspaces. Their transport still uses the actual owned

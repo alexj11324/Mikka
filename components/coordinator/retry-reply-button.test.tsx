@@ -439,20 +439,20 @@ test('a sent message that quotes a reply shows the quote above its words, and ev
 })
 
 
-test('an idle page detects the new build on its minute probe and keeps the draft mounted', async t => {
+test('an idle page does not poll for build changes and keeps the draft mounted', async t => {
   t.mock.timers.enable({ apis: ['setInterval'] })
   const page = () => <><VersionGuard /><Textarea defaultValue="keep this draft" /></>
   await act(async () => root.render(page()))
   const draft = container.querySelector('textarea')!
   serverVersion = { build: 'fixture-new' }
   await act(async () => t.mock.timers.tick(60_000))
-  assert.equal(versionReads, 2)
-  assert.match(document.querySelector('[role="alertdialog"]')?.textContent ?? '', /Common.refresh/)
+  assert.equal(versionReads, 1, 'idle tabs do not request public build metadata')
+  assert.equal(document.querySelector('[role="alertdialog"]'), null)
   assert.equal(container.querySelector('textarea'), draft)
   assert.equal(draft.value, 'keep this draft')
   await act(async () => root.render(null))
   await act(async () => t.mock.timers.tick(60_000))
-  assert.equal(versionReads, 2, 'unmount clears the probe')
+  assert.equal(versionReads, 1, 'unmount leaves no periodic probe')
 })
 
 // A [Welcome] turn that failed (store.failTurn): the chat as chatView reads it.

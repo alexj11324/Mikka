@@ -49,7 +49,7 @@ test('a background check opens no dialog; only a downloaded update reaches the r
   assert.deepEqual(ready, ['0.2.0'])
   assert.deepEqual(reports, [])
 
-  // Once downloaded, periodic checks stop.
+  // Once downloaded, another explicit check reuses the ready version.
   await updates.check(false)
   assert.equal(updater.checks, 1)
 })

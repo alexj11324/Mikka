@@ -369,7 +369,13 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     const require = createRequire(import.meta.url)
     const esbuild = require(require.resolve('esbuild', { paths: [require.resolve('tsx')] }))
     const bundle = join(directory, 'browser.js')
-    await esbuild.build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{NextIntlClientProvider}from'@/lib/intl/i18n-client';import{SubscriptionSettings}from'./components/settings/subscription-settings';import messages from './messages/en.json';createRoot(document.getElementById('root')).render(<NextIntlClientProvider locale="en" messages={messages}><SubscriptionSettings userKey="browser-owner" workspaceId="${workspaceId}"/></NextIntlClientProvider>);`, resolveDir: root, loader: 'tsx' }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', tsconfig: resolve(root, 'tsconfig.json'), define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '""' }, logLevel: 'silent' })
+    await esbuild.build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{NextIntlClientProvider}from'@/lib/intl/i18n-client';import{SubscriptionSettings}from'./components/settings/subscription-settings';import messages from './messages/en.json';createRoot(document.getElementById('root')).render(<NextIntlClientProvider locale="en" messages={messages}><SubscriptionSettings userKey="browser-owner" workspaceId="${workspaceId}"/></NextIntlClientProvider>);`, resolveDir: root, loader: 'tsx' }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', tsconfig: resolve(root, 'tsconfig.json'), define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '""' }, plugins: [{
+      name: 'stub-model-order-server-action',
+      setup(build) {
+        build.onResolve({ filter: /^@\/app\/actions\/model-order$/ }, () => ({ path: 'model-order-action', namespace: 'fixture' }))
+        build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export async function refreshSubscriptionModels() { return { error: "fixture-only" } }', loader: 'js' }))
+      }
+    }], logLevel: 'silent' })
     browserServer = createServer(async (incoming, outgoing) => {
       try {
         const url = `http://127.0.0.1:${browserServer.address().port}${incoming.url}`

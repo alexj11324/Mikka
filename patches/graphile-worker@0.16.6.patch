@@ -1,0 +1,222 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 786642f..2315d33 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -51,8 +51,10 @@ declare global {
+              */
+             maxPoolSize?: number;
+             /**
+-             *
+-             * @defaultValue `2000` */
++             * Milliseconds between idle job fetches. Set to `0` to disable idle
++             * polling; LISTEN/NOTIFY wakes workers and `run_at` schedules delayed jobs.
++             * @defaultValue `2000`
++             */
+             pollInterval?: number;
+             /** @defaultValue `true` */
+             preparedStatements?: boolean;
+diff --git a/dist/main.js b/dist/main.js
+index ba652d6..4e767c9 100644
+--- a/dist/main.js
++++ b/dist/main.js
+@@ -152,7 +152,7 @@ function runTaskList(rawOptions, tasks, pgPool) {
+ }
+ exports.runTaskList = runTaskList;
+ function runTaskListInternal(compiledSharedOptions, tasks, pgPool) {
+-    const { events, logger, resolvedPreset: { worker: { minResetLockedInterval, maxResetLockedInterval }, }, } = compiledSharedOptions;
++    const { events, logger, resolvedPreset: { worker: { minResetLockedInterval, maxResetLockedInterval, pollInterval }, }, } = compiledSharedOptions;
+     const withPgClient = (0, lib_1.makeEnhancedWithPgClient)((0, helpers_1.makeWithPgClientFromPool)(pgPool));
+     const workerPool = _runTaskList(compiledSharedOptions, tasks, withPgClient, {
+         continuous: true,
+@@ -331,8 +331,14 @@ function runTaskListInternal(compiledSharedOptions, tasks, pgPool) {
+         client.on("notification", handleNotification);
+         // Subscribe to jobs:insert message
+         client.query('LISTEN "jobs:insert"; LISTEN "worker:migrate";').then(() => {
+-            // Successful listen; reset attempts
++            // Successful listen; reset attempts. Event-driven workers may have
++            // missed enqueues while disconnected, so catch up after LISTEN is active.
+             attempts = 0;
++            if (pollInterval === 0) {
++                for (const worker of workerPool._workers) {
++                    worker.nudge();
++                }
++            }
+         }, onErrorReleaseClientAndTryAgain);
+         const supportedTaskNames = Object.keys(tasks);
+         logger.info(`Worker connected and looking for jobs... (task names: '${supportedTaskNames.join("', '")}')`);
+diff --git a/dist/sql/getJob.js b/dist/sql/getJob.js
+index 70cc9b4..98ef811 100644
+--- a/dist/sql/getJob.js
++++ b/dist/sql/getJob.js
+@@ -168,4 +168,38 @@ with j as (
+     }
+ }
+ exports.getJob = getJob;
+-//# sourceMappingURL=getJob.js.map
+\ No newline at end of file
++//# sourceMappingURL=getJob.js.map
++/**
++ * Return the delay until the next eligible delayed job, without claiming a job.
++ * Used only by event-driven workers to sleep until durable `run_at` work is due.
++ */
++async function getNextRunDelay(compiledSharedOptions, withPgClient, tasks) {
++    const { escapedWorkerSchema, workerSchema, resolvedPreset: { worker: { preparedStatements }, }, } = compiledSharedOptions;
++    const taskDetailsPromise = (0, taskIdentifiers_1.getTaskDetails)(compiledSharedOptions, withPgClient, tasks);
++    const taskDetails = isPromise(taskDetailsPromise) ? await taskDetailsPromise : taskDetailsPromise;
++    const values = [taskDetails.taskIds];
++    const flagsClause = "";
++    const { rows: [row], } = await withPgClient.withRetries((client) => client.query({
++        text: `\
++select case when next_job.run_at is null then null
++  else greatest(1, ceil(extract(epoch from (next_job.run_at - now())) * 1000))::bigint
++end as delay_ms
++from (
++  select min(jobs.run_at) as run_at
++  from ${escapedWorkerSchema}._private_jobs as jobs
++  where jobs.is_available = true
++    and jobs.run_at > now()
++    and jobs.task_id = any($1::int[])
++    ${flagsClause}
++    and (jobs.job_queue_id is null or exists (
++      select 1
++      from ${escapedWorkerSchema}._private_job_queues as job_queues
++      where job_queues.id = jobs.job_queue_id and job_queues.is_available = true
++    ))
++) as next_job`,
++        values,
++        name: !preparedStatements ? undefined : `next_run_delay/${workerSchema}${flagsClause ? "F" : ""}`,
++    }));
++    return row?.delay_ms == null ? null : Number(row.delay_ms);
++}
++exports.getNextRunDelay = getNextRunDelay;
+diff --git a/dist/worker.js b/dist/worker.js
+index 84afc57..fb98a92 100644
+--- a/dist/worker.js
++++ b/dist/worker.js
+@@ -27,6 +27,8 @@ function makeNewWorker(compiledSharedOptions, params) {
+     });
+     let activeJob = null;
+     let doNextTimer = null;
++    let gettingJob = false;
++    const eventDriven = pollInterval === 0;
+     const cancelDoNext = () => {
+         if (doNextTimer !== null) {
+             clearTimeout(doNextTimer);
+@@ -40,7 +42,8 @@ function makeNewWorker(compiledSharedOptions, params) {
+         if (active) {
+             active = false;
+             events.emit("worker:release", { worker });
+-            if (cancelDoNext()) {
++            if (cancelDoNext() || (eventDriven && !gettingJob && !activeJob)) {
++                // Event-driven idle workers have no recurring timer to cancel.
+                 workerDeferred.resolve();
+             }
+             else if (force) {
+@@ -60,6 +63,10 @@ function makeNewWorker(compiledSharedOptions, params) {
+             doNext();
+             return true;
+         }
++        if (eventDriven && !gettingJob && !activeJob) {
++            doNext();
++            return true;
++        }
+         else {
+             again = true;
+             // Not idle; find someone else!
+@@ -115,7 +122,11 @@ function makeNewWorker(compiledSharedOptions, params) {
+                 flagsToSkip = event.flagsToSkip;
+             }
+             events.emit("worker:getJob:start", { worker });
++            gettingJob = true;
+             const jobRow = await (0, getJob_1.getJob)(compiledSharedOptions, withPgClient, tasks, workerId, flagsToSkip);
++            // Keep the worker busy through the delayed-job lookup too: a LISTEN
++            // nudge or shutdown must not race that outstanding database read.
++            if (jobRow && jobRow.id || !eventDriven) gettingJob = false;
+             // `doNext` cannot be executed concurrently, so we know this is safe.
+             // eslint-disable-next-line require-atomic-updates
+             activeJob = jobRow && jobRow.id ? jobRow : null;
+@@ -127,13 +138,18 @@ function makeNewWorker(compiledSharedOptions, params) {
+             }
+         }
+         catch (err) {
++            gettingJob = false;
+             events.emit("worker:getJob:error", { worker, error: err });
+             if (continuous) {
+                 contiguousErrors++;
+                 logger.debug(`Failed to acquire job: ${err.message} (${contiguousErrors} contiguous fails)`);
+                 if (active) {
+-                    // Error occurred fetching a job; try again...
+-                    doNextTimer = setTimeout(() => doNext(), pollInterval);
++                    // Retry transport/query failures with backoff. In event-driven mode,
++                    // ordinary idle checks are disabled; this timer is only recovery.
++                    const retryDelay = eventDriven
++                        ? Math.min(60000, 1000 * 2 ** Math.min(contiguousErrors - 1, 6))
++                        : pollInterval;
++                    doNextTimer = setTimeout(() => doNext(), retryDelay);
+                 }
+                 else {
+                     workerDeferred.reject(err);
+@@ -155,17 +171,50 @@ function makeNewWorker(compiledSharedOptions, params) {
+                         // This could be a synchronisation issue where we were notified of
+                         // the job but it's not visible yet, lets try again in just a
+                         // moment.
++                        gettingJob = false;
+                         doNext();
+                     }
++                    else if (eventDriven) {
++                        try {
++                            const delay = await (0, getJob_1.getNextRunDelay)(compiledSharedOptions, withPgClient, tasks);
++                            gettingJob = false;
++                            if (!active) {
++                                workerDeferred.resolve();
++                            }
++                            else if (again) {
++                                doNext();
++                            }
++                            else if (delay !== null) {
++                                doNextTimer = setTimeout(() => {
++                                    if (active) doNext();
++                                }, Math.max(1, delay));
++                            }
++                        }
++                        catch (error) {
++                            gettingJob = false;
++                            events.emit("worker:getJob:error", { worker, error });
++                            if (active) {
++                                doNextTimer = setTimeout(() => {
++                                    if (active) doNext();
++                                }, 1000);
++                            }
++                            else {
++                                workerDeferred.resolve();
++                            }
++                        }
++                    }
+                     else {
++                        gettingJob = false;
+                         doNextTimer = setTimeout(() => doNext(), pollInterval);
+                     }
+                 }
+                 else {
++                    gettingJob = false;
+                     workerDeferred.resolve();
+                 }
+             }
+             else {
++                gettingJob = false;
+                 workerDeferred.resolve();
+                 release();
+             }
+diff --git a/dist/config.js b/dist/config.js
+--- a/dist/config.js
++++ b/dist/config.js
+@@ -15,8 +15,8 @@ const makeWorkerPresetWorkerOptions = () => ({
+     connectionString: process.env.DATABASE_URL,
+     schema: process.env.GRAPHILE_WORKER_SCHEMA ||
+         enforceStringOrUndefined("schema", cosmiconfig?.schema) ||
+         "graphile_worker",
+-    pollInterval: enforceNumberOrUndefined("pollInterval", cosmiconfig?.pollInterval) ||
++    pollInterval: enforceNumberOrUndefined("pollInterval", cosmiconfig?.pollInterval) ??
+         2000,
+     concurrentJobs: enforceNumberOrUndefined("concurrentJobs", cosmiconfig?.concurrentJobs) ||
+         1,

@@ -12,6 +12,11 @@ export function isSelfHostedBackendInput(path) {
   return production(path) && (backend.test(path) || migration.test(path))
 }
 const requirements = 'config/self-hosted-requirements.json'
+export const isSelfHostedAcceptanceTest = file =>
+  /^(?:scripts|tests|apps|packages|lib|app|hooks|cloudflare|services|components)\/[\w./-]+$/.test(file) &&
+  !file.includes('..') &&
+  (/(?:\.test\.[cm]?[jt]sx?$|\/acceptance\/)/.test(file) || file === 'scripts/test-subscription-worker.mjs') &&
+  existsSync(file) && statSync(file).isFile()
 function inventory(source, pattern) {
   return new Set(Array.from(source.matchAll(pattern), match => match[1] || match[2]))
 }
@@ -86,9 +91,7 @@ export function main(runTests = false, reportDatabase = false) {
   }
   git('rev-parse', '--verify', base + '^{commit}')
   const declarations = JSON.parse(readFileSync(requirements, 'utf8'))
-  const isTest = file => /^(?:scripts|tests|apps|packages|lib|app|hooks|cloudflare|services|components)\/[\w./-]+$/.test(file) &&
-    !file.includes('..') && /(?:\.test\.[cm]?[jt]sx?$|\/acceptance\/)/.test(file) &&
-    existsSync(file) && statSync(file).isFile()
+  const isTest = isSelfHostedAcceptanceTest
   const paths = git('diff', '--name-only', '--no-renames', '--diff-filter=AM', '-z', base, 'HEAD').split('\0').filter(Boolean)
   const errors = []
   for (const path of paths.filter(isSelfHostedBackendInput)) {

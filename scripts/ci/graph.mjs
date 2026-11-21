@@ -20,7 +20,7 @@ export function buildGraph(root = process.cwd(), tasks = defaultTasks) {
   const tree = readTree(root)
   const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'))).scripts
   const db = inventory(tree, scripts)
-  const inventoryPaths = new Set([...Object.keys(tree), ...db.scripts.flatMap(script => scripts[script].split(/\s+/))])
+  const inventoryPaths = new Set([...Object.keys(tree), ...REQUIRED_SUITES.map(({ file }) => file), ...db.scripts.flatMap(script => scripts[script].split(/\s+/))])
   const nodes = {}, dependencies = {}, unresolved = []
   const add = (name, data) => { nodes[name] = { name, type: 'lib', data: { name, ...data } }; dependencies[name] = [] }
   const edge = (source, target) => {

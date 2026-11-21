@@ -4,7 +4,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-packageExtensionsChecksum: sha256-6D3/iud088kujq5G4Zfbj8iVg34Id9PCxtGTuDn+h70=
+packageExtensionsChecksum: sha256-yVgvhfID6RjwPE2TkYfehXEGu4mO+yyQT+0mzPuyu4c=
 
 patchedDependencies:
   '@better-auth/sso@1.7.12':
@@ -17,7 +17,7 @@ patchedDependencies:
     hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
   '@workflow/world-postgres@5.2.0':
-    hash: 49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6
+    hash: 5f9a0a16fdb474b6e79953d06ab4d2176aadcddabfcb8bc2ece7098c690bd24d
     path: patches/@workflow__world-postgres@5.2.0.patch
   eve@1.0.0-rc.9:
     hash: e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2
@@ -25,6 +25,9 @@ patchedDependencies:
   ffmpeg-static@5.3.0:
     hash: 7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b
     path: patches/ffmpeg-static@5.3.0.patch
+  graphile-worker@0.16.6:
+    hash: 6b2f970fcd12f8f9329bbf1eb2b3d38abe51b946998cea3c585bef27699ed2ef
+    path: patches/graphile-worker@0.16.6.patch
 
 importers:
 
@@ -543,7 +546,7 @@ importers:
     dependencies:
       '@workflow/world-postgres':
         specifier: 5.2.0
-        version: 5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
+        version: 5.2.0(patch_hash=5f9a0a16fdb474b6e79953d06ab4d2176aadcddabfcb8bc2ece7098c690bd24d)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
       eve:
         specifier: 1.0.0-rc.9
         version: 1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(c629b6f9c4762629636b6743fc5a3ca8)
@@ -6531,9 +6534,6 @@ packages:
   core-js-compat@3.51.0:
     resolution: {integrity: sha512-52r6fkXgxv4GLMjmFcMWRx7X9bw071xTTdrDcdyPGRqU2oE+9pCG0bAOMifSBdLw0JRBZKEF0q3B55qPlLuE8g==}
     engines: {node: '>=6.4.0'}
-
-  core-js-pure@3.51.0:
-    resolution: {integrity: sha512-NE4SFDJ+qzQeqHG2vVSNwopzS6zZNPYJ5kinIqs+OofTqGzOmICgT89E/yvS9XY7rwb3eU1utWXTJ9nVFqv74A==}
 
   core-js@3.51.0:
     resolution: {integrity: sha512-7bDKx/5jm5MxzsXxc93g6Z2+4ZsuT/MddrfRmTDJNAkWsYWHU8EVNEsBiIEWnMAMCHMmRfUEjkuo3jeNBOIHRw==}
@@ -18119,7 +18119,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
 
-  '@workflow/world-postgres@5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)':
+  '@workflow/world-postgres@5.2.0(patch_hash=5f9a0a16fdb474b6e79953d06ab4d2176aadcddabfcb8bc2ece7098c690bd24d)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)':
     dependencies:
       '@vercel/queue': 0.10.0(@opentelemetry/api@1.10.0)
       '@workflow/errors': 5.1.1
@@ -18129,7 +18129,7 @@ snapshots:
       cbor-x: 1.6.9
       dotenv: 17.4.2
       drizzle-orm: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)(sql.js@1.16.0)
-      graphile-worker: 0.16.6(typescript@6.0.3)
+      graphile-worker: 0.16.6(patch_hash=6b2f970fcd12f8f9329bbf1eb2b3d38abe51b946998cea3c585bef27699ed2ef)(typescript@6.0.3)
       pg: 8.23.1
       ulid: 3.0.2
       zod: 4.6.7
@@ -19266,8 +19266,6 @@ snapshots:
     dependencies:
       browserslist: 4.29.4
 
-  core-js-pure@3.51.0: {}
-
   core-js@3.51.0: {}
 
   core-util-is@1.0.3: {}
@@ -20058,7 +20056,6 @@ snapshots:
   eve@1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(0ec25fadac82cd3688c4adb6ab00bbed):
     dependencies:
       ai: 7.0.148(zod@4.6.7)
-      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
       rolldown: 1.2.16
       undici: 8.12.3
@@ -20074,7 +20071,6 @@ snapshots:
   eve@1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(c629b6f9c4762629636b6743fc5a3ca8):
     dependencies:
       ai: 7.0.148(zod@4.6.7)
-      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
       rolldown: 1.2.16
       undici: 8.12.3
@@ -20090,7 +20086,6 @@ snapshots:
   eve@1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(f1e35574caad8581bd8099a0f38b0283):
     dependencies:
       ai: 7.0.148(zod@4.6.7)
-      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
       rolldown: 1.2.16
       undici: 8.12.3
@@ -21174,7 +21169,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  graphile-worker@0.16.6(typescript@6.0.3):
+  graphile-worker@0.16.6(patch_hash=6b2f970fcd12f8f9329bbf1eb2b3d38abe51b946998cea3c585bef27699ed2ef)(typescript@6.0.3):
     dependencies:
       '@graphile/logger': 0.2.0
       '@types/debug': 4.1.13

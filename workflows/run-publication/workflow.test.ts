@@ -35,6 +35,19 @@ test('a publication that lands first time is delivered with no wait', async () =
   assert.equal(fake.pendingTimers(), 0)
 })
 
+test('a committed publication event wakes a retry before its durable backoff deadline', async () => {
+  publishDoneAfter = 2
+  const running = workflow.runPublication('run-event')
+  await fake.settle()
+  assert.equal(publishResult.mock.callCount(), 1)
+  fake.resume('run-publication:run-event')
+  await fake.settle()
+  await running
+  assert.equal(publishResult.mock.callCount(), 2)
+  assert.equal(attempts[1] - attempts[0], 0, 'the durable state event beats the timer')
+  assert.equal(deliverResult.mock.callCount(), 1)
+})
+
 test('the first retry is 30 s, as before; later retries double up to 10 minutes', async () => {
   publishDoneAfter = 8
   await Promise.all([workflow.runPublication('run-2'), fake.advance(60 * 60_000)])

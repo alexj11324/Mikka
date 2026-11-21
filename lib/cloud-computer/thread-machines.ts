@@ -1,6 +1,7 @@
 import { anonymousStartupHint, firstAnonymousTask } from '../computer/anonymous-startup-hint'
 import { runChanged } from '../live/panels'
 import { connectForCommitEffects } from '../db/commit-effects'
+import { DEVICE_REGISTRATION_CHANNEL, subscribeShared } from '../db/listen'
 import { taskActivityChanged } from '../factory/activity-live'
 import { recordCancelledThreadSessionEnd } from './thread-machine-sessions'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
@@ -1449,13 +1450,21 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
         registrationWaiting = true
         refreshPhase = timings.next('worker_register')
         const deadline = Math.min(Date.now() + 30_000, refreshDeadline ?? Infinity)
+        const registration = await subscribeShared(pool, DEVICE_REGISTRATION_CHANNEL, [deviceId]).catch(() => null)
         let ready = false
-        do {
-          refreshBudget?.(1)
-          ready = Boolean((await pool.query('SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id WHERE d.id=$1 AND d."ownerId"=$2 AND d."lastSeenAt">=$3 AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3',
-            [deviceId, actor.userId, handoffStartedAt, createHash('sha256').update(credential).digest('hex')])).rowCount)
-          if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
-        } while (!ready && Date.now() < deadline)
+        try {
+          do {
+            refreshBudget?.(1)
+            registration?.reset()
+            ready = Boolean((await pool.query('SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id WHERE d.id=$1 AND d."ownerId"=$2 AND d."lastSeenAt">=$3 AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3',
+              [deviceId, actor.userId, handoffStartedAt, createHash('sha256').update(credential).digest('hex')])).rowCount)
+            if (ready) break
+            const remaining = deadline - Date.now()
+            if (remaining <= 0) break
+            if (!registration || registration.lost) await new Promise(resolve => setTimeout(resolve, Math.min(500, remaining)))
+            else await registration.next(remaining)
+          } while (!ready && Date.now() < deadline)
+        } finally { registration?.close() }
         if (!ready) throw new Error('Thread worker did not register')
       } else if (!messages.includes(REGISTRATION_COMPLETE)) throw new Error('Thread worker did not register')
       // A transport may coalesce stdout until completion. Keep every phase;

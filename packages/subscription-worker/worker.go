@@ -43,6 +43,7 @@ type Worker struct {
 	OAuth            OAuthProvider
 	Enrollment       *Enrollment
 	DatabaseIdentity string
+	DatabaseURL      string // trusted host configuration, never RPC input
 }
 
 func (w *Worker) store(operation *Operation) *Store {

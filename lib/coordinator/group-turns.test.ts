@@ -21,6 +21,16 @@ const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
 const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input'}
+test('group history reads do not start a worker; only a successful send schedules one', async () => {
+  const source = await readFile(new URL('../group-conversations-route.ts', import.meta.url), 'utf8')
+  const start = source.indexOf("if (resource === 'messages' && id")
+  assert.notEqual(start, -1)
+  const after = source.slice(start, source.indexOf('return NextResponse.json(result.body', start))
+  assert.match(after, /request\.method === 'POST'/)
+  assert.match(after, /afterJob\('after:group-turn'/)
+  assert.doesNotMatch(after, /request\.method === 'GET'|hasPendingGroupTurn/)
+})
+
 test('group session uses the same database/role/TLS and only bypasses the documented Neon transaction pooler',()=>{
   const source=new URL('postgresql://ep-group-pooler.c-7.us-east-2.aws.neon.tech/app?sslmode=require')
   source.username=randomUUID();source.password=randomUUID()

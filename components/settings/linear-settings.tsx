@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import useSWR from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { useSearchParams } from '@/lib/client-runtime/navigation'
-import { useLiveScope } from '@/hooks/use-live-key'
+import { useLiveKey, useLiveScope } from '@/hooks/use-live-key'
 import { ArrowRight, RefreshCw, Unplug } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -27,61 +28,38 @@ export function useLinearPlugin() {
   const routeWorkspace = useSearchParams().get('workspace')
   const liveScope = useLiveScope()
   const target = routeWorkspace ?? liveScope?.workspaceId
+  const stateKey = `linear-integration-state:${target ?? 'active'}`
   const confirmed = useRef<string | undefined>(undefined)
-  const [snapshot, setState] = useState<IntegrationState | null>(null)
-  const state = !target || target === snapshot?.workspaceId ? snapshot : null
-  const [enabled, setEnabled] = useState<boolean | null>(null)
   const [teams, setTeams] = useState<TeamOption[]>([])
   const [choice, setChoice] = useState<{ workspaceId: string; teamId: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  // Connecting from the desktop finishes in the system browser: read once on the way back.
-  const [reads, setReads] = useState(0)
-  const checkOnReturn = useCheckOnReturn(() => setReads(count => count + 1))
+  const { data: snapshot, error: loadError, mutate: reload } = useSWR<IntegrationState>(stateKey, async () => {
+    // Check global availability before a server action can read the session
+    // or integration tables. Configuration changes are delivered by live push.
+    const response = await fetch(withBasePath('/api/integrations/linear/status'), { cache: 'no-store' })
+    const availability = response.ok ? await response.json() as { enabled?: boolean } : null
+    if (availability?.enabled !== true) return { workspaceId: null, enabled: false, configured: false, connected: false, organizationName: null, syncs: [], errors: [], inboundErrors: [] }
+    const workspace = target ?? confirmed.current
+    const next = workspace ? await getLinearIntegrationState(workspace) : await getLinearIntegrationState()
+    confirmed.current = next.workspaceId ?? undefined
+    return next
+  }, { revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
+  const state = !target || target === snapshot?.workspaceId ? snapshot ?? null : null
+  const enabled = snapshot?.enabled ?? null
+  // Configuration, delivery diagnostics and active-sync state share this
+  // workspace settings invalidation; no timer is needed while a sync runs.
+  useLiveKey('workspace_settings', state?.workspaceId, [stateKey], state?.workspaceId)
+  const checkOnReturn = useCheckOnReturn(() => { void reload() })
 
   useEffect(() => {
     let active = true
-    let inFlight = false
-    let loadedTeams = false
-    let timer: number | undefined
-    const loadState = async () => {
-      if (inFlight) return
-      inFlight = true
-      window.clearTimeout(timer)
-      let poll = false
-      try {
-        // Check global availability before a server action can read the session
-        // or integration tables. Off/paused/disconnected never run a poll loop.
-        const response = await fetch(withBasePath('/api/integrations/linear/status'), { cache: 'no-store' })
-        const availability = response.ok ? await response.json() as { enabled?: boolean } : null
-        if (!active) return
-        if (availability?.enabled !== true) { setEnabled(false); return }
-        const workspace = target ?? confirmed.current
-        const next = workspace ? await getLinearIntegrationState(workspace) : await getLinearIntegrationState()
-        if (!active) return
-        setEnabled(next.enabled)
-        if (!next.enabled) return
-        confirmed.current = next.workspaceId ?? undefined
-        setState(next)
-        poll = next.connected && next.syncs.some(sync => sync.active)
-        if (next.connected && !loadedTeams) {
-          const options = await listLinearTeamOptions()
-          if (active) { setTeams(options); loadedTeams = true }
-        }
-      } catch {
-        poll = false
-        if (active) { setState(null); setEnabled(false); setError(t('loadError')) }
-      } finally {
-        inFlight = false
-        if (active && poll) timer = window.setTimeout(tick, 10_000)
-      }
-    }
-    // The poll skips its read while the page is hidden and keeps its schedule;
-    // showing the page again never reads by itself.
-    const tick = () => { if (document.hidden) timer = window.setTimeout(tick, 10_000); else void loadState() }
-    void loadState()
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [t, target, state?.connected, state?.syncs.some(sync => sync.active), reads])
+    if (!state?.connected) { setTeams([]); return () => { active = false } }
+    void listLinearTeamOptions().then(options => { if (active) setTeams(options) }).catch(() => {
+      if (active) setError(t('loadError'))
+    })
+    return () => { active = false }
+  }, [state?.connected, state?.workspaceId, t])
 
   const activeTeam = state?.syncs.find(sync => sync.active)
   const selectedTeam = (state?.workspaceId && choice?.workspaceId === state.workspaceId ? choice.teamId : null) ?? activeTeam?.linearTeamId ?? ''
@@ -89,8 +67,7 @@ export function useLinearPlugin() {
     if (state?.workspaceId) setChoice({ workspaceId: state.workspaceId, teamId })
   }
   async function refreshShownState() {
-    const workspace = state?.workspaceId ?? target ?? confirmed.current
-    setState(workspace ? await getLinearIntegrationState(workspace) : await getLinearIntegrationState())
+    await reload()
   }
   async function connect() {
     setBusy(true); setError('')
@@ -156,7 +133,7 @@ export function useLinearPlugin() {
     finally { setBusy(false) }
   }
 
-  return { state, enabled, teams, selectedTeam, setSelectedTeam, activeTeam, busy, error, connect, enableTeam, disableTeam, disconnect, retry, retryDelivery }
+  return { state, enabled, teams, selectedTeam, setSelectedTeam, activeTeam, busy, error: error || (loadError ? t('loadError') : ''), connect, enableTeam, disableTeam, disconnect, retry, retryDelivery }
 }
 
 export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | null }) {

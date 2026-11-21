@@ -31,6 +31,7 @@ import type { QuotaPlan } from './run-quota'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects, wakeThreadDelivery } from './run-completion-effects'
 import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
 import { withProjectResourceLease } from './project-resources/store'
+import { wakeTokens, wakeWorkflowAfterCommit } from './workflow-wake'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -324,6 +325,7 @@ async function settlePublication(claim: Publication, result: { pullRequest?: Pub
       result = { ...result, errorCode: 'issue_unavailable' }
     }
     await tx.update(runPublications).set({ status: result.pullRequest ? 'published' : 'blocked', pullRequest: result.pullRequest ?? null, errorCode: result.errorCode ?? null, leaseToken: null, leaseExpiresAt: null, updatedAt: new Date() }).where(eq(runPublications.runId, claim.runId))
+    wakeWorkflowAfterCommit(tx, wakeTokens.runPublication(claim.runId))
     return true
   })
   const settled = await withRunWorkspace(claim.userId, stored?.workspaceId ?? null, () => settle(true))

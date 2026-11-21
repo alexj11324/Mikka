@@ -28,10 +28,10 @@ before(async () => { ({ IssuePullRequestLink } = await import('./issue-pull-requ
 beforeEach(() => { userId = 'viewer'; pending = false; data = undefined; validating = false })
 const render = (compact = false) => renderToStaticMarkup(<IssuePullRequestLink issueId="issue-1" pr={{ url, state: 'open' }} compact={compact} />)
 
-test('requests are viewer scoped and refresh on mount, on push and every 5 minutes while visible, never on focus', () => {
+test('requests are viewer scoped and refresh on mount and push only, never periodically or on focus', () => {
   render()
   assert.deepEqual(swrKey, ['github-pr-status', 'viewer', 'issue-1', url])
-  assert.equal(swrOptions.refreshInterval, 5 * 60_000)
+  assert.equal(swrOptions.refreshInterval, 0)
   assert.equal(swrOptions.refreshWhenHidden, false)
   assert.notEqual(swrOptions.revalidateOnFocus, true)
   assert.equal(swrOptions.revalidateOnMount, true)

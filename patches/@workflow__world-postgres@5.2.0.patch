@@ -1,3 +1,16 @@
+diff --git a/dist/queue.js b/dist/queue.js
+index c93891d..4856d62 100644
+--- a/dist/queue.js
++++ b/dist/queue.js
+@@ -1156,7 +1156,7 @@ internal) {
+             ...(config.applicationManagedShutdown === true && {
+                 noHandleSignals: true,
+             }),
+-            pollInterval: config.pollInterval ?? 500, // per worker; LISTEN/NOTIFY only wakes idle workers early
++            pollInterval: config.pollInterval ?? 0, // patched Graphile Worker event-driven mode; delayed jobs use durable run_at timers
+             taskList,
+         });
+         // Graphile Worker only resets locks older than 4 hours. Release this
 diff --git a/dist/storage.js b/dist/storage.js
 --- a/dist/storage.js
 +++ b/dist/storage.js

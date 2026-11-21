@@ -201,6 +201,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         assert.ok(handoff)
         await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [handoff.deviceId])
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
+        await pool.query("SELECT pg_notify('mikka_device_registration', $1)", [handoff.deviceId])
       }
     } } } as unknown as import('e2b').Sandbox
     const workerRuntime = runtime
@@ -429,6 +430,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(visible.pendingApproval?.digest, review.digest)
     assert.deepEqual(visible.pendingApproval?.action, { tool: 'click', x: 3, y: 4 })
     assert.equal((await store.state(actor, another.id)).pendingApproval, undefined)
+    // Push is the freshness signal for cloud reviews; expiry and run lease remain authoritative.
+    await pool.query(`UPDATE local_computer_reviews SET "seenAt"=now()-interval '11 seconds' WHERE id=$1`, [review.id])
+    assert.equal((await store.state(actor, bot.id)).pendingApproval?.digest, review.digest)
     assert.equal(await decideComputerReview(pool, otherWorkspace, review.id, review.digest, true), false)
     assert.equal(await decideComputerReview(pool, actor, review.id, '0'.repeat(64), true), false)
     // #1212: the decision pushes the device through its gateway, so the daemon applies it now instead of syncing every second.

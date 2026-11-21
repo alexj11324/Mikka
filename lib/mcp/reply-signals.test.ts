@@ -59,18 +59,36 @@ test('a notification during a stale authoritative read forces a second read with
   assert.equal(app.closed, 1); assert.equal(workspace.closed, 1)
 })
 
-test('one missing or lost listener degrades the observer and loss wakes only once', async () => {
-  const app = subscription(), controller = new AbortController()
-  let notifications = 0
-  const observer = await observeReplySignals(async () => [app.value, null], () => { notifications++ }, controller.signal)
+test('a partial listener set reconnects with backoff and notifies once when complete', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const partial = subscription(), app = subscription(), workspace = subscription()
+  const controller = new AbortController()
+  let opens = 0
+  const changes: string[] = []
+  const observer = await observeReplySignals(async () => {
+    opens++
+    return opens === 1 ? [partial.value, null] : [app.value, workspace.value]
+  }, reason => { changes.push(reason ?? 'notification') }, controller.signal)
   assert.equal(observer.lost, true)
-  app.lose(); await flush()
-  assert.equal(notifications, 1)
-  assert.equal(app.waiting, 0)
+  assert.equal(partial.closed, 1)
+  t.mock.timers.tick(249)
   await flush()
-  assert.equal(notifications, 1)
-  observer.close()
+  assert.equal(opens, 1)
+  t.mock.timers.tick(1)
+  await flush()
+  assert.equal(opens, 2)
+  assert.equal(observer.lost, false)
+  assert.deepEqual(changes, ['notification'])
+  app.lose()
+  await flush()
+  assert.deepEqual(changes, ['notification', 'lost'])
+  assert.equal(observer.lost, true)
   assert.equal(app.closed, 1)
+  assert.equal(workspace.closed, 1)
+  observer.close()
+  t.mock.timers.tick(60_000)
+  await flush()
+  assert.equal(opens, 2, 'closing must stop reconnect attempts')
 })
 
 test('abort while listeners are being prepared is passed through and closes any returned subscriptions', async () => {

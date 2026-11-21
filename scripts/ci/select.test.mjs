@@ -51,6 +51,13 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
 })
+test('Cloudflare Eve Graphile Postgres recovery suite is inventoried and selected', async () => {
+  const file = 'tests/eve-runtime-graphile-event-driven.db.test.mjs'
+  assert(plan.db.scripts.includes('test:eve-graphile-db'))
+  const result = await pick(file)
+  assert(result.db_suites.includes('test:eve-graphile-db'))
+  assert(result.affected.includes(dbId('test:eve-graphile-db')))
+})
 test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
   const unit = await pick('lib/eve/streaming-model.ts')
   assert(unit.units.includes('ci-core-41'))

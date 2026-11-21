@@ -2,7 +2,8 @@ import { hostedBillingScope } from '@/lib/abuse/context'
 import { groupDirectory } from '@/lib/group-conversations-directory'
 import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
-import { groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn } from '@/lib/coordinator/group-turns'
+import { NextResponse } from 'next/server'
+import { groupsWithPendingTurns, processGroupTurn } from '@/lib/coordinator/group-turns'
 import { groupRuntime } from '@/lib/coordinator/group-runtime'
 import { and, eq, inArray } from 'drizzle-orm'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
@@ -65,14 +66,10 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     body: request.method !== 'GET' ? await request.text().catch(() => '') : undefined,
     before: url.searchParams.get('before'), after: url.searchParams.get('after'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId') ?? session?.tokenWorkspaceId,
   }, true)
-  if (resource === 'messages' && id && result.status < 300) {
-    // A send starts the worker. A history read (polled while a reply is generating) starts it only
-    // when a turn is still pending, instead of taking the group's lock and recovering on every poll.
-    const conversationId = id
-    afterJob('after:group-turn', async () => {
-      if (request.method === 'GET' && !await hasPendingGroupTurn(pool, conversationId).catch(() => false)) { await reconcileGroupTaskReports(conversationId); return }
-      await drainGroupTurns(conversationId, Date.now() + 220000)
-    })
+  if (resource === 'messages' && id && request.method === 'POST' && result.status < 300) {
+    // Only a committed send starts a request-bound worker. History reads stay read-only;
+    // durable recovery resumes work when the sending request or process ends early.
+    afterJob('after:group-turn', () => drainGroupTurns(id, Date.now() + 220000))
   }
   return NextResponse.json(result.body, { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
 }

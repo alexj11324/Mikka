@@ -16,6 +16,12 @@ let scheduled: Array<() => Promise<void>> = []
 // 自动化 Linear triggers are not sync: a signed delivery reaches them while sync is off (decision 2026-11-15-1930).
 const automationDeliveries: string[] = []
 const unexpected = () => { reads++; throw new Error('Unexpected database, authentication or provider access') }
+const dbMockUpdate = () => {
+  if (!finishClaimed) return unexpected()
+  return { set: (values: { status: string }) => ({ where: async () => {
+    assert.equal(values.status, 'done'); finished++
+  } }) }
+}
 let worker: typeof import('./worker')
 let dispatch: typeof import('./dispatch')
 let actions: typeof import('../../app/actions/linear-sync')
@@ -34,12 +40,10 @@ before(async () => {
   mock.module('@/lib/server-runtime/headers', { namedExports: { cookies: unexpected } })
   mock.module('@/lib/schedules/runtime', { namedExports: { fireLinearAutomations: async (deliveryId: string) => { automationDeliveries.push(deliveryId); return 0 } } })
   mock.module('@/lib/db', { namedExports: {
-    db: { select: unexpected, insert: unexpected, update: () => {
+    db: { select: unexpected, insert: unexpected, update: dbMockUpdate, transaction: async (run: (tx: { update: typeof dbMockUpdate }) => Promise<unknown>) => {
       if (!finishClaimed) return unexpected()
-      return { set: (values: { status: string }) => ({ where: async () => {
-        assert.equal(values.status, 'done'); finished++
-      } }) }
-    }, transaction: unexpected },
+      return run({ update: dbMockUpdate })
+    } },
     pool: { connect: async () => {
       return { query: async (query: string, params?: unknown[]) => {
         if (query.startsWith('select') && query.includes('linear_sync_outbox') && params?.[0] === false) {

@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 
 /** A known stale page stops application fetches and requires refresh. The public
- * version probe runs once a minute; drafts stay mounted until the person reloads.
+ * version probe runs on page entry/navigation; the action guard checks before
+ * writes, so an idle tab does not poll. Drafts stay mounted until reload.
  * Desktop binary minimum-version enforcement remains separate. */
 export function VersionGuard() {
   return <Suspense fallback={null}><VersionGuardContent /></Suspense>
@@ -38,9 +39,9 @@ function VersionGuardContent() {
       })
       .catch(() => {}) }
     check()
-    // Public build metadata only: no database or third-party connection-status query.
-    const timer = setInterval(check, 60_000)
-    return () => { disposed = true; clearInterval(timer) }
+    // Public build metadata only, read on page entry/navigation and before an
+    // explicit action. No periodic read while the page is idle.
+    return () => { disposed = true }
   }, [pathname, search, offer])
 
   // Retain the page and offer an explicit refresh, including an early missing action.
