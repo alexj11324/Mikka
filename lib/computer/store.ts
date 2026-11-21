@@ -17,7 +17,7 @@ export class ComputerError extends Error {
 }
 type Actor = { userId: string; workspaceId: string }
 type Bot = { id: string; name: string; ownerId: string; workspaceId: string }
-type Machine = { workspaceId: string; ownerId: string; sandboxId: string | null; operationId: string; state: string; runtimeReady: boolean }
+type Machine = { workspaceId: string; ownerId: string; sandboxId: string | null; operationId: string; state: string; errorCode: string | null; runtimeReady: boolean }
 type Desktop = { botId: string; ownerId: string; display: number; epoch: number; control: string; controlledBy: string | null; controlUntil: Date | null; lastAction: unknown }
 
 /** Serialize machine allocation and control transitions across server instances. */
