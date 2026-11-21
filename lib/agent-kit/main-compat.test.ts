@@ -310,6 +310,14 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
     assert.equal(args[13],'web');assert.equal(args[14],null)
     insertedRunId=String(args[0]);return fixtureRows([])
    }
+   if(sql.includes('FROM workspace_setting_values') && sql.includes('FROM personal_setting_values')){
+    assert.deepEqual(args,[workspace,'newWorkVisibility','allowPrivateNewWork',owner,workspace,'newWorkVisibility','allowPrivateNewWork'])
+    return fixtureRows([])
+   }
+   if(sql.startsWith('SELECT p.visibility FROM resource_access_policies p')){
+    assert.deepEqual(args,['thread',insertedRunId,owner,workspace])
+    return fixtureRows([{visibility:'private'}])
+   }
    if(sql==='INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)'){
     assert.ok(insertedRunId);assert.deepEqual(args,[insertedRunId,botId,workspace,owner]);return fixtureRows([])
    }

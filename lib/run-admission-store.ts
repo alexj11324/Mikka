@@ -166,15 +166,8 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['dispatch-issue', input.userId, task.id])}, 0))`)
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
-    const initializeVisibility = async () => {
-      // Continuations acquire their thread link later in the owning writer.
-      // Do not mistake an INSERT without retryOf/continuesRunId for a new root.
-      // Factory's first local admission also uses the internal continuation
-      // path. Only an already validated source identifies an existing thread.
-      if (sourceId) return
-      // Auto-selected machines have no destination-bound requestEventId. The
-      // Factory host already authenticated this source event and attempt for
-      // this exact owner/Bot/task in the same transaction before admission.
+    const isNewRootAdmission = !sourceId
+    const initializeRootVisibility = async () => {
       const settings = await requestedRunSettings(client, input.userId, input.factoryContext?.sourceEventId ?? input.requestEventId)
       await initializeWorkVisibility(client, { userId: input.userId, workspaceId: task.workspaceId! },
         { kind: 'thread', id: input.id, visibility: settings.visibility })
@@ -183,7 +176,7 @@ export async function acceptLocalRun(input: {
       // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
       scheduleThreadTitle(tx, input.id, input.userId, 'created')
       await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
-      await initializeVisibility()
+      if (isNewRootAdmission) await initializeRootVisibility()
       await runListChanged(tx, input.id)
       await runChanged(tx, input.id)
       return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
@@ -203,7 +196,7 @@ export async function acceptLocalRun(input: {
     // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
     scheduleThreadTitle(tx, input.id, input.userId, 'created')
     await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
-    await initializeVisibility()
+    if (isNewRootAdmission) await initializeRootVisibility()
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: effectiveBaseBranch, pushApproved: true })
     if (input.requestEventId && !input.continuation && !input.sourceRunId && (await requestedRunSettings(client, input.userId, input.requestEventId)).pin)
       await client.query('UPDATE agent_runs SET "conversationPinnedAt"=clock_timestamp() WHERE id=$1', [input.id])

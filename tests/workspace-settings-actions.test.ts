@@ -43,6 +43,14 @@ before(async () => {
   mock.module('@/lib/audit/record', { namedExports: { auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name, [tokenWorkspace]: tokenWorkspaceId }) } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: {
+    transaction: async (work: (tx: unknown) => Promise<unknown>) => work({
+      select: (fields: Record<string, unknown>) => {
+        const chain = { from: () => chain, leftJoin: () => chain, where: () => chain, for: async () => 'ownerId' in fields
+          ? [{ id: actor.workspaceId, kind: 'team', ownerId: actor.userId }]
+          : [{ id: actor.userId, organizationId: null }] }
+        return chain
+      },
+    }),
     // The workspace's Environments a new Bot binds (lib/bot-environment.ts): the default first, then the one listing acme/app.
     execute: async () => ({ rows: [{ id: 'env-default', name: 'Default', repositoryKeys: ['v2/github.com/acme/other'] }, { id: 'env-app', name: 'App', repositoryKeys: ['v2/github.com/acme/app'] }] }),
     select: (fields: Record<string, unknown>) => {
@@ -84,7 +92,17 @@ before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name }, session: { id: 'workspace-fixture-session' } }) } } } })
   // createBot writes the Bot, its access and followers in one transaction; this fixture's writes need no real one.
   mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } },
-    db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }), transaction: async (work: (tx: object) => Promise<unknown>) => work({}) },
+    db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }), transaction: async (work: (tx: object) => Promise<unknown>) => work({
+      execute: async (statement: SQL) => {
+        const { sql } = dialect.sqlToQuery(statement)
+        assert.match(sql, /FROM workspace_setting_values/)
+        return { rows: [] }
+      },
+      session: { client: { query: async (sql: string) => {
+        assert.match(sql, /^SELECT p.visibility FROM resource_access_policies/)
+        return { rows: [{ visibility: 'private' }] }
+      } } },
+    }) },
     withDatabaseTransaction: (_tx: object, work: () => unknown) => work() } })
   mock.module('@/lib/run-policy-stop', { namedExports: { stopRunsForPolicyChange: respond('stopRunsForPolicyChange', 0) } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {

@@ -3,7 +3,7 @@ import { workVisibilitySchema, type WorkCreationView, type WorkVisibility } from
 import { ActionFailureError } from '@/lib/action-error'
 import { captureDatabaseQuery } from '@/lib/db/commit-effects'
 import { requireTaskWorkspaceLease } from '@/lib/task-workspace'
-import { resolveSettingValue } from './registry'
+import { readRuntimeSettings } from './runtime'
 import { workCreationView } from './work-creation-policy'
 
 type Executor = Parameters<typeof captureDatabaseQuery>[0]
@@ -14,18 +14,8 @@ export interface WorkCreationActor { userId: string; workspaceId: string }
  * so a policy change cannot pass a half-finished creation or ACL transition. */
 export async function readWorkCreationPolicy(executor: Executor, actor: WorkCreationActor): Promise<WorkCreationView> {
   const workspace = requireTaskWorkspaceLease(actor.userId, actor.workspaceId)
-  const { query } = captureDatabaseQuery(executor)
-  const { rows } = await query<{ scope: 'personal' | 'workspace'; key: string; textValue: string | null; booleanValue: boolean | null }>(`
-    SELECT 'personal' AS scope,key,"textValue","booleanValue" FROM personal_setting_values
-      WHERE "userId"=$1 AND "workspaceId"=$2 AND key='newWorkVisibility'
-    UNION ALL
-    SELECT 'workspace',key,"textValue","booleanValue" FROM workspace_setting_values
-      WHERE "workspaceId"=$2 AND key IN ('newWorkVisibility','allowPrivateNewWork')`, [actor.userId, actor.workspaceId])
-  const value = (scope: 'personal' | 'workspace', key: string) => rows.find(row => row.scope === scope && row.key === key)
-  const preferred = resolveSettingValue('newWorkVisibility', value('personal', 'newWorkVisibility')?.textValue,
-    value('workspace', 'newWorkVisibility')?.textValue)
-  const allowed = resolveSettingValue('allowPrivateNewWork', null, value('workspace', 'allowPrivateNewWork')?.booleanValue)
-  return workCreationView(workspace.kind, { ...preferred, value: workVisibilitySchema.parse(preferred.value) }, allowed.value === true)
+  const { newWorkVisibility, allowPrivateNewWork } = await readRuntimeSettings(executor, ['newWorkVisibility', 'allowPrivateNewWork'], actor)
+  return workCreationView(workspace.kind, newWorkVisibility, allowPrivateNewWork.value)
 }
 
 /** An explicit choice must fit policy; an omitted choice uses the separately

@@ -56,10 +56,11 @@ export async function createOwnedBot(owner: { ownerId: string; workspaceId: stri
   const bot = { id: crypto.randomUUID(), ...look }
   // The Bot, its access and its followers commit together or not at all.
   await withTaskWorkspace(owner.ownerId, owner.workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
-    const visibility = workCreationVisibility(await readWorkCreationPolicy(tx, actor), access)
+    const policy = await readWorkCreationPolicy(tx, actor)
     // Refuse policy or follower input before the row exists; the WS lease is
     // held until this Bot and its existing ACL trigger commit together.
-    await access_.assertBotAccessInput(actor, visibility, subscribers ?? [])
+    await access_.assertBotAccessInput(actor, access ?? policy.effectiveVisibility, subscribers ?? [])
+    workCreationVisibility(policy, access)
     try {
       await db.insert(bots).values({ ...bot, ...owner, ...botSettingsColumns(settings), environmentId, model: model === undefined ? defaults!.defaultModel : model })
     } catch (error) {

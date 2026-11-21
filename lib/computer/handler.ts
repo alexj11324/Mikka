@@ -14,7 +14,7 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
       if (!botId) {
         if (request.method === 'GET') return response(await store.listBots(actor))
         const { name, visibility } = createBotSchema.parse(await request.json())
-        return response(await store.createBot(actor, name, { visibility }), 201)
+        return response(visibility === undefined ? await store.createBot(actor, name) : await store.createBot(actor, name, { visibility }), 201)
       }
       z.uuid().parse(botId)
       if (!action) return response(await store.state(actor, botId))

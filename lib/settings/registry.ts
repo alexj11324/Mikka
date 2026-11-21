@@ -9,7 +9,6 @@ export interface SettingDefinition extends SettingSchemaEntry {
   guard: z.ZodType<SettingValue>
   /** Existing account preferences stay global; title overrides belong to one workspace. */
   personalContext: 'account' | 'workspace'
-  legacy?: 'archive-days' | 'title-instructions' | 'title-triggers' | 'workspace-instructions'
 }
 
 const inherited = {
@@ -23,19 +22,19 @@ export const SETTINGS_REGISTRY = {
     ...inherited, key: 'archiveIdleAfterDays', group: 'threads', page: 'threads',
     ...settingMetadata('archiveIdleAfterDays'),
     type: 'integer', guard: z.literal(archiveIdleDays), defaultValue: 30, options: [...archiveIdleDays],
-    personalContext: 'account', legacy: 'archive-days',
+    personalContext: 'account',
   },
   threadTitleInstructions: {
     ...inherited, key: 'threadTitleInstructions', group: 'threads', page: 'threads',
     ...settingMetadata('threadTitleInstructions'),
     type: 'string', guard: z.string().trim().max(TITLE_INSTRUCTIONS_MAX), defaultValue: '',
-    personalContext: 'workspace', legacy: 'title-instructions',
+    personalContext: 'workspace',
   },
   threadTitleTriggers: {
     ...inherited, key: 'threadTitleTriggers', group: 'threads', page: 'threads',
     ...settingMetadata('threadTitleTriggers'),
     type: 'string', guard: z.enum(THREAD_TITLE_TRIGGERS), defaultValue: DEFAULT_TITLE_TRIGGERS, options: [...THREAD_TITLE_TRIGGERS],
-    personalContext: 'workspace', legacy: 'title-triggers',
+    personalContext: 'workspace',
   },
   subagentMaxConcurrent: {
     key: 'subagentMaxConcurrent', scope: ['workspace'], group: 'threads', page: 'threads',
@@ -47,7 +46,7 @@ export const SETTINGS_REGISTRY = {
     key: 'workspaceInstructions', scope: ['workspace'], group: 'instructions', page: 'instructions',
     ...settingMetadata('workspaceInstructions'),
     type: 'string', guard: z.string().trim().max(2000), defaultValue: '',
-    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', legacy: 'workspace-instructions',
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
   newWorkVisibility: {
     ...inherited, key: 'newWorkVisibility', group: 'work-creation', page: 'general',
@@ -76,6 +75,11 @@ export const SETTINGS_REGISTRY = {
 } satisfies Record<string, SettingDefinition>
 
 export type SettingKey = keyof typeof SETTINGS_REGISTRY
+export type SettingValueFor<K extends SettingKey> = z.output<(typeof SETTINGS_REGISTRY)[K]['guard']>
+
+export function personalSettingWorkspace(field: Pick<SettingDefinition, 'personalContext'>, workspaceId: string): string | null {
+  return field.personalContext === 'workspace' ? workspaceId : null
+}
 
 export function settingDefinition(key: string): SettingDefinition {
   if (!Object.hasOwn(SETTINGS_REGISTRY, key)) throw new z.ZodError([{ code: 'custom', path: [key], message: 'Unknown setting' }])
@@ -107,5 +111,5 @@ export function resolveSettingValue(key: string, personal: SettingValue | null |
 }
 
 export function settingsSchema(): SettingSchemaEntry[] {
-  return Object.values(SETTINGS_REGISTRY).map(({ guard: _guard, personalContext: _context, legacy: _legacy, ...entry }: SettingDefinition) => entry)
+  return Object.values(SETTINGS_REGISTRY).map(({ guard: _guard, personalContext: _context, ...entry }: SettingDefinition) => entry)
 }

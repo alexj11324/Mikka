@@ -298,7 +298,7 @@ export async function revokeShares(reader: ArtifactReader, artifactId: string): 
 type ShareViewer = ArtifactReader | null | (() => Promise<ArtifactReader | null>)
 
 async function sharedArtifactAccess(token: string, viewer?: ShareViewer) {
-  if (!/^mks_[A-Za-z0-9_-]{1,124}$/.test(token)) return null
+  if (!token.startsWith(SHARE_PREFIX) || !/^[A-Za-z0-9_-]{1,124}$/.test(token.slice(SHARE_PREFIX.length))) return null
   const [share] = await db.select({ artifactId: artifactShares.artifactId, createdBy: artifactShares.createdBy,
     visibility: artifactShares.visibility, workspaceId: artifacts.workspaceId }).from(artifactShares)
     .innerJoin(artifacts, eq(artifacts.id, artifactShares.artifactId))

@@ -106,6 +106,16 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       const sql=await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8')
       await pool.query(sql);await pool.query(sql)
     }
+    await pool.query(`CREATE TABLE user_preferences ("userId" text, "archiveIdleAfterDays" integer);
+      CREATE TABLE thread_title_settings ("userId" text, "workspaceId" uuid, instructions text, triggers text);
+      CREATE TABLE artifacts (id uuid PRIMARY KEY, "userId" text, "workspaceId" uuid, "runId" uuid, "issueId" uuid);
+      CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid);
+      CREATE TABLE coordinator_bots ("botId" uuid);
+      ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS "continuesRunId" uuid, ADD COLUMN IF NOT EXISTS "retryOf" uuid,
+        ADD COLUMN IF NOT EXISTS "questionContinuation" jsonb`)
+    for (const name of ['20261110150005_resource_acl.sql', '20261120185516_typed_setting_values.sql']) {
+      await pool.query(await readFile(new URL('../../drizzle/' + name, import.meta.url), 'utf8'))
+    }
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
     async function stateView() {

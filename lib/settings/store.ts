@@ -1,28 +1,23 @@
 import 'server-only'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { ResolvedSetting, SettingScope, SettingValue, SettingsView } from '@mikka/protocol/settings'
-import { workVisibilitySchema } from '@mikka/protocol/work-visibility'
 import { db } from '@/lib/db'
-import { threadTitleSettings, userPreferences, users } from '@/lib/db/schema'
+import { users } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace } from '@/lib/workspace-access'
-import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-title'
-import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
-import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
-import { personalSettingValues, workspaceSettingValues, workspaceInstructions } from './schema'
+import { workspaceListChanged } from '@/lib/live/lists'
+import { mirrorLegacySetting } from './legacy-mirrors'
+import { SETTINGS_REGISTRY, parseSettingsPatch, personalSettingWorkspace, settingDefinition, settingsResetInput, type SettingDefinition, type SettingKey } from './registry'
+import { readRuntimeSettings, type StoredSettingValue } from './runtime'
+import { personalSettingValues, workspaceSettingValues } from './schema'
 import { workCreationView } from './work-creation-policy'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
-type Reader = Pick<typeof db, 'select'>
+type Reader = Pick<typeof db, 'execute'>
 export interface SettingsContext { userId: string; workspaceId: string }
-type StoredValue = Pick<typeof personalSettingValues.$inferSelect, 'booleanValue' | 'integerValue' | 'textValue' | 'textArrayValue'>
 
-function unpack(row: StoredValue | undefined): SettingValue | null {
-  return row?.booleanValue ?? row?.integerValue ?? row?.textValue ?? row?.textArrayValue ?? null
-}
-
-function pack(field: SettingDefinition, raw: SettingValue | null): StoredValue {
-  const row: StoredValue = { booleanValue: null, integerValue: null, textValue: null, textArrayValue: null }
+function pack(field: SettingDefinition, raw: SettingValue | null): StoredSettingValue {
+  const row: StoredSettingValue = { booleanValue: null, integerValue: null, textValue: null, textArrayValue: null }
   if (raw === null) return row
   const value = field.guard.parse(raw)
   if (typeof value === 'boolean') row.booleanValue = value
@@ -33,15 +28,9 @@ function pack(field: SettingDefinition, raw: SettingValue | null): StoredValue {
 }
 
 async function readValues(context: SettingsContext, kind: 'personal' | 'team', database: Reader = db, scope: SettingScope = 'personal'): Promise<SettingsView> {
-  const personal = await database.select().from(personalSettingValues).where(and(eq(personalSettingValues.userId, context.userId),
-    or(isNull(personalSettingValues.workspaceId), eq(personalSettingValues.workspaceId, context.workspaceId))))
-  const workspace = await database.select().from(workspaceSettingValues).where(eq(workspaceSettingValues.workspaceId, context.workspaceId))
-  const values = Object.fromEntries(Object.values(SETTINGS_REGISTRY).map((field: SettingDefinition) => {
-    const own = personal.find(row => row.key === field.key && row.workspaceId === (field.personalContext === 'workspace' ? context.workspaceId : null))
-    return [field.key, resolveSettingValue(field.key, scope === 'personal' ? unpack(own) : null, unpack(workspace.find(row => row.key === field.key)))]
-  }))
-  const configured = { ...values.newWorkVisibility, value: workVisibilitySchema.parse(values.newWorkVisibility.value) }
-  return { workspaceId: context.workspaceId, values, workCreation: workCreationView(kind, configured, values.allowPrivateNewWork.value === true) }
+  const values = await readRuntimeSettings(database, Object.keys(SETTINGS_REGISTRY) as SettingKey[],
+    { workspaceId: context.workspaceId, ...(scope === 'personal' ? { userId: context.userId } : {}) })
+  return { workspaceId: context.workspaceId, values, workCreation: workCreationView(kind, values.newWorkVisibility, values.allowPrivateNewWork.value) }
 }
 
 /** Both API reads and background consumers re-admit the explicit workspace. */
@@ -63,30 +52,13 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
     const changed = { ...pack(field, value), updatedAt: new Date() }
     if (scope === 'personal') {
       await tx.insert(personalSettingValues).values({ userId: context.userId,
-        workspaceId: field.personalContext === 'workspace' ? context.workspaceId : null, key, ...changed })
+        workspaceId: personalSettingWorkspace(field, context.workspaceId), key, ...changed })
         .onConflictDoUpdate({ target: [personalSettingValues.userId, personalSettingValues.workspaceId, personalSettingValues.key], set: changed })
     } else {
       await tx.insert(workspaceSettingValues).values({ workspaceId: context.workspaceId, key, ...changed })
         .onConflictDoUpdate({ target: [workspaceSettingValues.workspaceId, workspaceSettingValues.key], set: changed })
     }
-    // Existing runtime readers and clients retain their typed columns during incremental adoption.
-    if (field.legacy === 'workspace-instructions' && scope === 'workspace') {
-      const instructions = (value ?? '') as string
-      await tx.insert(workspaceInstructions).values({ workspaceId: context.workspaceId, instructions })
-        .onConflictDoUpdate({ target: workspaceInstructions.workspaceId, set: { instructions, updatedAt: new Date() } })
-    }
-    if (field.legacy === 'archive-days' && scope === 'personal') {
-      const days = value === null ? 30 : value as number
-      await tx.insert(userPreferences).values({ userId: context.userId, archiveIdleAfterDays: days })
-        .onConflictDoUpdate({ target: userPreferences.userId, set: { archiveIdleAfterDays: days, updatedAt: new Date() } })
-      await archivePreferenceChanged(tx, context.userId)
-    }
-    if (field.legacy === 'title-instructions' || field.legacy === 'title-triggers') {
-      const change = field.legacy === 'title-instructions' ? { instructions: (value ?? '') as string }
-        : { triggers: (value ?? (scope === 'workspace' ? DEFAULT_TITLE_TRIGGERS : null)) as ThreadTitleTriggers | null }
-      await tx.insert(threadTitleSettings).values({ workspaceId: context.workspaceId, userId: scope === 'workspace' ? '' : context.userId, ...change })
-        .onConflictDoUpdate({ target: [threadTitleSettings.workspaceId, threadTitleSettings.userId], set: { ...change, updatedAt: new Date() } })
-    }
+    await mirrorLegacySetting(key)?.(tx, scope, context, value)
   }
 }
 

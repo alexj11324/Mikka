@@ -30,6 +30,11 @@ const requireFixtureProjectLease = (userId: string, selectedWorkspace: string) =
   assert.deepEqual([userId, selectedWorkspace], [owner, workspaceId])
   if (!projectLeaseActive) throw new ActionFailureError('projectEnvironmentUnavailable')
 }
+mock.module(new URL('./settings/work-creation.ts', import.meta.url).href, { namedExports: {
+  initializeWorkVisibility: async (_executor: unknown, actor: { userId: string; workspaceId: string }) => {
+    requireFixtureProjectLease(actor.userId, actor.workspaceId)
+  },
+} })
 mock.module(new URL('./project-resources/store.ts', import.meta.url).href, { namedExports: {
   withProjectExecution: async (input: ProjectExecutionInput, operation: (snapshot: ProjectExecutionSnapshot) => Promise<unknown>, requireExisting: boolean) => {
     assert.deepEqual(input, { userId: owner, workspaceId, issueId, repositoryKey: null, baseBranch: 'main', runtime: 'cloud', harness: 'codex' })
