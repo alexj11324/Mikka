@@ -435,7 +435,6 @@
     "passwordPlaceholder": "At least 8 characters",
     "submitCreate": "Create account and continue",
     "submitSignIn": "Sign in to the workspace",
-    "turnstilePending": "Verifying you're human…",
     "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired.",
     "googleAccountNotLinked": "This Google account is not linked to Mikka. Sign in with your existing method, then link Google in Settings → Account.",
     "githubAccountNotLinked": "This GitHub account is not linked to Mikka. Sign in with the method already linked to your account, or create a Mikka account first.",
@@ -480,6 +479,7 @@
     "retryIn": "Try again in {seconds}s",
     "verifyLinkInvalid": "This verification link is invalid, expired or already used. If your email is not verified yet, send a new link.",
     "verifyEmailLink": "Verify your email or resend the link",
+    "retryVerification": "Retry verification",
     "signupRefusal": {
       "disposableEmail": "Temporary email addresses aren't supported. Please use a regular address.",
       "signupRateLimited": "Too many sign-up attempts. Please try again later.",

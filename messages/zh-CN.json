@@ -435,7 +435,6 @@
     "passwordPlaceholder": "至少 8 位字符",
     "submitCreate": "创建账号并进入",
     "submitSignIn": "登录工作台",
-    "turnstilePending": "正在进行人机验证…",
     "oauthFailed": "OAuth 登录未完成，可能已取消或授权已过期。重新尝试。",
     "googleAccountNotLinked": "此 Google 账号尚未关联 Mikka。请先用已有方式登录，再到「设置 → 账户」关联 Google。",
     "githubAccountNotLinked": "此 GitHub 账号尚未关联 Mikka。请使用已关联的方式登录，或先创建 Mikka 账号。",
@@ -480,6 +479,7 @@
     "retryIn": "{seconds} 秒后可重试",
     "verifyLinkInvalid": "验证链接无效、已过期或已使用。如邮箱尚未验证，请重新发送。",
     "verifyEmailLink": "验证邮箱或重新发送验证邮件",
+    "retryVerification": "重试人机验证",
     "signupRefusal": {
       "disposableEmail": "不支持临时邮箱，请使用常用邮箱。",
       "signupRateLimited": "注册请求过多，请稍后重试。",
