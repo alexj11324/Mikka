@@ -5,6 +5,7 @@ import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { readSettings, resetSettings, writeSettings } from '@/lib/settings/store'
 import { settingsSchema } from '@/lib/settings/registry'
 import { requireUser } from '@/lib/issue-access'
+import { writeDeviceConcurrency } from '@/lib/settings/device-concurrency'
 
 export async function getSettings(workspaceId?: string) {
   return settingsWorkspaceAction(async () => readSettings(await currentWorkspaceActor(workspaceId)))
@@ -26,4 +27,7 @@ export async function resetWorkspaceSettings(workspaceId: string, raw: unknown) 
 }
 export async function getSettingsSchema() {
   return settingsWorkspaceAction(async () => { await requireUser(); return { settings: settingsSchema() } })
+}
+export async function patchDeviceConcurrency(deviceId: string, raw: unknown, workspaceId?: string) {
+  return settingsWorkspaceAction(async () => writeDeviceConcurrency(await currentWorkspaceActor(workspaceId), deviceId, raw))
 }

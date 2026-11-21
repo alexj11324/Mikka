@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { applySettingsMigration } from '../../tests/support/settings-migration'
 import { observePoolCommits } from '../db/commit-effects'
 import type { LiveScope } from '../live/scope'
 import type { LiveInvalidation } from '../live/events'
@@ -55,6 +56,7 @@ before(async () => {
   for (const name of ['20261027164501_cloud_computers.sql', '20261029011635_subagents_thread_machines.sql', '20261029080000_unattended_browser_runtime.sql', '20261029080001_owner_cloud_machines.sql']) {
     await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
   }
+  await applySettingsMigration(pool)
   await pool.query(`CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text DEFAULT 'allow',version bigint DEFAULT 0,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
     CREATE TABLE agent_kit_heads(owner_id text,bot_id uuid,workspace_id uuid,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
     CREATE TABLE pending_actions(id uuid PRIMARY KEY,"botId" uuid,"userId" text NOT NULL,action text NOT NULL,input jsonb NOT NULL,status text DEFAULT 'pending',"createdAt" timestamptz DEFAULT now(),"decidedAt" timestamptz,result jsonb,error text);

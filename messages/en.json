@@ -9046,6 +9046,14 @@
     "subagentMaxConcurrent": {
       "label": "Concurrent subagents",
       "keywords": "agent|concurrency|limit"
+    },
+    "protectManualThreadTitles": {
+      "label": "Protect manually named threads",
+      "keywords": "title|manual|rename"
+    },
+    "keepPinnedThreadsActive": {
+      "label": "Keep pinned threads active",
+      "keywords": "pin|archive"
     }
   }
 }

@@ -9,11 +9,13 @@ import { connectComputer } from '@/lib/computer/e2b-provider'
 import { maskFor } from '@/lib/secrets/runtime'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
+import { readRuntimeSetting } from '@/lib/settings/runtime'
 export type Actor = { userId: string; workspaceId: string }
 export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null; activeActionId?: string | null; nextAttemptAt?: Date | null; activeSteps?: number; consecutiveFailures?: number }
 /** Queued web tasks wait for a slot; wake them to try again (their workflow re-checks). */
 export async function wakeQueuedSubagents(client: Pick<Pool, 'query'>, ownerId: string, workspaceId: string) {
-  const { rows } = await client.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "ownerId"=$1 AND "workspaceId"=$2 AND status='queued' ORDER BY "createdAt" LIMIT 6`, [ownerId, workspaceId])
+  const limit = await readRuntimeSetting(client, 'subagentMaxConcurrent', { userId: ownerId, workspaceId })
+  const { rows } = await client.query<{ id: string }>(`SELECT id FROM bot_subagents WHERE "ownerId"=$1 AND "workspaceId"=$2 AND status='queued' ORDER BY "createdAt" LIMIT $3`, [ownerId, workspaceId, limit.value])
   for (const { id } of rows) wakeWorkflowAfterCommit(client, wakeTokens.subagent(id))
 }
 export class SubagentStore {
@@ -39,7 +41,7 @@ export class SubagentStore {
     await client.query('INSERT INTO subagent_events ("ownerId","workspaceId","botId","subagentId",event) VALUES ($1,$2,$3,$4,$5)', [row.ownerId, row.workspaceId, row.botId, row.id, JSON.stringify(event)])
     // Its workflow waits on this change instead of re-reading every 30 s (#1212).
     if (this.options.wakeSelf !== false) wakeWorkflowAfterCommit(client, wakeTokens.subagent(row.id))
-    // An ended task frees one of the owner's six browser slots for the next queued one.
+    // An ended task frees one of the owner's configured browser slots for the next queued one.
     if (['done', 'failed', 'stopped'].includes(row.status)) await wakeQueuedSubagents(client, row.ownerId, row.workspaceId)
     return event
   }
@@ -62,7 +64,8 @@ export class SubagentStore {
       }
       const count = Number((await client.query(`SELECT count(*) AS n FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND (status IN ('running','needs_you') OR (status='queued' AND "startLeaseUntil">now()))`, [actor.workspaceId,actor.userId])).rows[0].n)
       const older = await client.query(`SELECT 1 FROM bot_subagents WHERE "workspaceId"=$1 AND "ownerId"=$2 AND status='queued' AND ("startLeaseUntil" IS NULL OR "startLeaseUntil"<=now()) AND "createdAt"<(SELECT "createdAt" FROM bot_subagents WHERE id=$3) LIMIT 1`, [actor.workspaceId,actor.userId,id])
-      if (count >= 6 || older.rowCount) { await client.query('COMMIT'); return row }
+      const limit = await readRuntimeSetting(client, 'subagentMaxConcurrent', actor)
+      if (count >= limit.value || older.rowCount) { await client.query('COMMIT'); return row }
       const claimed = await client.query(`UPDATE bot_subagents SET "startLeaseId"=$2,"startLeaseUntil"=now()+interval '3 minutes' WHERE id=$1 AND status='queued' AND ("startLeaseUntil" IS NULL OR "startLeaseUntil"<=now()) RETURNING id`, [id,leaseId])
       await client.query('COMMIT')
       if (!claimed.rowCount) return row

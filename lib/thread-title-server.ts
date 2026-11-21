@@ -4,6 +4,7 @@ import { causeFields } from '@mikka/protocol/coded-error'
 import { pool } from '@/lib/db'
 import { defaultModelAvailable } from '@/lib/default-model'
 import { runListChanged } from '@/lib/live/lists'
+import { readRuntimeSetting } from '@/lib/settings/runtime'
 import { readRunChain } from '@/lib/run-chain'
 import { threadTitlePlan, effectiveTitleSettings, manualThreadTitle, READ_CHAIN_TITLE, READ_TITLE_SETTINGS, titleTriggerAllows, WRITE_THREAD_TITLE, type ThreadTitleSettingRow, type ThreadTitleSource, type ThreadTitleTrigger } from './thread-title'
 
@@ -48,24 +49,31 @@ export async function nameThread(database: Query, runId: string, ownerId: string
     if (!titleTriggerAllows(trigger, settings.triggers)) return null
     const runIds = await chainOf(database, ownerId, runId)
     const chain = ((await database.query(READ_CHAIN_TITLE, [runIds, ownerId])).rows[0] ?? { title: null, titleSource: null }) as { title: string | null; titleSource: ThreadTitleSource | null }
-    const plan = threadTitlePlan(trigger, run, chain, runIds.length)
+    const protection = await readRuntimeSetting(database, 'protectManualThreadTitles', { userId: ownerId, workspaceId: tenant })
+    const plan = threadTitlePlan(trigger, run, chain, runIds.length, protection.value)
     if (plan.do === 'keep') return null
     if (plan.do === 'copy') {
-      const changed = await write(database, ownerId, tenant, runIds, plan.title, plan.source, plan.source === 'manual')
+      const changed = await write(database, ownerId, tenant, runIds, plan.title, plan.source, plan.source === 'manual',
+        plan.source === 'manual' ? plan.title : undefined)
       return { kind: 'copied' as const, title: changed ? plan.title : null }
     }
     const [first = '', ...rest] = run.asked.split('\n').map(line => line.trim()).filter(Boolean)
     if (!first) return null
     const pullRequest = trigger === 'created' ? undefined : (await database.query(READ_PULL_REQUEST, [runIds])).rows[0] as { title: string } | undefined
     const body = [rest.join('\n'), trigger === 'created' ? '' : run.summary, pullRequest?.title ? `Pull request: ${pullRequest.title}` : ''].filter(Boolean).join('\n\n')
-    return { kind: 'generate' as const, first, body, chain, runIds, naming: settings.instructions }
+    return { kind: 'generate' as const, first, body, chain, runIds, naming: settings.instructions, protectManual: protection.value }
   })
   if (!input || input.kind === 'copied') return input?.title ?? null
   // The model runs outside the membership lock. Re-admit before persisting its result.
   const title = await generate(ownerId, { title: input.first, body: input.body }, tenant, input.naming)
   if (!title) return null
-  const changed = await withConversationWorkspace(ownerId, tenant, () => write(database, ownerId, tenant, input.runIds, title, 'generated',
-    trigger === 'regenerate', input.chain.titleSource === 'manual' ? input.chain.title : null))
+  const changed = await withConversationWorkspace(ownerId, tenant, async () => {
+    const protection = await readRuntimeSetting(database, 'protectManualThreadTitles', { userId: ownerId, workspaceId: tenant })
+    // A protection change during generation must not authorize overwriting a manual title.
+    const mayReplaceManual = trigger === 'regenerate' || (!input.protectManual && !protection.value)
+    return write(database, ownerId, tenant, input.runIds, title, 'generated', mayReplaceManual,
+      input.chain.titleSource === 'manual' ? input.chain.title : null)
+  })
   return changed ? title : null
 }
 

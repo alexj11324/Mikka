@@ -1,26 +1,22 @@
 import 'server-only'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import type { ResolvedSetting, SettingScope, SettingValue, SettingsView } from '@mikka/protocol/settings'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace } from '@/lib/workspace-access'
-import { workspaceListChanged } from '@/lib/live/lists'
+import { threadDirectorySettingsChanged, workspaceListChanged } from '@/lib/live/lists'
+import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { mirrorLegacySetting } from './legacy-mirrors'
-import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
+import { SETTINGS_REGISTRY, parseSettingsPatch, personalSettingWorkspace, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues } from './schema'
+import { unpackSettingValue, type StoredSettingValue } from './stored-value'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
 export interface SettingsContext { userId: string; workspaceId: string }
-type StoredValue = Pick<typeof personalSettingValues.$inferSelect, 'booleanValue' | 'integerValue' | 'textValue' | 'textArrayValue'>
-
-function unpack(row: StoredValue | undefined): SettingValue | null {
-  return row?.booleanValue ?? row?.integerValue ?? row?.textValue ?? row?.textArrayValue ?? null
-}
-
-function pack(field: SettingDefinition, raw: SettingValue | null): StoredValue {
-  const row: StoredValue = { booleanValue: null, integerValue: null, textValue: null, textArrayValue: null }
+function pack(field: SettingDefinition, raw: SettingValue | null): StoredSettingValue {
+  const row: StoredSettingValue = { booleanValue: null, integerValue: null, textValue: null, textArrayValue: null }
   if (raw === null) return row
   const value = field.guard.parse(raw)
   if (typeof value === 'boolean') row.booleanValue = value
@@ -35,8 +31,8 @@ async function readValues(context: SettingsContext, database: Reader = db, scope
     or(isNull(personalSettingValues.workspaceId), eq(personalSettingValues.workspaceId, context.workspaceId))))
   const workspace = await database.select().from(workspaceSettingValues).where(eq(workspaceSettingValues.workspaceId, context.workspaceId))
   const values = Object.fromEntries(Object.values(SETTINGS_REGISTRY).map((field: SettingDefinition) => {
-    const own = personal.find(row => row.key === field.key && row.workspaceId === (field.personalContext === 'workspace' ? context.workspaceId : null))
-    return [field.key, resolveSettingValue(field.key, scope === 'personal' ? unpack(own) : null, unpack(workspace.find(row => row.key === field.key)))]
+    const own = personal.find(row => row.key === field.key && row.workspaceId === personalSettingWorkspace(field, context.workspaceId))
+    return [field.key, resolveSettingValue(field.key, scope === 'personal' ? unpackSettingValue(own) : null, unpackSettingValue(workspace.find(row => row.key === field.key)))]
   }))
   return { workspaceId: context.workspaceId, values }
 }
@@ -60,13 +56,25 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
     const changed = { ...pack(field, value), updatedAt: new Date() }
     if (scope === 'personal') {
       await tx.insert(personalSettingValues).values({ userId: context.userId,
-        workspaceId: field.personalContext === 'workspace' ? context.workspaceId : null, key, ...changed })
+        workspaceId: personalSettingWorkspace(field, context.workspaceId), key, ...changed })
         .onConflictDoUpdate({ target: [personalSettingValues.userId, personalSettingValues.workspaceId, personalSettingValues.key], set: changed })
     } else {
       await tx.insert(workspaceSettingValues).values({ workspaceId: context.workspaceId, key, ...changed })
         .onConflictDoUpdate({ target: [workspaceSettingValues.workspaceId, workspaceSettingValues.key], set: changed })
     }
     await mirrorLegacySetting(key)?.(tx, scope, context, value)
+  }
+  if (Object.hasOwn(values, 'keepPinnedThreadsActive') || scope === 'workspace' && Object.hasOwn(values, 'archiveIdleAfterDays')) {
+    await threadDirectorySettingsChanged(tx, context.workspaceId, scope === 'personal' ? context.userId : undefined)
+  }
+  if (scope === 'workspace' && Object.hasOwn(values, 'subagentMaxConcurrent')) {
+    // Raising capacity wakes the existing waiting workflows after commit; no new polling loop.
+    const limit = Number(values.subagentMaxConcurrent ?? SETTINGS_REGISTRY.subagentMaxConcurrent.defaultValue)
+    const { rows } = await tx.execute<{ id: string }>(sql`SELECT id FROM (
+      SELECT id,row_number() OVER (PARTITION BY "ownerId" ORDER BY "createdAt",id) AS position
+      FROM bot_subagents WHERE "workspaceId"=${context.workspaceId} AND status='queued'
+    ) waiting WHERE position<=${limit}`)
+    for (const { id } of rows) wakeWorkflowAfterCommit(tx, wakeTokens.subagent(id))
   }
 }
 

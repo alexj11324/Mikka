@@ -9046,6 +9046,14 @@
     "subagentMaxConcurrent": {
       "label": "并发子 Agent 数量",
       "keywords": "子 Agent|并发|限制"
+    },
+    "protectManualThreadTitles": {
+      "label": "保护手动命名的线程",
+      "keywords": "标题|手动"
+    },
+    "keepPinnedThreadsActive": {
+      "label": "保留置顶线程",
+      "keywords": "置顶|归档"
     }
   }
 }

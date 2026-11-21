@@ -54,3 +54,7 @@ test('creation and Regenerate always name; the other triggers follow the setting
   assert.equal(titleTriggerAllows('pull_opened', 'first_run_ended'), false)
   assert.equal(titleTriggerAllows('pull_opened', 'either'), true)
 })
+test('explicitly disabling manual protection permits automatic renaming while a continuation still copies its title', () => {
+  assert.deepEqual(threadTitlePlan('pull_opened', manual, manual, 2, false), { do: 'generate' })
+  assert.deepEqual(threadTitlePlan('created', none, manual, 2, false), { do: 'copy', title: manual.title, source: 'manual' })
+})

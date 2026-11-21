@@ -41,9 +41,24 @@ export const SETTINGS_REGISTRY = {
     type: 'integer', guard: z.number().int().min(1).max(20), defaultValue: 6,
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
+  protectManualThreadTitles: {
+    ...inherited, key: 'protectManualThreadTitles', group: 'threads', page: 'threads',
+    ...settingMetadata('protectManualThreadTitles'),
+    type: 'boolean', guard: z.boolean(), defaultValue: true, personalContext: 'workspace',
+  },
+  keepPinnedThreadsActive: {
+    ...inherited, key: 'keepPinnedThreadsActive', group: 'threads', page: 'threads',
+    ...settingMetadata('keepPinnedThreadsActive'),
+    type: 'boolean', guard: z.boolean(), defaultValue: true, personalContext: 'workspace',
+  },
 } satisfies Record<string, SettingDefinition>
 
 export type SettingKey = keyof typeof SETTINGS_REGISTRY
+export type SettingValueFor<K extends SettingKey> = z.output<(typeof SETTINGS_REGISTRY)[K]['guard']>
+
+export function personalSettingWorkspace(field: Pick<SettingDefinition, 'personalContext'>, workspaceId: string): string | null {
+  return field.personalContext === 'workspace' ? workspaceId : null
+}
 
 export function settingDefinition(key: string): SettingDefinition {
   if (!Object.hasOwn(SETTINGS_REGISTRY, key)) throw new z.ZodError([{ code: 'custom', path: [key], message: 'Unknown setting' }])

@@ -159,6 +159,10 @@ export const archivePreferenceChanged = (executor: object, ownerId: string) => c
     WHERE m."userId"=$1 AND m.status='active' AND (w.kind='team' OR w."userId"=$1)`, [ownerId])
   return rows.map(scope => target(scope, ['thread_list', 'group_list']))
 })
+/** Workspace defaults affect its members; a scoped personal pin preference affects only that reader. */
+export const threadDirectorySettingsChanged = (executor: object, workspaceId: string, ownerId?: string) =>
+  changed(executor, `directory-settings:${workspaceId}:${ownerId ?? 'workspace'}`, async (_db, workspace) =>
+    (await workspaceScopes(workspace, workspaceId, ownerId ? [ownerId] : null)).map(scope => target(scope, ['thread_list', 'group_list'])))
 export const ownerListChanged = (executor: object, ownerId: string, kinds: readonly OwnerListKind[]) => changed(executor, `owner:${ownerId}:${[...kinds].sort().join(',')}`, (_db, workspace) => ownerListTargets(workspace, ownerId, kinds))
 /** 自动化: a workspace's schedules, their next run and their history. */
 export const scheduleListChanged = (executor: object, workspaceId: string) => workspaceListChanged(executor, workspaceId, ['schedule_list'])
