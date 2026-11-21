@@ -24,8 +24,12 @@ export type ChatComposerProps = {
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
-  /** A bot chat's model chip (the model-picker slot), beside attach. */
-  model?: ReactNode
+  /** Controls at the presentation's existing leading position, such as its attachment menu. */
+  leadingControls?: ReactNode
+  /** Controls before the send action, such as model and effort; each presentation keeps their existing position. */
+  leftControls?: ReactNode
+  /** Caller-owned content below the input. An absent footer adds no wrapper or space. */
+  footer?: ReactNode
   /** The person's send key (偏好设置); the caller reads it from their preferences. */
   sendKey?: SendKey
   /** A thread's composer, not a bot chat's: choosing a chat focuses only the latter, and Esc never stops the run (decision 2026-11-02-0301). */

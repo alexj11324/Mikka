@@ -33,6 +33,17 @@ async function requireAdmin(actorId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
 }
 
+/** Plan points granted for the active paid period (per-invoice grants plus their refills), in microdollars; the same active-grant window `HostedUsageStore.balance` uses. */
+async function planGrantLimit(workspaceId: string) {
+  const { rows } = await pool.query<{ limit: number }>(
+    `SELECT COALESCE(sum((g."points"::bigint + COALESCE((SELECT sum(r."points") FROM workspace_credit_grants r WHERE r."parentGrantId"=g.id),0))*$2::bigint),0)::float8 AS limit
+     FROM workspace_credit_grants g
+     WHERE g."workspaceId"=$1 AND g.bucket='plan' AND g."parentGrantId" IS NULL AND g.points>0
+       AND (g."periodStart" IS NULL OR g."periodStart"<=now()) AND (g."expiresAt" IS NULL OR g."expiresAt">now())`,
+    [workspaceId, MICRO_USD_PER_POINT])
+  return Number(rows[0]?.limit ?? 0)
+}
+
 async function activeMembers(workspaceId: string) {
   const [row] = await workspaceDb.select({ n: sql<number>`count(*)::int` }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.status, 'active')))
   return row?.n ?? 0
@@ -74,6 +85,7 @@ export async function readBillingAccount(workspaceId: string, env: Env, members?
     currentPeriodEnd: billing?.currentPeriodEnd?.toISOString() ?? null,
     hasCustomer: Boolean(billing?.stripeCustomerId),
     planPoints: billing?.billingModel === 'resource_v1' || balance.plan > 0 ? balance.plan / MICRO_USD_PER_POINT : null,
+    planPointsLimit: (await planGrantLimit(workspaceId)) / MICRO_USD_PER_POINT || null,
     purchasedPoints: balance.purchased / MICRO_USD_PER_POINT,
     autoRecharge: autoRechargePolicy(billing),
   }

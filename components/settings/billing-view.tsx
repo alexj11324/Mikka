@@ -56,7 +56,7 @@ export function BillingPageView({ plan: planState, balance, allowance, computerB
     </SettingsSection>
 
     {computerBilling && (data.planPoints !== null || data.purchasedPoints > 0) && <SettingsSection id="billing-points" title={t('points')}>
-      {data.planPoints !== null && <SettingRow title={t('planPoints')}><span>{t('pointsValue', { points: number.format(data.planPoints) })}</span></SettingRow>}
+      {data.planPoints !== null && <SettingRow title={t('planPoints')}><span>{data.planPointsLimit !== null ? `${number.format(Math.max(0, data.planPointsLimit - data.planPoints))} / ${t('pointsValue', { points: number.format(data.planPointsLimit) })}` : t('pointsValue', { points: number.format(data.planPoints) })}</span></SettingRow>}
       {data.purchasedPoints > 0 && <SettingRow title={t('purchasedPoints')} description={t('neverExpires')}><span>{t('pointsValue', { points: number.format(data.purchasedPoints) })}</span></SettingRow>}
     </SettingsSection>}
 

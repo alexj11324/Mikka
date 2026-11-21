@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ModelSourceBadge, ModelVendorMark } from '@/components/labels/model-vendor-mark'
 import { modelDisplayName } from '@/lib/model-display-name'
-import { useBotModelPicker, type ChipModel } from '@/hooks/use-bot-model-picker'
+import { useBotModelPicker, type BotModelPickerState, type ChipModel } from '@/hooks/use-bot-model-picker'
 import type { BotModelPickerProps } from '@/components/slots/model-picker-contract'
 import { cn } from '@/lib/utils'
 
@@ -31,8 +31,16 @@ function OptionLabel({ option, name }: { option: ChipModel; name: string }) {
  * menu of what this person can use here. The choice is saved per bot; a run
  * already going keeps its model.
  */
-export function BotModelPicker({ botId, running = false, thread }: BotModelPickerProps) {
-  const picker = useBotModelPicker(botId, thread)
+export function BotModelPicker(props: BotModelPickerProps) {
+  return props.controller ? <PickerView {...props} picker={props.controller} /> : <BoundPicker {...props} />
+}
+
+function BoundPicker(props: BotModelPickerProps) {
+  const picker = useBotModelPicker(props.botId, props.thread)
+  return <PickerView {...props} picker={picker} />
+}
+
+function PickerView({ running = false, picker }: BotModelPickerProps & { picker: BotModelPickerState }) {
   const { t, last } = picker
   // Someone else's bot gets no chip; while the menu loads, the chip keeps the model it showed last time (state completeness).
   // It is the chip's look only, not a control, until the menu it opens has arrived.

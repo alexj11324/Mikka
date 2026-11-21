@@ -25,6 +25,8 @@ export interface BillingView {
   currentPeriodEnd: string | null
   hasCustomer: boolean
   planPoints: number | null
+  /** Plan points granted for the active paid period, refills included; null when no active plan grant. `planPoints` is what remains of it. */
+  planPointsLimit: number | null
   purchasedPoints: number
   autoRecharge?: AutoRechargePolicyView
 }
