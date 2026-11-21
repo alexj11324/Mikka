@@ -148,6 +148,13 @@ jobs:
             sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
             sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
           fi
+      - name: Ensure isolated process support for HTTP provider fixtures
+        run: |
+          if ! command -v bwrap >/dev/null; then
+            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y bubblewrap
+          fi
       - name: Run selected integration tasks through Nx Core
         run: node scripts/ci/run-units.mjs integration
         env:

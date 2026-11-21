@@ -78,6 +78,9 @@ try {
   // The complete migration runner above already applied SQL-only runtime,
   // CLI policy and Factory tables. Never replay a handwritten subset here.
   for (const statement of postgresSchemaStatements) await pool.query(statement)
+  // A fresh full schema has no usable planner statistics yet. Account-pool
+  // ownership checks join the catalog under their unchanged bounded timeout.
+  await pool.query('ANALYZE')
   console.log('独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。')
 } finally {
   await pool.end()

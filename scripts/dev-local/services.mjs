@@ -1,21 +1,15 @@
-// pnpm dev:local's substitutes for the cloud services other than GitHub
-// (docs/local-runtime.md). They are extra routes on the one local fake-service
-// process (tests/mvp/services.mjs, 127.0.0.1:3191):
-//
-//   /litellm/v1/chat/completions   LiteLLM Chat Completions (scripted, no LLM)
-//   /litellm/v1/decisions          LiteLLM Decisions (first choice / 0.5)
-//   /resend/emails                 Resend send-email → local outbox
-//   /mail, /mail.json              the outbox
-//
-// The preload sends requests here only when no real key is set
-// (scripts/dev-local/transport.mjs), so each route accepts only the placeholder.
+// Loopback substitutes for the guarded local development environment.
+// Model serialization belongs exclusively to tests/fakes/litellm.mjs.
 import { randomUUID } from 'node:crypto'
+import { createLiteLlmRoutes, FAKE_LITELLM_KEY } from '../../tests/fakes/litellm.mjs'
+import { localModelAnswer, localDecision } from './model.mjs'
+export { localModelAnswer, localDecision } from './model.mjs'
 import { MVP_SERVICES } from '../../tests/mvp/isolated-env.mjs'
 
 /** The placeholder for RESEND_API_KEY when the developer set none. Not a credential. */
 export const LOCAL_RESEND_KEY = 'mikka-local-outbox'
 /** The placeholder LiteLLM service and key; never a live model credential. */
-export const LOCAL_LITELLM_KEY = 'mikka-local-litellm'
+export const LOCAL_LITELLM_KEY = FAKE_LITELLM_KEY
 export const LOCAL_LITELLM_URL = `${MVP_SERVICES}/litellm`
 /** The placeholder for CRON_SECRET when the developer set none. Not a credential. */
 export const LOCAL_CRON_SECRET = 'mikka-local-cron'
@@ -31,74 +25,6 @@ async function readJson(request) {
     chunks.push(chunk)
   }
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {}
-}
-
-const textOf = message => typeof message?.content === 'string' ? message.content
-  : (message?.content ?? []).filter(part => part.type === 'text').map(part => part.text).join('\n')
-
-
-/**
- * A scripted model. A user message `/tool <name> <json>` calls that registered
- * tool; a tool result is reported back as JSON; anything else is echoed.
- */
-export function localModelAnswer(request) {
-  const prompt = request.prompt ?? []
-  const last = prompt.at(-1)
-  if (last?.role === 'tool') {
-    const results = (last.content ?? []).filter(part => part.type === 'tool-result')
-    const summary = results.map(part => `${part.toolName}: ${JSON.stringify(part.output?.value ?? part.output ?? null).slice(0, 2000)}`).join('\n')
-    return { content: [{ type: 'text', text: summary || 'ok' }], finishReason: 'stop' }
-  }
-  const text = textOf(prompt.findLast(message => message.role === 'user')).trim()
-  const command = /^\/tool\s+([\w.-]+)\s*([\s\S]*)$/.exec(text.split('\n').findLast(line => line.startsWith('/tool ')) ?? '')
-  if (command) {
-    const [, toolName, raw] = command
-    if (!request.tools?.some(tool => tool.name === toolName))
-      return { content: [{ type: 'text', text: `Local model: no tool named ${toolName}. Tools: ${(request.tools ?? []).map(tool => tool.name).join(', ')}` }], finishReason: 'stop' }
-    let input
-    try { input = raw.trim() ? JSON.parse(raw) : {} } catch { return { content: [{ type: 'text', text: 'Local model: the tool input is not JSON.' }], finishReason: 'stop' } }
-    return { content: [{ type: 'tool-call', toolCallId: `local-${randomUUID()}`, toolName, input: JSON.stringify(input) }], finishReason: 'tool-calls' }
-  }
-  return { content: [{ type: 'text', text: `Local model: ${text || '(empty)'}` }], finishReason: 'stop' }
-}
-
-/** An OpenAI chat-completions request read as the scripted model's prompt. */
-export function chatCompletionPrompt(body) {
-  const names = new Map()
-  for (const message of body.messages ?? []) for (const call of message.tool_calls ?? []) names.set(call.id, call.function?.name)
-  const prompt = (body.messages ?? []).map(message => message.role === 'tool'
-    ? { role: 'tool', content: [{ type: 'tool-result', toolName: names.get(message.tool_call_id) ?? 'tool', output: { value: message.content } }] }
-    : { role: message.role, content: message.content })
-  return { prompt, tools: (body.tools ?? []).map(tool => ({ name: tool.function?.name })) }
-}
-
-/** The scripted answer as an OpenAI chat completion, or its server-sent chunks. */
-export function chatCompletion(answer, model, stream) {
-  const id = `local-${randomUUID()}`, created = Math.floor(Date.now() / 1000)
-  const text = answer.content.filter(part => part.type === 'text').map(part => part.text).join('')
-  const calls = answer.content.filter(part => part.type === 'tool-call')
-    .map((part, index) => ({ index, id: part.toolCallId, type: 'function', function: { name: part.toolName, arguments: part.input } }))
-  const finish = answer.finishReason === 'tool-calls' ? 'tool_calls' : 'stop'
-  const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
-  if (!stream) return { id, object: 'chat.completion', created, model, usage,
-    choices: [{ index: 0, finish_reason: finish, message: { role: 'assistant', content: text || null, ...(calls.length ? { tool_calls: calls } : {}) } }] }
-  const chunk = (delta, finishReason = null, extra = {}) => ({ id, object: 'chat.completion.chunk', created, model, choices: [{ index: 0, delta, finish_reason: finishReason }], ...extra })
-  return [
-    chunk({ role: 'assistant' }),
-    ...(text.match(/[\s\S]{1,24}/g) ?? []).map(content => chunk({ content })),
-    ...(calls.length ? [chunk({ tool_calls: calls })] : []),
-    chunk({}, finish, { usage }),
-  ]
-}
-
-/** Decision API answers: the first choice, or probability 0.5. */
-export function localDecision(input) {
-  return {
-    model: input.model,
-    answers: (input.questions ?? []).map(question => question.type === 'choice'
-      ? { type: 'choice', name: question.name, choice: question.choices?.[0]?.value }
-      : { type: 'predicate', name: question.name, probability: 0.5 }),
-  }
 }
 
 /**
@@ -122,8 +48,9 @@ const escape = value => String(value).replace(/[&<>"']/g, c => `&#${c.charCodeAt
  * The `routes` hook for startMvpServices: answers its own paths and returns
  * true, or returns false for the fake GitHub and the MVP routes.
  */
-export function localServiceRoutes({ log = console.info, origin = 'http://127.0.0.1:3191' } = {}) {
+export function localServiceRoutes({ log = console.info, origin = 'http://127.0.0.1:3191', observe = () => {} } = {}) {
   const outbox = []
+  const modelRoutes = createLiteLlmRoutes({ answer: localModelAnswer, decision: localDecision, observe })
   const routes = async (request, response, url) => {
     const json = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); return true }
     const bearer = request.headers.authorization?.replace(/^Bearer /, '')
@@ -143,25 +70,7 @@ export function localServiceRoutes({ log = console.info, origin = 'http://127.0.
         log(`mail "${mail.subject}" to ${mail.to.join(', ')}: ${origin}/mail`)
         return json({ id: mail.id })
       }
-      if (url.pathname.startsWith('/litellm/')) {
-        response.setHeader('x-litellm-call-id', `local-${randomUUID()}`)
-        response.setHeader('x-litellm-response-cost', '0')
-      }
-      if (url.pathname === '/litellm/v1/chat/completions' && request.method === 'POST') {
-        if (bearer !== LOCAL_LITELLM_KEY) return json({ error: { message: 'unknown key', type: 'authentication_error' } }, 401)
-        const body = await readJson(request)
-        const answer = localModelAnswer(chatCompletionPrompt(body))
-        if (!body.stream) return json(chatCompletion(answer, body.model, false))
-        response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
-        for (const part of chatCompletion(answer, body.model, true)) response.write(`data: ${JSON.stringify(part)}\n\n`)
-        response.end('data: [DONE]\n\n')
-        return true
-      }
-      if (!url.pathname.startsWith('/litellm/')) return false
-      if (bearer !== LOCAL_LITELLM_KEY) return json({ error: { message: 'unknown key', type: 'authentication_error' } }, 401)
-      if (url.pathname === '/litellm/v1/models' && request.method === 'GET') return json({ data: ['mikka-default', 'mikka-title', 'mikka-decision', 'mikka-planning'].map(id => ({ id })) })
-      if (url.pathname === '/litellm/v1/decisions' && request.method === 'POST') return json(localDecision(await readJson(request)))
-      return json({ error: { message: 'No local model substitute for this route', type: 'not_found' } }, 404)
+      return modelRoutes(request, response, url)
     } catch (error) {
       return json({ error: { message: error.message, type: 'local_services_error' } }, 500)
     }

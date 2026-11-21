@@ -140,7 +140,7 @@ export async function verifyFactoryHandoff(context) {
   const marker = `handoff-${randomUUID()}`, filename = `${marker}.txt`, expected = Buffer.from(`${marker}\n`)
   const evidence = { version: 1, marker, status: 'running', startedAt: new Date().toISOString(),
     daemonStallMinutes: context.daemonStallMinutes ?? 10,
-    boundaries: ['Real DeepSeek Flash via normal account authorization', 'Real daemons and unchanged 90s leases/minute cron',
+    boundaries: ['Scripted model via fake LiteLLM and normal account authorization', 'Real daemons and unchanged 90s leases/minute cron',
       'Disposable local database; SELECT evidence only', 'Local fixture GitHub and real bare Git publication',
       'Offline handoff only; not the 45-minute online-stall watchdog or production acceptance'] }
   const record = async (phase, data = {}) => {

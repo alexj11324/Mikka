@@ -10,24 +10,25 @@ import { once } from 'node:events'
 import { stopOwnedServices } from './shutdown.mjs'
 import { grantLocalCredits, localDecision, localModelAnswer, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY } from './services.mjs'
 
-test('the scripted model echoes, calls a registered tool on /tool and reports tool results', () => {
+test('the scripted model matches explicit /echo and /tool scripts and refuses unfamiliar prompts', () => {
   const user = text => ({ prompt: [{ role: 'user', content: [{ type: 'text', text }] }], tools: [{ type: 'function', name: 'create_issue' }] })
-  assert.deepEqual(localModelAnswer(user('hello')).content, [{ type: 'text', text: 'Local model: hello' }])
+  assert.deepEqual(localModelAnswer(user('/echo hello')).content, [{ type: 'text', text: 'Local model: hello' }])
   const call = localModelAnswer(user('/tool create_issue {"title":"A"}'))
   assert.equal(call.finishReason, 'tool-calls')
   assert.equal(call.content[0].toolName, 'create_issue')
   assert.deepEqual(JSON.parse(call.content[0].input), { title: 'A' })
-  assert.match(localModelAnswer(user('/tool nope {}')).content[0].text, /no tool named nope/)
-  const result = localModelAnswer({ prompt: [{ role: 'tool', content: [{ type: 'tool-result', toolName: 'create_issue', output: { type: 'json', value: { id: 'x' } } }] }] })
+  assert.equal(localModelAnswer(user('/tool nope {}')), null)
+  assert.equal(localModelAnswer(user('unregistered free-form prompt')), null)
+  const result = localModelAnswer({ ...user('/tool create_issue {"title":"A"}'), prompt: [...user('/tool create_issue {"title":"A"}').prompt, { role: 'tool', content: [{ type: 'tool-result', toolName: 'create_issue', output: { type: 'json', value: { id: 'x' } } }] }] })
   assert.equal(result.content[0].text, 'create_issue: {"id":"x"}')
 })
 
 test('decisions answer every question with a valid shape', () => {
-  const answer = localDecision({ model: 'm', questions: [
+  const answer = localDecision({ model: 'mikka-decision', input: '[fixture:decision]', questions: [
     { type: 'choice', name: 'tier', choices: [{ value: 'attention' }, { value: 'result' }] },
     { type: 'predicate', name: 'ok' },
   ] })
-  assert.equal(answer.model, 'm')
+  assert.equal(answer.model, 'mikka-decision')
   assert.deepEqual(answer.answers, [{ type: 'choice', name: 'tier', choice: 'attention' }, { type: 'predicate', name: 'ok', probability: 0.5 }])
 })
 
@@ -58,9 +59,9 @@ test('Decisions and Resend calls reach the substitutes', async t => {
     return fetch(new Request(target, request))
   }
 
-  const decision = await local('https://litellm.invalid/v1/decisions', { method: 'POST', headers: { authorization: `Bearer ${LOCAL_LITELLM_KEY}` }, body: JSON.stringify({ model: 'm', questions: [{ type: 'predicate', name: 'p' }] }) })
-  assert.match(decision.headers.get('x-litellm-call-id'), /^local-/)
-  assert.equal(decision.headers.get('x-litellm-response-cost'), '0')
+  const decision = await local('https://litellm.invalid/v1/decisions', { method: 'POST', headers: { authorization: `Bearer ${LOCAL_LITELLM_KEY}` }, body: JSON.stringify({ model: 'mikka-decision', input: '[fixture:decision]', questions: [{ type: 'predicate', name: 'p' }] }) })
+  assert.match(decision.headers.get('x-litellm-call-id'), /^fake-litellm-/)
+  assert.equal(decision.headers.get('x-litellm-response-cost'), '0.001234')
   assert.deepEqual((await decision.json()).answers, [{ type: 'predicate', name: 'p', probability: 0.5 }])
   const rejected = await local('https://litellm.invalid/v1/decisions', { method: 'POST', headers: { authorization: 'Bearer real-looking-key' }, body: '{}' })
   assert.equal(rejected.status, 401)
@@ -172,13 +173,13 @@ test('the real OpenAI-compatible provider reaches the LiteLLM substitute, tool c
   }
   // The LiteLLM client uses the same Chat Completions wire protocol.
   const model = createOpenAICompatible({ name: 'litellm', baseURL: 'https://litellm.invalid/v1', apiKey: LOCAL_LITELLM_KEY, includeUsage: true, fetch: local }).chatModel('mikka-default')
-  assert.equal((await generateText({ model, prompt: 'ping' })).text, 'Local model: ping')
-  const streamed = streamText({ model, prompt: 'a longer message than one chunk of the stream' })
+  assert.equal((await generateText({ model, prompt: '/echo ping' })).text, 'Local model: ping')
+  const streamed = streamText({ model, prompt: '/echo a longer message than one chunk of the stream' })
   assert.equal(await streamed.text, 'Local model: a longer message than one chunk of the stream')
-  assert.equal((await streamed.totalUsage).outputTokens, 1)
+  assert.equal((await streamed.totalUsage).outputTokens, 7)
   const echo = tool({ inputSchema: jsonSchema({ type: 'object', properties: { word: { type: 'string' } } }), execute: async ({ word }) => ({ echoed: word }) })
   const called = streamText({ model, tools: { echo }, stopWhen: stepCountIs(2), prompt: '/tool echo {"word":"hi"}' })
-  assert.equal(await called.text, 'echo: "{\\"echoed\\":\\"hi\\"}"')
+  assert.equal(await called.text, 'echo: {"echoed":"hi"}')
   const wrongKey = createOpenAICompatible({ name: 'litellm', baseURL: 'https://litellm.invalid/v1', apiKey: 'real-looking-key', fetch: local }).chatModel('mikka-default')
-  await assert.rejects(generateText({ model: wrongKey, prompt: 'ping', maxRetries: 0 }))
+  await assert.rejects(generateText({ model: wrongKey, prompt: '/echo ping', maxRetries: 0 }))
 })
