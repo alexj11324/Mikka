@@ -3289,6 +3289,7 @@
       "othersUsage": "Team members can use it to run their own bots. Usage is billed to your API account.",
       "afterQuota": "Use an API key when subscription quota runs out",
       "afterQuotaBilling": "The same model continues on your API key, billed at the provider’s price",
+      "afterQuotaNoKey": "Add an API key for the same model before this can continue at the provider’s price",
       "sectionTitle": "API keys",
       "none": "No API keys yet",
       "loading": "Loading API keys…",
@@ -8166,7 +8167,16 @@
       "providerOn": "{on}/{total} enabled",
       "firstModel": "Tasks start with",
       "noFirstModel": "No usable model yet",
-      "keyProvider": "Provider"
+      "keyProvider": "Provider",
+      "catalog": "Model catalogue",
+      "catalogFailed": "Could not load models",
+      "catalogLoading": "Loading models…",
+      "subscriptionNoModels": "These subscriptions have not reported any models",
+      "noSubscriptions": "No subscription connected",
+      "keyNoModels": "These API keys have not reported any models",
+      "noApiKeys": "No API keys added",
+      "customNoModels": "These custom providers have not reported any models",
+      "connectedNoModels": "Your connections have not reported any models"
     }
   },
   "CodeReview": {

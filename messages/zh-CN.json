@@ -3289,6 +3289,7 @@
       "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的 API 账单上。",
       "afterQuota": "订阅额度用完后，自动改用 API Key",
       "afterQuotaBilling": "同一个模型改用你的 API Key 继续跑，按服务商的价格付费",
+      "afterQuotaNoKey": "需要先添加支持同一模型的 API Key，才会按服务商价格继续运行",
       "sectionTitle": "API Key",
       "none": "还没有 API Key",
       "loading": "正在读取 API Key…",
@@ -8166,7 +8167,16 @@
       "providerOn": "{on}/{total} 个已启用",
       "firstModel": "任务先用",
       "noFirstModel": "还没有可用的模型",
-      "keyProvider": "服务商"
+      "keyProvider": "服务商",
+      "catalog": "模型",
+      "catalogFailed": "无法读取模型",
+      "catalogLoading": "正在读取模型…",
+      "subscriptionNoModels": "已连接的订阅还没有返回模型",
+      "noSubscriptions": "还没有连接订阅",
+      "keyNoModels": "已添加的 API Key 还没有返回模型",
+      "noApiKeys": "还没有添加 API Key",
+      "customNoModels": "自定义服务商还没有返回模型",
+      "connectedNoModels": "已连接的订阅或 API Key 还没有返回模型"
     }
   },
   "CodeReview": {
