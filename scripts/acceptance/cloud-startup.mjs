@@ -292,11 +292,20 @@ export async function restoreAcceptanceWorkspace(client, ownerId, workspaceId) {
   assert(current.currentUserId === ownerId && current.workspace?.id === workspaceId && session.user?.id === ownerId, 'workspace_restore_failed')
 }
 
-export async function acceptanceBot(client, botId, fixtureId, { issue = 1505, rememberCreated } = {}) {
+export async function acceptanceBot(client, botId, fixtureId, { issue = 1505, rememberCreated, mode } = {}) {
   assert([1505, 1593].includes(issue), 'fixture_scope_invalid')
   let created = false
+  const canaryName = `测试${issue} cloud-run-canary`
+  if (!botId && mode === 'canary') {
+    const bots = await client.rpc('bots.listBots', [])
+    assert(Array.isArray(bots), 'response_invalid')
+    const matches = bots.filter(bot => bot.name === canaryName)
+    assert(matches.length <= 1, 'test_bot_required')
+    botId = matches[0]?.id
+    if (matches.length) assert(UUID.test(botId ?? ''), 'bot_invalid')
+  }
   if (!botId) {
-    const value = await client.rpc('bots.createBot', [{ name: `测试${issue} ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
+    const value = await client.rpc('bots.createBot', [{ name: mode === 'canary' ? canaryName : `测试${issue} ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
     assert(UUID.test(value.id ?? ''), 'bot_create_failed')
     botId = value.id; created = true
     rememberCreated?.(botId)
@@ -305,7 +314,7 @@ export async function acceptanceBot(client, botId, fixtureId, { issue = 1505, re
   // This normal GET only returns bots owned by this session in its selected workspace.
   const bot = await client.json(`/api/bots/${botId}`)
   assert(bot.id === botId && new RegExp(`^测试\\s*${issue}(?:\\s|$)`).test(bot.name ?? ''), 'test_bot_required')
-  return { botId, created, retention: 'retained_no_delete_api' }
+  return { botId, created, retention: mode === 'canary' ? 'retained_reusable_canary' : 'retained_no_delete_api' }
 }
 
 /** The case's Bot chat takes the account's own subscription model: a
@@ -1260,7 +1269,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
     }
     report.phase = 'bot_create'
-    const fixture = await acceptanceBot(client, botId, fixtureId)
+    const fixture = await acceptanceBot(client, botId, fixtureId, { mode: options.mode })
     botId = fixture.botId
     if (fixture.created) await onFixture?.({ kind: 'bot', id: botId })
     if (fixture.created) report.createdBotId = botId

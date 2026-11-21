@@ -40,6 +40,8 @@ smoke account to dispatch one official Claude Code cloud task, read the test
 repository's README, verify its reply after tool execution, wait for successful
 completion, and confirm cleanup. It consumes ordinary billed cloud usage on
 the smoke account; the smoke email tag is not a billing exemption.
+Repeated runs reuse the owner's `测试1505 cloud-run-canary` bot in the selected
+workspace instead of creating a bot each time.
 
 The job summary reports `cloud-run canary: PASS/FAIL` and elapsed time when
 available. Download the `cloud-run-canary-report` artifact for `report.json`.
