@@ -239,9 +239,9 @@ function reader(fixture, mutate = () => {}) {
   return { calls, fetchImpl: async (url, options) => {
     calls.push(url); mutate(fixture, calls)
     assert.equal(options.headers.authorization, `Bearer ${TOKEN}`); assert.equal(options.redirect, 'error')
-    const data = { [`${API}/actions/workflows/e2b-official-runtime.yml`]: fixture.workflow, [`${API}/actions/runs/123`]: fixture.run,
-      [`${IMMUTABLE_API}/git/ref/heads/main`]: fixture.main, [`${API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
-      [`${API}/actions/runs/123/artifacts?per_page=100`]: fixture.listing, [`${API}/actions/artifacts/321`]: fixture.artifact }
+    const data = { [`${IMMUTABLE_API}/actions/workflows/e2b-official-runtime.yml`]: fixture.workflow, [`${IMMUTABLE_API}/actions/runs/123`]: fixture.run,
+      [`${IMMUTABLE_API}/git/ref/heads/main`]: fixture.main, [`${IMMUTABLE_API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
+      [`${IMMUTABLE_API}/actions/runs/123/artifacts?per_page=100`]: fixture.listing, [`${IMMUTABLE_API}/actions/artifacts/321`]: fixture.artifact }
     assert.ok(Object.hasOwn(data, url), 'only fixed read-only GitHub routes are used')
     return Response.json(data[url])
   } }
@@ -501,7 +501,7 @@ test('real CI CLI binds artifact bytes then refuses changed source/attempt/publi
     + `if((o.method??'GET')!=='GET')throw Error('write_refused');if(url==='https://productionresultssa12.blob.core.windows.net/result'){if(o.headers)throw Error('token_forwarded');return new Response(Buffer.from(f.archive,'base64'))}\n`
     + `if(url==='https://app.aspectlylabs.com/mikka/api/version')return Response.json({build:f.publicBuild});if(o.headers.authorization!=='Bearer ${TOKEN}')throw Error('token_missing');\n`
     + `if(url==='${IMMUTABLE_API}/actions/artifacts/321/zip')return new Response(null,{status:302,headers:{location:'https://productionresultssa12.blob.core.windows.net/result'}});\n`
-    + `const routes={'${API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${API}/actions/runs/123':f.run,'${IMMUTABLE_API}/git/ref/heads/main':f.main,'${API}/actions/runs/123/attempts/2/jobs?per_page=100':f.jobs,'${API}/actions/runs/123/artifacts?per_page=100':f.listing,'${API}/actions/artifacts/321':f.artifact};if(!Object.hasOwn(routes,url))throw Error('route_refused');return Response.json(routes[url])};\n`)
+    + `const routes={'${IMMUTABLE_API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${IMMUTABLE_API}/actions/runs/123':f.run,'${IMMUTABLE_API}/git/ref/heads/main':f.main,'${IMMUTABLE_API}/actions/runs/123/attempts/2/jobs?per_page=100':f.jobs,'${IMMUTABLE_API}/actions/runs/123/artifacts?per_page=100':f.listing,'${IMMUTABLE_API}/actions/artifacts/321':f.artifact};if(!Object.hasOwn(routes,url))throw Error('route_refused');return Response.json(routes[url])};\n`)
   const cliEnv = { PATH: process.env.PATH, ...env(), GITHUB_SHA: source, APPLICATION_SHA: source, EXPECTED_SOURCE_SHA: source,
     EXPECTED_WORKER_SHA: worker, EXPECTED_WORKER_SOURCE_SHA: source, RUNNER_TEMP: temp, FIXTURE_PATH: fixturePath,
     GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output, GITHUB_ENV: environment }
