@@ -44,6 +44,32 @@ test('the completed main push selects only the latest queued source, without rew
   assert.throws(() => selectAutomaticCandidate(forged, original, source))
 })
 
+test('merge queue provenance is accepted only on automatic main runs with both bot identifiers', () => {
+  const bot = { id: 118344674, login: 'github-merge-queue[bot]' }
+  const original = { ...run(), actor: bot, triggering_actor: bot }
+  assert.equal(selectAutomaticCandidate(event(original), original, source), 'selected')
+  const deployed = { ...original, path: '.github/workflows/cloudflare-app-deploy.yml', event: 'workflow_run' }
+  assert.equal(checkedRun(deployed, deployed.path, { automaticDeployment: true }).id, 101)
+  assert.throws(() => checkedRun(deployed, deployed.path))
+  for (const actor of [{ ...bot, id: 7 }, { ...bot, login: 'outsider' }, { login: bot.login }, undefined]) {
+    for (const field of ['actor', 'triggering_actor']) {
+      const forged = { ...original, [field]: actor }
+      assert.throws(() => selectAutomaticCandidate(event(forged), forged, source))
+    }
+  }
+  for (const path of [producer, '.github/workflows/cloud-services-ci.yml', '.github/workflows/cloudflare-app-deploy.yml'])
+    assert.throws(() => checkedRun({ ...original, path, event: 'workflow_dispatch' }, path))
+})
+
+test('merge queue identity cannot select a manual stage, rollback or production promotion', async () => {
+  const env = { GITHUB_REPOSITORY: repo.full_name, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
+    GITHUB_REF: 'refs/heads/main', GITHUB_ACTOR_ID: '118344674', GITHUB_ACTOR: 'github-merge-queue[bot]' }
+  const api = async () => assert.fail('Untrusted selection must not read GitHub')
+  for (const phase of ['pipeline-stage', 'pipeline-rollback'])
+    await assert.rejects(selectPipeline({ env: { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', MIKKA_DEPLOYMENT_PHASE: phase }, api }))
+  await assert.rejects(selectPromotion({ env: { ...env, GITHUB_EVENT_NAME: 'workflow_run' }, api }))
+})
+
 test('failed builds, fork PRs, branches and different actors never become deployable candidates', () => {
   for (const change of [
     { conclusion: 'failure' }, { status: 'in_progress' }, { event: 'pull_request' },
