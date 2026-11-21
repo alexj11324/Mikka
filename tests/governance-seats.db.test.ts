@@ -30,7 +30,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
   const quotaPool = new Pool({ connectionString: target.toString(), max: 5 })
   const db = drizzle(pool, { schema: workspaceSchema })
   try {
-    await pool.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name varchar(120) NOT NULL,slug varchar(64) UNIQUE,icon text,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now());
+    await pool.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name varchar(120) NOT NULL,slug varchar(64) UNIQUE,"taskPrefix" varchar(4),"parallelSubagents" integer NOT NULL DEFAULT 8,"nestDepth" integer NOT NULL DEFAULT 2,"newWorkVisibility" text NOT NULL DEFAULT 'inherit',"workspaceWorkVisibility" text NOT NULL DEFAULT 'members',"allowPrivate" boolean NOT NULL DEFAULT false,icon text,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"));
       CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));
       CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"leadUserId" text,"archivedAt" timestamptz);`)
