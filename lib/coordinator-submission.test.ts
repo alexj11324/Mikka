@@ -6,6 +6,9 @@ import { bots, coordinatorEvents } from './db/schema'
 import type { TaskDestination } from './task-destination'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from './coordinator-submission'
 import { listReadDeadline, observeListRead, ownerListWorkspace } from './live/list-read'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+
+captureFixtureLiveEffects()
 
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 /** The owner's Coordinator: an ordinary bot row, resolved where a message enters. */
@@ -250,8 +253,14 @@ before(async () => {
   } } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('@/lib/eve/retry',{namedExports:{retryEveTurn:async()=>retryQueued?{queued:true}:{queued:false,reason:retryWorking?'working':'nothingToRetry'}}})
-  mock.module('@/lib/server-runtime/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  const background = await import('./background')
+  mock.module(new URL('./background.ts', import.meta.url).href, { namedExports: {
+    ...background,
+    afterJob: ((label, work, options) => background.afterJob(label, work, label === 'after:coordinator-wake'
+      ? { ...options, schedule: callback => { callbacks.push(callback) } }
+      : options)) satisfies typeof background.afterJob,
+  } })
   retiredPosts = [(await import('../app/api/coordinator/messages/route')).POST, (await import('../app/api/mobile/chat/route')).POST]
   ;({ sendSuggestion, retryCoordinatorTurn, getCoordinatorChat, pollCoordinatorChat } = await import('../app/actions/coordinator'))
 })

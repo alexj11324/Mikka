@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { EventEmitter } from 'node:events'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+
+captureFixtureLiveEffects()
 
 let transaction = false
 let locked = false

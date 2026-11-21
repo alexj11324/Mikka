@@ -13,6 +13,9 @@ import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
 import { createTracerProvider, SafeExporter } from '../lib/tracing/node'
 import { createLogProvider } from '../lib/tracing/logs'
+import { captureFixtureLiveEffects } from './support/live-runtime'
+
+captureFixtureLiveEffects()
 
 const owner = 'synthetic-owner', botId = '10000000-0000-4000-8000-000000000001'
 const issueId = '10000000-0000-4000-8000-000000000002', runId = '10000000-0000-4000-8000-000000000003'
