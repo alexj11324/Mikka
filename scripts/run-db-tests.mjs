@@ -40,6 +40,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/enterprise/audit-outbox.ts', file: 'lib/enterprise/audit-outbox.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/enterprise/execution-authority.ts', file: 'lib/enterprise/execution-authority.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/enterprise/live-authority.ts', file: 'lib/enterprise/live-authority.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/enterprise/two-factor.ts', file: 'tests/organization-security.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/enterprise/sso-plugin.ts', file: 'lib/enterprise/http.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/governance/organizations.ts', file: 'lib/enterprise/governance.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/mobile-push.ts', file: 'tests/mobile-push-workspace.db.test.ts', script: 'test:visibility-db' },

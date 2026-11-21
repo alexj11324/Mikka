@@ -50,6 +50,12 @@ Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,
 Notion, Slack, Linear, Telegram), even when the app is a Google one.
 
+The [organization security contract](design/decisions/2026-11-20-1900-settings-organization-security.md)
+defines native two-factor enrollment and recovery, organization MFA/grace
+requirements, DNS-verified domain admission and invitations with an explicit
+role/team scope. Organization membership alone continues to grant no workspace
+access.
+
 ## Run environments
 
 Settings › Run environments edits the Workspace resources used by task admission.

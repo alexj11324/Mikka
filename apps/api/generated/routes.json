@@ -1629,6 +1629,15 @@
       "sourceHash": "52c34e61bbefec3d50945b99cfa5f2c7aa0a92d70a33840cad950eb45d51c294"
     },
     {
+      "path": "/mikka/api/me/security",
+      "template": "/api/me/security",
+      "source": "app/api/me/security/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "4920419cd70590235f6541e068e8b4aae6a080c93534c12d262ddd7d704c2556"
+    },
+    {
       "path": "/mikka/api/mobile/artifacts/[id]",
       "template": "/api/mobile/artifacts/[id]",
       "source": "app/api/mobile/artifacts/[id]/route.ts",
@@ -1935,7 +1944,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "97a837860fad6de47a3bd98682481e9a7b5211c5db237385a7c69e6b750dd561"
+      "sourceHash": "f8de92d7cfc6f2e06f396ba2ac866af5207b9485c23367e7da6df8f2f54dff83"
     },
     {
       "path": "/mikka/api/organizations",
@@ -1986,6 +1995,15 @@
         "DELETE"
       ],
       "sourceHash": "3fda651feace379a9c0188b2dfaa712609513e74b9b35285646d795aad846ab6"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/allowed-domains/[domainId]/verify",
+      "template": "/api/organizations/[organizationId]/allowed-domains/[domainId]/verify",
+      "source": "app/api/organizations/[organizationId]/allowed-domains/[domainId]/verify/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "b947224ab3d836a94cbe015f8a98bbf576097e58db01d44726f24cf0fde064d5"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/api-keys",
@@ -2214,6 +2232,16 @@
         "GET"
       ],
       "sourceHash": "4d76471d5eecd699fb3bcde947a6ccf4b4d5750f3cd94d78315ea98fd1fc3d65"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/security",
+      "template": "/api/organizations/[organizationId]/security",
+      "source": "app/api/organizations/[organizationId]/security/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "sourceHash": "8d6937c208327a48007a513ecf1be20f27b2c5643b5cab52646c3f003b1b601f"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/workspaces",

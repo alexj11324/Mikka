@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { resolveTxt } from 'node:dns/promises'
+import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm'
 import publicEmailDomains from 'free-email-domains'
 import { z } from 'zod'
 import { disposableEmail } from '@/lib/abuse/signup'
@@ -21,10 +22,51 @@ const domainFields = {
   domain: organizationJoinDomains.domain,
   createdByUserId: organizationJoinDomains.createdByUserId,
   createdAt: organizationJoinDomains.createdAt,
+  verifiedAt: organizationJoinDomains.verifiedAt,
+  lastCheckedAt: organizationJoinDomains.lastCheckedAt,
+  verificationError: organizationJoinDomains.verificationError,
   // Grants are immutable. Adding a removed domain creates a new grant.
   updatedAt: organizationJoinDomains.createdAt,
 }
 type Account = { id: string; email: string }
+
+/** This public DNS challenge proves control of this domain for this exact organization grant. */
+export function organizationDomainRecord(organizationId: string, domain: { id: string; domain: string }) {
+  return { type: 'TXT' as const, name: `_mikka-domain.${domain.domain}`, value: `mikka-domain=${organizationId}:${domain.id}` }
+}
+
+export async function verifyAllowedDomain(organizationId: string, domainId: string, userId: string) {
+  z.uuid().parse(domainId)
+  const domain = await workspaceDb.transaction(async tx => {
+    await requireOrganizationAdmin(tx, organizationId, userId)
+    const [row] = await tx.select(domainFields).from(organizationJoinDomains)
+      .where(and(eq(organizationJoinDomains.organizationId, organizationId), eq(organizationJoinDomains.id, domainId)))
+    if (!row) throw new GovernanceError('not_found')
+    return row
+  })
+  const dns = organizationDomainRecord(organizationId, domain)
+  let verificationError: 'record_missing' | 'lookup_failed' | null = null
+  try {
+    const records = await resolveTxt(dns.name)
+    if (!records.some(parts => parts.join('') === dns.value)) verificationError = 'record_missing'
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    verificationError = code === 'ENODATA' || code === 'ENOTFOUND' ? 'record_missing' : 'lookup_failed'
+  }
+  return workspaceDb.transaction(async tx => {
+    // No DNS request holds a database lock. Recheck administrator and grant after it completes.
+    await requireOrganizationAdmin(tx, organizationId, userId)
+    const checkedAt = new Date()
+    const [updated] = await tx.update(organizationJoinDomains).set({
+      lastCheckedAt: checkedAt, verifiedAt: verificationError ? null : checkedAt, verificationError,
+    }).where(and(eq(organizationJoinDomains.organizationId, organizationId),
+      eq(organizationJoinDomains.id, domainId), eq(organizationJoinDomains.domain, domain.domain))).returning(domainFields)
+    if (!updated) throw new GovernanceError('not_found')
+    await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.join_domain_checked',
+      targetId: domainId, result: verificationError ? 'failure' : 'success', metadata: { reason: verificationError, enabled: !verificationError } })
+    return { domain: updated, dns, verified: !verificationError }
+  })
+}
 
 async function verifiedDomainUser(user: Account) {
   const { rows: [account] } = await pool.query<{ name: string; email: string }>(
@@ -53,12 +95,12 @@ export async function addAllowedDomain(organizationId: string, user: Account, in
     if ((await verifiedDomainUser(user))?.domain !== domain) throw new GovernanceError('access_denied')
     const [existing] = await tx.select(domainFields).from(organizationJoinDomains)
       .where(and(eq(organizationJoinDomains.organizationId, organizationId), eq(organizationJoinDomains.domain, domain)))
-    if (existing) return { domain: existing }
+    if (existing) return { domain: existing, dns: organizationDomainRecord(organizationId, existing) }
     const id = randomUUID()
     await tx.insert(organizationJoinDomains).values({ id, organizationId, domain })
     await enqueueOrganizationAudit(tx, { organizationId, actorId: user.id, action: 'organization.join_domain_added', targetId: id })
     const [created] = await tx.select(domainFields).from(organizationJoinDomains).where(eq(organizationJoinDomains.id, id))
-    return { domain: created }
+    return { domain: created, dns: organizationDomainRecord(organizationId, created) }
   })
 }
 
@@ -80,7 +122,8 @@ export async function listJoinableOrganizations(user: Account, sessionId: string
   const candidates = await workspaceDb.select({ id: organizations.id, name: organizations.name }).from(organizationJoinDomains)
     .innerJoin(organizations, eq(organizations.id, organizationJoinDomains.organizationId))
     .leftJoin(organizationMembers, and(eq(organizationMembers.organizationId, organizations.id), eq(organizationMembers.userId, user.id)))
-    .where(and(eq(organizationJoinDomains.domain, account.domain), isNull(organizations.archivedAt), isNull(organizationMembers.userId)))
+    .where(and(eq(organizationJoinDomains.domain, account.domain), isNotNull(organizationJoinDomains.verifiedAt),
+      isNull(organizations.archivedAt), isNull(organizationMembers.userId)))
     .orderBy(asc(organizations.name), asc(organizations.id))
   const visible = []
   for (const candidate of candidates) {
@@ -104,7 +147,8 @@ export async function joinOrganizationByDomain(organizationId: string, user: Acc
     const account = await verifiedDomainUser(user)
     if (!account) throw new GovernanceError('access_denied')
     const [allowed] = await tx.select({ id: organizationJoinDomains.id }).from(organizationJoinDomains)
-      .where(and(eq(organizationJoinDomains.organizationId, organizationId), eq(organizationJoinDomains.domain, account.domain)))
+      .where(and(eq(organizationJoinDomains.organizationId, organizationId), eq(organizationJoinDomains.domain, account.domain),
+        isNotNull(organizationJoinDomains.verifiedAt)))
     if (!allowed) throw new GovernanceError('access_denied')
     const [member] = await tx.select({ status: organizationMembers.status, role: organizationMembers.role }).from(organizationMembers)
       .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, user.id)))

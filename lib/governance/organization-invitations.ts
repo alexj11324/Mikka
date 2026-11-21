@@ -2,13 +2,19 @@ import 'server-only'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gt, inArray, isNull, notExists, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { organizationInvitations, organizationMembers, organizations } from '@/lib/db/governance-schema'
+import { organizationInvitations, organizationInvitationTeams, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
+import { teamMembers, teams } from '@/lib/db/team-schema'
+import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { enqueueOrganizationAudit } from './audit'
 import { GovernanceError } from './errors'
 import { assertOrganizationAccountWritable } from './organization-ownership'
+import { assertActiveHumanAdmission } from './entitlements'
+import { requireEnterpriseOrganization } from '@/lib/enterprise/access'
+import { ownerWorkspaceListsChanged, workspaceListChanged } from '@/lib/live/lists'
+import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
 const invitationIdSchema = z.uuid()
@@ -49,9 +55,41 @@ export type OrganizationInvitationOutcome =
   | { email: string; created: true; id: string; path: string }
   | { email: string; created: false; reason: 'duplicate' | 'alreadyMember' | 'pending' }
 
-function emailsFromInput(input: unknown): string[] {
-  const { emails } = z.object({ emails: z.array(z.string()).min(1).max(20) }).strict().parse(input)
-  return emails.map(email => emailSchema.parse(email.trim().toLowerCase()))
+function invitationInput(input: unknown) {
+  const parsed = z.object({ emails: z.array(z.string()).min(1).max(20),
+    role: z.enum(['admin', 'member']).default('member'), teamIds: z.array(z.uuid()).max(50).default([]),
+  }).strict().parse(input)
+  return { ...parsed, emails: parsed.emails.map(email => emailSchema.parse(email.trim().toLowerCase())), teamIds: [...new Set(parsed.teamIds)].sort() }
+}
+
+type TeamScope = { teamId: string; workspaceId: string }
+
+/** The workspace locks precede the Organization lock, including acceptance and scope revalidation. */
+async function lockTeamScopes(tx: WorkspaceTransaction, organizationId: string, actorId: string, teamIds: string[]): Promise<TeamScope[]> {
+  if (!teamIds.length) return []
+  const candidates = await tx.select({ teamId: teams.id, workspaceId: teams.workspaceId }).from(teams)
+    .where(inArray(teams.id, teamIds)).orderBy(asc(teams.id))
+  if (candidates.length !== teamIds.length) throw new GovernanceError('access_denied')
+  const workspaceIds = [...new Set(candidates.map(team => team.workspaceId))].sort()
+  for (const workspaceId of workspaceIds) {
+    const [workspace] = await tx.select({ kind: workspaces.kind, role: workspaceMembers.role }).from(workspaces)
+      .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, actorId), eq(workspaceMembers.status, 'active')))
+      .where(eq(workspaces.id, workspaceId)).for('update').limit(1)
+    if (!workspace || workspace.kind !== 'team' || workspace.role !== 'admin') throw new GovernanceError('access_denied')
+    const [link] = await tx.select({ organizationId: organizationWorkspaces.organizationId }).from(organizationWorkspaces)
+      .where(and(eq(organizationWorkspaces.workspaceId, workspaceId), eq(organizationWorkspaces.organizationId, organizationId))).limit(1)
+    if (!link) throw new GovernanceError('access_denied')
+  }
+  const current = await tx.select({ teamId: teams.id, workspaceId: teams.workspaceId }).from(teams)
+    .where(and(inArray(teams.id, teamIds), isNull(teams.archivedAt))).orderBy(asc(teams.id)).for('update')
+  if (current.length !== candidates.length || current.some((team, index) => team.workspaceId !== candidates[index].workspaceId))
+    throw new GovernanceError('access_denied')
+  return current
+}
+
+async function invitationScopes(tx: WorkspaceTransaction, invitationId: string) {
+  return tx.select({ teamId: organizationInvitationTeams.teamId, workspaceId: organizationInvitationTeams.workspaceId })
+    .from(organizationInvitationTeams).where(eq(organizationInvitationTeams.invitationId, invitationId)).orderBy(asc(organizationInvitationTeams.teamId))
 }
 
 /** An Organization membership never grants access to an attached Workspace or Project. */
@@ -68,13 +106,15 @@ async function requireActiveOrganizationMember(tx: WorkspaceTransaction, organiz
   return membership
 }
 
-/** All issued roles are Member; an ordinary member cannot create an admin/owner invitation. */
+/** Ordinary members can issue unscoped Member links; elevated roles/scopes require current administration. */
 export async function issueOrganizationInvitations(organizationId: string, actorId: string, input: unknown) {
-  const emails = emailsFromInput(input)
+  const { emails, role, teamIds } = invitationInput(input)
   return workspaceDb.transaction(async tx => {
     // Account deletion guards precede the Organization row lock (same order as member admission).
     await assertOrganizationAccountWritable(tx, actorId)
-    await requireActiveOrganizationMember(tx, organizationId, actorId)
+    const scopes = await lockTeamScopes(tx, organizationId, actorId, teamIds)
+    const actor = await requireActiveOrganizationMember(tx, organizationId, actorId)
+    if ((role === 'admin' || scopes.length) && actor.role === 'member') throw new GovernanceError('access_denied')
     const members = new Set((await tx.select({ email: organizationMembers.email }).from(organizationMembers)
       .where(and(eq(organizationMembers.organizationId, organizationId),
         inArray(sql`lower(${organizationMembers.email})`, emails)))).map(row => row.email.toLowerCase()))
@@ -99,15 +139,17 @@ export async function issueOrganizationInvitations(organizationId: string, actor
       const id = previous?.id ?? randomUUID()
       const expiresAt = new Date(now.getTime() + sevenDaysMs)
       await tx.insert(organizationInvitations).values({
-        id, organizationId, createdBy: actorId, email, tokenHash: hashToken(token), expiresAt,
+        id, organizationId, createdBy: actorId, email, role, tokenHash: hashToken(token), expiresAt,
       }).onConflictDoUpdate({
         target: [organizationInvitations.organizationId, organizationInvitations.email],
-        set: { createdBy: actorId, tokenHash: hashToken(token), status: 'pending', acceptedBy: null,
+        set: { createdBy: actorId, role, tokenHash: hashToken(token), status: 'pending', acceptedBy: null,
           expiresAt, createdAt: now, updatedAt: now },
       })
+      await tx.delete(organizationInvitationTeams).where(eq(organizationInvitationTeams.invitationId, id))
+      if (scopes.length) await tx.insert(organizationInvitationTeams).values(scopes.map(scope => ({ invitationId: id, ...scope })))
       await enqueueOrganizationAudit(tx, {
         organizationId, actorId, action: 'organization.member_invited', targetId: id,
-        metadata: { role: 'member', status: 'pending' },
+        metadata: { role, status: 'pending', count: scopes.length },
       })
       outcomes.push({ email, created: true, id, path: '/organization-invite/' + token })
     }
@@ -120,12 +162,14 @@ export async function listOrganizationInvitations(organizationId: string, actorI
     const member = await requireActiveOrganizationMember(tx, organizationId, actorId)
     const rows = await tx.select({
       id: organizationInvitations.id, email: organizationInvitations.email,
-      createdBy: organizationInvitations.createdBy, status: organizationInvitations.status,
+      createdBy: organizationInvitations.createdBy, status: organizationInvitations.status, role: organizationInvitations.role,
       createdAt: organizationInvitations.createdAt, expiresAt: organizationInvitations.expiresAt,
     }).from(organizationInvitations).where(and(eq(organizationInvitations.organizationId, organizationId),
       member.role === 'member' ? eq(organizationInvitations.createdBy, actorId) : undefined))
       .orderBy(asc(organizationInvitations.createdAt))
-    return { invitations: rows }
+    const scopes = rows.length ? await tx.select().from(organizationInvitationTeams)
+      .where(inArray(organizationInvitationTeams.invitationId, rows.map(row => row.id))).orderBy(asc(organizationInvitationTeams.teamId)) : []
+    return { invitations: rows.map(row => ({ ...row, teamIds: scopes.filter(scope => scope.invitationId === row.id).map(scope => scope.teamId) })) }
   })
 }
 
@@ -150,7 +194,7 @@ export async function revokeOrganizationInvitation(organizationId: string, actor
 }
 
 /** The signed-in verified account accepts only an invitation addressed to its current verified email. */
-export async function acceptOrganizationInvitation(input: unknown, user: { id: string; email: string; name: string }) {
+export async function acceptOrganizationInvitation(input: unknown, user: { id: string; email: string; name: string }, sessionId?: string) {
   const selector = z.union([z.object({ token: tokenSchema }).strict(), z.object({ invitationId: invitationIdSchema }).strict()]).parse(input)
   const canonical = await verifiedInvitationRecipient(user)
   const addressedInvitation = and(eq(organizationInvitations.email, canonical.email), 'token' in selector
@@ -158,11 +202,14 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
   return workspaceDb.transaction(async tx => {
     // Read the routing ID without a row lock, then acquire the Organization lock first,
     // matching invitation writes and member removal. Recheck the invitation under lock.
-    const [candidate] = await tx.select({ organizationId: organizationInvitations.organizationId })
+    const [candidate] = await tx.select({ id: organizationInvitations.id, organizationId: organizationInvitations.organizationId, createdBy: organizationInvitations.createdBy })
       .from(organizationInvitations).where(addressedInvitation).limit(1)
     if (!candidate) throw new GovernanceError('invalid_request')
     // Acquire the account deletion guard before Organization row locks (global lock order).
     await assertOrganizationAccountWritable(tx, user.id)
+    const scopesBefore = await invitationScopes(tx, candidate.id)
+    const scopes = await lockTeamScopes(tx, candidate.organizationId, candidate.createdBy, scopesBefore.map(scope => scope.teamId))
+    if (scopes.some((scope, index) => scope.workspaceId !== scopesBefore[index].workspaceId)) throw new GovernanceError('invalid_request')
     const [organization] = await tx.select({ archivedAt: organizations.archivedAt }).from(organizations)
       .where(eq(organizations.id, candidate.organizationId)).for('update').limit(1)
     if (!organization || organization.archivedAt) throw new GovernanceError('invalid_request')
@@ -171,11 +218,16 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
         addressedInvitation)).for('update').limit(1)
     if (!invitation || invitation.status !== 'pending' || invitation.expiresAt <= new Date()
       || invitation.email !== canonical.email) throw new GovernanceError('invalid_request')
+    const scopesAfter = await invitationScopes(tx, invitation.id)
+    if (invitation.createdBy !== candidate.createdBy || scopesAfter.length !== scopesBefore.length
+      || scopesAfter.some((scope, index) => scope.teamId !== scopesBefore[index].teamId || scope.workspaceId !== scopesBefore[index].workspaceId))
+      throw new GovernanceError('invalid_request')
+    await requireEnterpriseOrganization(user.id, candidate.organizationId, sessionId)
     // Pending invites cannot outlive the issuer's current Organization membership, including SCIM suspensions.
-    const [issuer] = await tx.select({ userId: organizationMembers.userId }).from(organizationMembers)
+    const [issuer] = await tx.select({ userId: organizationMembers.userId, role: organizationMembers.role }).from(organizationMembers)
       .where(and(eq(organizationMembers.organizationId, candidate.organizationId),
         eq(organizationMembers.userId, invitation.createdBy), eq(organizationMembers.status, 'active'))).limit(1)
-    if (!issuer) throw new GovernanceError('invalid_request')
+    if (!issuer || ((invitation.role === 'admin' || scopes.length) && issuer.role === 'member')) throw new GovernanceError('invalid_request')
     const [existing] = await tx.select({ status: organizationMembers.status })
       .from(organizationMembers).where(and(eq(organizationMembers.organizationId, candidate.organizationId),
         eq(organizationMembers.userId, user.id))).limit(1)
@@ -183,15 +235,31 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
     if (existing) throw new GovernanceError('invalid_request')
     await tx.insert(organizationMembers).values({
       organizationId: candidate.organizationId, userId: user.id,
-      name: canonical.name, email: canonical.email.toLowerCase(), role: 'member',
+      name: canonical.name, email: canonical.email.toLowerCase(), role: invitation.role,
     })
+    for (const workspaceId of [...new Set(scopes.map(scope => scope.workspaceId))].sort()) {
+      const [membership] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id))).limit(1)
+      if (membership?.status === 'suspended') throw new GovernanceError('access_denied')
+      if (!membership) {
+        await assertActiveHumanAdmission(tx, workspaceId, user.id)
+        await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: canonical.name, email: canonical.email, role: 'member' })
+        await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: user.id, name: canonical.name },
+          action: 'member.joined', target: { type: 'member', id: user.id }, metadata: { role: 'member' } })
+      }
+      await tx.insert(teamMembers).values(scopes.filter(scope => scope.workspaceId === workspaceId)
+        .map(scope => ({ teamId: scope.teamId, userId: user.id, role: 'member' as const }))).onConflictDoNothing()
+      await workspaceListChanged(tx, workspaceId, ['workspace_settings', 'issue_list'])
+    }
+    if (scopes.length) await ownerWorkspaceListsChanged(tx, user.id, ['workspace_settings'])
     await tx.update(organizationInvitations).set({
       status: 'accepted', acceptedBy: user.id, updatedAt: new Date(),
     }).where(eq(organizationInvitations.id, invitation.id))
     await enqueueOrganizationAudit(tx, {
       organizationId: candidate.organizationId, actorId: user.id, action: 'organization.invitation_accepted',
-      targetId: invitation.id, metadata: { role: 'member', status: 'accepted' },
+      targetId: invitation.id, metadata: { role: invitation.role, status: 'accepted', count: scopes.length },
     })
-    return { organizationId: candidate.organizationId, joined: true, role: 'member' as const }
+    return { organizationId: candidate.organizationId, joined: true, role: invitation.role,
+      ...(scopes.length ? { teamIds: scopes.map(scope => scope.teamId) } : {}) }
   })
 }

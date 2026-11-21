@@ -1,6 +1,6 @@
-import { betterAuth } from 'better-auth'
+import { betterAuth, type BetterAuthPlugin } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
-import { bearer, deviceAuthorization, multiSession } from 'better-auth/plugins'
+import { bearer, deviceAuthorization, multiSession, twoFactor } from 'better-auth/plugins'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { expo } from '@better-auth/expo'
 import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
@@ -23,6 +23,9 @@ import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop-rpc/session-cache'
 import { completeEnterpriseSignIn, enterpriseIdentityModels, enterpriseSessionFields, enterpriseSso, ssoSessionData, withEnterpriseAuthRequest } from '@/lib/enterprise/sso-plugin'
 
+import { assertTwoFactorManagement, completeTwoFactorVerification, twoFactorSessionFields } from '@/lib/enterprise/two-factor'
+import { assertTwoFactorCanBeDisabled } from '@/lib/governance/organization-security'
+
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export { MOBILE_APP_ORIGIN } from '@/lib/auth-config'
 
@@ -43,6 +46,60 @@ export type DeviceSessionSummary = {
   user: { id: string; email: string }
 }
 
+/** After native 2FA withholding, before bearer/header and cookie publication. */
+const authCompletion: BetterAuthPlugin = {
+  id: 'mikka-auth-completion',
+  hooks: {
+    // Better Auth applies before-hook header replacements after the whole chain.
+    // Resolve through its fresh session API so both cookie and bearer identities
+    // finish native normalization before this management authorization check.
+    before: [{ matcher: ctx => ['/two-factor/disable', '/two-factor/get-totp-uri', '/two-factor/generate-backup-codes'].includes(ctx.path ?? ''),
+      handler: createAuthMiddleware(async ctx => {
+        const session = await auth.api.getSession({ headers: ctx.headers ?? ctx.request?.headers ?? new Headers(), query: { disableCookieCache: true } })
+        if (session) {
+          await assertTwoFactorManagement(session.user.id, session.session.id)
+          if (ctx.path === '/two-factor/disable') await assertTwoFactorCanBeDisabled(session.user.id)
+        }
+      }),
+    }],
+    after: [{ matcher: () => true, handler: createAuthMiddleware(async ctx => {
+      await completeTwoFactorVerification(ctx)
+      await completeEnterpriseSignIn(ctx)
+      await auditAuthentication(ctx)
+      const deviceToken = await exchangeDaemonSession({
+        path: ctx.path, clientId: ctx.body?.client_id,
+        returned: ctx.context.returned, newSession: ctx.context.newSession,
+      }, {
+        issueToken: userId => issueDeviceToken(userId),
+        revokeSession: token => ctx.context.internalAdapter.deleteSession(token),
+      })
+      if (deviceToken) {
+        ctx.context.newSession = null
+        ctx.setHeader('cache-control', 'no-store')
+        ctx.setHeader('pragma', 'no-cache')
+        return ctx.json(deviceToken)
+      }
+      if (ctx.path === '/verify-email' || ctx.path?.startsWith('/reset-password')) {
+        ctx.setHeader('referrer-policy', 'no-referrer')
+        ctx.setHeader('cache-control', 'no-store')
+      }
+      const requestResult = await email.publicRequestResult(ctx.path, ctx.context.returned, ctx.request)
+      if (requestResult) return Response.json(requestResult, { status: 202, headers: { 'cache-control': 'no-store' } })
+      // Publish the private SDK cache only after sign-in auditing succeeds;
+      // a withheld/revoked sign-in must never receive a usable cached proof.
+      desktopSessionCacheAfter(ctx)
+      // Preserve sessions issued before multi-session was enabled when adding the first extra account.
+      if (ctx.path !== '/get-session' || !ctx.request || ctx.headers?.get('cookie')?.includes('_multi-')) return
+      const active = ctx.context.session
+      if (!active || active.session.expiresAt <= new Date()) return
+      const cookie = ctx.context.authCookies.sessionToken
+      await ctx.setSignedCookie(`${cookie.name}_multi-${active.session.token.toLowerCase()}`, active.session.token, ctx.context.secret, {
+        ...cookie.attributes,
+        maxAge: Math.max(0, Math.floor((active.session.expiresAt.getTime() - Date.now()) / 1000)),
+      })
+    }) }] },
+}
+
 export const auth = betterAuth({
   appName: 'Mikka',
   onAPIError: { errorURL: withBasePath('/sign-in?oauth=failed') },
@@ -50,7 +107,7 @@ export const auth = betterAuth({
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
     session: {
-      create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) },
+      create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId), twoFactorVerifiedAt: null, twoFactorMethod: null } }) },
       // Native hooks run after the deletion transaction commits. The durable
       // trigger already stopped fan-out; transport retries must not hold auth.
       delete: { after: async session => {
@@ -109,6 +166,8 @@ export const auth = betterAuth({
   plugins: [
     enterpriseIdentityModels,
     enterpriseSso(),
+    twoFactor({ issuer: 'Mikka', allowPasswordless: true }),
+    authCompletion,
     bearer(),
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
@@ -130,6 +189,7 @@ export const auth = betterAuth({
       disableJwtPlugin: true,
       prefix: { opaqueAccessToken: 'mka_', refreshToken: 'mkr_' },
     }),
+    // Authentication may still revoke/replace cookies; publish the final journal last.
     mikkaCookies(),
   ],
   hooks: {
@@ -138,45 +198,10 @@ export const auth = betterAuth({
       await beforeSignup(pool,ctx)
       return email.before(ctx)
     }),
-    after: createAuthMiddleware(async ctx => {
-      await completeEnterpriseSignIn(ctx)
-      await auditAuthentication(ctx)
-      const deviceToken = await exchangeDaemonSession({
-        path: ctx.path, clientId: ctx.body?.client_id,
-        returned: ctx.context.returned, newSession: ctx.context.newSession,
-      }, {
-        issueToken: userId => issueDeviceToken(userId),
-        revokeSession: token => ctx.context.internalAdapter.deleteSession(token),
-      })
-      if (deviceToken) {
-        ctx.context.newSession = null
-        ctx.setHeader('cache-control', 'no-store')
-        ctx.setHeader('pragma', 'no-cache')
-        return ctx.json(deviceToken)
-      }
-      if (ctx.path === '/verify-email' || ctx.path?.startsWith('/reset-password')) {
-        ctx.setHeader('referrer-policy', 'no-referrer')
-        ctx.setHeader('cache-control', 'no-store')
-      }
-      const requestResult = await email.publicRequestResult(ctx.path, ctx.context.returned, ctx.request)
-      if (requestResult) return Response.json(requestResult, { status: 202, headers: { 'cache-control': 'no-store' } })
-      // Publish the private SDK cache only after sign-in auditing succeeds;
-      // a withheld/revoked sign-in must never receive a usable cached proof.
-      desktopSessionCacheAfter(ctx)
-      // Preserve sessions issued before multi-session was enabled when adding the first extra account.
-      if (ctx.path !== '/get-session' || !ctx.request || ctx.headers?.get('cookie')?.includes('_multi-')) return
-      const active = ctx.context.session
-      if (!active || active.session.expiresAt <= new Date()) return
-      const cookie = ctx.context.authCookies.sessionToken
-      await ctx.setSignedCookie(`${cookie.name}_multi-${active.session.token.toLowerCase()}`, active.session.token, ctx.context.secret, {
-        ...cookie.attributes,
-        maxAge: Math.max(0, Math.floor((active.session.expiresAt.getTime() - Date.now()) / 1000)),
-      })
-    }),
   },
   // Polls read the session from a signed cookie for up to 5 minutes instead of two queries each time (Alex
   // 2026-11-02). Money, permissions, credentials and deletion read it fresh (lib/fresh-session.ts).
-  session: { ...SESSION_OPTIONS, storeSessionInDatabase: true, additionalFields: enterpriseSessionFields },
+  session: { ...SESSION_OPTIONS, storeSessionInDatabase: true, additionalFields: { ...enterpriseSessionFields, ...twoFactorSessionFields } },
   // Organization identity management uses the fresh-session, organization-admin route.
   disabledPaths: ['/sso/register', '/sso/update-provider', '/sso/delete-provider', '/sso/providers', '/sso/get-provider', '/sso/request-domain-verification', '/sso/verify-domain'],
   advanced: {

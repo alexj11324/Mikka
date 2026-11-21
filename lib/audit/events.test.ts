@@ -103,6 +103,8 @@ test('metadata is a per-action allowlist', () => {
     ['integration.permission_changed', { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }],
     ['auth.signed_in', { newDevice: true, method: 'password' }],
     ['auth.signed_in', { method: 'oauth' }],
+    ['auth.signed_in', { method: 'totp' }],
+    ['auth.signed_in', { method: 'recovery_code' }],
     ['token.created', { tokenName: 'CI deploy' }],
     ['token.created', { tokenName: 'CI deploy', scopes: ['tasks:read', 'runs:read'] }],
     ['token.rotated', {}],

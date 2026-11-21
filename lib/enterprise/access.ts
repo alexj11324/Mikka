@@ -9,13 +9,14 @@ import { WorkspaceError } from '@/lib/workspace-error'
 import { enterprisePrincipal, type EnterprisePrincipal, type EnterpriseReader } from './principal'
 import { enterpriseAccessAllowed, type EnterpriseAccessState } from './access-policy'
 import { currentExecutionAuthority } from './execution-authority'
+import { organizationTwoFactorAllowed } from './two-factor'
 export { enterpriseAccessAllowed } from './access-policy'
 
 type AccessPrincipal = EnterprisePrincipal | { kind: 'execution'; credentialValid: boolean }
-async function currentPrincipal(userId: string, workspaceId: string, explicit: EnterprisePrincipal | undefined, query: EnterpriseAuthExecutor): Promise<AccessPrincipal | undefined> {
+async function currentPrincipal(userId: string, workspaceId: string, explicit: EnterprisePrincipal | { kind: 'none' } | undefined, query: EnterpriseAuthExecutor): Promise<AccessPrincipal | undefined> {
   // Original human/delegated proof always wins, including when it has expired
   // or lost SSO assurance. Background work cannot silently replace that actor.
-  if (explicit) return explicit
+  if (explicit) return explicit.kind === 'none' ? undefined : explicit
   const acting = actingContext.getStore()
   if (acting && acting.userId !== userId) return undefined
   if (acting?.enterprisePrincipal) return acting.enterprisePrincipal
@@ -37,17 +38,20 @@ export async function enterpriseWorkspaceAllowed(userId: string, workspaceId: st
   if (!organizationId) return true
   return organizationAccess(userId, workspaceId, organizationId, explicit, appExecutor)
 }
-async function organizationAccess(userId: string, workspaceId: string, organizationId: string, explicit?: EnterprisePrincipal, appExecutor: EnterpriseAuthExecutor = pool) {
-  const { rows } = await appExecutor.query<{ enforceSso: boolean; allowMachineCredentials: boolean; managedRevoked: boolean }>(`select
+async function organizationAccess(userId: string, workspaceId: string, organizationId: string, explicit?: EnterprisePrincipal | { kind: 'none' }, appExecutor: EnterpriseAuthExecutor = pool) {
+  const { rows } = await appExecutor.query<{ enforceSso: boolean; allowMachineCredentials: boolean; managedRevoked: boolean; requireTwoFactor: boolean }>(`select
     coalesce((select "enforceSso" from enterprise_org_policy where "organizationId"=$1),false) as "enforceSso",
     coalesce((select "allowMachineCredentials" from enterprise_org_policy where "organizationId"=$1),false) as "allowMachineCredentials",
+    coalesce((select "requireTwoFactor" from enterprise_org_policy where "organizationId"=$1),false) as "requireTwoFactor",
     (exists(select 1 from enterprise_org_policy where "organizationId"=$1 and "archivedAt" is not null) or exists(select 1 from enterprise_scim_user u join enterprise_scim_connection c on c.id=u."connectionId"
       join enterprise_sso_provider p on p."providerId"=c."providerId"
       where u."organizationId"=$1 and u."userId"=$2 and (not u.active or u.deleted or c."revokedAt" is not null or not p."domainVerified"))) as "managedRevoked"`, [organizationId, userId])
   const state: EnterpriseAccessState = { ...rows[0], credentialValid: false, sessionAssured: false, breakGlass: false }
   if (state.managedRevoked) return false
+  const principal = state.enforceSso || rows[0].requireTwoFactor ? await currentPrincipal(userId, workspaceId, explicit, appExecutor) : undefined
+  if (rows[0].requireTwoFactor && !await organizationTwoFactorAllowed(userId, organizationId,
+    principal?.kind === 'session' ? principal : { kind: principal ? 'machine' : 'none' }, appExecutor)) return false
   if (!state.enforceSso) return true
-  const principal = await currentPrincipal(userId, workspaceId, explicit, appExecutor)
   if (principal?.kind === 'execution') {
     state.credentialValid = principal.credentialValid
   } else if (principal?.kind === 'session') {
@@ -88,8 +92,9 @@ async function organizationAccess(userId: string, workspaceId: string, organizat
 }
 
 /** Organization administration has its own role check; this only enforces its authentication policy. */
-export async function requireEnterpriseOrganization(userId: string, organizationId: string, sessionId: string, appExecutor: EnterpriseAuthExecutor = pool) {
-  if (!await organizationAccess(userId, '', organizationId, { kind: 'session', sessionId }, appExecutor)) throw new WorkspaceError('workspaceAccessDenied')
+export async function requireEnterpriseOrganization(userId: string, organizationId: string, sessionId: string | undefined, appExecutor: EnterpriseAuthExecutor = pool) {
+  const principal = sessionId === undefined ? { kind: 'none' } as const : { kind: 'session', sessionId } as const
+  if (!await organizationAccess(userId, '', organizationId, principal, appExecutor)) throw new WorkspaceError('workspaceAccessDenied')
 }
 
 export async function requireEnterpriseWorkspace(userId: string, workspaceId: string, principal?: EnterprisePrincipal, executor?: WorkspaceLinkExecutor, appExecutor?: EnterpriseAuthExecutor) {
@@ -118,4 +123,3 @@ export async function filterEnterpriseWorkspaces<T extends { id: string }>(reade
   const links = await workspaceDb.select().from(organizationWorkspaces).where(inArray(organizationWorkspaces.workspaceId, workspaces.map(workspace => workspace.id)))
   return filterWorkspaceOrganizations(reader, workspaces, new Map(links.map(link => [link.workspaceId, link.organizationId])), appExecutor)
 }
-
