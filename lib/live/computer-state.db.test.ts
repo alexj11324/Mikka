@@ -101,9 +101,11 @@ test('real PG: computer changes publish committed owner state without heartbeat 
   try {
     await database.query('CREATE TABLE "user" (id text PRIMARY KEY)')
     await database.query('INSERT INTO "user" VALUES ($1),($2)', [actor.userId, peer.userId])
-    for (const name of ['20261027164501_cloud_computers.sql', '20261029080001_owner_cloud_machines.sql']) {
+    for (const name of ['20261027164501_cloud_computers.sql', '20261029080001_owner_cloud_machines.sql', '20261121053829_cloud_machine_error_code.sql']) {
       await database.query(await readFile(new URL('../../drizzle/' + name, import.meta.url), 'utf8'))
     }
+    await database.query('CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY); CREATE TABLE workspace_e2b_keys ("createdBy" text)')
+    await database.query('INSERT INTO user_e2b_keys VALUES ($1),($2)', [actor.userId, peer.userId])
     await database.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL REFERENCES "user"(id),kind text NOT NULL CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text,PRIMARY KEY("workspaceId","userId"));
       CREATE TABLE session (id text PRIMARY KEY,"userId" text NOT NULL REFERENCES "user"(id),"expiresAt" timestamptz NOT NULL,
