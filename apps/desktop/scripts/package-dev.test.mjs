@@ -25,7 +25,7 @@ test('Dev ad-hoc signing cannot inherit release credentials and does not mutate 
 })
 
 test('Dev build still requires an explicit isolated credential-free backend', () => {
-  for (const url of [undefined, 'http://test.example', 'https://name:password@test.example', 'https://app.aspectlylabs.com/mikka', 'https://mikka.vercel.app/mikka']) {
+  for (const url of [undefined, 'http://test.example', 'https://name:password@test.example', 'https://app.aspectlylabs.com/mikka']) {
     assert.throws(() => devPackageEnvironment({ MIKKA_DESKTOP_APP_URL: url }))
   }
   assert.equal(devPackageEnvironment({ MIKKA_DESKTOP_APP_URL: 'http://localhost:3000/mikka' }).MIKKA_DESKTOP_APP_URL, 'http://localhost:3000/mikka')

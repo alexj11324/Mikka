@@ -166,7 +166,7 @@ export async function runProductionMcpProof({
         deployment = await waitForWebDeployment({ expectedBuild: binding.applicationSha, token: env.GH_TOKEN,
           fetchImpl, maxWaitMs: 30_000, intervalMs: 1000 })
       } catch { throw new ProbeError('application_binding') }
-      report.deployment = { webRunId: deployment.webRunId, webAttempt: deployment.webAttempt,
+      report.deployment = { provider: deployment.provider, verifiedAt: deployment.verifiedAt,
         exactApplication: deployment.sourceCommit === binding.applicationSha && deployment.publicBuild === binding.applicationSha }
     }
     need(report.deployment.exactApplication, 'application_binding')

@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { QUARTER_HOUR } from '../../cloudflare/suggestions-cron/src/schedule.mjs'
-import { applicationWitness, readJson } from '../device-gateway/deploy.mjs'
+import { readJson } from '../device-gateway/deploy.mjs'
 import { actionsMikkaRepository } from '../cloudflare-source.mjs'
+import { readCronPromotion } from './promotion.mjs'
 import { affectsWorker } from '../device-gateway/select-release.mjs'
 
 export const WORKER = 'mikka-suggestions-cron'
@@ -45,19 +46,6 @@ export function existingWorker(settings, subdomain, schedules, requireNewCadence
   if (cadence !== QUARTER_HOUR && (requireNewCadence || cadence !== '* * * * *')) fail('cron_schedule_mismatch')
 }
 
-/** These two read-only origins need different credentials; neither receives the other's bearer. */
-async function releaseJson(url, token, fetchImpl) {
-  if (url.origin !== 'https://api.github.com' && url.href !== MIKKA_URL + '/api/version') fail('release_read_origin_invalid')
-  const headers = url.origin === 'https://api.github.com'
-    ? { authorization: 'Bearer ' + token, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' }
-    : { 'cache-control': 'no-cache' }
-  let response
-  try { response = await fetchImpl(url, { headers, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(20_000) }) }
-  catch { fail('release_read_unavailable') }
-  if (!response.ok) { await response.body?.cancel(); fail('release_read_http_' + response.status) }
-  try { return await response.json() } catch { fail('release_read_response_invalid') }
-}
-
 export function gitRepository(cwd = ROOT) {
   const git = async args => {
     try { return (await execute('git', args, { cwd, timeout: 30_000, maxBuffer: 2_000_000 })).stdout.trim() }
@@ -85,11 +73,11 @@ export function gitRepository(cwd = ROOT) {
   }
 }
 
-export async function deployCron({ sourceCommit, accountId, cloudflareToken, vercelToken, readPromotedWeb,
+export async function deployCron({ sourceCommit, accountId, cloudflareToken, githubToken, readPromotedWeb,
   repository = gitRepository(), configText = readFileSync(new URL('../../' + CONFIG, import.meta.url), 'utf8'),
   fetchImpl = fetch, deployWorker = wranglerDeploy, wait = sleep, maxPolls = 60, log = console.log }) {
   if (!SHA.test(sourceCommit ?? '')) fail('release_sha_invalid')
-  if (!/^[a-f0-9]{32}$/.test(accountId ?? '') || !cloudflareToken || (!readPromotedWeb && !vercelToken)) fail('release_credentials_unavailable')
+  if (!/^[a-f0-9]{32}$/.test(accountId ?? '') || !cloudflareToken || (!readPromotedWeb && !githubToken)) fail('release_credentials_unavailable')
   validateConfig(configText)
   await repository.assertCheckout(sourceCommit)
   const cloudflare = async path => {
@@ -102,7 +90,7 @@ export async function deployCron({ sourceCommit, accountId, cloudflareToken, ver
     existingWorker(settings, subdomain, schedules, requireNewCadence)
   }
   await inspect()
-  const readApplication = await applicationWitness({ sourceCommit, vercelToken, readPromotedWeb, fetchImpl })
+  const readApplication = readPromotedWeb ?? (() => readCronPromotion({ sourceCommit, token: githubToken, fetchImpl }))
 
   const releaseState = async () => {
     const main = await repository.refreshMain()
@@ -111,12 +99,7 @@ export async function deployCron({ sourceCommit, accountId, cloudflareToken, ver
     const production = await readApplication()
     if (!production || !await repository.contains(sourceCommit, production.sha)) return { state: 'waiting' }
     if (!await repository.contains(production.sha, main) || !await repository.sameInputs(sourceCommit, production.sha)) fail('production_release_mismatch')
-    // The protected promotion already checks the live Web, deployment and owner approval.
-    if (readPromotedWeb) return { state: 'ready', production }
-    // Per-service releases publish no Web deploy run: the live public build is the release.
-    const version = await releaseJson(new URL(MIKKA_URL + '/api/version'), undefined, fetchImpl)
-    if (!SHA.test(version.build ?? '')) fail('production_version_invalid')
-    if (version.build !== production.sha) return { state: 'waiting' }
+    // The Cloudflare observation revalidates the exact live product and release pin.
     return { state: 'ready', production }
   }
 
@@ -164,7 +147,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (process.env.GITHUB_ACTIONS !== 'true' || !actionsMikkaRepository(process.env)
       || process.env.GITHUB_REF !== 'refs/heads/main' || !['push', 'workflow_dispatch'].includes(process.env.GITHUB_EVENT_NAME)) fail('reviewed_main_workflow_required')
     const report = await deployCron({ sourceCommit: process.env.GITHUB_SHA, accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-      cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN })
+      cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, githubToken: process.env.GITHUB_TOKEN })
     const hash = createHash('sha256')
     for (const file of ['index.mjs', 'schedule.mjs']) {
       hash.update(file + '\0').update(readFileSync(new URL('../../cloudflare/suggestions-cron/src/' + file, import.meta.url)))

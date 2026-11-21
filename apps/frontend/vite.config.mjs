@@ -18,7 +18,7 @@ let resolvedApplicationBuild
 
 function applicationBuild() {
   if (resolvedApplicationBuild !== undefined) return resolvedApplicationBuild
-  const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.MIKKA_BUILD_REVISION ?? process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA
+  const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.MIKKA_BUILD_REVISION
   if (configured !== undefined) resolvedApplicationBuild = configured
   else {
     try { resolvedApplicationBuild = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { resolvedApplicationBuild = '' }
@@ -34,7 +34,7 @@ export async function frontendConfig({ target = 'web', command = 'build', outdir
   const directory = process.env.MIKKA_UI_OVERLAY_DIR?.trim()
   const selected = directory || process.env.MIKKA_UI_OVERLAY_SHA?.trim()
   if (serverPages && (target !== 'web' || selected || publicTestFixture)) throw new Error('SERVER_PAGES_REQUIRE_PUBLIC_WEB_BUILD')
-  if (publicTestFixture && (selected || process.env.VERCEL_ENV === 'production')) throw new Error('PUBLIC_FIXTURE_REQUIRES_NON_RELEASE_BUILD')
+  if (publicTestFixture && (selected || stage === 'production')) throw new Error('PUBLIC_FIXTURE_REQUIRES_NON_RELEASE_BUILD')
   if (!publicTestFixture && !(development && directory && !process.env.MIKKA_UI_OVERLAY_SHA)) {
     const mode = await installationBuild({ ...process.env, MIKKA_UI_OVERLAY_DIR: directory && resolve(repository, directory) })
     if (target === 'desktop' && mode === 'build:server') throw new Error('OFFICIAL_DESKTOP_UI_CHECKOUT_REQUIRED')

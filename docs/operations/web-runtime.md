@@ -11,16 +11,15 @@ Web 和桌面通过 [`apps/frontend`](../../apps/frontend/vite.config.mjs) 编�
 | --- | --- | --- |
 | Web 前端 | `apps/frontend/vite.config.mjs`，目标 `web` | `apps/frontend/dist/web`；公开路径 `/mikka/` |
 | 桌面前端 | `apps/desktop/scripts/build-renderer.mjs`，目标 `desktop` | `apps/desktop/dist/renderer`；由 Electron 本地协议提供 |
-| API | `apps/api/nitro.config.ts`、`apps/api/runtime/entry.ts` | Hono 分派现有业务 handler，Nitro 承担 Node/Vercel 生命周期 |
+| API | `apps/api/nitro.config.ts`、`apps/api/runtime/entry.ts` | Hono 分派现有业务 handler，由当前 Cloudflare API release 或自托管 Node 服务承载 |
 | Bot Agent | `apps/eve/agent/` | eve 服务；独立会话、事件与 Workflow 队列，部署见 [Bot runtime](eve-runtime.md) |
 | Node 产品 | `apps/api/scripts/build.mjs`，`node-server` preset | `.output/`，包含 API、静态文件、运行资源和构建清单 |
-| Vercel 产品 | 同一构建脚本，`vercel` preset | `.vercel/output/`，Build Output API v3、函数、静态资源和 Workflow 路由 |
 
 `renderer-manifest.json` 记录目标、`rendererBuild`、实际使用的 `usedActions` 和输入图。构建插件只把真实导入的显式注册动作转换成 RPC，不自动暴露一个模块的全部导出；浏览器图出现服务端运行依赖会失败。Vite 复用根目录 `public`，Web 静态内容随后挂到 `/mikka`。`index.html` 由页面策略返回，不作为绕过语言、安全头的静态文件发布；API、`/v1`、`.well-known` 的未知路径不能得到 SPA 的 200 响应。
 
 CSS 继续经过共享 Tailwind 与 Lightning CSS 的构建期处理及冻结的浏览器目标（`apps/frontend/scripts/css-targets.mjs`）；Vite 不再进行第二轮 CSS 压缩。Web 保留原 `instrumentation-client`、PostHog 和 VersionGuard；桌面保留原本的本地认证和主进程能力边界。开发模式使用真实 development React 与 React Fast Refresh。
 
-前端配置禁止自动公开任意 `VITE_*` 或服务端环境。只显式编译原来使用的公开值：Computer 的 acceptance/deployment/enabled/mock、应用 build、daemon package、PostHog key、Stripe publishable key、Turnstile site key。其中 Computer deployment 仍来自 `VERCEL_ENV`，不以缺失的同名公开变量关闭既有生产功能。
+前端配置禁止自动公开任意 `VITE_*` 或服务端环境。只显式编译原来使用的公开值：Computer 的 acceptance/deployment/enabled/mock、应用 build、daemon package、PostHog key、Stripe publishable key、Turnstile site key。其中 Computer deployment 来自显式 `MIKKA_DEPLOYMENT_STAGE`；缺失时保持未设置。
 
 ## 认证、RPC 与版本
 
@@ -57,11 +56,11 @@ Hono 根据静态优先的匹配规则延迟载入原 handler，保留参数、�
 
 请求作用域使用 AsyncLocalStorage 保存真实 Request、Cookie、locale 和请求级缓存。Cookie 在响应提交边界写回。`after` 的生命周期在响应产生前登记到官方 `waitUntil`；回调在真实响应完成或断开后运行，流式响应不能以“已创建 Response”作为结束。嵌套任务加入同一生命周期，运行错误保留闭集诊断。
 
-Workflow 使用官方 `workflow/nitro` 集成，扫描根目录现有 workflow/step。Vercel 由 SDK 生成 flow/webhook、队列 trigger 和函数配置；finalize 仅加启动 wrapper、资源与清单，保留生成的队列信息，不自行替换 managed World。原有部署的未完成 run 必须继续到其绑定部署，不能通过删除旧部署或重定向队列来“迁移”。
+Workflow 使用官方 `workflow/nitro` 集成，扫描根目录现有 workflow/step。SDK 生成 Workflow flow/webhook 与队列配置；finalize 仅加启动 wrapper、资源与清单，保留生成的队列信息，不自行替换 managed World。原有部署的未完成 run 必须继续到其绑定部署，不能通过删除旧部署或重定向队列来“迁移”。
 
-`WORKFLOW_TARGET_WORLD=local` 时，插件注册 close hook，再调用官方 World 的 start；关停时调用 close。开发入口为每个端口保留独立本地数据目录。本地 World 的重启恢复验证与 Vercel 托管队列验证是两件事，前者不能证明生产分布式行为。
+`WORKFLOW_TARGET_WORLD=local` 时，插件注册 close hook，再调用官方 World 的 start；关停时调用 close。开发入口为每个端口保留独立本地数据目录。本地 World 的重启恢复验证与 Cloudflare 生产队列验收是两件事，前者不能证明生产分布式行为。
 
-每个 Node/Vercel 入口先静态载入 `mikka-tracing.mjs`，再动态载入应用图，保证 tracing 初始化早于实际 `pg` 导入；仅靠较晚的 Nitro 插件不满足这个顺序。`pg` 和 OTel 使用真实外部依赖及其 package 元数据。请求 span 按实际响应结束收尾，后台 `after` 工作保留捕获的上下文。真实 HTTP → SQL → 后台任务 trace、流断开和导出结果仍须在固定环境单独验收，不能由 bundle 文件存在推断通过。
+每个 Node/Cloudflare API 入口先静态载入 `mikka-tracing.mjs`，再动态载入应用图，保证 tracing 初始化早于实际 `pg` 导入；仅靠较晚的 Nitro 插件不满足这个顺序。`pg` 和 OTel 使用真实外部依赖及其 package 元数据。请求 span 按实际响应结束收尾，后台 `after` 工作保留捕获的上下文。真实 HTTP → SQL → 后台任务 trace、流断开和导出结果仍须在固定环境单独验收，不能由 bundle 文件存在推断通过。
 
 ## 开发与 Node 启动
 
@@ -85,20 +84,16 @@ pnpm dev --host 127.0.0.1 --port 3000
 
 [`start-app.mjs`](../../scripts/start-app.mjs) 在导入和监听前检查 `.output/mikka-build.json`、真实 Node 24、preset、revision、锁文件/路由/tracing hash 格式及可选测试 revision 绑定。它保留启动目录；从构建所对应的仓库根目录使用 `pnpm start`。启动时只做有界 `/mikka/api/version` 就绪检查，验证实际 build，随后不新增空闲读取。
 
-发布必须包含完整输出和所需运行依赖，不能只复制 `index.mjs`。finalize 将域名数据、E2B 脚本和已生成的 worker/enrollment 二进制等实际资源复制入 Node 输出或各 Vercel 函数，并记录 hash。独立归档运行还须验证原 `process.cwd()` 资源路径和正式入口；不要绕过启动校验临时拼接部分输出。
+发布必须包含完整输出和所需运行依赖，不能只复制 `index.mjs`。finalize 将域名数据、E2B 脚本和已生成的 worker/enrollment 二进制等实际资源复制入 Node 输出或对应 Cloudflare API release，并记录 hash。独立归档运行还须验证原 `process.cwd()` 资源路径和正式入口；不要绕过启动校验临时拼接部分输出。
 
 Docker 的公开验收入口使用同一次 Nitro 编译图的 `mikka-docker.mjs`；该 adapter 不自行 listen、不安装信号处理器、`trustProxy=false`。外层已核验环境持有 HTTP/WS 监听与 ingress，严格验证固定 origin/Host 后交给真实 Node request；关闭顺序包含响应结束、官方 waitUntil 和 Nitro close。不能用新起的普通 listener 替代这个环境证明。
 
-## Vercel 构建与生产切换记录
+## Cloudflare 生产与 Node 自托管
 
-Vercel 输出使用 Build Output API，并保留官方 Workflow 生成的队列入口和函数配置。
-frontend、API 和 Eve 输出必须绑定同一源码版本；仅有编译成功或 READY 状态不能
-证明外部服务、队列投递或业务验收通过。
-
-Vercel TLS 终止后的 origin 由服务端配置的应用域名和平台 deployment host 精确选取；不能信任任意 Forwarded/Host 来扩大认证 origin。Docker 与 Vercel 的 ingress 适配分别验收，普通 Web RPC 的同源校验保持独立。
-
-公司现有项目设置、身份交付、上传操作和生产切换记录见[私有运维入口](README.md)。
-通用 Eve 输出与独立 World 的要求见 [Bot runtime](eve-runtime.md)。
+公司生产 Web/API 由 Cloudflare release 工作流管理；发布、部署观察、回滚
+以及运行资源绑定以[当前 Web 部署合同](web-deploy.md)和私有运维入口为准。
+Node `node-server` 构建仍用于自托管及本地真实运行验收。Cloudflare 与 Node
+的 ingress/服务生命周期分别验收，普通 Web RPC 的同源校验保持独立。
 
 ## 回滚操作
 

@@ -4,30 +4,27 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join, matchesGlob } from 'node:path'
 import { tmpdir } from 'node:os'
-import { productionSha, PRODUCTION_VERSION_URL,
+import { PRODUCTION_VERSION_URL, assertProductionSource,
   assertCurrentMain, waitForWebDeployment, containsDesktopSource } from './web-deploy.mjs'
 
 const SHA = 'a'.repeat(40)
-test('reads the commit production serves through the alias', async () => {
+test('runtime release accepts only the exact source currently served by Cloudflare', async () => {
   const calls = []
-  const fetchImpl = async url => {
-    calls.push(String(url))
-    if (String(url).includes('/v4/aliases/')) return Response.json({ deploymentId: 'dpl_abc' })
-    return Response.json({ meta: { githubCommitSha: SHA } })
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url: String(url), init })
+    return Response.json({ build: SHA }, { headers: { 'cf-ray': 'fixture' } })
   }
-  assert.equal(await productionSha({ token: 't', fetchImpl }), SHA)
-  assert.match(calls[1], /\/v13\/deployments\/dpl_abc\?teamId=team_/)
+  await assertProductionSource({ expectedBuild: SHA, fetchImpl })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].url, PRODUCTION_VERSION_URL)
+  assert.equal(calls[0].init.headers.authorization, undefined)
+  await assert.rejects(assertProductionSource({ expectedBuild: OTHER, fetchImpl }), /production_source_changed/)
+  const staleProvider = async () => Response.json({ build: SHA }, { headers: { 'x-vercel-id': 'retired-provider' } })
+  await assert.rejects(assertProductionSource({ expectedBuild: SHA, fetchImpl: staleProvider }), /production_source_changed/)
 })
 
 const OTHER = 'b'.repeat(40)
-const webRun = overrides => ({ id: 70, run_attempt: 2, head_sha: SHA, head_branch: 'main', path: '.github/workflows/web-deploy.yml',
-  repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } }, head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } },
-  event: 'push', status: 'completed', conclusion: 'success', ...overrides })
-const buildJob = overrides => ({ name: 'deploy', head_sha: SHA, status: 'completed', conclusion: 'success',
-  steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-    'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })), ...overrides })
-
-function webFixture({ main = () => SHA, runs = () => [webRun()], publisher = 'active', job = buildJob(), version = () => SHA, overlay = () => undefined, budget = 500 } = {}) {
+function webFixture({ main = () => SHA, version = () => SHA, overlay = () => undefined, budget = 500 } = {}) {
   let elapsed = 0
   const calls = []
   const fetchImpl = async (input, init = {}) => {
@@ -36,240 +33,53 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], publisher = 'ac
     assert.equal(init.redirect, 'error')
     if (url.origin === 'https://api.github.com') {
       assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
-      if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: main(elapsed) } })
-      if (url.pathname.endsWith('/actions/workflows/web-deploy.yml')) return Response.json({ path: '.github/workflows/web-deploy.yml', state: publisher })
-      if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) {
-        assert.equal(url.searchParams.get('head_sha'), SHA)
-        assert.equal(url.searchParams.get('branch'), 'main')
-        return Response.json({ workflow_runs: runs(elapsed) })
-      }
-      assert.equal(url.pathname, '/repositories/1427517699/actions/runs/70/attempts/2/jobs')
-      return Response.json({ total_count: 1, jobs: [typeof job === 'function' ? job(elapsed, value => { elapsed = value }) : job] })
+      assert.equal(url.pathname, '/repositories/1427517699/git/ref/heads/main')
+      return Response.json({ object: { type: 'commit', sha: main(elapsed, value => { elapsed = value }) } })
     }
-    assert.equal(input, PRODUCTION_VERSION_URL)
+    assert.equal(String(input), PRODUCTION_VERSION_URL)
     assert.equal(init.headers.authorization, undefined)
     assert.equal(init.cache, 'no-store')
-    return Response.json({ build: version(elapsed, value => { elapsed = value }), overlaySha: overlay(elapsed) })
+    return Response.json({ build: version(elapsed, value => { elapsed = value }), overlaySha: overlay(elapsed) },
+      { headers: { 'cf-ray': 'fixture' } })
   }
   return { calls, run: extra => waitForWebDeployment({ expectedBuild: SHA, token: 'read-only-fixture', fetchImpl,
     now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: budget, ...extra }), elapsed: () => elapsed }
 }
 
-test('a frozen publisher without a matching build cannot start paid template work', async () => {
-  const f = webFixture({ runs: () => [], publisher: 'disabled_manually' })
-  await assert.rejects(f.run(), /matchingWebPublisherInactive/)
-  assert.equal(f.elapsed(), 0)
-  assert.equal(f.calls.some(call => call.origin !== 'https://api.github.com'), false)
-})
-
-test('a qualified published build remains valid after future publication is frozen', async () => {
-  const f = webFixture({ publisher: 'disabled_manually' })
-  assert.equal((await f.run()).publicBuild, SHA)
-  assert.equal(f.calls.some(call => call.path.endsWith('/workflows/web-deploy.yml')), false)
-})
-
-test('waits for a GitHub build while Vercel still only serves the older READY source', async () => {
-  const fixture = webFixture({ runs: elapsed => [webRun(elapsed < 200 ? { status: 'in_progress', conclusion: null } : {})],
-    version: elapsed => elapsed < 300 ? OTHER : SHA })
+test('waits until the exact source is observed through Cloudflare and returns provider evidence', async () => {
+  const fixture = webFixture({ version: elapsed => elapsed < 300 ? OTHER : SHA })
   const result = await fixture.run()
-  assert.equal(result.sourceCommit, SHA)
-  assert.equal(result.webRunId, 70)
-  assert.equal(result.webAttempt, 2)
-  assert.equal(result.publicBuild, SHA)
+  assert.deepEqual(result, { sourceCommit: SHA, publicBuild: SHA, provider: 'cloudflare', verifiedAt: result.verifiedAt })
+  assert.ok(Number.isFinite(Date.parse(result.verifiedAt)))
   assert.equal(fixture.elapsed(), 300)
-  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [200, 300])
+  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [0, 100, 200, 300])
   assert.ok(fixture.calls.every(call => call.method === 'GET'))
-  assert.ok(fixture.calls.every(call => call.origin !== 'https://api.vercel.com'), 'the lock-free wait does not inspect Vercel build states or mutate configuration')
+  assert.ok(fixture.calls.every(call => call.origin !== 'https://api.vercel.com'))
 })
 
-
-test('waits for completed Web step metadata to converge before accepting the public build', async () => {
-  // 3c32675c run 42439514995 completed successfully while its attempt jobs API
-  // still reported Upload in_progress and Verify pending (2026-11-08).
-  for (const event of ['push', 'workflow_dispatch']) {
-    const fixture = webFixture({ runs: () => [webRun({ event })], job: elapsed => {
-      const job = buildJob()
-      if (elapsed < 100) {
-        Object.assign(job.steps[1], { status: 'in_progress', conclusion: null })
-        Object.assign(job.steps[2], { status: 'pending', conclusion: null })
-      } else if (elapsed < 200) {
-        Object.assign(job.steps[2], { status: 'queued', conclusion: null })
-      }
-      return job
-    } })
-    const result = await fixture.run()
-    assert.equal(result.webRunId, 70)
-    assert.equal(result.webAttempt, 2)
-    assert.equal(result.publicBuild, SHA)
-    assert.equal(fixture.elapsed(), 200)
-    assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com')
-      .map(call => call.at), [200], 'public READY cannot replace pending step evidence')
-    assert.ok(fixture.calls.every(call => call.method === 'GET'))
-  }
-})
-
-
-test('pending Web step metadata shares the original deadline without reading the public build', async () => {
-  const job = buildJob()
-  Object.assign(job.steps[1], { status: 'in_progress', conclusion: null })
-  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
-  const fixture = webFixture({ job, budget: 250 })
-  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
-  assert.equal(fixture.elapsed(), 250)
-  assert.equal(fixture.calls.filter(call => call.path.endsWith('/jobs')).length, 3)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-})
-
-test('main advancing during step metadata convergence stops before another evidence read', async () => {
-  const job = buildJob()
-  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
-  const fixture = webFixture({ job, main: elapsed => elapsed >= 100 ? OTHER : SHA })
-  await assert.rejects(fixture.run(), /mainChanged/)
-  assert.equal(fixture.calls.filter(call => call.path.endsWith('/jobs')).length, 1)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-})
-
-test('step metadata that completes after the original deadline cannot admit a release', async () => {
-  const fixture = webFixture({ job: (elapsed, advance) => {
-    const job = buildJob()
-    if (!elapsed) Object.assign(job.steps[2], { status: 'pending', conclusion: null })
-    else advance(501)
-    return job
-  } })
-  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
-  assert.equal(fixture.elapsed(), 501)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-})
-
-test('pending step metadata never hides a failed, cancelled or skipped required step', async () => {
-  for (const conclusion of ['failure', 'cancelled', 'skipped', 'timed_out']) {
-    const job = buildJob()
-    job.steps[1].conclusion = conclusion
-    Object.assign(job.steps[2], { status: 'pending', conclusion: null })
-    const fixture = webFixture({ job })
-    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/, conclusion)
-    assert.equal(fixture.elapsed(), 0)
-    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-  }
-})
-
-test('duplicate, missing or contradictory step evidence fails instead of waiting or accepting public READY', async () => {
-  const cases = [
-    ['duplicate success', job => { job.steps.push({ ...job.steps[1] }) }],
-    ['success plus pending duplicate', job => { job.steps.push({ ...job.steps[1], status: 'pending', conclusion: null }) }],
-    ['missing required step', job => { job.steps.splice(1, 1) }],
-    ['missing steps', job => { delete job.steps }],
-    ['non-array steps', job => { job.steps = {} }],
-    ['unknown status', job => { Object.assign(job.steps[1], { status: 'waiting', conclusion: null }) }],
-    ['completed without result', job => { job.steps[1].conclusion = null }],
-    ['pending with failure', job => { Object.assign(job.steps[1], { status: 'pending', conclusion: 'failure' }) }],
-    ['in-progress with success', job => { job.steps[1].status = 'in_progress' }],
-    ['pending without conclusion', job => { job.steps[1].status = 'pending'; delete job.steps[1].conclusion }],
-  ]
-  for (const [label, change] of cases) {
-    const job = buildJob()
-    change(job)
-    const fixture = webFixture({ job })
-    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/, label)
-    assert.equal(fixture.elapsed(), 0, label)
-    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0, label)
-  }
-})
-
-test('main advancing while waiting rejects the obsolete source before another workflow or public read', async () => {
-  const fixture = webFixture({ main: elapsed => elapsed >= 100 ? OTHER : SHA, runs: () => [webRun({ status: 'in_progress', conclusion: null })] })
-  await assert.rejects(fixture.run(), /mainChanged/)
-  assert.equal(fixture.calls.filter(call => call.path.endsWith('/runs')).length, 1)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-})
-
-test('the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation', async () => {
-  for (const conclusion of ['failure', 'cancelled', 'timed_out', 'skipped']) {
-    const fixture = webFixture({ runs: () => [webRun({ id: 69, run_attempt: 1 }), webRun({ conclusion })] })
-    await assert.rejects(fixture.run(), /matchingWebRunFailed:70/)
-    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-  }
-})
-
-test('a docs-only skipped build or incomplete upload never passes even if public already has that SHA', async () => {
-  for (const index of [0, 1, 2]) {
-    const job = buildJob()
-    job.steps[index].conclusion = 'skipped'
-    const fixture = webFixture({ job })
-    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
-    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-  }
-})
-
-test('a successful Web job waits for its required step results to catch up before reading public', async () => {
-  const fixture = webFixture({ job: elapsed => {
-    const job = buildJob()
-    if (elapsed < 200) {
-      job.steps[1] = { ...job.steps[1], status: 'in_progress', conclusion: null }
-      job.steps[2] = { ...job.steps[2], status: 'pending', conclusion: null }
-    }
-    return job
-  } })
-  const result = await fixture.run()
-  assert.equal(result.webRunId, 70)
+test('only an exact Cloudflare-served build with the requested overlay is accepted', async () => {
+  const fixture = webFixture({ version: () => SHA, overlay: elapsed => elapsed < 200 ? OTHER : SHA })
+  assert.equal((await fixture.run({ expectedOverlay: SHA })).publicBuild, SHA)
   assert.equal(fixture.elapsed(), 200)
-  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [200])
 })
 
-test('required Web step results that remain pending cannot pass and retain the finite wait', async () => {
-  const job = buildJob()
-  job.steps[2] = { ...job.steps[2], status: 'pending', conclusion: null }
-  const fixture = webFixture({ job, budget: 250 })
-  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
-  assert.equal(fixture.elapsed(), 250)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+test('a Vercel response cannot satisfy the production source fence', async () => {
+  const fetchImpl = async input => String(input) === PRODUCTION_VERSION_URL
+    ? Response.json({ build: SHA }, { headers: { 'x-vercel-id': 'retired-provider' } })
+    : Response.json({ object: { type: 'commit', sha: SHA } })
+  await assert.rejects(waitForWebDeployment({ expectedBuild: SHA, token: 'read-only-fixture', fetchImpl,
+    maxWaitMs: 100, intervalMs: 100, now: (() => { let t = 0; return () => t++ })(), wait: async () => {} }),
+  /matchingWebDeploymentTimedOut/)
 })
 
-test('pending Web step results retain the exact-main fence on every wait', async () => {
-  const job = buildJob()
-  job.steps[2] = { ...job.steps[2], status: 'pending', conclusion: null }
-  const fixture = webFixture({ job, main: elapsed => elapsed >= 100 ? OTHER : SHA })
-  await assert.rejects(fixture.run(), /mainChanged/)
-  assert.equal(fixture.elapsed(), 100)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-})
-
-test('pending step metadata does not hide a required step that already failed or skipped', async () => {
-  for (const conclusion of ['failure', 'cancelled', 'timed_out', 'skipped']) {
-    const job = buildJob()
-    job.steps[1] = { ...job.steps[1], status: 'in_progress', conclusion: null }
-    job.steps[2].conclusion = conclusion
-    const fixture = webFixture({ job })
-    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
-    assert.equal(fixture.elapsed(), 0)
-    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-  }
-})
-
-test('another repository, branch or workflow cannot stand in for the matching main Web run', async () => {
-  for (const wrong of [{ repository: { full_name: 'other/Mikka' } }, { head_repository: { full_name: 'fork/Mikka' } },
-    { path: '.github/workflows/e2b-official-runtime.yml' }, { head_sha: OTHER }, { head_branch: 'other' }]) {
-    const fixture = webFixture({ runs: () => [webRun(wrong)], budget: 200 })
-    await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
-    assert.equal(fixture.elapsed(), 200)
-    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
-  }
-})
-
-test('a successful Web run with an old public build has a finite monotonic wait', async () => {
+test('a public build mismatch has a finite wait and cannot pass after the deadline', async () => {
   const fixture = webFixture({ version: () => OTHER, budget: 250 })
   await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
   assert.equal(fixture.elapsed(), 250)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 3)
 })
 
-test('a matching public response after the deadline cannot admit the runtime mutation', async () => {
-  const fixture = webFixture({ version: (_elapsed, advance) => { advance(501); return SHA } })
-  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
-})
-
-test('the final read-only fence also rejects a main change during public verification', async () => {
-  const fixture = webFixture({ main: elapsed => elapsed ? OTHER : SHA, version: (_elapsed, advance) => { advance(1); return SHA } })
+test('main advancing during public verification rejects the obsolete source', async () => {
+  const fixture = webFixture({ main: (elapsed, advance) => { if (elapsed) return OTHER; advance(1); return SHA } })
   await assert.rejects(fixture.run(), /mainChanged/)
 })
 
@@ -403,12 +213,6 @@ test('an unbound or malformed GitHub comparison cannot admit a desktop release',
   }
 })
 
-test('private-push exact-source wait keeps matching overlay behavior', async () => {
-  const fixture = webFixture({ overlay: elapsed => elapsed < 200 ? OTHER : SHA })
-  assert.equal((await fixture.run({ expectedOverlay: SHA })).publicBuild, SHA)
-  assert.equal(fixture.elapsed(), 200)
-})
-
 test('large runtime reports cross jobs only as immutable artifact files', () => {
   const files = ['e2b-template.yml', 'e2b-official-runtime.yml']
     .map(name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8'))
@@ -423,6 +227,8 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
   assert.match(builder, /name: e2b-candidate-build-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(runtime, /artifact-ids: \$\{\{ needs\.validate\.outputs\.candidate-artifact-id \}\}/)
   assert.match(runtime, /name: e2b-release-evidence-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(runtime, /name: e2b-release-evidence-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}[\s\S]{0,300}retention-days: 90/,
+    'published E2B release attestations must outlive the short-lived candidate evidence')
   assert.match(runtime, /name: e2b-runtime-release-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(runtime, /release-artifact-id: \$\{\{ steps\.release\.outputs\.artifact-id \}\}/)
   assert.match(runtime, /RUNTIME_REPORT_ARTIFACT_ID: \$\{\{ steps\.release\.outputs\.artifact-id \}\}/)
@@ -441,74 +247,4 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
   assert.match(cleanup, /CANDIDATE_IDENTITIES: \$\{\{ needs\.validate\.outputs\.candidate-identities \}\}/)
   assert.doesNotMatch(cleanup, /download-artifact|candidate-artifact-id/,
     'cleanup uses independently bounded known IDs even when the full report download fails')
-})
-
-test('duplicate required step cannot hide a failure or pending record behind one success', async () => {
-  const outcomes = []
-  for (const duplicate of [
-    { status: 'completed', conclusion: 'failure' },
-    { status: 'pending', conclusion: null },
-  ]) {
-    const job = buildJob()
-    job.steps.push({ ...job.steps[1], ...duplicate })
-    const fixture = webFixture({ job })
-    const result = await fixture.run().then(() => 'accepted', error => error.message)
-    outcomes.push({ status: duplicate.status, result, elapsed: fixture.elapsed(),
-      publicReads: fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length })
-  }
-  assert.deepEqual(outcomes, [
-    { status: 'completed', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
-    { status: 'pending', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
-  ])
-})
-
-test('a ninety-minute wait passes forty minutes for the latest Web run instead of accepting an older successful push', async () => {
-  const latestSucceedsAt = 40 * 60_000 + 9_000
-  const fixture = webFixture({
-    // An older successful push and matching public version cannot admit the latest pending dispatch.
-    runs: elapsed => [
-      webRun({ id: 69, run_attempt: 1, event: 'push' }),
-      webRun({ event: 'workflow_dispatch',
-        ...(elapsed < latestSucceedsAt ? { status: 'in_progress', conclusion: null } : {}) }),
-    ],
-    version: () => SHA,
-  })
-  const result = await fixture.run({ maxWaitMs: 90 * 60_000, intervalMs: 10_000 })
-  assert.equal(result.webRunId, 70)
-  assert.equal(result.webAttempt, 2)
-  assert.equal(result.sourceCommit, SHA)
-  assert.equal(result.publicBuild, SHA)
-  assert.equal(fixture.elapsed(), 40 * 60_000 + 10_000)
-  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at),
-    [40 * 60_000 + 10_000], 'an older successful push cannot bypass the latest pending dispatch')
-})
-
-test('a ninety-minute wait stops while required Web step evidence remains pending without reading public', async () => {
-  const job = buildJob()
-  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
-  const fixture = webFixture({ job })
-  await assert.rejects(fixture.run({ maxWaitMs: 90 * 60_000, intervalMs: 10_000 }),
-    /matchingWebDeploymentTimedOut/)
-  assert.equal(fixture.elapsed(), 90 * 60_000)
-  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0,
-    'matching public output cannot replace unfinished required Web step evidence')
-})
-
-
-test('Web evidence uses immutable repository API routes and accepts the transferred canonical comparison', async () => {
-  const repository = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
-  const f = webFixture({ runs: () => [webRun({ repository, head_repository: repository })] })
-  assert.equal((await f.run()).webRunId, 70)
-  assert.ok(f.calls.filter(call => call.origin === 'https://api.github.com')
-    .every(call => call.path.startsWith('/repositories/1427517699/')))
-  assert.equal(await containsDesktopSource({ expectedBuild: SHA, publicCommit: OTHER, token: 'fixture',
-    fetchImpl: async input => {
-      assert.equal(new URL(input).pathname, '/repositories/1427517699/compare/' + SHA + '...' + OTHER)
-      return Response.json({ url: 'https://api.github.com/repos/aspectly-labs/Mikka/compare/' + SHA + '...' + OTHER,
-        base_commit: { sha: SHA }, merge_base_commit: { sha: SHA }, status: 'ahead', ahead_by: 1, behind_by: 0 })
-    } }), true)
-  for (const wrong of [{ ...repository, id: 42 }, { ...repository, owner: { id: 183887963 } },
-    { ...repository, full_name: 'foreign/Mikka' }]) {
-    await assert.rejects(webFixture({ runs: () => [webRun({ repository: wrong, head_repository: wrong })], budget: 1 }).run(), /matchingWebDeploymentTimedOut/)
-  }
 })

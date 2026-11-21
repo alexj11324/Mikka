@@ -43,10 +43,12 @@ test('credential broker publishes only the committed session-resume event and ca
   const pool = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 4 })
   const reader = new Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 2 })
   const previousSecret = process.env.BETTER_AUTH_SECRET
-  const previousBroker = process.env.CREDENTIAL_BROKER_URL
+  const previousCredentialRuntime = process.env.CREDENTIAL_RUNTIME
+  const previousCredentialEnvironment = process.env.CREDENTIAL_ENVIRONMENT
   const previousEdition = process.env.MIKKA_EDITION
   process.env.MIKKA_EDITION = 'cloud'
-  process.env.CREDENTIAL_BROKER_URL = 'https://fixture-broker.vercel.app'
+  process.env.CREDENTIAL_RUNTIME = 'cloudflare'
+  process.env.CREDENTIAL_ENVIRONMENT = 'production'
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const keys = new Map<string, { key: Buffer; context: EncryptionContext }>()
   let decrypts = 0
@@ -69,7 +71,9 @@ test('credential broker publishes only the committed session-resume event and ca
     namedExports: { notifyLive: (scope: LiveScope, events: LiveInvalidation[]) => onNotify(scope, events) },
   })
   const runtimeBoundaries = [
-    mock.module('@vercel/oidc', { namedExports: { getVercelOidcToken: async () => 'synthetic-oidc' } }),
+    mock.module(new URL('../credentials/runtime-identity.ts', import.meta.url).href, { namedExports: {
+      credentialRuntimeEnvironment: () => 'production', cloudflareCredentialToken: async () => 'synthetic-cloudflare-token',
+    } }),
     mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth: {} } }),
     mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool } }),
     mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExports: { loadWorkspaceContext: () => { throw Error('unexpected actor lookup') } } }),
@@ -82,10 +86,10 @@ test('credential broker publishes only the committed session-resume event and ca
   ]
   let brokerReply: (lease: string) => Promise<Response> = async () => { throw Error('unexpected broker request') }
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
-    assert.equal(String(input), 'https://fixture-broker.vercel.app/api/fill')
+    assert.equal(String(input), 'https://broker.internal/api/fill')
     assert.equal(init?.method, 'POST')
     assert.equal(init?.redirect, 'error')
-    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer synthetic-oidc')
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer synthetic-cloudflare-token')
     const payload = JSON.parse(String(init?.body))
     assert.deepEqual(Object.keys(payload), ['lease'])
     return brokerReply(payload.lease)
@@ -261,7 +265,8 @@ test('credential broker publishes only the committed session-resume event and ca
   } finally {
     for (const mocked of runtimeBoundaries.reverse()) mocked.restore()
     boundary.restore()
-    if (previousBroker === undefined) delete process.env.CREDENTIAL_BROKER_URL; else process.env.CREDENTIAL_BROKER_URL = previousBroker
+    if (previousCredentialRuntime === undefined) delete process.env.CREDENTIAL_RUNTIME; else process.env.CREDENTIAL_RUNTIME = previousCredentialRuntime
+    if (previousCredentialEnvironment === undefined) delete process.env.CREDENTIAL_ENVIRONMENT; else process.env.CREDENTIAL_ENVIRONMENT = previousCredentialEnvironment
     if (previousEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = previousEdition
     if (previousSecret === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = previousSecret
     for (const { key } of keys.values()) key.fill(0)

@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { afterEach, before, beforeEach, mock, test } from 'node:test'
 
 // The real arm, workflow, steps and owner checks run against an SDK boundary
-// recorder. No database, Vercel world, model or production workflow is called.
+// recorder. No database, hosted runtime world, model or production workflow is called.
 const TOKEN = 'due-timer:run-recovery'
 const NAME = 'workflow//./workflows/due-timer/workflow//dueTimer'
 type Context = { runId: string; deploymentId: string }
@@ -26,7 +26,7 @@ let beforeForce: (() => void) | undefined
 let afterForce: (() => void) | undefined
 let afterResume: (() => Promise<void>) | undefined
 let dueTimer: typeof import('./workflow').dueTimer, armDueTimer: typeof import('@/lib/due-timer').armDueTimer
-const previousEnvironment = { VERCEL: process.env.VERCEL, VERCEL_ENV: process.env.VERCEL_ENV }
+const previousEnvironment = { WORKFLOW_TARGET_WORLD: process.env.WORKFLOW_TARGET_WORLD, MIKKA_DEPLOYMENT_ID: process.env.MIKKA_DEPLOYMENT_ID, MIKKA_DEPLOYMENT_STAGE: process.env.MIKKA_DEPLOYMENT_STAGE, MIKKA_DEPLOYMENT_ENVIRONMENT: process.env.MIKKA_DEPLOYMENT_ENVIRONMENT }
 const previousWarn = console.warn, warnings: unknown[][] = []
 const privateMarkers = ['synthetic private transport text', 'timer-private-input', 'timer-private-cookie', 'timer-private-response']
 const diagnostics = () => warnings.filter(args => typeof args[0] === 'string' && args[0].startsWith('{'))
@@ -205,7 +205,7 @@ beforeEach(() => {
   latest = 'new'; caller = 'new'; environment = 'production'; resolver = true; next = null
   serial = 0; jobs = 0; legacyJobs = 0; nextReads = 0; lookupFailure = false; cancelFailure = false; startFailure = false
   beforeForce = undefined; afterForce = undefined; afterResume = undefined
-  process.env.VERCEL = '1'; process.env.VERCEL_ENV = 'production'
+  process.env.WORKFLOW_TARGET_WORLD = 'production'; process.env.MIKKA_DEPLOYMENT_ID = 'new_release'; process.env.MIKKA_DEPLOYMENT_STAGE = 'production'; process.env.MIKKA_DEPLOYMENT_ENVIRONMENT = 'production'
 })
 afterEach(async () => {
   // Stop late imports from creating a new hook after the cleanup snapshot.
@@ -441,7 +441,7 @@ test('cancel failure prevents due work and never touches the native task', async
 })
 
 test('preview run-recovery keeps the existing non-force lifecycle', async () => {
-  environment = 'preview'; process.env.VERCEL_ENV = 'preview'
+  environment = 'preview'; process.env.MIKKA_DEPLOYMENT_ID = 'new_release'; process.env.MIKKA_DEPLOYMENT_STAGE = 'preview'; process.env.MIKKA_DEPLOYMENT_ENVIRONMENT = 'preview'
   launch('preview'); await settle()
   assert.equal(jobs, 1); assert.equal(hooks.has(TOKEN), false)
   assert.equal(forced().length, 0); assert.deepEqual(cancelled(), [])

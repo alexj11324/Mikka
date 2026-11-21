@@ -19,12 +19,11 @@ export function traceEnvironment(env: Env = process.env): TraceEnvironment {
 
 /**
  * Head sampling rate between 0 and 1. Tests and CI always get 0 (no tracer at
- * all); otherwise MIKKA_TRACE_SAMPLE_RATE, default 10%. Vercel sets CI during
- * its build only, so a deployment's functions still trace.
+ * all); otherwise MIKKA_TRACE_SAMPLE_RATE, default 10%.
  */
 export function traceSampleRate(env: Env = process.env): number {
   if (env.NODE_ENV === 'test') return 0
-  if (env.CI && !env.VERCEL) return 0
+  if (env.CI) return 0
   const raw = env.MIKKA_TRACE_SAMPLE_RATE?.trim()
   if (!raw) return DEFAULT_SAMPLE_RATE
   const rate = Number(raw)
@@ -43,7 +42,7 @@ export function traceSettings(env: Env = process.env, token = posthogConfig.toke
     token,
     sampleRate,
     environment: traceEnvironment(env),
-    version: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || undefined,
+    version: env.MIKKA_BUILD_REVISION?.slice(0, 12) || undefined,
   }
 }
 

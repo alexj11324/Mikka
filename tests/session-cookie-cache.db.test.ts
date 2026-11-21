@@ -100,7 +100,6 @@ test('the money, permission, credential and deletion entry points read the sessi
   }
   const routes: Record<string, string[]> = {
     'app/api/account/deletion/route.ts': ['POST', 'DELETE'],
-    'app/api/credentials/oidc/route.ts': ['POST'],
     'app/api/credentials/route.ts': ['DELETE'],
     'app/api/device-tokens/[tokenId]/revoke/route.ts': ['POST'],
     'app/api/devices/enrollment/route.ts': ['POST'],

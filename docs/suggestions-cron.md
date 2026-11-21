@@ -1,6 +1,6 @@
 # Suggestions schedules
 
-Three schedules keep the 建议 page and each person's profile current (R-21, R-73). They do not use Vercel Cron (`vercel.json` has no crons). The Cloudflare Worker `cloudflare/suggestions-cron` (`mikka-suggestions-cron`) fires them. The Worker only calls Mikka with a bearer secret; the logic stays in the
+Three schedules keep the 建议 page and each person's profile current (R-21, R-73). The Cloudflare Worker `cloudflare/suggestions-cron` (`mikka-suggestions-cron`) fires them. The Worker only calls Mikka with a bearer secret; the logic stays in the
 Hono/Nitro API. Community deployments can run the same schedule through the
 [built-in scheduler](self-hosting-realtime.md#scheduled-work).
 
@@ -33,7 +33,7 @@ All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, an
 
 The briefing is delivered by the Coordinator, not shown in 建议 (R-21). Writing a briefing with something in it queues a `daily_briefing` event in the person's Coordinator inbox (dedupe key `daily_briefing:<userId>:<localDate>:<daily|first>`, so at most one push per kind and day) and wakes the Coordinator. The event is triaged as needing the person; the Coordinator writes the briefing in its chat in the person's language, names the most important items, and asks before acting on any of them. An empty day pushes nothing. Where the Coordinator does not run (no AI Gateway), the event waits in the inbox for the next turn.
 
-- Each person's IANA time zone is stored in `user_time_zones` (`drizzle/20261027011046_user_time_zones.sql`). The browser's zone, sent as `tz` when the suggestions list loads, replaces any earlier value. The connect callbacks' IP-derived zone (`x-vercel-ip-timezone`) only fills a gap. A person without a stored zone gets no scheduled briefing; the lazy path below still serves them. A zone the person picks in Settings (`source = 'manual'`, `drizzle/20261029213936_settings_preferences.sql`) is never replaced by either; people with 每日建议 off, or 记忆 off, are skipped (docs/settings-backend/prefs.md).
+- Each person's IANA time zone is stored in `user_time_zones` (`drizzle/20261027011046_user_time_zones.sql`). The browser's zone, sent as `tz` when the suggestions list loads, replaces any earlier value. The connect callbacks' IP-derived zone only fills a gap. A person without a stored zone gets no scheduled briefing; the lazy path below still serves them. A zone the person picks in Settings (`source = 'manual'`, `drizzle/20261029213936_settings_preferences.sql`) is never replaced by either; people with 每日建议 off, or 记忆 off, are skipped (docs/settings-backend/prefs.md).
 - A zone is due from 08:00 until its local midnight. Every run writes the briefing for due people that have no row for their local date, so a briefing lands within 15 minutes of 08:00 and a missed run is caught up by the next one the same day. The `(userId, localDate)` primary key keeps it to one per day, even with overlapping runs.
 - A day with nothing to report still gets a row with `total = 0`, so it is not recomputed every 15 minutes; nothing is pushed for it.
 - Connecting an app still writes a `first` briefing at once (`writeFirstBriefing`) and the Coordinator pushes it. One written before 08:00 is replaced by that day's daily briefing, which is pushed too; one written after 08:00 is today's briefing.
@@ -63,7 +63,7 @@ Facts the person corrected in 记忆 are never faded or overwritten. A person is
 ## Cron GET exception and the Factory monitor sweep
 
 Mikka's rule is that GET is strictly read-only. Cron endpoints are the one documented exception
-(the Vercel Cron pattern, which only issues GET): `/api/cron/*` handlers may write, provided that
+(scheduled GET): `/api/cron/*` handlers may write, provided that
 they accept nothing but the exact `CRON_SECRET` bearer (503 when unset, 401 otherwise, checked
 before any read or write) and every write is idempotent, so a repeated or overlapping run converges.
 
@@ -129,8 +129,8 @@ Keep deployment credentials and secret values in Infisical; deliver the Worker
 secret through a dedicated `prod:/cloudflare/suggestions-cron` Secret Sync.
 Never put either value in source, local environment files, or logs.
 
-The app reads `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` from the Vercel
-environment synced from Infisical `prod:/github`. The receiving webhook at
+The app reads `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` from the production
+runtime synced from Infisical `prod:/github`. The receiving webhook at
 `/mikka/api/webhooks/github` uses `GITHUB_WEBHOOK_SECRET` from the same source;
 it must match the GitHub App's webhook secret. GitHub App credentials are not
 Worker bindings.
@@ -138,12 +138,11 @@ Worker bindings.
 ## Acceptance boundary
 
 `pnpm build` runs `scripts/migrate.mjs` last, after the subscription worker,
-Agent UI generation, shared frontend/API build and type checks succeed, so a
-Vercel production deploy applies pending migrations itself. Do not apply the
+Agent UI generation, shared frontend/API build and type checks succeed, so the
+production release applies pending migrations through the existing build flow. Do not apply the
 Production SQL by hand. Off production it skips unless `MIGRATE=1` (or every
 target is a loopback database); initialize any other non-production database
-only against its own dedicated database with `MIGRATE=1`. Branches have no
-Vercel Preview.
+only against its own dedicated database with `MIGRATE=1`. Branches have no automatic preview deployment.
 
 GitHub's redelivery API returns 202 when it accepts the request. The receiving
 Mikka webhook also returns 202 before asynchronous suggestion ingestion

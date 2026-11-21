@@ -79,32 +79,21 @@ test('background job labels group like routes; anything else stays unattributed'
   assert.deepEqual(grouped,['after:coordinator-wake','cron:run-recovery','null','workflow:runPublication/publishResult'])
 })
 
-test('real collector contract combines closed daily usage and current-day hourly usage without double counting',async()=>{
-  const alias={alias:'app.aspectlylabs.com',projectId:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',deploymentId:'dpl_test',updatedAt:1}
+test('Cloudflare collector combines current runtime and provider usage without double counting',async()=>{
   const sample={msg:'db_sample',timestamp:new Date(now-1000).toISOString(),sampleRate:.01,statement:'abc123def456',route:'/actions/issues/poll',rows:1,bytes:100}
+  const containerWindow={applicationId:'app-1',environment:'production',start:now-15*60_000,end:now,events:[{deploymentId:'app-1',environment:'production',message:JSON.stringify(sample)}]}
   const fetchImpl=async (raw,options)=>{
     const url=new URL(raw)
-    assert.equal(options.redirect,'error')
-    if(url.hostname==='api.vercel.com'){
-      if(url.pathname.includes('/aliases/'))return Response.json(alias)
-      return Response.json({events:[{deploymentId:'dpl_test',environment:'production',message:JSON.stringify(sample)}],pagination:{hasMore:false,nextCursor:null}})
-    }
+    assert.equal(url.hostname,'console.neon.tech');assert.equal(options.redirect,'error')
     if(url.searchParams.get('granularity')==='daily')return Response.json({projects:[]})
     return Response.json(usage(1000))
   }
-  const report=await run({vercelToken:'v',neonToken:'n',now,fetchImpl})
+  const report=await run({containerWindow,neonToken:'n',now,fetchImpl})
   assert.equal(report.status,'ok');assert.equal(report.neon.periodBytes,1000)
-  assert.equal(report.neon.latestHourBytes,1000)
-  assert.equal(report.runtime.samples,1)
-  const excluded=await run({vercelToken:'v',neonToken:'n',now,fetchImpl:async(url,options)=>{
-    const response=await fetchImpl(url,options)
-    if(new URL(url).pathname==='/v1/observability/events'){
-      const body=await response.json();body.meta={excludedIntervals:[{}]};return Response.json(body)
-    }
-    return response
-  }})
-  assert.equal(excluded.status,'insufficient');assert.ok(excluded.reasons.includes('log_intervals_excluded'))
-  const aged=await run({vercelToken:'v',neonToken:'n',now:now+4*3600000,fetchImpl})
+  assert.equal(report.neon.latestHourBytes,1000);assert.equal(report.runtime.samples,1)
+  const missing=await run({neonToken:'n',now,fetchImpl})
+  assert.equal(missing.status,'insufficient');assert.ok(missing.reasons.includes('container_window_unavailable'))
+  const aged=await run({neonToken:'n',now:now+4*3600000,fetchImpl})
   assert.ok(aged.reasons.includes('neon_usage_stale'))
 })
 

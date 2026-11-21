@@ -35,7 +35,7 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 每条秘密继续使用独立随机 AES-256-GCM 数据密钥。主密钥只包裹数据密钥；owner、credential ID、网站 origin 和用途绑定到 authenticated additional data。密码、会话快照和被包裹的数据密钥使用不同用途，跨用户、跨站点或篡改密文无法解密。不要把此密钥提交进仓库；恢复备份需要原密钥，更换密钥需要先迁移既有记录。
 
-社区版在同一进程调用现有 broker：一次性租约、浏览器页面绑定、权限检查、截图保护和审计保持有效，不需要部署 `services/credential-broker`。云版继续使用独立 broker、AWS KMS 和 Vercel OIDC；即使意外设置本地主密钥，`MIKKA_EDITION=cloud` 也不会改用它。
+社区版在同一进程调用现有 broker：一次性租约、浏览器页面绑定、权限检查、截图保护和审计保持有效，不需要部署 `services/credential-broker`。云版通过 Cloudflare 私有 broker/identity 使用 AWS KMS；即使意外设置本地主密钥，`MIKKA_EDITION=cloud` 也不会改用它。
 
 ## 必需的 LiteLLM 模型出口
 

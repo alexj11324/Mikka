@@ -255,7 +255,7 @@ function fixture(options = {}) {
     }
     if (url.origin === 'https://app.aspectlylabs.com') {
       assert.equal(init.headers.authorization, undefined)
-      return Response.json({ build: options.publicBuild ?? COMMIT })
+      return Response.json({ build: options.publicBuild ?? COMMIT }, { headers: { 'cf-ray': 'fixture' } })
     }
     assert.equal(url.origin, 'https://api.vercel.com')
     assert.equal(url.searchParams.get('teamId'), TEAM)
@@ -351,19 +351,19 @@ test('obsolete refreshes fail even when their old runtime env already matches', 
   assert.equal(fake.calls.filter(call => call.origin === 'https://api.vercel.com').length, 0)
 })
 
-test('a different serving alias or public version prevents every configuration write', async () => {
-  for (const options of [{ aliasBuild: OTHER }, { publicBuild: OTHER }]) {
+test('a mismatched Cloudflare-served version prevents every configuration write', async () => {
+  for (const options of [{ publicBuild: OTHER }]) {
     const fake = fixture(options)
     await assert.rejects(fake.run(), /production_source_changed/)
     assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
   }
 })
 
-test('does not search past a newer application for an older matching READY deployment', async () => {
-  const fake = fixture({ aliasBuild: OTHER })
-  await assert.rejects(fake.run(), /production_source_changed/)
-  assert.equal(fake.calls.filter(call => call.path === '/v6/deployments').length, 0)
-  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 0)
+test('does not consult retired Vercel deployment metadata when checking production source', async () => {
+  const fake = fixture()
+  await fake.run()
+  assert.equal(fake.calls.filter(call => call.path.startsWith('/v4/aliases/') || call.path.startsWith('/v13/deployments/')).length, 0)
+  assert.equal(fake.calls.filter(call => call.method === 'POST').length, 1)
 })
 
 test('refuses missing or short source identities and candidate mismatches before requests', async () => {
@@ -438,19 +438,12 @@ test('GitHub-only build timeline waits for source upload before the single runti
           'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),
       }] })
     }
-    if (url.origin === 'https://app.aspectlylabs.com') return Response.json({ build: elapsed < 300 ? OTHER : COMMIT })
+    if (url.origin === 'https://app.aspectlylabs.com') return Response.json({ build: elapsed < 300 ? OTHER : COMMIT }, { headers: { 'cf-ray': 'fixture' } })
     assert.equal(url.origin, 'https://api.vercel.com')
     if (method === 'POST' && url.pathname.endsWith('/env')) { wrote = true; published = Object.fromEntries(JSON.parse(init.body).map(row => [row.key, row.value])); return Response.json({ created: [] }) }
     const values = wrote ? published : { ...STORED, MIKKA_CLOUD_WORKER_SHA: OTHER }
     if (url.pathname.endsWith('/env')) return Response.json({ envs: Object.keys(values).map(key => ({ id: `id-${key}`, key, target: ['production'] })) })
     if (url.pathname.includes('/env/id-')) return Response.json({ value: values[url.pathname.split('/env/id-')[1]] })
-    // Reproduce the observed gap: while GitHub is building there is NO Vercel
-    // in-flight deployment, only the previous READY application. The legacy
-    // orchestration fails production_source_changed here without waiting.
-    if (url.pathname === '/v6/deployments') return Response.json({ deployments: [{ uid: 'dpl_live', name: 'mikka', state: 'READY',
-      meta: { githubCommitSha: elapsed < 300 ? OTHER : COMMIT } }] })
-    if (url.pathname.startsWith('/v4/aliases/')) return Response.json({ deploymentId: 'dpl_live' })
-    if (url.pathname === '/v13/deployments/dpl_live') return Response.json({ meta: { githubCommitSha: elapsed < 300 ? OTHER : COMMIT } })
     assert.fail(`unexpected publication ${method} ${url.pathname}`)
   }
   // Run the same fixture with either checkout's actual orchestration. The

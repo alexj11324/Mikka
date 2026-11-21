@@ -394,7 +394,7 @@ export function productionOutcome(report, attesting = false) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const attesting = process.argv.includes('--attest')
-  const issueNumber = process.argv.includes('--migration-1415') ? 1415 : 1372
+  const issueNumber = process.env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target' ? 1415 : 1372
   let report
   try {
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))

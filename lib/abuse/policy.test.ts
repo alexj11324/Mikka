@@ -45,7 +45,7 @@ test('Gmail aliases normalize; other domains keep dots; disposable subdomains ar
 test('Turnstile local skip, production missing config, invalid and valid provider token', async () => {
   await verifyTurnstile(undefined, {})
   await assert.rejects(
-    verifyTurnstile(undefined, { VERCEL_ENV: 'production' }),
+    verifyTurnstile(undefined, { MIKKA_DEPLOYMENT_STAGE: 'production' }),
     /SIGNUP_VERIFICATION_UNAVAILABLE/,
   )
   await assert.rejects(
@@ -70,14 +70,14 @@ test('Turnstile local skip, production missing config, invalid and valid provide
   await assert.rejects(
     verifyTurnstile(
       'synthetic',
-      { TURNSTILE_SECRET_KEY: 'test', VERCEL_ENV: 'production' },
+      { TURNSTILE_SECRET_KEY: 'test', MIKKA_DEPLOYMENT_STAGE: 'production' },
       mock({ success: true, hostname: 'other.test' }),
     ),
     /TURNSTILE_INVALID/,
   )
   await verifyTurnstile(
     'synthetic',
-    { TURNSTILE_SECRET_KEY: 'test', VERCEL_ENV: 'production' },
+    { TURNSTILE_SECRET_KEY: 'test', MIKKA_DEPLOYMENT_STAGE: 'production' },
     mock({ success: true, hostname: 'app.aspectlylabs.com' }),
   )
 })

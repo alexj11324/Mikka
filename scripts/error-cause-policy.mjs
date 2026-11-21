@@ -121,7 +121,6 @@ export const droppedCauseAllowlist = {
   'lib/credentials/contracts.ts': 1,
   'lib/credentials/http.ts': 1,
   'lib/credentials/kms.ts': 3,
-  'lib/credentials/oidc.ts': 1,
   'lib/credentials/page-binding.ts': 1,
   'lib/credentials/runtime.ts': 2,
   'lib/execution-settings.ts': 1,

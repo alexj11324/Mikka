@@ -13,8 +13,8 @@ const FACTORY_MONITOR_BUDGET_MS = 50_000
 
 // Called hourly by the Cloudflare Worker in cloudflare/suggestions-cron.
 //
-// Documented exception to "GET is strictly read-only": this is a cron endpoint (the Vercel Cron
-// pattern, which only issues GET). It writes, so it accepts nothing but the exact CRON_SECRET
+// Documented exception to "GET is strictly read-only": this is a scheduled endpoint
+// that accepts only GET. It writes, so it accepts nothing but the exact CRON_SECRET
 // bearer (503 when unset, 401 otherwise, before any read or write), and every write it makes is
 // idempotent, so a repeated or overlapping run converges on the same state. See docs/suggestions-cron.md.
 async function handleGET(request: Request) {

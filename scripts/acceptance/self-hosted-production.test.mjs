@@ -61,7 +61,7 @@ test('core production accepts only a same-repository main dispatch, not another 
 
 test('target proof never accesses owner credentials and requires current main served live', async () => {
   const f = metadata(), guardedEnv = { ...env }
-  for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'VERCEL_TEAM_TOKEN'])
+  for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD'])
     Object.defineProperty(guardedEnv, key, { get() { return assert.fail('Target proof must not read ' + key) } })
   const proof = await f.prove({ env: guardedEnv })
   assert.equal(proof.status, 'ready'); assert.deepEqual(proof.openIssues, [...CORE_ISSUES])

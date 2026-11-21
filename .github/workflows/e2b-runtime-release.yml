@@ -193,7 +193,7 @@ jobs:
           name: e2b-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
       - name: Verify the Cloudflare release evidence and final public Web
         run: |
           node scripts/e2b/runtime-report.mjs reference

@@ -13,7 +13,7 @@ export function desktopDiscovery(env: Environment = process.env) {
   const name = env.MIKKA_SERVER_NAME?.trim().slice(0, 120) || 'Mikka'
   return {
     name,
-    version: APP_BUILD || env.MIKKA_BUILD_REVISION || env.VERCEL_GIT_COMMIT_SHA || 'development',
+    version: APP_BUILD || env.MIKKA_BUILD_REVISION || 'development',
     edition: getEdition(env),
     basePath: BASE_PATH || '/mikka',
     desktopProtocol: { min: DESKTOP_RPC_PREVIOUS_VERSION, max: DESKTOP_RPC_VERSION },

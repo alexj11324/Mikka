@@ -37,13 +37,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node --test scripts/suggestions-cron/deploy.test.mjs cloudflare/suggestions-cron/src/index.test.mjs
-      - name: Select changed Worker and confirm the legacy production origin
+      - run: node --test scripts/suggestions-cron/{deploy,promotion,select-release}.test.mjs cloudflare/suggestions-cron/src/index.test.mjs
+      - name: Select changed Worker and confirm Cloudflare production
         id: select
         if: github.event_name != 'pull_request'
         env:
           RELEASE_BEFORE: ${{ github.event.before }}
-        run: node scripts/device-gateway/select-release.mjs cron
+        run: node scripts/suggestions-cron/select-release.mjs
   deploy:
     needs: test
     if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main' && needs.test.outputs.publish == 'true'
@@ -90,16 +90,7 @@ jobs:
           secret-path: /platform
           secret-name: CLOUDFLARE_ACCOUNT_ID
           include-imports: false
-      - name: Read the existing Vercel release token for read-only checks
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
       - name: Wait for the matching public build, then update the existing minute Worker
         run: node scripts/suggestions-cron/deploy.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

@@ -4,10 +4,10 @@ import { pageRedirect } from './http-policy.mjs'
 import { isLoopbackHost } from '../../../lib/loopback'
 
 type Handler = (request: ServerRequest) => Response | Promise<Response>
-type Configuration = { origin: string | undefined; deploymentHost?: string; productionHost?: string; legacyHost?: string }
-type ConfigurationDetail = 'missing_origin' | 'invalid_origin' | 'invalid_platform_host'
+type Configuration = { origin: string | undefined; legacyHost?: string }
+type ConfigurationDetail = 'missing_origin' | 'invalid_origin' | 'invalid_legacy_host'
 const invalid = (detail: ConfigurationDetail, cause?: unknown): never => {
-  throw new CodedError('API_VERCEL_AUTHORITY_CONFIG_INVALID', { detail, ...(cause === undefined ? {} : { cause }) })
+  throw new CodedError('API_REQUEST_AUTHORITY_CONFIG_INVALID', { detail, ...(cause === undefined ? {} : { cause }) })
 }
 
 function configuredOrigin(value: string | undefined, allowLoopback = false): URL {
@@ -18,10 +18,11 @@ function configuredOrigin(value: string | undefined, allowLoopback = false): URL
   return url
 }
 
-function platformOrigin(host: string): URL {
-  const url = configuredOrigin(`https://${host}`)
-  if (url.host !== host || url.port) return invalid('invalid_platform_host')
-  return url
+function configuredLegacyHost(host: string): string {
+  let url: URL
+  try { url = new URL(`https://${host}`) } catch (error) { return invalid('invalid_legacy_host', error) }
+  if (url.host !== host || url.port) return invalid('invalid_legacy_host')
+  return url.host
 }
 
 const rejected = () => Object.assign(new Response(null, { status: 400, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } }), {
@@ -29,41 +30,17 @@ const rejected = () => Object.assign(new Response(null, { status: 400, headers: 
   crossws: { upgrade() { throw new Response(null, { status: 400 }) } },
 })
 
-/** Vercel supplies Host as visited, X-Forwarded-Host as the same host and a
- * forwarded scheme. Its Nitro Node adapter currently leaves srvx trustProxy
- * off, so a TLS-terminated request otherwise becomes http:// at the app.
- *
- * Only server configuration contributes authorities. Incoming Origin, cookies,
- * authentication and platform-marker headers never add one. The selected host
- * is retained (not rewritten to the main domain), so deployment-local Workflow
- * callbacks continue to reach their own deployment. Browser RPC still compares
- * Origin and the resulting URL against its separate configured app origin.
- * https://vercel.com/docs/headers/request-headers */
-export function withVercelRequestAuthority(fetch: Handler, configuration: Configuration): Handler {
-  return withConfiguredAuthority(fetch, configuration)
-}
-
 /** A self-hosted reverse proxy supplies the configured Host. No incoming proxy
- * header can invent an origin; plain HTTP is supported only on loopback. */
-export function withNodeRequestAuthority(fetch: Handler, configuration: Pick<Configuration, 'origin' | 'legacyHost'>): Handler {
-  return withConfiguredAuthority(fetch, configuration, true)
-}
-
-function withConfiguredAuthority(fetch: Handler, configuration: Configuration, allowLoopback = false): Handler {
-  const canonical = configuredOrigin(configuration.origin, allowLoopback)
+ * header can invent an authority; plain HTTP is supported only on loopback. */
+export function withNodeRequestAuthority(fetch: Handler, configuration: Configuration): Handler {
+  const canonical = configuredOrigin(configuration.origin, true)
   const origins = new Map([[canonical.host, canonical.origin]])
-  for (const host of [configuration.deploymentHost, configuration.productionHost]) {
-    if (host) { const value = platformOrigin(host); origins.set(value.host, value.origin) }
-  }
-  // This legacy domain has one existing fixed 308 destination, never a route
-  // into application data. Preserve that redirect without adding an auth host.
-  const legacy = configuration.legacyHost ? platformOrigin(configuration.legacyHost).host : undefined
-  if (legacy && origins.has(legacy)) return invalid('invalid_platform_host')
+  const legacy = configuration.legacyHost ? configuredLegacyHost(configuration.legacyHost) : undefined
+  if (legacy && origins.has(legacy)) return invalid('invalid_legacy_host')
 
   return request => {
     const node = request.runtime?.node
-    // Nitro's private serverFetch can call the app without a Node ingress.
-    // Actual external Vercel requests always arrive through toNodeHandler.
+    // Internal serverFetch calls have no HTTP ingress and keep their supplied URL.
     if (!node) return fetch(request)
     const http2 = node.req.httpVersionMajor === 2
     const raw = node.req.rawHeaders
@@ -93,8 +70,8 @@ function withConfiguredAuthority(fetch: Handler, configuration: Configuration, a
     // oxlint-disable-next-line no-control-regex -- Validate the raw HTTP origin-form target before URL construction.
     if (!target || !target.startsWith('/') || target.startsWith('//') || /[\\#\x00-\x20\x7f]/.test(target)) return rejected()
     const absolute = new URL(target, host === legacy ? `https://${legacy}` : origins.get(host))
-    // The official SDK exposes its parsed URL. Set it before H3/the lazy native
-    // Request reads anything; preserve the same body, abort, req/res and waitUntil.
+    // Set the parsed URL before H3/the lazy native Request reads it. Preserve
+    // the same body, abort, req/res and waitUntil.
     request._url = absolute
     if (request.url !== absolute.href) return rejected()
     if (host === legacy) return pageRedirect(request, { legacyHost: legacy, origin: canonical.origin }) ?? rejected()

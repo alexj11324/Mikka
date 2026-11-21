@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { AuditActor } from '../audit/events'
 
 export class CredentialError extends Error {
-  constructor(public code = 'credential_unavailable', public status = 503) { super(code) }
+  constructor(public code = 'credential_unavailable', public status = 503, options?: ErrorOptions) { super(code, options) }
 }
 export const secretText = z.string().min(1).max(4096).refine(value => !/[\r\n\0]/.test(value))
 export const submitSchema = z.object({

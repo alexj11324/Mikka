@@ -52,21 +52,10 @@ function fixture(options = {}) {
         mainReads++
         return json({ object: { type: 'commit', sha: options.wrongMain || options.advanceMain && mainReads > 2 ? OTHER : APP } })
       }
-      if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) return json({ workflow_runs: [{
-        id: 51, run_attempt: 1, head_sha: APP, head_branch: 'main', event: 'push',
-        path: '.github/workflows/web-deploy.yml', repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } },
-        head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } }, status: 'completed', conclusion: 'success',
-      }] })
-      if (url.pathname.endsWith('/actions/runs/51/attempts/1/jobs')) return json({ total_count: 1, jobs: [{
-        name: 'deploy', head_sha: APP, status: 'completed', conclusion: 'success',
-        steps: ['Build (runs migrations last, as the Vercel build did)',
-          'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
-          .map(name => ({ name, status: 'completed', conclusion: 'success' })),
-      }] })
       assert.fail('Unexpected GitHub path')
     }
     assert.equal(url.origin, ORIGIN)
-    if (url.pathname === '/mikka/api/version') { versionReads++; return json({ build: APP }) }
+    if (url.pathname === '/mikka/api/version') { versionReads++; return json({ build: APP }, 200, { 'cf-ray': 'synthetic-cloudflare-edge' }) }
     if (url.pathname === '/mikka/api/auth/sign-in/email') {
       assert.equal(method, 'POST'); assert.equal(headers.get('origin'), ORIGIN)
       assert.deepEqual(JSON.parse(init.body), { email: EMAIL, password: PASSWORD })
@@ -224,6 +213,8 @@ test('actual existing PKCE helper: one owned client, catalogue only, normal revo
   assert.deepEqual(report.requestedScopes, ['mikka'])
   assert.equal(report.refreshRequested, false)
   assert.equal(report.toolsInvoked, 0)
+  assert.equal(report.deployment.provider, 'cloudflare')
+  assert.ok(Number.isFinite(Date.parse(report.deployment.verifiedAt)))
   assert.equal(report.cleanup.unresolvedResources, false)
   for (const key of ['tokenRevoked', 'tokenRejected', 'clientDeleted', 'clientAbsent', 'normalSessionClosed', 'sessionAbsent'])
     assert.equal(report.cleanup[key], true, key)

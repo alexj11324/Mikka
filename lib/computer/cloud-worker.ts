@@ -9,6 +9,7 @@ import { CloudWorkerError } from './worker-error'
 import { CLOUD_WORKER_COMMAND } from './worker-command'
 import { desktopGitHubConfig, installDesktopGitHub } from './desktop-github'
 import { deviceIsOnline } from '../device-presence'
+import { vercelPreviewProtectionBypass } from './preview-transport'
 
 type Actor = { userId: string; workspaceId: string }
 
@@ -17,8 +18,7 @@ type Actor = { userId: string; workspaceId: string }
 export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbox, server: string, sourceSha: string, _runtime = provider) {
   const url = new URL(server)
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Invalid cloud worker configuration')
-  const protectionBypass = process.env.VERCEL_ENV === 'preview' ? process.env.MIKKA_CLOUD_PREVIEW_BYPASS : undefined
-  if (protectionBypass && (!url.hostname.endsWith('.vercel.app') || !/^[A-Za-z0-9_-]{20,256}$/.test(protectionBypass))) throw new Error('Invalid cloud worker configuration')
+  const protectionBypass = vercelPreviewProtectionBypass(url.toString())
   const leaseId = randomUUID()
   if (!await claimWorkerLease(pool, actor, sandbox.sandboxId, leaseId)) throw new Error('Cloud worker provisioning is busy or unavailable')
   const temporary = `/run/mikka-viewer/worker-${leaseId}.next`

@@ -45,7 +45,7 @@ export async function collectProviderEgress(pool: Pool, options: Options = {}) {
     try {
       if (options.collect) await options.collect()
       else {
-        const report = await run({ vercelToken: undefined, neonToken: options.neonToken, providerOnly: true })
+        const report = await run({ neonToken: options.neonToken, providerOnly: true })
         // Publish failure health too; never replace missing supplier data with 0.
         await publish(report, options.posthogKey)
         if (report.reasons.length) throw Error('egressProviderUnavailable')

@@ -14,7 +14,7 @@ export function devPackageEnvironment(source) {
   if (url.username || url.password || !['http:', 'https:'].includes(url.protocol) || (!local && url.protocol !== 'https:')) {
     throw new Error('The test backend must be loopback HTTP(S) or credential-free HTTPS')
   }
-  if (url.hostname === 'app.aspectlylabs.com' || url.hostname === 'mikka.vercel.app') {
+  if (url.hostname === 'app.aspectlylabs.com') {
     throw new Error('Mikka Dev acceptance packages cannot connect to production')
   }
   const env = Object.fromEntries(Object.entries(source).filter(([name]) => !/^(?:(?:WIN_)?CSC_|APPLE_)/.test(name)))

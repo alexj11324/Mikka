@@ -22,7 +22,7 @@ test('official releases require the checkout and a complete immutable revision',
   const nested = join(checkout, 'unversioned-provider')
   mkdirSync(nested)
   await assert.rejects(installationBuild({ MIKKA_UI_OVERLAY_DIR: nested, ...revision }), /independentCheckoutRequired/)
-  for (const env of [directory, revision, { ...directory, MIKKA_UI_OVERLAY_SHA: 'main' }, { VERCEL: '1', VERCEL_ENV: 'production' }]) {
+  for (const env of [directory, revision, { ...directory, MIKKA_UI_OVERLAY_SHA: 'main' }, { MIKKA_DEPLOYMENT_STAGE: 'production' }]) {
     await assert.rejects(installationBuild(env), /OFFICIAL_UI_CHECKOUT_AND_REVISION_REQUIRED/)
   }
   await assert.rejects(installationBuild({ ...directory, MIKKA_UI_OVERLAY_SHA: 'b'.repeat(40) }), /checkoutMismatch/)

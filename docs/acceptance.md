@@ -257,11 +257,11 @@ created no API key and is not a model-prompt result.
 
 After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 
-1. Watch the Vercel production deployment of the merge commit until it is
-   READY, and confirm the production domain serves that commit.
+1. Follow the Cloudflare production release and serving observation for the merge
+   commit; confirm the production domain serves that commit.
 2. Pending migrations run through the existing flow. `pnpm build` runs
    `scripts/migrate.mjs` in the production-mode GitHub Actions build before
-   deploying the prebuilt output to Vercel. See
+   publishing the verified output through the Cloudflare release flow. See
    [migration bootstrap](migration-bootstrap.md). Do not apply SQL by hand.
 3. Decide whether the change needs production acceptance (Alex, 2026-11-07):
    - **No**, when a local production build can show it: UI, interaction,
@@ -302,8 +302,8 @@ for production acceptance, first confirm the domain serves the merged commit.
 Deployment is not a general prerequisite for local functional acceptance.
 
 For a GitHub-backed v0 project, its working-branch deployment can be reviewed
-without publishing to production. The embedded sandbox and a Vercel deployment
-are distinct runtimes; verify the actual origin and session relevant to the
+without publishing to production. The embedded sandbox and a separate deployed runtime
+are distinct environments; verify the actual origin and session relevant to the
 check. For OAuth proxy acceptance, prove the round trip from the originating
 runtime through `https://app.aspectlylabs.com` and back to that same origin.
 The callback hub must not switch the reviewed application to production or

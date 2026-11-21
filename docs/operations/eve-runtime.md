@@ -67,26 +67,6 @@ database transaction. Concurrent replicas serialize operations for the same
 session. Model generation and idle sessions hold no database client. The same
 provider serves Node, Docker and Vercel; it requires no paid Vercel Sandbox.
 
-## Vercel prebuilt output
-
-The existing GitHub prebuilt deployment builds both services from the same
-revision. Packaging copies eve's generated Node functions under
-`functions/_mikka_eve`, preserving its queue triggers and adding the app's
-runtime resources. Eve's public routes precede application routes. Its
-Workflow consumers stay separate from the application's root
-`/.well-known/workflow` endpoints.
-
-`EVE_PUBLIC_ROUTE_PREFIX=/mikka/api/agents` supplies the public callback
-namespace. The small generated function adapter removes that prefix before
-passing the request to the upstream fetch handler. Native queue deliveries
-retain their context and generated trigger configuration.
-
-The build runs upstream preparation with the portable scratch provider. The
-existing production `vercel pull --environment=production` step supplies the
-project settings and actual `VERCEL_OIDC_TOKEN` through the existing build
-environment delivery. Preserve that authenticated preparation when building
-the Vercel output.
-
 ## Verification and rollback
 
 Run the deployment contract tests through `pnpm test:api`. They cover

@@ -734,12 +734,6 @@
     "behavior": "Preserve machine routes, request authority and response headers while selecting an HTML page only for document navigation.",
     "test": "apps/api/runtime/http-policy.test.mjs"
   },
-  "apps/api/scripts/dedupe-functions.mjs": {
-    "mode": "optional-cloud",
-    "environment": [],
-    "behavior": "The Vercel packaging step deduplicates byte-identical function trees only when deployment configuration and resolved dependencies agree. Compose uses the Node server target.",
-    "test": "apps/api/scripts/dedupe-functions.test.mjs"
-  },
   "apps/api/scripts/dev.mjs": {
     "mode": "built-in",
     "environment": [
@@ -4322,5 +4316,53 @@
     "behavior": "Pure projection partitioning an API key’s discovered models into recognized and unrecognized entries with select-all state; no network or credentials.",
     "test": "lib/api-key-models-view.test.ts",
     "suite": "test:lib-units"
+  },
+  "lib/computer/preview-transport.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_CLOUD_PREVIEW_BYPASS",
+      "VERCEL_ENV"
+    ],
+    "behavior": "Send the optional Vercel deployment-protection bypass only to an HTTPS .vercel.app host in Vercel preview; other preview hosts rely on the existing per-device bearer credential.",
+    "test": "lib/computer/preview-transport.test.ts",
+    "suite": "test:computer-db"
+  },
+  "lib/tracing/config.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_BUILD_REVISION"
+    ],
+    "behavior": "Configures optional server tracing and records the supplied build revision; when no tracing token is configured, self-hosted instances do not export traces.",
+    "test": "lib/tracing/tracing.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/credentials/kms.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "CREDENTIAL_MASTER_KEY"
+    ],
+    "behavior": "Community credential storage wraps per-secret encryption keys with the installation master key; hosted AWS KMS role access uses the runtime-specific platform identity (Cloudflare workload identity or Vercel OIDC).",
+    "test": "lib/credentials/local-kms.test.ts",
+    "suite": "test:self-hosted-byok"
+  },
+  "lib/due-timer-owner.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DEPLOYMENT_STAGE",
+      "MIKKA_DEPLOYMENT_ENVIRONMENT"
+    ],
+    "behavior": "Coordinates durable run-recovery timer ownership only for explicit production deployment stages, using the installed Workflow runtime.",
+    "test": "lib/due-timer.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/due-timer.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DEPLOYMENT_STAGE",
+      "MIKKA_DEPLOYMENT_ENVIRONMENT"
+    ],
+    "behavior": "Wakes durable due timers after committed database writes and selects deployment-aware recovery using explicit Mikka deployment configuration.",
+    "test": "lib/due-timer.test.ts",
+    "suite": "test:schedules"
   }
 }

@@ -12,8 +12,12 @@ vault/master-key proposal remains superseded.
 The Web API runs in Vercel project `mikka` through the
 [Hono/Nitro runtime](../operations/web-runtime.md). The standalone Node APIs
 in `services/credential-broker` run in `mikka-credential-broker` with that root
-directory and access to source files outside it. Both use Team OIDC. The app
-can GenerateDataKey/Encrypt; the broker can Decrypt. There is no static AWS
+directory and access to source files outside it. Vercel deployments use Team
+OIDC. The Cloudflare API ingress also binds the app to the private Cloudflare
+credential broker and credential-identity service; this gateway path forwards
+only private broker routes and requires Cloudflare workload identity. Each
+runtime uses its platform's identity, with no fallback to another issuer. The
+app can GenerateDataKey/Encrypt; the broker can Decrypt. There is no static AWS
 key or fallback credential chain. The broker verifies the app's exact signed
 project/team/environment identity before consuming an opaque, database-bound
 30-second single-use lease. When testing together, the app and broker must
@@ -25,9 +29,11 @@ Infisical supplies the five AWS settings from `staging:/aws` for Preview and
 `prod:/aws` for Production. The vault is enabled by default; the optional
 `CREDENTIAL_VAULT_ENABLED=0` is an incident kill switch. Runtime settings are
 `CREDENTIAL_BROKER_URL` (a frozen deployment origin) and, for protected
-Previews, `CREDENTIAL_BROKER_PREVIEW_BYPASS`. Store settings in Infisical and
-scope delivery to the selected environment/branch. Deployment applies the
-credential migration to the matching database before serving the feature.
+Previews, `CREDENTIAL_BROKER_PREVIEW_BYPASS`. Cloudflare deployments use their private
+service bindings instead of a public broker URL or Preview bypass. Store settings
+in Infisical and scope delivery to the selected environment/branch. Deployment
+applies the credential migration to the matching database before serving the
+feature.
 
 ## Data and authorization
 

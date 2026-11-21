@@ -482,7 +482,7 @@ jobs:
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
-      # No production build in CI: Vercel builds main (decision 2026-11-01-0230).
+      # This job does not build the production release artifact.
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.
