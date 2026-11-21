@@ -242,7 +242,7 @@ export class HostedUsageStore {
         `INSERT INTO hosted_usage (id,"workspaceId",model,state,"holdMicroUsd","usageWorkspaceId","billingOrganizationId","executionOwnerId","actorId","usageProjectId","usageThreadId","usageRunId","attributionComplete")
           VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [id, workspaceId, model, estimate, attribution.workspaceId, attribution.billingOrganizationId ?? null, attribution.ownerId ?? null,
-          attribution.actorId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
+          attribution.actorId ?? attribution.ownerId ?? null, attribution.projectId ?? null, attribution.threadId ?? null, attribution.runId ?? null, attribution.attributionComplete ?? false],
       )
       return { id, workspaceId }
     }) } finally { await quota?.close() }

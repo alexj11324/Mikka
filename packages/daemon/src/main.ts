@@ -95,11 +95,8 @@ import { judgeComputerAction, noServerDecision } from "./decision-judgments"
 import type { ServerDecide } from "./server-decision"
 import { RpcServer, type RpcHandlers } from "./rpc/server"
 import { RunJournal } from "./runs/journal"
-import {
-  baseReport,
-  RunSupervisor,
-  type SupervisorDeps,
-} from "./runs/supervisor"
+import { baseReport } from "./runs/publication"
+import { RunSupervisor, type SupervisorDeps } from "./runs/supervisor"
 import { DEVICE_GATEWAY_UPDATE_REQUIRED_CODE, DeviceGatewayClosedError, DeviceSession, type DeviceSessionVerdict } from "./device-gateway"
 import { deviceRepoSchema } from "@mikka/protocol"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
