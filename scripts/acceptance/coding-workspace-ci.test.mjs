@@ -109,7 +109,7 @@ test('only relevant changes with an actual validated publication select paid acc
   assert.equal(workspaceReleaseSelection({ runtime: 'validated_and_published' }, ['messages/en.json']).selected, false)
 })
 
-const expected = { sourceCommit: SHA, runId: 123, runAttempt: 2, workflowId: workflow.id }
+const expected = { sourceCommit: SHA, workerSha: OTHER, runId: 123, runAttempt: 2, workflowId: workflow.id }
 function attestation() {
   return { kind: 'coding-workspace-ci-attestation', selected: true, runtime: 'validated_and_published', sourceCommit: SHA,
     workerSourceCommit: SHA, workerSha: OTHER, upstream: { runId: 123, runAttempt: 2, workflowId: workflow.id },
@@ -124,6 +124,7 @@ test('attestation binds upstream attempt, actual Web and both source identities'
     value => { value.sourceCommit = OTHER },
     value => { value.workerSourceCommit = OTHER },
     value => { value.workerSha = 'main' },
+    value => { value.workerSha = 'c'.repeat(40) },
     value => { value.upstream.runAttempt++ },
     value => { value.web.publicBuild = OTHER },
     value => { value.web.webAttempt = 0 },

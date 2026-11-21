@@ -281,6 +281,7 @@ function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event
     }
     const url = new URL(input)
     assert.equal(url.origin, 'https://api.github.com')
+    assert.equal(options.headers.authorization, 'Bearer private-credential-sentinel')
     assert.equal(url.pathname.startsWith('/repositories/1427517699/'), true)
     const route = url.pathname.slice('/repositories/1427517699'.length) + url.search
     calls.push(route)
@@ -321,6 +322,13 @@ test('automatic build-time publication binds the actual report source to current
   assert.equal(proof.artifact.id, 321)
   assert.match(proof.reportSha256, /^[a-f0-9]{64}$/)
   assert.equal(fixture.calls.filter(path => path === 'storage').length, 1)
+  const attested = { ...proof, web: { sourceCommit: SHA, publicBuild: SHA, webRunId: 456, webAttempt: 1 } }
+  assert.doesNotThrow(() => assertAttestation(expected(), attested))
+  for (const mutate of [value => { value.workerSourceCommit = OTHER }, value => { value.artifact.repositoryId++ },
+    value => { value.reportSha256 = 'invalid' }, value => { delete value.artifact }]) {
+    const changed = structuredClone(attested); mutate(changed)
+    assert.throws(() => assertAttestation(expected(), changed), /thread_lifecycle_ci:report/)
+  }
   for (const change of [{ publishedSource: OTHER }, { rerun: true }, { mainMoved: true }])
     await assert.rejects(verifyRelease({ env: env(), event: event(), files: [], ...apiFixture({ buildTime: true, ...change }) }))
 })
