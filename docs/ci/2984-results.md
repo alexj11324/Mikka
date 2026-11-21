@@ -111,7 +111,7 @@ declare every command in the repository globally optimal.
 | Local migration-ready cache beside the migration ledger | Remove the incomplete cache in #2987; use the existing setup runner and ledger |
 | Repeated CI timing logic on retries | Correct the existing collector/summary in #2988; no new poller or validator |
 | Automatic runtime producer emits `workflow_run`, but three consumers admit only older event types | Repair eight existing event checks in #2995; preserve fixed workflow identity, repository/source/attempt/receipt checks and pre-credential revalidation |
-| Runtime publication history recognizes the retired `subscriptions` job and equates workflow head with published source | Independent #2984 follow-up: inspect original publication artifacts and add source-specific counterexamples before correcting the existing history reader; no paid rebuild is triggered for measurement |
+| Runtime publication history recognizes the retired `subscriptions` job and equates workflow head with published source | #3000 repairs the existing reader and shared artifact binding: real historical ZIP/source counterexample, original Node RED and independent61/61 GREEN; exact protected CI/merge remain pending. No paid rebuild is triggered for measurement |
 
 Seven original job logs underlying the typecheck comparison are in
 [2984-typecheck-assessment.json](2984-typecheck-assessment.json). Identical command
@@ -142,6 +142,49 @@ red/green evidence lives in the
 the [post-merge receipt](../operations/evidence/2984-bootstrap-postmerge.json)
 records a different, actual merged run. Test counts are not added across these
 different versions and described as one run.
+
+## B1. Fixed-source local feedback before final CI
+
+The [local-feedback evidence](2984-b1-local-feedback.json) records three real
+problems: two independently executed old/new source replays and one original
+Owner runtime report. The replays occurred after the historical failures and
+repairs. They prove a cheap deterministic entry point existed; they do not
+rewrite the original developer chronology or claim that queue differences were
+actually saved. The restored Linux computer used Node24.22.3 and the pinned
+TypeScript5.9.3 for the original route generator.
+
+| Problem / Owner | Original local entry point and fixed-source result | Native CI and limits |
+| --- | --- | --- |
+| Generated route source hash, #2973 / #2956 | Original `node apps/api/scripts/generate-routes.mjs --check`: old67199ca7 rejects stale output in0.664650439 s; fixed45144ea3 passes twice in0.631379609/0.714444750 s,395routes/522methods. Generated files and output hashes remain unchanged | Original Site44811835977/1,job136550118390 queued831 s and printed the first error947.0578911 s after creation. Fixed Site44815741395/1 passed, while primaryCI44815741718/1 failed unrelated original contracts. The original batch is unmerged |
+| Fixture preload uses the child cwd, #2969 / #2891 | Original preload in`.output/eve`: oldbf605701 reproduces nested-manifest ENOENT in0.032093036 s; fixedd30f6ec4 passes twice in0.035802252/0.034687927 s. Original guard/proxy/bundle suites pass6/6 at old source and7/7 at new source | Minimal explicitly synthetic manifest only. DB/LiteLLM URLs are parsed, not connected; original proxy tests use isolated loopback fixtures. No actual Eve/productHTTP/UI journey is claimed. The original Draft remains unmerged and itsCI44833174357/1 selector failed |
+| Empty native sessions.create body, #2996 / #2869 | [Original Owner report](https://github.com/aspectly-labs/Mikka/pull/2996#issuecomment-7052767951) binds09e694c3 to LinuxNode24/PG17/loopback-model execution: zero-byte creation, first text, Stop1.748 s, and a separate request settling13synthetic microdollars once | PRCI44831511577/1 failed a port-in-use case; failed-job retry/2 passed at the same source. Normal merge9bbe245ca19d4ac3863cfc75dd47d072ebba1d33 has mainCI44834869958/1 failure from old Draft-policy documentation/test contracts. Original localRED command/duration and a complete rawHTTP receipt are unknown; no independent rerun or exact merged runtime pass is invented |
+
+The replay denominator is two problems, each with one RED and two GREEN
+invocations, plus two original test-suite runs. Complete UI→API→DB→new-browser
+readback remains zero. Synthetic manifests were removed; four fixed-source
+worktrees retained unchanged tracked files. Original commands, exits, UTC
+boundaries, source/tree/blob hashes, sample denominators and full limitations
+are retained in the JSON.
+
+The refreshed main also exposed three genuine test-integration failures after
+accepted#2998 added a Draft rejection step and explicit PR event types. On
+this documentation branch's66fa2b9235784e26656ed293d0842d7a3578aca2 tree,
+the three original entries actually run51 tests:48pass/3fail/0skip in
+11.153068534 s. The failing tests assume an exact old trigger string, use
+`steps[0]` for the final Analytics gate, or take the first`run` block as the
+final selected-work gate. They now select the deliberate Draft rejection step.
+Missing-dependency attempts are separately recorded and do not count as that
+51-case RED. The Ready phrase is present in this PR's existing procedure;
+this does not erase the failures observed at an earlier main.
+
+A fresh ownership check found that original [PR#2994](https://github.com/aspectly-labs/Mikka/pull/2994)
+head40571ce6c780d4044f3c664099e060c857085879 already repairs those same three
+locators/contracts, preserving the negative result matrix and explicitly
+checking Draft refusal. No parallel fix or copied unmerged Owner code was
+made. Original#3001 also updates its own Ready/local-first instructions.
+Final integration waits for the original repairs to land normally; queued or
+failed current-main checks are not described as green. This dependency does
+not complete B1, the fixture journey, or either original product epic.
 
 ## C. Earlier migration diagnosis without deployment authority
 
@@ -217,8 +260,9 @@ of the Owner's later head `d30f6ec4a4a1b66278587442e7fd91676ab2f709` finds the
 preload now resolves its root from `import.meta.url`, independent of child cwd.
 That is an original-owner code correction, still on the unmerged Draft at this
 observation. It has not been relabelled as a new runtime or browser pass; the
-old failure remains attached to its old source. This remediation did not copy a
-manifest, remove preload, change the readiness budget or take over that branch.
+old failure remains attached to its old source. The B1 replay above verifies the repaired preload against a minimal synthetic
+manifest. It does not move/copy an actual build manifest as a startup workaround,
+remove preload, change the readiness budget or take over that branch.
 
 Completed UI→API→DB→new-browser-readback rounds are **0** at this checkpoint.
 Two runs of the original seed smoke each passed six scenarios with identical
@@ -252,8 +296,12 @@ documentation patches were recovered against their original remote files using
 the authorized GitHub interface; existing branches, PRs and the single ledger
 were retained. The supplied Docker fallback was searched in available tools and
 the plugin directory; no callable Docker entry was returned. No paid substitute,
-new CI workflow or test-result simulation was introduced. Original repository
-CI continues to provide actual execution where local execution is unavailable.
+new CI workflow or test-result simulation was introduced. The existing cloud computer was later restored with a fresh filesystem. The
+original pushed branches were recovered through Git and normally integrated
+with main; new local results above are separately source-bound. The same public
+repository ID1427517699 is now`aspectly-labs/Mikka`. Historical receipt URLs
+are preserved. No new identity or permission grant was required to resume
+standard GitHub code writes.
 
 ## E. Independent delivery and exact post-merge evidence
 
@@ -373,6 +421,12 @@ production acceptance. This remediation still owns the private #418 exact-head
 qualification/merge, completed protected post-merge observations and this
 documentation PR's own review/CI/merge. The automatic-E2B event contract repair
 is merged and independently verified at its merge source; live publication is
-not claimed. The newly identified publication-history job/source mismatch is
-being repaired independently. The live progress comment tracks these without
+not claimed. The publication-history job/source mismatch is implemented in#3000 at
+head275cf937d8de19da2baa761aa3567930b880fe84, with independent61/61 original
+Node cases and the actual46376-byte historical ZIP digest verified. Its
+[fixed-source evidence](https://github.com/aspectly-labs/Mikka/blob/275cf937d8de19da2baa761aa3567930b880fe84/docs/ci/2984-runtime-reuse.json)
+keeps original metadata, closed-adapter transport and true archive-byte checks
+separate. It still requires protectedCI, normal merge and exact merged-source
+verification. Remaining repository-transfer consumer boundaries are being
+checked against existing Owner work; no unverified fleet-wide recovery is claimed. The live progress comment tracks these without
 creating a second issue ledger.
