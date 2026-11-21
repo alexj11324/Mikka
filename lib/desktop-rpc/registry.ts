@@ -1,3 +1,4 @@
+import * as settingsActions from '@/app/actions/settings'
 import * as taskDomainActions from '@/app/actions/task-domain'
 import * as projectResourcesActions from '@/app/actions/project-resources'
 import * as enabledModels from '@/app/actions/enabled-models'
@@ -50,6 +51,13 @@ import * as listViews from '@/app/actions/list-views'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
+  'settings.getSettings': settingsActions.getSettings,
+  'settings.getWorkspaceSettings': settingsActions.getWorkspaceSettings,
+  'settings.patchPersonalSettings': settingsActions.patchPersonalSettings,
+  'settings.patchWorkspaceSettings': settingsActions.patchWorkspaceSettings,
+  'settings.resetPersonalSettings': settingsActions.resetPersonalSettings,
+  'settings.resetWorkspaceSettings': settingsActions.resetWorkspaceSettings,
+  'settings.getSettingsSchema': settingsActions.getSettingsSchema,
   'desktop.readBatch': createReadBatch(() => desktopActions),
   'desktop.bootstrap': desktopBootstrap,
   'desktop.session': desktopSession,

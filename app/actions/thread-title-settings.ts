@@ -1,12 +1,12 @@
 'use server'
 
 import { z } from 'zod'
+import { ActionFailureError } from '@/lib/action-error'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { threadTitleSettings } from '@/lib/db/schema'
-import { ActionFailureError } from '@/lib/action-error'
+import { writeSettings } from '@/lib/settings/store'
 import { THREAD_TITLE_TRIGGERS, DEFAULT_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX, type ThreadTitleTriggers } from '@/lib/thread-title'
-import { workspaceRole } from '@/lib/secrets/store'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 
@@ -51,15 +51,12 @@ export async function saveThreadTitleSettings(raw: z.input<typeof input>): Promi
   return settingsWorkspaceAction(async () => {
     const parsed = input.parse(raw)
     const actor = await currentWorkspaceActor(parsed.workspaceId)
-    const userId = parsed.scope === 'workspace' ? '' : actor.userId
-    if (parsed.scope === 'workspace' && await workspaceRole(actor.userId, actor.workspaceId) !== 'admin') throw new ActionFailureError('workspaceAccessDenied')
     if (parsed.scope === 'workspace' && parsed.triggers === null) throw new ActionFailureError('validationGeneric')
-    const change = {
-      ...parsed.instructions !== undefined ? { instructions: parsed.instructions.trim() } : {},
-      ...parsed.triggers !== undefined ? { triggers: parsed.triggers } : {},
+    const values = {
+      ...(parsed.instructions !== undefined ? { threadTitleInstructions: parsed.instructions } : {}),
+      ...(parsed.triggers !== undefined ? { threadTitleTriggers: parsed.triggers } : {}),
     }
-    await db.insert(threadTitleSettings).values({ workspaceId: actor.workspaceId, userId, ...change })
-      .onConflictDoUpdate({ target: [threadTitleSettings.workspaceId, threadTitleSettings.userId], set: { ...change, updatedAt: new Date() } })
+    await writeSettings(actor, parsed.scope === 'workspace' ? 'workspace' : 'personal', { values })
     return readSettings(actor)
   })
 }

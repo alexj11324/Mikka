@@ -9034,5 +9034,23 @@
     "merge": "Merge",
     "mergeAnyway": "Merge anyway, {count} failing",
     "mergeFailed": "Could not merge."
+  },
+  "SettingsRegistry": {
+    "archiveIdleAfterDays": {
+      "label": "Archive idle threads",
+      "keywords": "archive|idle|days"
+    },
+    "threadTitleInstructions": {
+      "label": "Thread title instructions",
+      "keywords": "title|naming"
+    },
+    "threadTitleTriggers": {
+      "label": "Update thread titles",
+      "keywords": "title|pull request|PR"
+    },
+    "subagentMaxConcurrent": {
+      "label": "Concurrent subagents",
+      "keywords": "agent|concurrency|limit"
+    }
   }
 }

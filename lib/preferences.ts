@@ -7,6 +7,7 @@ import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/s
 import { SEND_KEYS } from '@/lib/send-key'
 import { ActionFailureError } from '@/lib/action-error'
 import { setAttentionEnabled } from '@/lib/attention/store'
+import { writePersonalArchiveSetting } from '@/lib/settings/archive-preferences'
 
 /**
  * The app's 通知, 偏好 and 记忆 settings (docs/design/mobile.md, "Settings";
@@ -97,6 +98,7 @@ export async function readPreferences(userId: string, executor: Pick<typeof db, 
  * dailySuggestionsNeedMemory.
  */
 export async function savePreferences(userId: string, patch: PreferencesPatch): Promise<Preferences> {
+  patch = parsePreferencesPatch(patch)
   return db.transaction(async tx => {
     // An owner exists even before their first preference row. Serialize read/merge/write
     // for that owner so simultaneous patches cannot replace each other's fields.
@@ -110,6 +112,9 @@ export async function savePreferences(userId: string, patch: PreferencesPatch): 
     const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
     await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
       .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
+    if (rest.archiveIdleAfterDays !== undefined) {
+      await writePersonalArchiveSetting(tx, userId, rest.archiveIdleAfterDays)
+    }
     if (rest.archiveIdleAfterDays !== undefined && current.archiveIdleAfterDays !== rest.archiveIdleAfterDays) {
       await (await import('./live/lists')).archivePreferenceChanged(tx, userId)
     }

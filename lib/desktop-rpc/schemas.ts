@@ -1,3 +1,4 @@
+import { settingsPatchInput, settingsResetInput } from '@/lib/settings/registry'
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
@@ -270,6 +271,13 @@ export const desktopActionSchemas = {
   'issue-states.reorderWorkspaceIssueStates': tuple(reorderIssueStatesInput),
   'issue-states.setDefaultWorkspaceIssueState': tuple(setDefaultIssueStateInput),
   'issue-states.deleteWorkspaceIssueState': tuple(deleteIssueStateInput),
+  'settings.getSettings': inWorkspace,
+  'settings.getWorkspaceSettings': oneId,
+  'settings.patchPersonalSettings': tuple(settingsPatchInput, workspace),
+  'settings.patchWorkspaceSettings': tuple(uuid, settingsPatchInput),
+  'settings.resetPersonalSettings': tuple(settingsResetInput, workspace),
+  'settings.resetWorkspaceSettings': tuple(uuid, settingsResetInput),
+  'settings.getSettingsSchema': none,
   'thread-title-settings.getThreadTitleSettings': inWorkspace,
   'thread-title-settings.saveThreadTitleSettings': tuple(object({ workspaceId: workspace, scope: z.enum(['workspace', 'mine']), instructions: text(1000).optional(), triggers: z.enum(['first_run_ended', 'pull_opened', 'either']).nullable().optional() })),
   'issues.listIssues': none,

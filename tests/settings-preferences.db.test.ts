@@ -53,6 +53,8 @@ after(async () => {
   await db.delete(schema.userTimeZones).where(inArray(schema.userTimeZones.userId, ids))
   await db.delete(schema.briefings).where(inArray(schema.briefings.userId, ids))
   await db.delete(schema.users).where(inArray(schema.users.id, ids))
+  await (await import('@/lib/builtin-gateway/runtime')).builtinGateway()?.stop()
+  await (await import('@/lib/workspace-db')).workspacePool.end()
   await m.pool.end()
 })
 
