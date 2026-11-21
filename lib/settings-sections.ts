@@ -4,7 +4,7 @@
  * exists in one place only.
  */
 export type SettingsSectionId =
-  | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
+  | 'account' | 'security' | 'preferences' | 'threads' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
   | 'general' | 'issue-states' | 'members' | 'teams' | 'permissions' | 'secrets' | 'environments' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
 
@@ -29,6 +29,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'account', group: 'personal', title: 'Account' },
   { id: 'security', group: 'personal', title: 'Security' },
   { id: 'preferences', group: 'personal', title: 'Preferences' },
+  { id: 'threads', group: 'personal', title: 'Threads' },
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
@@ -42,8 +43,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'general', group: 'workspace', title: 'General' },
   // Capy's Issue states (decision 2026-11-19-2115): members read them, admins edit them.
   { id: 'issue-states', group: 'workspace', title: 'Issue states' },
-  // The workspace's app access and run policy, inherited by every Bot (decisions 2026-10-31, 2026-11-10).
-  { id: 'bot-permissions', group: 'workspace', title: 'App & run permissions' },
+  // Workspace execution rules for Agent runs.
+  { id: 'bot-permissions', group: 'workspace', title: 'Run permissions' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },

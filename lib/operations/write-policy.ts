@@ -2,12 +2,14 @@ import { z } from 'zod'
 import { OperationError } from './write-error'
 import { permissionDecision } from './permission-precedence'
 
+// Numeric versions are pinned receipts for operations created before the settings change.
+export const DIRECT_APP_WRITE_VERSION = 'direct'
+export const writePolicyVersion = z.union([z.literal(DIRECT_APP_WRITE_VERSION), z.string().regex(/^\d+(?::\d+)?$/)])
+
 const decision = z.enum(['allow', 'ask', 'deny'])
 const settings = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), decision)
 
-/** The default for an action no layer names: allow unless the Decisions API
- * judged the exact call destructive (decision 2026-10-31, R-77). A caller
- * without a judgment gets ask. */
+/** The default stored with an older policy-bound operation. */
 export type WriteFallback = 'allow' | 'ask'
 
 /** The workspace entry is the decision. There is no agent/Bot choice to narrow:

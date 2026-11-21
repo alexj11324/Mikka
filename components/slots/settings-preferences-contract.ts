@@ -1,4 +1,5 @@
-// What the 偏好设置 slot receives (docs/ui-overlay.md): nothing; its reads and
-// saves come from hooks/settings/use-preferences-page.ts.
+// Preferences and Threads share this slot; their existing hooks own reads and saves.
 
-export type SettingsPreferencesProps = Record<string, never>
+export type SettingsPreferencesProps =
+  | { page?: 'preferences' }
+  | { page: 'threads'; workspaceId: string; workspaceName?: string }

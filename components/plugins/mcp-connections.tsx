@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type FormEvent } from 'react'
-import useSWR, { type SWRResponse } from 'swr'
+import useSWR from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Plus, Trash2, UserRound } from '@/components/icons'
 import { withBasePath } from '@/lib/base-path'
@@ -36,24 +36,18 @@ export async function readMcpConnections(workspaceId: string): Promise<McpWorksp
   return pageFrom(await fetch(withBasePath(`/api/integrations/mcp?${query}`), { cache: 'no-store', signal: AbortSignal.timeout(30_000) }), workspaceId)
 }
 
-export function useMcpConnections(workspaceId?: string) {
-  return useSWR<McpWorkspacePage>(workspaceId ? mcpConnectionsKey(workspaceId) : null, () => readMcpConnections(workspaceId!))
-}
+type UnconfirmedChange = { serverId?: string; message: 'shareUnconfirmed' | 'enabledUnconfirmed' | 'createUnconfirmed' }
 
-/** The owner grants access only to the current workspace, as API-key sharing does. */
-export function McpConnections({ workspaceId, workspaceName, read }: {
-  workspaceId: string; workspaceName?: string; read: SWRResponse<McpWorkspacePage>;
-}) {
-  const t = useTranslations('Settings.mcpConnections')
-  const commonT = useTranslations('Common')
-  const [sharing, setSharing] = useState<McpWorkspaceServerView | null>(null)
-  const [adding, setAdding] = useState(false)
+export function useMcpConnections(workspaceId?: string) {
+  const read = useSWR<McpWorkspacePage>(workspaceId ? mcpConnectionsKey(workspaceId) : null, () => readMcpConnections(workspaceId!))
+  // Keep write state while the MCP tab is closed, so reopening it cannot repeat an unconfirmed change.
   const [pending, setPending] = useState(false)
-  const [unconfirmed, setUnconfirmed] = useState<string | null>(null)
+  const [unconfirmed, setUnconfirmed] = useState<UnconfirmedChange | null>(null)
   const page = read.data
   const blocked = pending || Boolean(read.error) || unconfirmed !== null
 
   async function check() {
+    if (!workspaceId || pending) return
     setPending(true)
     try {
       const current = await readMcpConnections(workspaceId)
@@ -63,25 +57,26 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
     finally { setPending(false) }
   }
 
-  async function share(server: McpWorkspaceServerView, shared: boolean) {
-    if (!server.mine || !page?.canShare || blocked) return
+  async function update(server: McpWorkspaceServerView, change: { shared: boolean } | { enabled: boolean }) {
+    const sharing = 'shared' in change
+    if (!workspaceId || !server.mine || blocked || (sharing && !page?.canShare)) return
     setPending(true)
     try {
-      const response = await fetch(withBasePath('/api/integrations/mcp/shares'), {
+      const response = await fetch(withBasePath(sharing ? '/api/integrations/mcp/shares' : '/api/integrations/mcp'), {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30_000),
-        body: JSON.stringify({ serverId: server.id, workspaceId, shared }),
+        body: JSON.stringify(sharing ? { serverId: server.id, workspaceId, shared: change.shared } : { id: server.id, enabled: change.enabled }),
       })
-      const current = await pageFrom(response, workspaceId)
+      if (!response.ok) throw new ReadResponseError(response.status)
+      const current = sharing ? await pageFrom(response, workspaceId) : await readMcpConnections(workspaceId)
       await read.mutate(current, { revalidate: false })
       setUnconfirmed(null)
-    } catch { setUnconfirmed(server.id) }
-    finally { setPending(false); setSharing(null) }
+    } catch { setUnconfirmed({ serverId: server.id, message: sharing ? 'shareUnconfirmed' : 'enabledUnconfirmed' }) }
+    finally { setPending(false) }
   }
 
   async function create(input: McpCreateInput) {
-    if (blocked) return
+    if (!workspaceId || blocked) return
     setPending(true)
-    setAdding(false)
     try {
       const response = await fetch(withBasePath('/api/integrations/mcp'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30_000),
@@ -91,29 +86,49 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
       const current = await readMcpConnections(workspaceId)
       await read.mutate(current, { revalidate: false })
       setUnconfirmed(null)
-    } catch { setUnconfirmed('create') }
+    } catch { setUnconfirmed({ message: 'createUnconfirmed' }) }
     finally { setPending(false) }
   }
 
-  if (!page && !read.error) return <SettingsLoading label={t('loading')} rows={1} />
+  return { data: page, error: read.error, blocked, pending, unconfirmed, check, update, create }
+}
+
+/** The owner grants access only to the current workspace, as API-key sharing does. */
+export function McpConnections({ workspaceId, workspaceName, read, query = '' }: {
+  workspaceId: string; workspaceName?: string; read: ReturnType<typeof useMcpConnections>; query?: string;
+}) {
+  const t = useTranslations('Settings.mcpConnections')
+  const commonT = useTranslations('Common')
+  const [sharing, setSharing] = useState<McpWorkspaceServerView | null>(null)
+  const [adding, setAdding] = useState(false)
+  const { data: page, error, blocked, pending, unconfirmed } = read
+  const search = query.trim().toLowerCase()
+  const servers = page?.servers.filter(server => server.name.toLowerCase().includes(search)) ?? []
+
+  if (!page && !error) return <SettingsLoading label={t('loading')} rows={1} />
   return <div className="flex flex-col gap-3">
-    {(read.error || unconfirmed) && <SettingsSaveError message={t(unconfirmed ? 'shareUnconfirmed' : 'loadFailed')}
-      retryLabel={t('checkAgain')} onRetry={() => { if (!pending) void check() }} />}
+    {(error || unconfirmed) && <SettingsSaveError message={t(unconfirmed?.message ?? 'loadFailed')}
+      retryLabel={t('checkAgain')} onRetry={() => void read.check()} />}
     {page && <SettingsSection id="custom-mcp-heading" title={t('title')}
       action={<Button {...settingsSectionAction} disabled={blocked} onClick={() => setAdding(true)}><Plus data-icon="inline-start" aria-hidden="true" />{t('add')}</Button>}>
-      {page.servers.length === 0 && <SettingRow title={t('empty')} />}
-      {page.servers.map(server => <div key={server.id} data-mcp-server-id={server.id}>
+      {servers.length === 0 && <SettingRow title={t(page.servers.length === 0 ? 'empty' : 'noMatches')} />}
+      {servers.map(server => <div key={server.id} data-mcp-server-id={server.id}>
         <SettingRow icon={<AppTile app="mcp" dim={!server.enabled} />} title={server.name}
           description={!server.mine ? <span className="inline-flex items-center gap-1.5"><UserRound aria-hidden="true" className="size-3.5 shrink-0" />{t('sharedBy', { name: server.ownerName ?? t('member') })}</span> : undefined}>
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="secondary">{server.transport.toUpperCase()}</Badge>
-            {!server.enabled && <Badge variant="secondary">{t('paused')}</Badge>}
-            {unconfirmed === server.id ? <Badge variant="secondary">{t('unconfirmed')}</Badge> : server.mine && !page.canShare ? <span className="text-xs text-muted-foreground">{t(server.shared ? 'sharedReadOnly' : 'onlyYou')}</span> : null}
+            {!server.mine && !server.enabled && <Badge variant="secondary">{t('paused')}</Badge>}
+            {unconfirmed?.serverId === server.id ? <Badge variant="secondary">{t('unconfirmed')}</Badge> : server.mine && !page.canShare ? <span className="text-xs text-muted-foreground">{t(server.shared ? 'sharedReadOnly' : 'onlyYou')}</span> : null}
             {server.mine && server.enabled && server.transport !== 'stdio' && <McpToolList key={`${workspaceId}:${server.id}:${server.revision}`} server={server} disabled={blocked} />}
+            {server.mine && <Label className="flex min-h-10 items-center gap-2 font-normal text-muted-foreground">
+              {t('enabled')}
+              <Switch aria-label={t('enabledLabel', { name: server.name })} checked={server.enabled} disabled={blocked}
+                onCheckedChange={enabled => void read.update(server, { enabled })} />
+            </Label>}
             {server.mine && page.canShare && <Label className="flex min-h-10 items-center gap-2 font-normal text-muted-foreground">
               {t('share')}
               <Switch aria-label={t('shareLabel', { name: server.name })} checked={server.shared} disabled={blocked}
-                onCheckedChange={checked => { if (checked) setSharing(server); else void share(server, false) }} />
+                onCheckedChange={shared => { if (shared) setSharing(server); else void read.update(server, { shared }) }} />
             </Label>}
           </div>
         </SettingRow>
@@ -122,7 +137,7 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
     <Dialog open={adding} onOpenChange={open => { if (!pending) setAdding(open) }}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col" aria-describedby={undefined}>
         <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
-        {adding && <McpServerForm pending={pending} onCancel={() => setAdding(false)} onCreate={input => { void create(input) }} />}
+        {adding && <McpServerForm pending={pending} onCancel={() => setAdding(false)} onCreate={input => { setAdding(false); void read.create(input) }} />}
       </DialogContent>
     </Dialog>
     <AlertDialog open={sharing !== null} onOpenChange={open => { if (!open && !pending) setSharing(null) }}>
@@ -133,7 +148,7 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="default" disabled={pending || Boolean(read.error)} onClick={() => { if (sharing) void share(sharing, true) }}>{t('confirmShare')}</AlertDialogAction>
+          <AlertDialogAction variant="default" disabled={blocked} onClick={() => { if (sharing) void read.update(sharing, { shared: true }).finally(() => setSharing(null)) }}>{t('confirmShare')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -27,9 +27,14 @@ Supported actions: append_notion_paragraph `{page_id:UUID,text:1..2000}`, send_s
 
 HTTP400invalid envelope/input,401session/Bearer rejection,403Origin,409domain/uncertain COMMIT,503unavailable/disabled.200is a typed result, not automatic provider success. View/list statuses pending/running/done/declined; running+operationUncertain remains unresolved. COMMIT errors retain explicit committed/unconfirmed state from the foundation; clients keep IDs and inspect the same result. No automatic transaction-body retry.
 
-## Default permission (2026-10-31, R-77)
+## Connected-app writes
 
-Explicit `ask` and `deny` in the workspace's `external_write_permissions` still narrow, and an explicit `allow` runs without a model call. Only when no setting names the action (`lockWritePolicy` reports `defaulted`) does `proposeFromRun` ask the injected `judgeWrite` (`lib/operations/write-judgment.ts`, on the existing Decisions route via `decide`) one predicate, `destructive`. Its input is the action, the write tool's slug and Composio tags (the MCP hints, from `composioWriteProvider.prepare`, which already fetches the tool) and the concrete payload. Every call is judged, a `readOnlyHint` tool included (the hint is input); probability ≥ 0.5 (the existing predicate cut-off) asks; an unavailable, refused or malformed answer shows no card: the agent's own call goes ahead and the log records `Write judgment fallback` (decision 2026-11-01-1330). The result is frozen in `operationBinding.run.approvalDefault` and the ledger `policyScope`, so every later check (insert, decide, ledger phases) resolves the same way. Bindings made before this change keep `ask`. The Coordinator's Gmail/Calendar writes use the same judge in `writeAccountAction`.
+The run still needs current access to the tool and its account. An
+authorized call dispatches without an additional approval judgment.
+Run-backed records use the `direct` policy version. Records with numeric
+policy versions retain their stored-policy checks. The operation ledger
+continues to pin the account, target, content, execution and invocation.
+See [authorized MCP connections](../design/decisions/2026-11-19-native-mcp-authorization.md).
 
 ## Product approval integration
 

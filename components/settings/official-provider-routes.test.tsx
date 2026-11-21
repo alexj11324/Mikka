@@ -8,11 +8,13 @@ import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import en from '../../messages/en.json'
 import type { BotOverviewProps } from '../slots/bot-overview-contract'
 import type { SettingsMembersProps } from '../slots/settings-members-contract'
+import type { SettingsPreferencesProps } from '../slots/settings-preferences-contract'
 
 const identity = (value: { children: ReactNode }) => value.children
 const none = () => null
 let overview: BotOverviewProps | undefined
 let members: SettingsMembersProps | undefined
+let preferences: SettingsPreferencesProps | undefined
 const team = { role: 'member', workspace: { id: 'workspace-one', name: 'Shared', kind: 'team' }, edition: 'cloud' }
 let workspace: typeof team | undefined = team
 let readError: Error | undefined
@@ -30,9 +32,10 @@ const slot = (name: string, providedExports: Record<string, unknown>) =>
 slot('bot-overview', { BotOverview: (props: BotOverviewProps) => { overview = props; return <strong>{props.conversation.name}</strong> } })
 slot('panel-header', { PanelHeader: () => <header>Overview header</header>, PANEL_INITIAL_WIDTH: null })
 slot('settings-members', { MembersScreen: (props: SettingsMembersProps) => { members = props; return <strong>{props.section}</strong> } })
+slot('settings-preferences', { PreferencesSettings: (props: SettingsPreferencesProps) => { preferences = props; return <strong>Preferences provider</strong> } })
 for (const [name, member] of [
   ['settings-models', 'ApiAndSubscriptions'], ['settings-security', 'SecurityAndSignIn'],
-  ['settings-preferences', 'PreferencesSettings'], ['settings-general', 'WorkspaceGeneral'],
+  ['settings-general', 'WorkspaceGeneral'],
 ]) slot(name, { [member]: none })
 slot('settings-organization', { OrganizationSettings: none, ORGANIZATION_SETTINGS: false })
 slot('settings-content', { SettingsContentFrame: identity })
@@ -75,6 +78,24 @@ before(async () => {
   ;({ SettingsView } = await import('./settings-view'))
 })
 const render = (node: ReactNode) => renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={en} timeZone="UTC"><SWRConfig value={{ use: [recordKeys] }}>{node}</SWRConfig></NextIntlClientProvider>)
+
+test('Threads resolves its selected workspace through the official preferences provider', () => {
+  const props = { user: { name: 'Member', email: 'member@example.test' }, workspaceId: team.workspace.id, onRail: none, onSignOut: none, signingOut: false, accountError: '' }
+  try {
+    render(<SettingsView {...props} activeSection="threads" />)
+    assert.deepEqual(preferences, { page: 'threads', workspaceId: team.workspace.id, workspaceName: team.workspace.name })
+    for (const error of [new SettingsReadError('denied', 403), new Error('failed')]) {
+      readError = error
+      preferences = undefined
+      render(<SettingsView {...props} activeSection="threads" />)
+      assert.equal(preferences, undefined, 'a failed workspace read cannot mount a cached editor')
+    }
+    readError = undefined
+    preferences = undefined
+    render(<SettingsView {...props} activeSection="threads" preview />)
+    assert.equal(preferences, undefined)
+  } finally { readError = undefined }
+})
 
 test('frame tab, standalone column and sheet expose the same Bot identity and edit command', async () => {
   const bot = { id: 'bot-one', name: 'Studio', kind: 'bot' as const }

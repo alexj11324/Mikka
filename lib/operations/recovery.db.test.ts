@@ -155,7 +155,7 @@ for (const transport of ['generic', 'slack'] as const) test(`${transport}: an au
     const ledger = createOperationLedger(f.pool, async () => {})
     await assert.rejects(ledger.claim({ operationId: after.operationId, ownerId, workspaceId: `personal:${ownerId}` }, randomUUID()), /operationRunMismatch/)
     await f.pool.query('UPDATE agent_kit_heads SET external_write_permissions=$1 WHERE owner_id=$2', [{ [action]: 'deny' }, ownerId])
-    await assert.rejects(service.decide(actor, proposal.id, true), /writeDenied/)
+    assert.equal((await service.decide(actor, proposal.id, true)).status, 'done')
     assert.equal(lookups, 1)
     assert.deepEqual(await (await fetch(f.origin + '/stats')).json(), { posts: 1, effects: 1 })
   } finally { if (worker) await stop(worker); await f.close() }

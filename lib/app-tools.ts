@@ -2,19 +2,13 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { OWN_INTEGRATIONS, TOOLKIT_SLUG } from '@/lib/composio-accounts'
 import type { ComposioAccountChoice } from '@/lib/composio-actions'
-import { appCallSettingKeys } from '@/lib/operations/app-permission-keys'
-import { permissionDecision } from '@/lib/operations/permission-precedence'
-import type { WriteJudge } from '@/lib/operations/write-judgment'
 import type { NativeWriteReview } from '@/lib/operations/native-write-review'
 
 // Any app a person connected from the 插件 store, through the tools Composio
 // lists for that toolkit; nothing is written per app (decision 2026-10-31).
-// Reads (readOnlyHint) run at once. A write follows R-77 (#658): an explicit
-// ask / deny / allow setting wins; otherwise the shared write judge
-// (lib/operations/write-judgment.ts, the Decisions API with the tool's MCP
-// hints) decides, and a call it judges destructive or cannot judge becomes a
-// card. Every other write runs and leaves a record.
-// Pure: the Composio client, the database and the decision call come in as deps.
+// Authorized calls run directly; native approval capabilities retain their
+// exact-call review. Writes leave a record before dispatch.
+// Pure: the Composio client and the database come in as deps.
 
 const TOOL_SLUG = /^[A-Z][A-Z0-9_]{0,127}$/
 export const APP_TOOL_ACTION = 'app_tool_call'
@@ -40,7 +34,6 @@ export type ListAppToolsInput = z.infer<typeof listAppToolsInput>
 export type CallAppToolInput = z.infer<typeof callAppToolInput>
 
 export type AppTool = { slug: string; name: string; description?: string; tags?: readonly string[]; version?: string; toolkit?: { slug: string }; inputParameters?: unknown }
-export type AppToolDecision = 'allow' | 'ask' | 'deny'
 /** What a card or the record keeps: the exact call, pinned to the tool version. */
 export type AppToolCall = { toolkit: string; tool: string; name: string; version: string; arguments: Record<string, unknown> }
 /** The exact call a card or record holds; anything else is not run. */
@@ -62,10 +55,6 @@ export type AppToolDeps = {
   getTool: (slug: string) => Promise<AppTool>
   /** `accountId` is null only for an app that needs no connection (its tools run on the person's id alone). */
   execute: (call: AppToolCall, accountId: string | null) => Promise<AppToolExecution>
-  /** The workspace's explicit setting for this tool or app, or null when none names it, including when the layer cannot be read. */
-  setting: (tool: string, toolkit: string) => Promise<AppToolDecision | null>
-  /** The shared R-77 judge: `ask` for a destructive, unjudged or refused call. */
-  judge: WriteJudge
   /** The record of a direct write, written before dispatch. */
   recordStart: (call: AppToolCall, accountId: string | null) => Promise<string>
   recordEnd: (id: string, outcome: { status: 'done' | 'failed' | 'running'; error?: string | null; result?: Record<string, string> }) => Promise<void>
@@ -75,30 +64,7 @@ export type AppToolDeps = {
   noAuth?: (toolkit: string) => Promise<boolean>
 }
 
-const decision = z.enum(['allow', 'ask', 'deny'])
-const layer = z.record(z.string(), decision).nullable().optional()
-/**
- * An explicit setting for any of `keys` (the tool, then its app key and legacy
- * action), from the workspace's layer only. A deny in the workspace, then an
- * ask; only when the workspace does not restrict does an allow run the call
- * without the judge. There is no Bot layer to narrow it. Null when nothing
- * names the call; settings that cannot be read throw, and the caller decides
- * how to fail.
- */
-export function explicitSetting(row: { workspace: unknown } | null, keys: readonly string[]): AppToolDecision | null {
-  if (!row) return null
-  const workspace = layer.parse(row.workspace) ?? {}
-  return permissionDecision(keys.flatMap(key => Object.hasOwn(workspace, key) ? [workspace[key]] : []))
-}
-
-/** One app tool call's explicit setting: its own slug, then its app key and legacy write action. */
-export function appCallSetting(row: { workspace: unknown } | null, tool: string, toolkit: string): AppToolDecision | null {
-  return explicitSetting(row, appCallSettingKeys(tool, toolkit))
-}
-
 export const isReadOnlyTool =(tool: Pick<AppTool, 'tags'>) => Array.isArray(tool.tags) && tool.tags.includes('readOnlyHint')
-/** The settings key for a tool: its lower-case slug (write-policy keys are `[a-z][a-z0-9_]{0,63}`). */
-export const toolSettingKey = (slug: string) => slug.toLowerCase().slice(0, 64)
 
 function schemaView(value: unknown, max: number) {
   const text = JSON.stringify(value ?? {})
@@ -166,16 +132,9 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown, native?: { ow
   if (!tool.version || tool.version === 'latest') return { error: 'integrationActionVersionUnavailable' }
   const call: AppToolCall = { toolkit, tool: tool.slug, name: tool.name.slice(0, 200), version: tool.version, arguments: args }
 
-  // The person's explicit setting wins; otherwise the Decisions API judges every call, reads included (readOnlyHint is one of its inputs).
-  // A layer that cannot be read names nothing, so the call goes to the judge
-  // exactly as an unset key does (decision 2026-11-01-1330); `deps.setting`
-  // logs the failure by name and returns null rather than refusing.
-  const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
-  let decision = setting === 'deny' ? 'deny' as const : setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask') ? 'ask' as const : 'allow' as const
-  if (native) {
-    const reviewed = await native.review(decision, { ownerId: native.ownerId, botId: native.botId, action: 'app_tool_call', input: call, accountId: ready.accountId, version: call.version, policy: setting })
-    if (decision !== 'deny') decision = reviewed
-  }
+  const decision = native
+    ? await native.review('allow', { ownerId: native.ownerId, botId: native.botId, action: 'app_tool_call', input: call, accountId: ready.accountId, version: call.version, policy: null })
+    : 'allow'
   if (decision === 'deny') return { error: 'integrationActionDenied' }
   if (decision === 'ask') return deps.propose(call, ready.accountId)
   if (!isReadOnlyTool(tool)) return runRecorded(deps, call, ready.accountId)
@@ -206,7 +165,7 @@ export async function runRecorded(deps: Pick<AppToolDeps, 'execute' | 'recordSta
   return { status: 'done' as const, actionId: id, data: bounded(result.data) }
 }
 
-const WRITE_NOTE = 'A write acts in the person\'s connected account at once unless it needs approval; then the result is awaiting_approval, the person sees a card and the outcome arrives later as an [Event]. After operationUncertain it may already have happened; never call it again.'
+const WRITE_NOTE = 'A write acts in the person\'s connected account at once. After operationUncertain it may already have happened; never call it again.'
 /** The two tools every Bot gets for apps connected from the store. */
 export function createAppTools(run: { list: (input: ListAppToolsInput) => Promise<unknown>; call: (input: CallAppToolInput) => Promise<unknown> }) {
   return {

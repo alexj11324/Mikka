@@ -2221,6 +2221,10 @@
       "preferences": {
         "title": "Preferences"
       },
+      "threads": {
+        "title": "Threads",
+        "keywords": "thread titles title instructions regenerate naming workspace default"
+      },
       "memory": {
         "title": "Memory and suggestions"
       },
@@ -2240,7 +2244,7 @@
         "title": "Connections"
       },
       "bot-permissions": {
-        "title": "App & run permissions"
+        "title": "Run permissions"
       },
       "models": {
         "title": "Models and subscriptions",
@@ -2807,7 +2811,8 @@
         "writePolicyChanged": "The settings just changed; read again",
         "agentPolicyUnavailable": "This setting can't be saved right now",
         "workspaceAccessDenied": "Only admins can change workspace settings",
-        "noBotInWorkspace": "This workspace has no Bot yet. Create one to read and save its app permissions."
+        "noBotInWorkspace": "This workspace has no Bot yet. Create one to manage run permissions.",
+        "noAgent": "Connect an Agent to manage run permissions."
       }
     },
     "workspaceLoading": "Loading the workspace…",
@@ -3232,17 +3237,22 @@
       "refreshTools": "Refresh tools",
       "nextTools": "Next page",
       "title": "Custom MCP",
+      "searchPlaceholder": "Search MCP servers",
       "loading": "Loading custom MCP connections",
       "share": "Share with workspace members",
       "shareLabel": "Share {name} with workspace members",
       "sharedBy": "Shared by {name}",
       "member": "Workspace member",
       "paused": "Disabled",
+      "enabled": "Enabled",
+      "enabledLabel": "Enable {name}",
       "onlyYou": "Only you",
       "sharedReadOnly": "Shared with workspace members",
       "unconfirmed": "State unconfirmed",
       "loadFailed": "Custom MCP connection state unavailable",
       "shareUnconfirmed": "Sharing change unconfirmed; current sharing state unknown",
+      "enabledUnconfirmed": "Connection state could not be confirmed",
+      "createUnconfirmed": "Could not confirm that the server was added",
       "checkAgain": "Check again",
       "confirmTitle": "Share {name} with members of {workspace}?",
       "currentWorkspace": "this workspace",
@@ -3250,6 +3260,7 @@
       "confirmShare": "Share connection",
       "add": "Add MCP server",
       "empty": "No MCP servers",
+      "noMatches": "No matching MCP servers",
       "name": "Name",
       "transport": "Connection type",
       "command": "Command",
@@ -3711,6 +3722,12 @@
     },
     "threadTitles": {
       "title": "Thread titles",
+      "scope": {
+        "label": "Thread settings scope",
+        "mine": "Mine",
+        "workspace": "Workspace"
+      },
+      "workspaceReadOnly": "Workspace admins can edit",
       "instructions": "Title instructions",
       "instructionsMine": "How Mikka names the threads you start, on top of the workspace's instructions",
       "instructionsWorkspace": "How Mikka names every thread started in this workspace",

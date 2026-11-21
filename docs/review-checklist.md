@@ -40,6 +40,18 @@ what they came for. A reviewer who did not build the screen runs this.
 - [ ] The walk-through table (task | before | after) is in the PR body or the
       review page.
 
+### Settings layout
+
+- [ ] Find each changed setting by its name and common search terms in the official sidebar.
+      The page names the applicable account or workspace scope before editing.
+- [ ] Keep ordinary settings ahead of advanced and destructive actions. Opening a destructive
+      confirmation keeps the rest of the settings page in place. Verify cancel, pending and failure.
+- [ ] Use one label and one value or control per row. Align controls on wide screens and stack
+      them where the row gets crowded. Test long names and addresses in Chinese and English
+      at a narrow width. The Web page reflows at 320 CSS pixels without clipping the controls
+      or hiding essential text. See [Google's settings guidance](https://developer.android.com/design/ui/mobile/guides/patterns/settings)
+      and [WCAG reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html).
+
 ### Action coverage and honest completion (before visual polish)
 
 - [ ] For changed business capabilities, the authoritative `command × permission × business transition × promised UI entry` is traced **both ways**; each authorized user job has a discoverable path and every visible action reaches a real command and durable result. Use [mikka-action-coverage](../.claude/skills/mikka-action-coverage/SKILL.md).

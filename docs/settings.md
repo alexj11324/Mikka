@@ -29,23 +29,44 @@ supplies content.
 
 ## Layout
 
-Settings render inside the app window (`SettingsFrame` in
-`components/settings/settings-shell.tsx`): the window bar and icon rail stay,
-the section list is the card's first column, and the section scrolls beside it.
-There is no 「返回应用」; the rail leaves Settings. On phones the section list is
-the sheet behind the header's sidebar button, with the rail items at its foot.
+The official app shows Settings in its own frame. Use the sidebar to search
+sections and teams, or use Back to return to the previous page. Settings
+keeps the selected workspace when moving between sections. On narrow screens,
+open the sidebar from the page header.
 
 ## Sections
 
 The section list is `SETTINGS_SECTIONS` in `lib/settings-sections.ts`; the
 sidebar, URL parsing and page body all read it.
 
-- **Personal (account):** Account, Security, Preferences, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. The same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
-- **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Run environments, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
+- **Personal (account):** Account, Security, Preferences, Threads, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. Threads holds the current workspace's personal and shared title settings; the other account settings are the same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
+- **Workspace:** General, Run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Run environments, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
 
 Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,
 Notion, Slack, Linear, Telegram), even when the app is a Google one.
+
+Open the **Custom MCP** tab in Connections to find or add a server. The owner
+can enable or disable a server and manage its workspace share. Recipients of
+a shared connection can see its status. If a change's result is unconfirmed,
+**Check again** reads the saved state.
+
+## Threads
+
+Settings › Threads (`section=threads`) holds thread-title instructions and
+regeneration triggers. The shipped `SegmentedControl` selects **Mine** or the
+current workspace's name and shows the existing `ThreadTitleSection` for that
+scope. Both scopes belong to the workspace carried in
+the Settings URL, including a personal workspace. Mine instructions add to the
+workspace instructions; Mine triggers can inherit the workspace default.
+Members see the workspace's disabled controls and read-only state; only
+workspace admins can edit them.
+
+The official UI composes this page through the existing `settings-preferences`
+slot (`page: 'threads'`, `workspaceId`) and reuses `useThreadTitleSettings` and its existing
+read/write actions. Preferences keeps its ordinary personal settings; General
+keeps workspace identity, transfer and deletion. Neither repeats the title
+settings. See the [Threads settings decision](design/decisions/2026-11-19-threads-settings.md).
 
 ## Run environments
 

@@ -2,10 +2,7 @@ import 'server-only'
 import { pendingActionsChanged } from './live/pending-actions'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
-import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
-import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
-import { accountWriteSetting } from '@/lib/operations/account-write-setting'
-import { accountWriteError, accountWriteOutcome } from '@/lib/operations/account-write-gate'
+import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
@@ -18,33 +15,22 @@ const MAX_PENDING = 20
 /**
  * Sends mail or writes the calendar in the person's connected account.
  *
- * The workspace's setting is the permission (ADR 2026-11-10-1730): a deny
- * withholds the call, an ask makes the card, an allow runs at once without the
- * Decisions judge. Only a workspace that names no key for the app reaches the
- * judge, which asks for a destructive call and otherwise runs it
- * (lib/operations/write-judgment.ts). The gate runs before every dispatch, so
- * nothing is sent for a withheld or carded call.
+ * Authorized calls run directly. A supplied native review still checks the
+ * exact prepared input, account and tool version before dispatch.
  *
- * The row is written before dispatch and kept as the record; like other writes
- * the policy allows, it has no `decidedAt` and never shows as a card.
+ * The row is written before dispatch and kept as the record; a direct write
+ * has no `decidedAt` and never shows as a card.
  */
-export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId), review?: NativeWriteReview, signal?:AbortSignal) {
+export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, review?: NativeWriteReview, signal?:AbortSignal) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
-  // Read once, before the account and tool version are resolved: the setting is
-  // the workspace's, and reading it inside the gate would read it per attempt.
-  const setting = await accountWriteSetting(db, userId, botId, action)
   const id = crypto.randomUUID()
   let recorded = false as boolean
   const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
-    let outcome = await accountWriteOutcome(setting, () => judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }))
-    if (review) {
-      const decision = await review(outcome === 'run' ? 'allow' : outcome, { ownerId: userId, botId, action, input: parsed, accountId, version: tool.version ?? '', policy: setting })
-      if (outcome !== 'deny') outcome = decision === 'allow' ? 'run' : decision
-    }
-    const stopped = accountWriteError(outcome)
-    if (stopped) return stopped
+    const decision = review ? await review('allow', { ownerId: userId, botId, action, input: parsed, accountId, version: tool.version ?? '', policy: null }) : 'allow'
+    if (decision === 'deny') return { error: 'integrationActionDenied' }
+    if (decision === 'ask') return { error: 'integrationApprovalRequired' }
     await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
     recorded = true
     return null
@@ -88,8 +74,7 @@ export async function proposeAction(userId: string, action: string, input: unkno
 }
 
 /**
- * A store app's tool call that needs the person's approval (a destructive
- * write, or one an explicit setting asks for). Nothing runs here.
+ * Stores an explicit store-app approval request. Nothing runs here.
  */
 export async function proposeAppToolCall(userId: string, call: AppToolCall, accountId: string | null, botId: string | null = null) {
   const parsed = appToolCallSchema.safeParse(call)

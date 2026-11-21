@@ -542,19 +542,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
   and money defaults (approval requirements, auto-recharge) are not features;
   they change only with Alex's decision. Source: Alex, 2026-10-31.
-- **R-77** An app write has the permission its connection grants, and only
-  a destructive call asks. If the Gmail, Calendar, Notion or Slack
-  connection allows the write, the agent writes without a card. The workspace's
-  allow/ask/deny wins first; there is no per-Bot or per-person layer. Otherwise
-  the Decisions API answers one predicate, `destructive`: does this exact call
-  delete, overwrite or remove existing data? The tool's MCP annotations
-  (`destructiveHint`, `readOnlyHint`) are evidence; the hint is input to the
-  judge and none of them skips the call. Creating, sending, appending and
-  adding never ask. An unavailable, refused or malformed judgment shows no
-  card: the agent running the task already judged the call by making it, so it
-  goes ahead and the log records `Write judgment fallback`
-  ([decision](decisions/2026-11-01-1330-write-judgment-unavailable-goes-ahead.md)).
-  Source: Alex, 2026-10-31.
+- **R-77** Enabled and authorized connections run their tools with the
+  connected account's permissions. Mikka adds no per-call Decision API
+  judgment and no Allow/Ask/Deny matrix for connected apps. Connection
+  ownership, sharing, provider scopes and active run checks still apply.
+  Explicit approvals already created retain their exact account and action
+  binding. See [authorized MCP connections](decisions/2026-11-19-native-mcp-authorization.md).
 - **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
   in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where
   the Agent changes, a plan step, the execution identity), the main mark is

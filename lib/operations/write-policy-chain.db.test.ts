@@ -10,7 +10,7 @@ import { validateTarget } from '../../scripts/run-db-tests.mjs'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createWritePolicySettings } from './write-policy-settings'
-test('isolated PG and HTTP follow external-write policy and preserve one effect', { timeout:30000 }, async () => {
+test('isolated PG and HTTP authorize direct app writes and preserve one effect', { timeout:30000 }, async () => {
 validateTarget(process.env)
 assert.equal(process.env.REQUIRE_DB,'1')
 const schema='write374_chain_'+randomUUID().replaceAll('-','')
@@ -31,8 +31,8 @@ try {
 const owner='fixture-owner', runId=randomUUID(), revision=randomUUID(), action='append_notion_paragraph', actor={userId:owner,sessionId:'fixture-session'}
 const definition={...DEFAULT_AGENT_DEFINITION,tools:[action]}
 const snapshot=makeSnapshot(revision,1,definition,'host',{harness:'ai_sdk',model:'openai/gpt-6-luna'})
-let writes=0, prepares=0, uncertain=false
-const provider:WriteProvider={name:'synthetic',prepare:async()=>{prepares++;return {accountId:'account',version:'v1'}},execute:async ({beforeSend})=>{await beforeSend();writes++;if (uncertain) throw Error('synthetic transport lost');return {providerObjectId:'fixture',evidenceDigest:'a'.repeat(64)}},lookup:async()=>null}
+let writes=0, uncertain=false
+const provider:WriteProvider={name:'synthetic',prepare:async()=>({accountId:'account',version:'v1'}),execute:async ({beforeSend})=>{await beforeSend();writes++;if (uncertain) throw Error('synthetic transport lost');return {providerObjectId:'fixture',evidenceDigest:'a'.repeat(64)}},lookup:async()=>null}
 const input={page_id:randomUUID(),text:'fixture'}
 const run={ownerId:owner,botId:null,workspaceId:null,runId}
  await scopedPool.query('insert into "session" values($1,$2,now()+interval \'1 hour\')',[actor.sessionId,owner])
@@ -42,48 +42,34 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  const service=createApprovedWrites(scopedPool,provider,action,{modelRun:run})
  const set=async (decision:string)=>scopedPool.query('update agent_kit_heads set external_write_permissions=$1 where owner_id=$2',[{[action]:decision},owner])
  await set('deny')
- await assert.rejects(service.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,0);assert.equal(prepares,0)
- await set('allow')
  const allowKey=randomUUID(), allowed=await service.proposeFromRun(input,allowKey)
  assert.equal(allowed.status,'done');assert.equal(writes,1)
  const repeated=await service.proposeFromRun(input,allowKey)
  assert.equal(repeated.status,'done');assert.equal(writes,1)
  assert.equal(Number((await scopedPool.query("select count(*) from pending_actions where status='pending'")).rows[0].count),0)
- // No setting names the action: the destructive judgment decides (decision 2026-10-31).
- await scopedPool.query('update agent_kit_heads set external_write_permissions=$1 where owner_id=$2',[{},owner])
- let direct=0
- const judged:WriteProvider={...provider,prepare:async()=>({accountId:'account',version:'v1',tool:'NOTION_APPEND_BLOCK_CHILDREN',annotations:['openWorldHint']}),execute:async ({beforeSend})=>{await beforeSend();direct++;return {providerObjectId:'judged',evidenceDigest:'c'.repeat(64)}}}
- const judgedCalls:unknown[]=[]
- const judge=(answer:'allow'|'ask')=>async (call:unknown)=>{judgedCalls.push(call);return answer}
- const granted=await createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('allow')}).proposeFromRun(input,randomUUID())
- assert.equal(granted.status,'done');assert.equal(direct,1)
- assert.deepEqual(judgedCalls[0],{action,tool:'NOTION_APPEND_BLOCK_CHILDREN',annotations:['openWorldHint'],input})
- // A provider that names no tool slug is still judged by the Decisions API, under the action name.
- const slugless:WriteProvider={...judged,prepare:async()=>({accountId:'account',version:'v1'})}
- assert.equal((await createApprovedWrites(scopedPool,slugless,action,{modelRun:run,judgeWrite:judge('allow')}).proposeFromRun(input,randomUUID())).status,'done');assert.equal(direct,2)
- assert.deepEqual(judgedCalls[1],{action,tool:action,annotations:undefined,input});judgedCalls.splice(1,1)
- const destructiveService=createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('ask')}), destructive=await destructiveService.proposeFromRun(input,randomUUID())
- assert.equal(destructive.status,'awaiting_approval');assert.equal(direct,2)
- assert.equal((await destructiveService.decide(actor,destructive.actionId,true)).status,'done');assert.equal(direct,3)
- assert.equal((await createApprovedWrites(scopedPool,judged,action,{modelRun:run}).proposeFromRun(input,randomUUID())).status,'awaiting_approval','without a judge it asks')
- await set('allow')
- const explicit=await createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('ask')}).proposeFromRun(input,randomUUID())
- assert.equal(explicit.status,'done');assert.equal(judgedCalls.length,2,'an explicit setting wins without asking the model')
- await set('ask')
- const askKey=randomUUID(), asked=await service.proposeFromRun(input,askKey)
+ const review = createApprovedWrites(scopedPool, provider, action, {
+   modelRun: run,
+   nativeWriteReview: async (decision, binding) => {
+     assert.equal(decision, 'allow')
+     assert.deepEqual(binding.input, input)
+     return 'ask'
+   },
+ })
+ const askKey=randomUUID(), asked=await review.proposeFromRun(input,askKey)
  assert.equal(asked.status,'awaiting_approval');assert.equal(writes,1)
- assert.equal((await service.proposeFromRun(input,askKey)).actionId,asked.actionId)
+ assert.equal((await review.proposeFromRun(input,askKey)).actionId,asked.actionId)
  await scopedPool.query("update agent_kit_executions set status='completed' where id=$1",[runId])
  const handler=approvedWriteHandler({api:{getSession:async()=>({user:{id:owner},session:{id:actor.sessionId}})}},(name,context)=>createApprovedWrites(scopedPool,provider,name,context))
  const request=()=>new Request('https://fixture.invalid/api/approved-writes',{method:'POST',headers:{origin:'https://fixture.invalid',cookie:'fixture=1'},body:JSON.stringify({op:'decide',action,id:asked.actionId,approve:true})})
  const result=await handler(request());assert.equal(result.status,200);assert.equal((await result.json()).status,'done');assert.equal(writes,2)
  const again=await handler(request());assert.equal(again.status,200);assert.equal(writes,2)
  await scopedPool.query("update agent_kit_executions set status='running' where id=$1",[runId])
- await set('ask')
- const revoked=await service.proposeFromRun(input,randomUUID());await set('deny')
+ const revoked=await review.proposeFromRun(input,randomUUID())
+ const withoutTool={...definition,tools:[]}
+ await scopedPool.query('update agent_kit_versions set definition=$1,digest=$2 where id=$3',[withoutTool,digest(withoutTool),revision])
  const no=await handler(new Request('https://fixture.invalid/api/approved-writes',{method:'POST',headers:{origin:'https://fixture.invalid',cookie:'fixture=1'},body:JSON.stringify({op:'decide',action,id:revoked.actionId,approve:true})}))
  assert.equal(no.status,409);assert.equal(writes,2)
- await set('allow')
+ await scopedPool.query('update agent_kit_versions set definition=$1,digest=$2 where id=$3',[definition,digest(definition),revision])
  const concurrentKey=randomUUID()
  const simultaneous=await Promise.all(Array.from({length:4},()=>service.proposeFromRun(input,concurrentKey)))
  assert.equal(new Set(simultaneous.map(value=>value.actionId)).size,1);assert.equal(writes,3)
@@ -105,21 +91,7 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  assert.deepEqual(await settings.readWorkspace(botScope),{permissions:{},version:'0'})
  assert.deepEqual(await settings.setWorkspace(botScope,{[action]:'deny'},'0'),{permissions:{[action]:'deny'},version:'1'})
  const botService=createApprovedWrites(scopedPool,provider,action,{modelRun:{...botScope,runId:botRun},guard:membership,guardForRun:()=>membership})
- await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,4)
- await settings.setWorkspace(botScope,{[action]:'allow'},'1')
- // A Bot head deny is ignored: the workspace's allow is the whole decision.
- await scopedPool.query('update agent_kit_heads set external_write_permissions=$1 where owner_id=$2 and bot_key=$3',[{ [action]: 'deny' },owner,botId])
  assert.equal((await botService.proposeFromRun(input,randomUUID())).status,'done');assert.equal(writes,5)
- let release!:()=>void, entered!:()=>void
- const started=new Promise<void>(resolve=>{entered=resolve}), proceed=new Promise<void>(resolve=>{release=resolve})
- const slowProvider:WriteProvider={...provider,execute:async ({beforeSend})=>{await beforeSend();entered();await proceed;writes++;return {providerObjectId:'slow',evidenceDigest:'b'.repeat(64)}}}
- const slow=createApprovedWrites(scopedPool,slowProvider,action,{modelRun:{...botScope,runId:botRun},guard:membership,guardForRun:()=>membership})
- const effect=slow.proposeFromRun(input,randomUUID());await started
- let workspaceRevoked=false
- const change=settings.setWorkspace(botScope,{[action]:'deny'},'2').then(value=>{workspaceRevoked=true;return value})
- await new Promise(resolve=>setTimeout(resolve,100));assert.equal(workspaceRevoked,false)
- release();assert.equal((await effect).status,'done');assert.equal((await change).version,'3')
- await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,6)
- console.log('isolated PG/HTTP: deny zero writes; allow once without pending; ask one decision; replay no resend; revoked denied')
+ console.log('isolated PG/HTTP: direct calls honor the pinned run and tool, native approval remains bound, and replay does not resend')
 } finally { await pool?.end(); await admin.end() }
 })

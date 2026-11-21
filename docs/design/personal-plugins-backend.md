@@ -137,16 +137,9 @@ Bots and the Coordinator reach a connected store app through two generic tools
 (`lib/app-tools.ts`), not hand-written actions: `list_app_tools` lists the
 toolkit's Composio tools (with `readOnly` from `readOnlyHint`), and
 `call_app_tool` runs one, pinned to its version, in the person's own account.
-Reads run at once. A write follows R-77: an explicit setting in the
-workspace's external-write settings, keyed by the lower-case tool slug or the
-toolkit slug, wins; otherwise the shared
-write judge (`lib/operations/write-judgment.ts`: the Decisions API, given the
-tool's MCP hints and the concrete arguments) decides. A call it judges
-destructive becomes an approval card (`pending_actions.action =
-'app_tool_call'`), and so does a call it cannot judge. Every other write runs directly and leaves a
-`pending_actions` record; an unclear outcome stays `running` and is never
-resent. The hand-written Gmail, Calendar, Notion, Slack and Drive tools are
-unchanged.
+An enabled and authorized connection's tools run directly. Write calls
+leave a `pending_actions` record. An unclear outcome stays `running` and
+must not be resent. See [authorized MCP connections](decisions/2026-11-19-native-mcp-authorization.md).
 
 ## Validation
 

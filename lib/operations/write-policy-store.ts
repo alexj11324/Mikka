@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import { OperationError } from './write-error'
-import { resolveWritePermission, type WriteFallback } from './write-policy'
+import { DIRECT_APP_WRITE_VERSION, resolveWritePermission, type WriteFallback } from './write-policy'
 import { digest, parseDefinition, type DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { supportsWritePlanning } from './write-planning-model'
 
@@ -11,9 +11,9 @@ export interface WritePolicyScope { ownerId: string; botId: string | null; works
 const scopeSchema = z.object({ ownerId: z.string().min(1), botId: z.uuid().nullable(), workspaceId: z.uuid().nullable(), runId: z.uuid(), action: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/) }).strict().refine(s => (s.botId === null) === (s.workspaceId === null))
 
 /** readbackOnly is for an already-invoked operation, not another effect grant.
- * withWritePolicy restricts that mode to read/reconcile phases. fallback is the
- * judged default for an action no setting names; defaulted says whether it applied. */
-export async function lockWritePolicy(tx: PoolClient, input: WritePolicyScope, options: { allowCompleted?: boolean; readbackOnly?: boolean; fallback?: WriteFallback } = {}) {
+ * withWritePolicy restricts that mode to read/reconcile phases. Numeric
+ * policy versions preserve the stored settings checks for existing receipts. */
+export async function lockWritePolicy(tx: PoolClient, input: WritePolicyScope, options: { allowCompleted?: boolean; readbackOnly?: boolean; fallback?: WriteFallback; direct?: boolean } = {}) {
   const scope = scopeSchema.parse(input)
   const key = scope.botId ?? 'coordinator'
   // The head is identity only: it binds the run to its Bot and workspace and
@@ -30,6 +30,7 @@ export async function lockWritePolicy(tx: PoolClient, input: WritePolicyScope, o
   const current = await tx.query<{ definition: unknown; digest: string }>('select definition,digest from agent_kit_versions where owner_id=$1 and bot_key=$2 and id=$3', [scope.ownerId, key, identity.active_version])
   const definition = current.rows[0]
   if (!definition || digest(definition.definition) !== definition.digest || !parseDefinition(definition.definition).tools.includes(scope.action as never)) throw new OperationError('writeRunUnavailable')
+  if (options.direct) return { decision: 'allow' as const, defaulted: true, version: DIRECT_APP_WRITE_VERSION }
   if (!scope.workspaceId) {
     // A run that names no workspace still reads the owner's legacy Coordinator
     // head as an explicit ceiling. It is not a per-Bot layer and is removed

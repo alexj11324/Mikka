@@ -8,9 +8,12 @@ import { LocaleSetting } from '@/components/settings/locale-setting'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { ReplayOnboarding } from '@/components/settings/workspace-settings'
 import { useAppearance, type AppTheme } from '@/hooks/settings/use-preferences-page'
+import type { SettingsPreferencesProps } from '@/components/slots/settings-preferences-contract'
 
 /** 偏好设置: appearance and language, the task prefix, 重新播放引导. */
-export function PreferencesSettings() {
+export function PreferencesSettings(props: SettingsPreferencesProps = {}) {
+  // The official Threads renderer is supplied by the hosted preferences slot.
+  if (props.page === 'threads') return null
   return <><AppearanceSection /><IssuePrefixSettings /><ReplayOnboarding /></>
 }
 

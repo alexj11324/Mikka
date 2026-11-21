@@ -2221,6 +2221,10 @@
       "preferences": {
         "title": "偏好设置"
       },
+      "threads": {
+        "title": "线程",
+        "keywords": "线程标题 标题说明 重新生成 命名 工作区默认"
+      },
       "memory": {
         "title": "记忆与建议"
       },
@@ -2240,7 +2244,7 @@
         "title": "连接"
       },
       "bot-permissions": {
-        "title": "应用与运行权限"
+        "title": "运行权限"
       },
       "models": {
         "title": "模型与订阅",
@@ -2807,7 +2811,8 @@
         "writePolicyChanged": "设置刚被改过，已重新读取",
         "agentPolicyUnavailable": "这项设置现在保存不了",
         "workspaceAccessDenied": "只有管理员能改工作区设置",
-        "noBotInWorkspace": "这个工作区还没有 Bot。新建一个 Bot 后才能读取和保存工作区的应用权限。"
+        "noBotInWorkspace": "这个工作区还没有 Bot。新建一个 Bot 后即可管理运行权限。",
+        "noAgent": "连接 Agent 后即可管理运行权限。"
       }
     },
     "workspaceLoading": "正在读取工作区…",
@@ -3232,17 +3237,22 @@
       "refreshTools": "刷新工具",
       "nextTools": "下一页",
       "title": "自定义 MCP",
+      "searchPlaceholder": "搜索 MCP 服务器",
       "loading": "正在读取自定义 MCP 连接",
       "share": "分享给工作区成员",
       "shareLabel": "将「{name}」分享给工作区成员",
       "sharedBy": "分享者：{name}",
       "member": "工作区成员",
       "paused": "已停用",
+      "enabled": "启用",
+      "enabledLabel": "启用「{name}」",
       "onlyYou": "仅自己",
       "sharedReadOnly": "已分享给工作区成员",
       "unconfirmed": "状态未确认",
       "loadFailed": "自定义 MCP 连接状态无法读取",
       "shareUnconfirmed": "分享变更未确认，当前分享状态未知",
+      "enabledUnconfirmed": "无法确认连接状态",
+      "createUnconfirmed": "无法确认服务器是否已添加",
       "checkAgain": "重新检查",
       "confirmTitle": "向「{workspace}」成员分享「{name}」？",
       "currentWorkspace": "当前工作区",
@@ -3250,6 +3260,7 @@
       "confirmShare": "分享连接",
       "add": "添加 MCP 服务器",
       "empty": "暂无 MCP 服务器",
+      "noMatches": "没有符合搜索条件的 MCP 服务器",
       "name": "名称",
       "transport": "连接方式",
       "command": "启动命令",
@@ -3711,6 +3722,12 @@
     },
     "threadTitles": {
       "title": "线程标题",
+      "scope": {
+        "label": "线程设置范围",
+        "mine": "我的",
+        "workspace": "工作区"
+      },
+      "workspaceReadOnly": "工作区管理员可编辑",
       "instructions": "标题说明",
       "instructionsMine": "Mikka 给你发起的线程起名时，在工作区说明之外再遵循这些",
       "instructionsWorkspace": "Mikka 给这个工作区里每个线程起名时遵循这些",

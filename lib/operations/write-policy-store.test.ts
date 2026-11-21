@@ -73,3 +73,13 @@ test('foreign scope, inactive run, revoked tool and corrupt workspace policy fai
  f.state.currentTools = []; await assert.rejects(lockWritePolicy(f.tx, f.scope), /writeRunUnavailable/); f.state.currentTools = ['send_slack_message']
  f.state.workspacePermissions = { send_slack_message: 'yes' }; await assert.rejects(lockWritePolicy(f.tx, f.scope), /writePolicyUnavailable/)
 })
+
+
+test('direct app writes ignore old app preferences but still check the live run and its tool', async () => {
+ const f = fixture()
+ f.state.workspacePermissions = { send_slack_message: 'deny' }
+ assert.equal((await lockWritePolicy(f.tx, f.scope, { direct: true })).decision, 'allow')
+ assert.equal(f.state.queries.some(sql => sql.includes('workspace_computer_policies')), false)
+ f.state.currentTools = []
+ await assert.rejects(lockWritePolicy(f.tx, f.scope, { direct: true }), /writeRunUnavailable/)
+})

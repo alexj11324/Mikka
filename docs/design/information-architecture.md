@@ -80,7 +80,7 @@ referenced by id (DDD).
 | Device | The person's computer or server | Device · account | `devices.ownerId` (`schema.ts:248-262`) | Daemon registration (`app/v1/devices/register/route.ts:41`) | 设置 › 设备 | 设置 › 设备 |
 | Bot computer (电脑) | A bot's own desktop on its owner's bot machine; one machine per person per workspace | Bot · workspace (machine: person · workspace) | `bot_desktops (botId PK)`, `bot_cloud_runtimes (botId, workspaceId, ownerId)`; `cloud_machines` PK (`workspaceId`, `ownerId`) (`drizzle/20261029080001_owner_cloud_machines.sql`) | With the bot (R-04) | — | 概览 › 电脑 |
 | Connection | Link to an outside app | Connection · account | `composio_accounts.userId` (`schema.ts:727-741`), `github_connections.userId` (`:399`), `linear_connections.userId` (`:169`), `telegram_links` | 插件 › an app | 插件, and 设置 › 连接 (same `PluginsView`) | 插件 rail page |
-| App policy | The workspace's allow/ask/deny per app; 团队权限 › 允许使用的应用 still narrows which apps a Bot may use | Workspace · workspace | `workspace_computer_policies.external_write_permissions` (legacy `workspace_app_policies.workspaceId` is still enforced) | — | 设置 › 应用与运行权限; 设置 › 团队权限 | 设置 › 应用与运行权限; 设置 › 团队权限 |
+| App availability | 团队权限 › 允许使用的应用 controls which apps are available to workspace Bots | Workspace · workspace | `workspace_app_policies.workspaceId` | — | 设置 › 团队权限 | 设置 › 团队权限 |
 | Secret / env var | Value injected into the workspace's runs | Secret · workspace | `workspace_secrets (workspaceId, scopeType, scopeRef, createdBy)` (`lib/db/secrets-schema.ts:8-23`); injected by `loadWorkspaceRuntimeSecrets` (`lib/secrets/runtime.ts:20`) | 设置 › 密钥与环境 (`lib/secrets/store.ts:124`) | 设置 › 密钥与环境 | 设置 › 密钥与环境 |
 | Model credential | Subscription login or API key | Credentials · account | `byos_connections.ownerId` (+ legacy `workspaceId`), `model_api_keys.ownerId`, `user_e2b_keys.userId`; shares `model_api_key_shares` (subscriptions are owner-only since 2026-11-17-1400; `workspace_subscription_shares` is retired) (drizzle `20261027164503`, `20261101021000`, `20261101020201`) | 设置 › 模型与订阅 | 设置 › 模型与订阅 (shares: team only) | 设置 › 模型与订阅; bot model chip (R-11) |
 | Credits, allowance, billing | What a workspace spends and pays | Billing · workspace | `workspace_billing`, `workspace_credit_grants` (`schema.ts:1151-1180`), `hosted_allowances`, `hosted_usage` (drizzle `20261030230000`); `workspace_payment_designations`, `workspace_credit_shares` (team) | Stripe webhook (`lib/billing/service.ts:145`); allowance on verification | 设置 › 用量, 计费 | 设置 › 用量, 计费 |
@@ -168,6 +168,7 @@ terms) and tenancy rule.
 | 账户 (`account`) | Account | Account | T6 | Account | Identity |
 | 安全 (`security`) | Account | Account | T6 | Account | Sign-in |
 | 偏好设置 (`preferences`) | Account | Account | T6 | Account; 重新播放引导 moves here (#890) | The person's own |
+| 线程 (`threads`) | Person in the current Workspace; Workspace defaults | Thread title settings | T1, T6 | One Mine / named workspace selector; members read Workspace, admins edit | One destination for thread-title instructions and regeneration triggers; both scopes retain the Settings URL's workspace |
 | 通知 (`notifications`) | Account | Account | T6 | Account | The person's pushes |
 | 记忆与建议 (`memory`) | Account | Account (profile memory) | T6; 2310 | Account | Facts about the person |
 | 连接 (`connections`) | Account | Connection | T6; 2240 | Account | Runs only the owner's bots |
@@ -180,7 +181,7 @@ terms) and tenancy rule.
 | 成员 (`members`) | Team-only | Member | T2 | Team-only | Between people |
 | 团队 (`teams`) | Team-only | Team | T2 | Team-only (server gap M5) | Between people |
 | Bot 与 Agents (`bots`) | Workspace; 已暂停的 Bot team-only | Bot, Agent | T1, T2 | Team-only; fixed by #890 | A person's bots need defaults; bots of people who left are a team's |
-| 应用与运行权限 (`bot-permissions`) | Workspace | Workspace (policies) | T1 | Workspace | The workspace's app access and run policy; every Bot inherits it |
+| 运行权限 (`bot-permissions`) | Workspace | Run policy | T1 | Workspace | Execution rules for Agent runs |
 | 团队权限 (`permissions`) | Team-only | Workspace (policies) | T2 | Team-only | Governs sharing with other members (2240); still holds 允许使用的应用 (`workspace_app_policies`) |
 | 密钥与环境 (`secrets`) | Workspace | Secret | T5 | Team-only, admin-only; fixed by #895 (members gap M6) | Injected into the workspace's own runs |
 | 运行环境 (`environments`) | Workspace, personal and shared | Run environment, Project default | T1, T5 | Active members read; admins edit, archive/restore and select defaults | Reuses canonical resource configuration; setup approval is explicit and each Run freezes its selected revision |
@@ -193,6 +194,21 @@ related settings by type" (account group vs workspace group); IA-7 (show few
 options: a personal workspace hides only what cannot apply); PM:`empty-nav-state`
 (a destination that does not apply is explained, not silently hidden: the
 personal 常规 row 「个人工作区不能删除」 in #895).
+
+### Thread settings within the page
+
+Settings › Threads groups the person's and workspace's title settings under
+**Mine** and the current workspace's name in the shipped `SegmentedControl`.
+Mine is a per-person preference in the selected workspace. Its instructions add to the workspace instructions,
+and its regeneration trigger can inherit the workspace default. Members read
+Workspace settings through disabled controls and a read-only state; only admins
+edit them. The workspace remains explicit in
+the Settings URL when opening or switching sections.
+
+The title controls move out of Preferences and General. Preferences retains
+ordinary personal settings, and General retains workspace identity and danger
+actions. This changes their location, not their ownership or save actions. See
+the [Threads settings decision](decisions/2026-11-19-threads-settings.md).
 
 ### Model settings within the page
 
