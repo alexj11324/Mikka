@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from '@/lib/intl/i18n-client'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
@@ -7,7 +7,9 @@ import { useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR from 'swr'
 import { Bell, Blocks, Brain, Building2, ChartColumn, ChevronLeft, CircleCheck, CircleDashed, Cloud, CreditCard, FileText, Folder, Gauge, GitPullRequest, HardDrive, History, Keyboard, KeyRound, Landmark, Lightbulb, MessageSquareText, Monitor, Plus, Settings, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, Star, UserRound, Users, type IconGlyph } from '@/components/icons'
 import { listTeams } from '@/app/actions/teams'
-import { switchWorkspace } from '@/app/actions/workspace'
+import { switchWorkspaceAndNavigate } from '@/hooks/use-workspace-switcher'
+import { getPathname } from '@/i18n/navigation'
+import { withBasePath } from '@/lib/base-path'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { Button } from '@/components/ui/button'
@@ -83,26 +85,39 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
       })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label={i18nText("FeatureCopy.c_cb11190c")} isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span>{i18nText("Settings.nav.createTeam")}</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
     </SidebarContent>
     {/* Phones have no rail; its destinations move here, as in the bot list. */}
-    {workspaceId ? <WorkspaceSwitch currentId={workspaceId} currentName={workspaceName} /> : null}
+    {workspaceId ? <WorkspaceSwitch currentId={workspaceId} currentName={workspaceName} section={section} /> : null}
     {isMobile && <SidebarFooter>
       <SidebarMenu>{RAIL_ITEMS.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton onClick={() => { setOpenMobile(false); onRail(item.id) }}><item.icon /><span>{i18nText(item.label)}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
     </SidebarFooter>}
   </>
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText("Settings.title")} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
 
-function WorkspaceSwitch({ currentId, currentName }: { currentId: string; currentName?: string }) {
-  const { data } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
-  const choices = data?.accounts[0]?.choices ?? []
-  if (choices.length < 2) return <p className="mt-auto border-t px-4 py-3 text-sm">{currentName}</p>
-  return <div className="mt-auto flex items-center gap-2 px-3 py-2 text-sm">
-    <Users />
-    <NativeSelect aria-label={currentName} className="min-w-0 flex-1" value={currentId} onChange={event => { void switchWorkspace({ workspaceId: event.target.value }) }}>
-      {choices.map(choice => <NativeSelectOption key={choice.id} value={choice.id}>{choice.name}</NativeSelectOption>)}
-    </NativeSelect>
-  </div>
-}
   // On desktop the section list is the card's first column, where the bot list sits elsewhere in the app.
   return <ResizablePane data-slot="settings-list" storageKey="mikka:settings-list-width" defaultWidth={256} min={208} max={400} edge="end" from="md" label={i18nText('Common.resize.settingsList')} className="hidden shrink-0 border-r md:block">
     <Sidebar collapsible="none" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")} className="w-full bg-transparent">{body}</Sidebar>
   </ResizablePane>
+}
+
+function WorkspaceSwitch({ currentId, currentName, section }: { currentId: string; currentName?: string; section: SettingsSectionId }) {
+  const locale = useLocale()
+  const t = useTranslations()
+  const [pending, setPending] = useState(false)
+  const { data } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
+  const choices = data?.accounts[0]?.choices ?? []
+  async function select(workspaceId: string) {
+    if (pending || workspaceId === currentId) return
+    setPending(true)
+    try {
+      await switchWorkspaceAndNavigate({ workspaceId }, currentId,
+        selected => withBasePath(getPathname({ locale, href: settingsHref(section, selected) })),
+        t("FeatureCopy.c_b8e346ef"))
+    } finally { setPending(false) }
+  }
+  if (choices.length < 2) return <p className="mt-auto border-t px-4 py-3 text-sm">{currentName}</p>
+  return <div className="mt-auto flex items-center gap-2 px-3 py-2 text-sm">
+    <Users />
+    <NativeSelect aria-label={currentName} className="min-w-0 flex-1" value={currentId} disabled={pending} onChange={event => { void select(event.target.value) }}>
+      {choices.map(choice => <NativeSelectOption key={choice.id} value={choice.id}>{choice.name}</NativeSelectOption>)}
+    </NativeSelect>
+  </div>
 }

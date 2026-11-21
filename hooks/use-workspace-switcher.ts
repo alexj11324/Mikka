@@ -13,6 +13,17 @@ import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 
+export async function switchWorkspaceAndNavigate(input: Parameters<typeof switchWorkspace>[0], outgoingWorkspaceId: string | undefined,
+  destination: (workspaceId: string | undefined) => string, failure: string) {
+  try {
+    const result = await switchWorkspace(input)
+    if (!result.ok) { toast.error(result.error); return }
+    await clearPersistentReadCaches({ documentNavigation: true })
+    if (outgoingWorkspaceId) rememberWorkspaceBeforeSwitch(outgoingWorkspaceId)
+    window.location.assign(destination(result.data.workspaceId))
+  } catch { toast.error(failure) }
+}
+
 /**
  * The account menu's data and actions: the signed-in accounts' workspaces,
  * switching, 添加账户, 新建工作区 and the ⌘, shortcut to 设置. The open-source
@@ -67,14 +78,10 @@ export function useWorkspaceSwitcher({ user, onSettings, signingOut, onBeforeCha
     run(async () => {
       setPending(true)
       try {
-        const result = await switchWorkspace({ accountId, workspaceId })
-        if (!result.ok) { toast.error(result.error); return }
-        await clearPersistentReadCaches({ documentNavigation: true })
-        if (accountId === data?.accounts[0]?.id) rememberWorkspaceBeforeSwitch(data.workspace.id)
-        const selected = result.data.workspaceId
-        const href = selected ? { pathname: '/', query: { workspace: selected } } : '/'
-        window.location.assign(withBasePath(getPathname({ locale, href })))
-      } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
+        await switchWorkspaceAndNavigate({ accountId, workspaceId }, accountId === data?.accounts[0]?.id ? data?.workspace.id : undefined,
+          selected => withBasePath(getPathname({ locale, href: selected ? { pathname: '/', query: { workspace: selected } } : '/' })),
+          i18nText("FeatureCopy.c_b8e346ef"))
+      }
       finally { setPending(false) }
     })
   }

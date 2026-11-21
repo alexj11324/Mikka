@@ -25,12 +25,11 @@ export function ThreadSettings({ workspaceId, personal }: { workspaceId?: string
   const [scope, setScope] = useState<'mine' | 'workspace'>('mine')
   const shown = scope === 'workspace' && workspaceId && !personal ? 'workspace' : 'mine'
   return <>
-    <p className="text-sm text-muted-foreground">{t('lead')}</p>
     {workspaceId && !personal ? <div className="flex gap-1" role="group" aria-label={`${t('scopeMine')} / ${t('scopeWorkspace')}`}>
       <Button type="button" size="sm" variant={shown === 'mine' ? 'secondary' : 'ghost'} aria-pressed={shown === 'mine'} onClick={() => setScope('mine')}>{t('scopeMine')}</Button>
       <Button type="button" size="sm" variant={shown === 'workspace' ? 'secondary' : 'ghost'} aria-pressed={shown === 'workspace'} onClick={() => setScope('workspace')}>{t('scopeWorkspace')}</Button>
     </div> : null}
-    <TitleScope key={shown} scope={shown} workspaceId={shown === 'workspace' ? workspaceId : null} />
+    <TitleScope key={`${workspaceId ?? ''}:${shown}`} scope={shown} workspaceId={workspaceId} />
     {shown === 'mine' ? <ArchiveSection /> : null}
     <SubagentLimits workspaceId={workspaceId} />
   </>

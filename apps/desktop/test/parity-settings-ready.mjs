@@ -82,8 +82,8 @@ export async function settingsReady(page, id, fixture, messages) {
       await enabled(role('radio', 'Settings.appearance.light'))
       break
     case 'threads':
-      await visible(role('textbox', 'Settings.threadTitles.instructions').first())
-      await visible(role('combobox', 'Settings.threadTitles.triggers').first())
+      await visible(role('button', 'Settings.threadTitles.edit').first())
+      await visible(role('combobox', 'Settings.threadTitles.regenerate').first())
       break
     case 'instructions':
     case 'memory':

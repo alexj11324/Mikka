@@ -35,11 +35,9 @@ export const UI_THEMES = [
 
 export type UiThemeId = (typeof UI_THEMES)[number]['id']
 const THEME_IDS = UI_THEMES.map(theme => theme.id) as [UiThemeId, ...UiThemeId[]]
-const RAIL_IDS = RAIL_PAGE_IDS
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/)
 
 export const BACKGROUND_EFFECTS = ['none', 'colorful'] as const
-export const WALLPAPERS = ['none', 'color'] as const
 
 export interface CustomTheme { id: string; name: string; accent: string; fill: string; foreground: string }
 
@@ -66,7 +64,6 @@ export interface UiPreferences {
   border: string | null
   background: (typeof BACKGROUNDS)[number]
   backgroundEffect: (typeof BACKGROUND_EFFECTS)[number]
-  wallpaper: (typeof WALLPAPERS)[number]
   customThemes: CustomTheme[]
   codeSize: (typeof CODE_SIZES)[number]
   diffView: (typeof DIFF_VIEWS)[number]
@@ -86,17 +83,16 @@ export const DEFAULT_UI: UiPreferences = {
   microphone: 'system',
   appearanceSync: true,
   colorScheme: 'system',
-  themeId: 'mikka',
-  accent: '#2365db',
-  fill: '#ffffff',
-  foreground: '#171717',
+  themeId: UI_THEMES[0].id,
+  accent: UI_THEMES[0].accent,
+  fill: UI_THEMES[0].fill,
+  foreground: UI_THEMES[0].foreground,
   accentDark: null,
   fillDark: null,
   foregroundDark: null,
   border: null,
   background: 'none',
   backgroundEffect: 'colorful',
-  wallpaper: 'none',
   customThemes: [],
   codeSize: 'default',
   diffView: 'unified',
@@ -125,9 +121,9 @@ export const uiPreferencesSchema = z.object({
   border: HEX.nullable(),
   background: z.enum(BACKGROUNDS),
   backgroundEffect: z.enum(BACKGROUND_EFFECTS),
-  wallpaper: z.enum(WALLPAPERS),
+  wallpaper: z.enum(BACKGROUNDS),
   customThemes: z.array(z.object({ id: z.string().min(1).max(40), name: z.string().min(1).max(40), accent: HEX, fill: HEX, foreground: HEX })).max(24),
-  sidebarPages: z.array(z.enum(RAIL_IDS)).max(RAIL_IDS.length).nullable(),
+  sidebarPages: z.array(z.enum(RAIL_PAGE_IDS)).max(RAIL_PAGE_IDS.length).nullable(),
   codeSize: z.enum(CODE_SIZES),
   diffView: z.enum(DIFF_VIEWS),
   diffColor: z.enum(DIFF_COLORS),
@@ -148,8 +144,9 @@ function migrateStored(stored: unknown) {
 
 export function normalizeUi(stored: unknown): UiPreferences {
   const patch = uiPreferencesSchema.safeParse(migrateStored(stored) ?? {})
-  const value = patch.success ? patch.data : {}
-  return { ...DEFAULT_UI, ...value, sidebarPages: value.sidebarPages ?? DEFAULT_UI.sidebarPages }
+  const { wallpaper, ...value } = patch.success ? patch.data : {}
+  return { ...DEFAULT_UI, ...value, background: wallpaper === 'color' ? wallpaper : value.background ?? DEFAULT_UI.background,
+    sidebarPages: value.sidebarPages ?? DEFAULT_UI.sidebarPages }
 }
 
 export function themeById(id: string) {
@@ -201,7 +198,6 @@ export function publishUiPreferences(ui: UiPreferences, root: HTMLElement | null
   root.dataset.hiddenFiles = ui.hiddenFiles
   root.dataset.uiTheme = ui.themeId
   root.dataset.backgroundEffect = ui.backgroundEffect
-  root.dataset.wallpaper = ui.wallpaper
   root.style.setProperty('--ui-accent', accent)
   root.style.setProperty('--ui-fill', fill)
   root.style.setProperty('--ui-foreground', foreground)
@@ -220,8 +216,7 @@ export function publishUiPreferences(ui: UiPreferences, root: HTMLElement | null
     root.style.backgroundImage = ''
     root.style.backgroundSize = ''
   }
-  if (ui.wallpaper === 'color') root.style.backgroundColor = accentMix
-  else if (!custom) root.style.backgroundColor = ''
+  root.style.backgroundColor = ui.background === 'color' ? accentMix : ''
 }
 
 export interface RunKeyEvent { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; isComposing: boolean }

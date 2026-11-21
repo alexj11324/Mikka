@@ -11,6 +11,13 @@ import { isIanaTimeZone } from './suggestions/time-zone'
 
 const key = (fields: Partial<ComposerKey> = {}): ComposerKey => ({ key: 'Enter', shiftKey: false, metaKey: false, ctrlKey: false, isComposing: false, ...fields })
 
+test('legacy wallpaper colors normalize to the dashboard background preference', () => {
+  assert.equal(normalizeUi({ wallpaper: 'color', background: 'none' }).background, 'color')
+  assert.equal(normalizeUi({ wallpaper: 'none', background: 'color' }).background, 'color')
+  assert.equal(Object.hasOwn(normalizeUi({ wallpaper: 'color' }), 'wallpaper'), false)
+  assert.equal(parsePreferencesPatch({ ui: { wallpaper: 'color' } }).ui?.wallpaper, 'color')
+})
+
 test('send key: Enter sends by default, Shift+Enter breaks the line', () => {
   assert.equal(sendsMessage(key()), true)
   assert.equal(sendsMessage(key(), 'enter'), true)

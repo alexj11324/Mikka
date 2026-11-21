@@ -113,7 +113,9 @@ export async function savePreferences(userId: string, patch: PreferencesPatch): 
     const { ui: uiPatch, ...restWithoutUi } = rest
     const { proactive: _currentProactive, ui: currentUi, ...currentWithoutUi } = current
     const merged = { ...currentWithoutUi, ...restWithoutUi }
-    const ui = normalizeUi({ ...currentUi, ...uiPatch })
+    const { wallpaper, ...appearancePatch } = uiPatch ?? {}
+    const background = appearancePatch.background ?? wallpaper ?? currentUi.background
+    const ui = normalizeUi({ ...currentUi, ...appearancePatch, background })
     const stored = { ...merged, uiPreferences: ui, dailySuggestions: merged.dailySuggestions && memoryEnabled }
     await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
       .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })

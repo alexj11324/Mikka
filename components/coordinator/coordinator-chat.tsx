@@ -584,6 +584,11 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     }
   }
 
+  function onRunKey(action: 'steer' | 'queue' | 'interrupt') {
+    if (action === 'interrupt') void stop()
+    else void send(undefined, action)
+  }
+
   // 全部展开 / 全部收起 for the chat's tool groups (R-83).
   const expansion = useActivityExpansion()
 
@@ -680,6 +685,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
           composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: resuming, editableWhileSending: resuming, onSubmit: () => { void send() },
+            onRunKey,
             attachmentScope: data?.botId ? { kind: 'bot', id: data.botId } : undefined, running: working && !stopping }}
           pending={[
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
@@ -826,7 +832,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       {turnOptions}{queuedNotice}
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={resuming} editableWhileSending={resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
-        onRunKey={action => { if (action === 'interrupt') void stop(); else void send(undefined, action) }}
+        onRunKey={onRunKey}
         model={<div className="flex min-w-0 items-center gap-1">
           <BotModelPicker botId={botId ?? null} running={working || sending} />
           {/* How near the next fold is (lib/coordinator/context-usage.ts). Beside the model chip,

@@ -101,7 +101,7 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
       if (running) {
         const action = runKeyAction(chord, currentUiPreferences())
         if (action === 'interrupt') { event.preventDefault(); if (onRunKey) onRunKey('interrupt'); else onStop?.(); return }
-        if (action === 'steer' || action === 'queue') { event.preventDefault(); if (onRunKey) onRunKey(action); else submit(); return }
+        if (action === 'steer' || action === 'queue') { event.preventDefault(); if (!canSend) return; if (onRunKey) onRunKey(action); else submit(); return }
       }
       if (!sendsMessage(chord, sendKey)) return
       event.preventDefault()

@@ -14,11 +14,11 @@ type Read = { ui?: UiPreferences; error?: string }
 /** The signed-in person's interface preferences, saved through the existing preferences action. */
 export function useUiPreferences() {
   const read = useSWR(settingsKeys.preferences(), () => settingsRead<Read>('preferences'))
-  const { setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
   const ui = read.data && !read.data.error && read.data.ui ? read.data.ui : DEFAULT_UI
   useLayoutEffect(() => {
     if (read.data && !read.data.error && read.data.ui) publishUiPreferences(read.data.ui)
-  }, [read.data])
+  }, [read.data, resolvedTheme])
   useLayoutEffect(() => {
     if (!read.data?.ui?.appearanceSync) return
     setTheme(read.data.ui.colorScheme)

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ChevronRight, Cloud, Image, Pencil, Plus } from '@/components/icons'
+import { ChevronRight, Image, Pencil, Plus } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ColorSwatch } from '@/components/ui/color-swatch'
@@ -113,10 +113,6 @@ export function AppearanceSettings() {
       <SettingRow title={t('backgroundEffect')}>
         <SettingSelect label={t('backgroundEffect')} value={ui.backgroundEffect} options={[{ value: 'colorful', label: t('effectColorful') }, { value: 'none', label: t('backgroundNone') }]} onValueChange={value => { if (value === 'none' || value === 'colorful') paint({ backgroundEffect: value }) }} />
       </SettingRow>
-      <SettingRow title={t('wallpaper')} description={t('effectHint')}>
-        <Button type="button" size="sm" variant="outline" onClick={() => paint({ wallpaper: 'color' })}><Cloud data-icon />{t('saveCurrent')}</Button>
-      </SettingRow>
-      <p className="px-5 py-3 text-sm text-muted-foreground">{t('wallpaperEmpty')}</p>
     </SettingsSection>
     <SettingsSection title={t('code')}>
       <SettingRow title={t('codeSize')} description={t('codeSizeHint')}>

@@ -67,12 +67,11 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
     const changes: Partial<typeof workspaces.$inferInsert> = {}
     if (values.name !== undefined && values.name !== workspace.name) changes.name = values.name
     if (icon !== undefined && icon !== workspace.icon) changes.icon = icon
-    if (values.taskPrefix !== undefined && values.taskPrefix !== workspace.taskPrefix) changes.taskPrefix = values.taskPrefix
-    if (values.parallelSubagents !== undefined && values.parallelSubagents !== workspace.parallelSubagents) changes.parallelSubagents = values.parallelSubagents
-    if (values.nestDepth !== undefined && values.nestDepth !== workspace.nestDepth) changes.nestDepth = values.nestDepth
-    if (values.newWorkVisibility !== undefined && values.newWorkVisibility !== workspace.newWorkVisibility) changes.newWorkVisibility = values.newWorkVisibility
-    if (values.workspaceWorkVisibility !== undefined && values.workspaceWorkVisibility !== workspace.workspaceWorkVisibility) changes.workspaceWorkVisibility = values.workspaceWorkVisibility
-    if (values.allowPrivate !== undefined && values.allowPrivate !== workspace.allowPrivate) changes.allowPrivate = values.allowPrivate
+    function assignChanged<K extends keyof typeof values & keyof typeof changes & keyof typeof workspace>(key: K) {
+      const next = values[key]
+      if (next !== undefined && next !== workspace[key]) changes[key] = next
+    }
+    for (const key of ['taskPrefix', 'parallelSubagents', 'nestDepth', 'newWorkVisibility', 'workspaceWorkVisibility', 'allowPrivate'] as const) assignChanged(key)
     if (values.slug !== undefined && values.slug !== workspace.slug) {
       // Serialize namespace changes across Workspaces before checking redirects.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
