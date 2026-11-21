@@ -40,6 +40,7 @@ const browser = new Window({ url: 'https://fixture.example/mikka' })
 let container: HTMLDivElement, root: Root
 let createRoot: (typeof import('react-dom/client'))['createRoot']
 let ChatComposer: (typeof import('./chat-composer'))['ChatComposer']
+let ChatComposerAttachment: (typeof import('./chat-composer'))['ChatComposerAttachment']
 const inputRef = createRef<HTMLTextAreaElement>()
 
 before(async () => {
@@ -63,7 +64,7 @@ before(async () => {
     })
   }
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ ChatComposer } = await import('./chat-composer'))
+  ;({ ChatComposer, ChatComposerAttachment } = await import('./chat-composer'))
 })
 beforeEach(() => {
   errors.length = 0
@@ -97,6 +98,7 @@ function Composer({
   editDraft = setDraft
   return (
     <ChatComposer
+      leadingControls={<ChatComposerAttachment />}
       ref={inputRef}
       label="fixture-input"
       value={draft}
