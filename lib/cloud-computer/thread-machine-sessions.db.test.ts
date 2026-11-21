@@ -23,6 +23,7 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
   const workspace = randomUUID(), otherWorkspace = randomUUID(), bot = randomUUID(), chatBot = randomUUID(), foreignBot = randomUUID()
   const task = { id: randomUUID(), userId: owner, issueId: randomUUID() }
   const migration = await readFile(new URL('../../drizzle/20261109010001_thread_machine_sessions.sql', import.meta.url), 'utf8')
+  const meterMigration = await readFile(new URL('../../drizzle/20261121074400_meter_thread_machine_seconds.sql', import.meta.url), 'utf8')
   try {
     // The migration under test runs in a separate schema with the actual
     // parent-column types, unique VM custody and FK cascade semantics.
@@ -67,6 +68,31 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
       await pool.query(migration)
       assert.equal((await intervals(known)).length, 1)
       assert.equal((await intervals(resuming)).length, 1)
+    })
+
+    await t.test('settles whole elapsed seconds once at the confirmed handoff, not in prepaid chunks', async () => {
+      const historical = await run({ state: 'running', sandbox: 'vm-pre-metering', start: '2026-11-08T00:00:00Z' })
+      await pool.query('UPDATE thread_machines SET state=\'paused\',"runningSince"=NULL WHERE "runId"=$1', [historical])
+      await pool.query(meterMigration)
+      assert.equal((await intervals(historical))[0].durationSeconds, null, 'migration leaves pre-existing history untouched')
+      const meters = new Map<string, string>()
+      for (const [elapsed, seconds] of [['0.999999', '0'], ['1', '1'], ['299.999999', '299'], ['300', '300'], ['301.234567', '301']]) {
+        const start = '2026-11-08T00:00:00.998Z'
+        const id = await run({ state: 'running', sandbox: `vm-meter-${elapsed}`, start })
+        const metered = async () => (await pool.query('SELECT "durationSeconds"::text AS seconds FROM thread_machine_sessions WHERE "runId"=$1', [id])).rows
+        assert.deepEqual(await metered(), [{ seconds: null }], 'an open interval has no final meter reading')
+        const transfer = () => pool.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL,"runningSince"=NULL,
+          lifecycle=jsonb_build_object('phase','transferred','transferredAt',$2::timestamptz + $3::numeric * interval '1 second')
+          WHERE "runId"=$1`, [id, start, elapsed])
+        await transfer()
+        assert.deepEqual(await metered(), [{ seconds }])
+        await transfer()
+        assert.deepEqual(await metered(), [{ seconds }], 'replayed handoff cannot add another metered interval')
+        meters.set(id, seconds)
+      }
+      await pool.query(meterMigration)
+      for (const [id, seconds] of meters) assert.equal((await intervals(id))[0].durationSeconds, seconds)
+      assert.equal((await intervals(historical))[0].durationSeconds, null)
     })
 
     await t.test('create intent has no session; confirmed create, pause and resume produce distinct intervals', async () => {
@@ -192,7 +218,9 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
       assert.equal(await recordCancelledThreadSessionEnd(pool, { ...scope, operationId: randomUUID() }), false)
       assert.equal((await intervals(id))[0].endedAt, null, 'a stale cleanup operation cannot close a newer VM')
       assert.equal(await recordCancelledThreadSessionEnd(pool, scope), true)
-      const ended = (await intervals(id))[0].endedAt
+      const [closed] = await intervals(id)
+      const ended = closed.endedAt
+      assert.match(closed.durationSeconds, /^\d+$/)
       assert.equal(await recordCancelledThreadSessionEnd(pool, scope), false, 'ack replay preserves its first recorded end')
       assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1', [id])).rows[0].sandboxId, 'late-created', 'the existing cleanup owner still owns its row')
       await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,lifecycle='{"phase":"retired"}' WHERE "runId"=$1`, [id])

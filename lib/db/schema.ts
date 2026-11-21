@@ -558,6 +558,7 @@ export const threadMachineSessions = pgTable('thread_machine_sessions', {
   workspaceId: uuid('workspaceId').notNull(), botId: uuid('botId'), sandboxId: text('sandboxId').notNull(),
   startedAt: timestamp('startedAt', { withTimezone: true }).notNull(),
   endedAt: timestamp('endedAt', { withTimezone: true }),
+  durationSeconds: bigint('durationSeconds', { mode: 'number' }),
   reason: text('reason').$type<'paused' | 'retired' | 'provider_missing' | 'transferred' | 'replaced' | 'scope_changed'>(),
   source: text('source').$type<'running_since' | 'observed' | 'running_since_backfill'>().notNull(),
 }, table => [
