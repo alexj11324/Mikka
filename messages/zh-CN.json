@@ -479,6 +479,7 @@
     "retryIn": "{seconds} 秒后可重试",
     "verifyLinkInvalid": "验证链接无效、已过期或已使用。如邮箱尚未验证，请重新发送。",
     "verifyEmailLink": "验证邮箱或重新发送验证邮件",
+    "retryVerification": "重试人机验证",
     "signupRefusal": {
       "disposableEmail": "不支持临时邮箱，请使用常用邮箱。",
       "signupRateLimited": "注册请求过多，请稍后重试。",

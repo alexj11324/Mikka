@@ -18,6 +18,7 @@ type SignInCardProps = {
   registering: boolean
   addAccount?: boolean
   pending: boolean
+  verificationPending?: boolean
   googleEnabled: boolean
   githubEnabled: boolean
   /** Off while email sign-in is switched off in PostHog: GitHub and Google only. */
@@ -47,7 +48,7 @@ const FIELD = 'h-11 sm:h-10'
 const FIELD_ORDER: FieldName[] = ['name', 'email', 'password']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile, sso }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, verificationPending = false, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile, sso }: SignInCardProps) {
   const t = useTranslations('Auth')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const oauthEnabled = googleEnabled || githubEnabled
@@ -161,7 +162,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             </Field>
           </FieldGroup>
           {turnstile}
-          <Button type="submit" className={cn('w-full', FIELD)} disabled={pending}>
+          <Button type="submit" className={cn('w-full', FIELD)} disabled={pending || verificationPending}>
             {registering ? t('submitCreate') : t('submitSignIn')}
             {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRight aria-hidden="true" data-icon="inline-end" />}
           </Button>
