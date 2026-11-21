@@ -8,8 +8,8 @@ import { requireWorkspace } from '@/lib/workspace-access'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { mirrorLegacySetting } from './legacy-mirrors'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
-import { keyboardShortcuts, personalSettingValues, workspaceSettingValues } from './schema'
-import { writeKeyboardShortcuts } from './keyboard-shortcuts'
+import { personalSettingValues, workspaceSettingValues } from './schema'
+import { validateAndMirrorKeyboardShortcuts } from './keyboard-shortcuts'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
@@ -35,11 +35,9 @@ async function readValues(context: SettingsContext, database: Reader = db, scope
   const personal = await database.select().from(personalSettingValues).where(and(eq(personalSettingValues.userId, context.userId),
     or(isNull(personalSettingValues.workspaceId), eq(personalSettingValues.workspaceId, context.workspaceId))))
   const workspace = await database.select().from(workspaceSettingValues).where(eq(workspaceSettingValues.workspaceId, context.workspaceId))
-  const shortcuts = scope === 'personal' ? await database.select().from(keyboardShortcuts).where(eq(keyboardShortcuts.userId, context.userId)) : []
   const values = Object.fromEntries(Object.values(SETTINGS_REGISTRY).map((field: SettingDefinition) => {
     const own = personal.find(row => row.key === field.key && row.workspaceId === (field.personalContext === 'workspace' ? context.workspaceId : null))
-    const personalValue = field.action ? shortcuts.find(row => row.actionId === field.action)?.binding : unpack(own)
-    return [field.key, resolveSettingValue(field.key, scope === 'personal' ? personalValue : null, unpack(workspace.find(row => row.key === field.key)))]
+    return [field.key, resolveSettingValue(field.key, scope === 'personal' ? unpack(own) : null, unpack(workspace.find(row => row.key === field.key)))]
   }))
   return { workspaceId: context.workspaceId, values }
 }
@@ -80,7 +78,7 @@ export async function writeSettings(context: SettingsContext, scope: SettingScop
     await requireWorkspace(workspaceTx, context.workspaceId, context.userId, scope === 'workspace')
     const result = await db.transaction(async tx => {
       if (scope === 'personal') await tx.select({ id: users.id }).from(users).where(eq(users.id, context.userId)).for('no key update')
-      if (scope === 'personal') await writeKeyboardShortcuts(tx, context.userId, values)
+      if (scope === 'personal') await validateAndMirrorKeyboardShortcuts(tx, context.userId, values)
       await writeRows(tx, scope, context, values)
       return readValues(context, tx, scope)
     })

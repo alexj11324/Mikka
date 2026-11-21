@@ -160,6 +160,14 @@ dbTest('keyboard shortcuts are owner-only account settings with typed entity and
   assert.deepEqual((await pool.query('SELECT binding FROM keyboard_shortcuts WHERE "userId"=$1 AND "actionId"=\'search.open\'', [owner])).rows, [{ binding: 'Mod+Shift+F2' }])
   assert.deepEqual((await pool.query('SELECT "workspaceId","textValue","integerValue","booleanValue","textArrayValue" FROM personal_setting_values WHERE "userId"=$1 AND key=$2', [owner, key])).rows,
     [{ workspaceId: null, textValue: 'Mod+Shift+F2', integerValue: null, booleanValue: null, textArrayValue: null }])
+  await pool.query('UPDATE keyboard_shortcuts SET binding=NULL WHERE "userId"=$1 AND "actionId"=$2', [owner, 'search.open'])
+  try {
+    assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${workspaceId}`))).json()).values[key], { value: 'Mod+Shift+F2', source: 'personal' })
+    const collision = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ 'keyboardShortcuts.settings.open': 'Mod+Shift+F2' })))
+    assert.equal(collision.status, 409)
+  } finally {
+    await pool.query('UPDATE keyboard_shortcuts SET binding=$3 WHERE "userId"=$1 AND "actionId"=$2', [owner, 'search.open', 'Mod+Shift+F2'])
+  }
   assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${homes.get(owner)}`))).json()).values[key], { value: 'Mod+Shift+F2', source: 'personal' })
   as(member)
   assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${workspaceId}&userId=${owner}`))).json()).values[key], { value: 'Mod+KeyK', source: 'default' })

@@ -1,30 +1,30 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { db } from '@/lib/db'
 import { ownerKeyboardShortcutsChanged } from '@/lib/live/lists'
 import type { SettingValue } from '@mikka/protocol/settings'
 import { KEYBOARD_SHORTCUT_ACTIONS, keyboardShortcutConflicts, keyboardShortcutSettingKey, type KeyboardShortcutBindings } from '@mikka/protocol/keyboard-shortcuts'
-import { settingDefinition } from './registry'
-import { keyboardShortcuts } from './schema'
+import { keyboardShortcuts, personalSettingValues } from './schema'
 import { KeyboardShortcutConflictError } from './shortcut-conflict'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+const activeActions = new Map<string, typeof KEYBOARD_SHORTCUT_ACTIONS[number]['action']>(
+  KEYBOARD_SHORTCUT_ACTIONS.map(({ action }) => [keyboardShortcutSettingKey(action), action]))
 
 /** Called after the existing user row lock. Checking defaults, saved overrides
  * and the whole patch together permits an atomic swap and serializes races. */
-export async function writeKeyboardShortcuts(tx: Transaction, userId: string, values: Record<string, SettingValue | null>): Promise<void> {
+export async function validateAndMirrorKeyboardShortcuts(tx: Transaction, userId: string, values: Record<string, SettingValue | null>): Promise<void> {
   const entries = Object.entries(values).flatMap(([key, value]) => {
-    const field = settingDefinition(key)
-    return field.action ? [{ action: field.action, binding: value === null ? null : field.guard.parse(value) as string }] : []
+    const action = activeActions.get(key)
+    return action && (value === null || typeof value === 'string') ? [{ action, binding: value }] : []
   })
   if (!entries.length) return
-  const saved = await tx.select().from(keyboardShortcuts).where(eq(keyboardShortcuts.userId, userId))
+  const saved = await tx.select({ key: personalSettingValues.key, binding: personalSettingValues.textValue }).from(personalSettingValues)
+    .where(and(eq(personalSettingValues.userId, userId), isNull(personalSettingValues.workspaceId),
+      inArray(personalSettingValues.key, [...activeActions.keys()])))
   const bindings: KeyboardShortcutBindings = {}
   for (const row of saved) {
-    // Retired actions remain stored for rollback but do not claim an active key.
-    const action = KEYBOARD_SHORTCUT_ACTIONS.find(value => value.action === row.actionId)
-    if (!action) continue
-    const field = settingDefinition(keyboardShortcutSettingKey(action.action))
-    if (field.action) bindings[field.action] = row.binding === null ? null : field.guard.parse(row.binding) as string
+    const action = activeActions.get(row.key)
+    if (action) bindings[action] = row.binding
   }
   for (const { action, binding } of entries) bindings[action] = binding
   const conflicts = keyboardShortcutConflicts(bindings)

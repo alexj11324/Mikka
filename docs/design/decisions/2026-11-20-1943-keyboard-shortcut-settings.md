@@ -55,8 +55,10 @@ Use the P1 endpoints and authenticated workspace context:
 
 Values are account-wide and owner-only. Workspace writes are rejected even for
 an administrator. A null value restores `source: default`; empty text disables
-the action with `source: personal`. The typed `keyboard_shortcuts` entity owns
-the binding; its P1 typed text row is an atomic mirror. Neither stores JSON.
+the action with `source: personal`. The account-wide `personal_setting_values`
+text row owns the binding and is the source for conflict checks. The
+`keyboard_shortcuts` table is an atomic, write-only mirror so rolling back to
+the earlier shortcut implementation preserves choices. Neither stores JSON.
 
 After acquiring the existing user row lock, a write validates all effective
 defaults, saved overrides and the complete incoming patch before updating

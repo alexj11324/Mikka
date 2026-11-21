@@ -97,9 +97,9 @@ set. This backend work does not implement or verify that frontend integration.
 
 ## Storage and extension
 
-Each action has one personal registry field. The typed `keyboard_shortcuts`
-entity stores its account, action ID, and nullable binding; the P1 typed text
-row is an atomic mirror. Neither table stores a settings JSON blob. Adding
+Each action has one personal registry field. The account-wide P1 typed text row
+stores the binding and supplies conflict checks. The `keyboard_shortcuts` table
+is an atomic compatibility mirror for rollback, not a read source. Adding
 an action after this table exists requires its declaration and metadata,
 without another migration or server action.
 
