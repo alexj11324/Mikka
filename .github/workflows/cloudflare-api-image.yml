@@ -92,7 +92,7 @@ jobs:
     # The existing environment rejects refs/pull/*/merge, including owner PRs.
     # Keep that protection: PRs run the credential-free legacy image gates;
     # Registry publication starts only after a real merge into main.
-    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && ((github.actor_id == '183887963' && github.triggering_actor == 'alexj11324') || (github.actor_id == '118344674' && github.actor == 'github-merge-queue[bot]' && (github.triggering_actor == 'github-merge-queue[bot]' || github.triggering_actor == 'alexj11324'))) && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 10
