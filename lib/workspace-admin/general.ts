@@ -13,24 +13,11 @@ import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/del
 import { deleteWorkspaceRows } from '@/lib/workspace-rows'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 import { parseWorkspaceIcon } from './icon'
+import { updateWorkspaceInput, type UpdateWorkspaceInput } from './general-input'
 import { ownerListChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '../live/lists'
 import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '../coding-workspace/review-sessions'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
-export const workspaceSlugSchema = z.string().trim().toLowerCase().min(3).max(64).regex(/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/)
-export const updateWorkspaceInput = z.object({
-  name: z.string().trim().min(1).max(120).optional(),
-  slug: workspaceSlugSchema.optional(),
-  icon: z.string().max(400_000).nullable().optional(),
-  taskPrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,4}$/).nullable().optional(),
-  parallelSubagents: z.number().int().min(1).max(16).optional(),
-  nestDepth: z.number().int().min(1).max(8).optional(),
-  newWorkVisibility: z.enum(['inherit', 'members', 'private']).optional(),
-  workspaceWorkVisibility: z.enum(['members', 'private']).optional(),
-  allowPrivate: z.boolean().optional(),
-}).strict()
-export type UpdateWorkspaceInput = z.input<typeof updateWorkspaceInput>
 
 export interface WorkspaceGeneral {
   id: string
