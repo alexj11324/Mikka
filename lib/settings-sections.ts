@@ -37,8 +37,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'logins', group: 'personal', title: 'Secrets and logins' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'computers', group: 'personal', title: 'Devices' },
-  // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
-  { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
+  { id: 'developer', group: 'personal', title: 'Personal access tokens' },
   { id: 'general', group: 'workspace', title: 'General' },
   // Capy's Issue states (decision 2026-11-19-2115): members read them, admins edit them.
   { id: 'issue-states', group: 'workspace', title: 'Issue states' },
