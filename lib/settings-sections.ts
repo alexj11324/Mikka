@@ -6,7 +6,7 @@
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
-  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'environments' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
+  | 'general' | 'issue-states' | 'members' | 'teams' | 'permissions' | 'secrets' | 'environments' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
@@ -40,6 +40,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
   { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
   { id: 'general', group: 'workspace', title: 'General' },
+  // Capy's Issue states (decision 2026-11-19-2115): members read them, admins edit them.
+  { id: 'issue-states', group: 'workspace', title: 'Issue states' },
   // The workspace's app access and run policy, inherited by every Bot (decisions 2026-10-31, 2026-11-10).
   { id: 'bot-permissions', group: 'workspace', title: 'App & run permissions' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },

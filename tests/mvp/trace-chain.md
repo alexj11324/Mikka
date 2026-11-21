@@ -63,7 +63,7 @@ duration. This is development-server readiness, not an authenticated MCP check.
 
 ## Assertions and retained evidence
 
-Two cases run through the real RPC action `coordinator.sendCoordinatorMessage`:
+Two cases submit through the authenticated native Eve `POST /api/agents/eve/v1/session` with a submission UUID, selected device and trace headers, requiring a 202 delivery receipt:
 successful synthetic execution and an intentional synthetic failure. Each carries a new
 W3C trace parent and browser-session reference. The check verifies the persisted
 run carrier; daemon registration, repo, worktree and adapter stages; workflow and

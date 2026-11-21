@@ -145,10 +145,10 @@ What is fake and what is real:
 | GitHub App, installation, push grant, pull requests | Fake (`tests/mvp/services.mjs`); a fresh App key is generated at start |
 | Repository | A local bare `file://` origin seeded with `README.md` |
 | GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
-| Model, a workspace's own key (Settings › 模型与订阅) | Real. Saving it needs `WORKSPACE_SECRETS_KEY`; without one, dev:local creates a random local key in `.cache/dev-local/workspace-secrets-key` (git-ignored, mode 0600) and reuses it, so saved keys still open after a restart |
-| The DeepSeek key, added automatically | `DEEPSEEK_API_KEY` comes from the environment or the named Infisical `dev:/vercel` secret. Use the configured `INFISICAL_PROJECT_ID` (or `MIKKA_DEV_INFISICAL_PROJECT`) with an existing `INFISICAL_TOKEN` or Universal Auth identity. The managed HTTP proxy is preserved. Setup runs immediately, then reconciles every 5 seconds; existing keys are reused, new Bots and workspaces receive the Flash choice, and individual failures back off from 30 seconds to 5 minutes. The key stays in process memory and sealed application storage. Missing Flash models never fall back to another real model. Without the key, the scripted substitute below remains available for development. The API-key path never gates a merge or acceptance. |
-| Mikka 默认 (ZeroCat, `https://zero.cat/v1`, `lib/abuse/zerocat.ts`; AI Gateway as fallback) | Not used locally: the Coordinator and Bots use DS 4.1 Flash through the DeepSeek key (below). With no `ZEROCAT_API_KEY` set, dev:local sets the placeholder `mikka-local-zerocat` and sends ZeroCat's `/v1/chat/completions` to a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
-| Decisions (AI Gateway Decision API: triage, run outcome, push) | Local runs set no `AI_GATEWAY_API_KEY`, so the first choice of each question, `0.5` for a predicate |
+| Model, a workspace's own key (Settings › 模型与订阅) | Uses the configured LiteLLM; without one, the synthetic LiteLLM fixture answers without a provider request. Saving it needs `WORKSPACE_SECRETS_KEY`; without one, dev:local creates a random local key in `.cache/dev-local/workspace-secrets-key` (git-ignored, mode 0600) and reuses it, so saved keys still open after a restart |
+| The DeepSeek key, added automatically | `DEEPSEEK_API_KEY` comes from the environment or the named Infisical `dev:/vercel` secret. Use the configured `INFISICAL_PROJECT_ID` (or `MIKKA_DEV_INFISICAL_PROJECT`) with an existing `INFISICAL_TOKEN` or Universal Auth identity. The managed HTTP proxy is preserved. Setup runs immediately, then reconciles every 5 seconds; existing keys are reused, new Bots and workspaces receive the Flash choice, and individual failures back off from 30 seconds to 5 minutes. The key stays in process memory and sealed application storage. Missing Flash models never fall back to another real model. Real requests require a configured `MIKKA_LITELLM_URL` and `MIKKA_LITELLM_MASTER_KEY`; otherwise the scripted substitute answers the model calls. The API-key path never gates a merge or acceptance. |
+| Mikka 默认 (`mikka-default`, through LiteLLM) | Without configured LiteLLM, dev:local uses the loopback `/litellm/v1/chat/completions` fixture: it echoes (`Local model: <text>`), `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON. It does not call a real model. |
+| Decisions (`mikka-decision`, through LiteLLM) | The same loopback fixture answers the first choice of each question, `0.5` for a predicate, and marks its LiteLLM-shaped cost/call receipts as synthetic. |
 | Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
 | Verification and password-reset mail ([Resend](https://resend.com/docs/api-reference/emails/send-email)) | Real with a real `RESEND_API_KEY`; otherwise a local outbox at `http://127.0.0.1:3191/mail` (JSON at `/mail.json`), one terminal line per mail |
 | Cron (the production quarter-hour Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against the local API, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |
@@ -175,24 +175,21 @@ The existing development setup uses these settings.
   the Coordinator and the Bots (`scripts/dev-local/seed-model-keys.ts`). Outside
   dev:local, the same setup uses a DeepSeek key in Settings › 模型与订阅 with
   an allowed Flash model selected.
-- Mikka 默认 (hosted, billed per call, served by ZeroCat, AI Gateway as fallback) is not
-  used for local work, so a local run needs neither `ZEROCAT_API_KEY` nor a
-  card verification.
-
-The existing ZeroCat route accepts `ZEROCAT_BASE_URL=https://zero.cat/v1`
-and an existing process-delivered key. Other base URLs are refused. Without
-both settings, or on a failure before its first token, the route falls back to
-`deepseek/deepseek-v4.1-flash` on the AI Gateway. `dev:local` substitutes that
-Gateway too when no real key is present. This describes the retained runtime
-route. Authorized model acceptance follows the two official subscription
-paths above, and real API-key calls use only the policy's requested Flash model.
+- All model requests use LiteLLM. Set both `MIKKA_LITELLM_URL` and
+  `MIKKA_LITELLM_MASTER_KEY` for a real service. Configure built-in aliases
+  and upstream credentials there; user API keys are passed only for their
+  authorized request. With no URL, dev:local uses the guarded loopback
+  LiteLLM protocol fixture, including for API-key chats. The fixture does
+  not prove live models, upstream selection or billing.
+- The synthetic default uses a local allowance; no card verification or
+  direct ZeroCat, Workers AI, Vercel or provider endpoint is needed.
 
 First run: sign up at `http://localhost:3000/mikka`, then approve the device
 with the code the script prints. Ask the Coordinator to change
 `mikka-e2e/core-loop`. Running as root, set `MIKKA_DEV_DAEMON_USER` to an
 unprivileged user for the daemon (bubblewrap).
 
-The placeholders (`AI_GATEWAY_API_KEY`, `ZEROCAT_API_KEY`, `RESEND_API_KEY`, `CRON_SECRET`) are
+The placeholders (`MIKKA_LITELLM_MASTER_KEY`, `RESEND_API_KEY`, `CRON_SECRET`) are
 set in the application process only. The test-account environment accepts the
 exact model and mail placeholders only in local test-account mode after a
 random challenge proves that the current fetch path reaches the local
@@ -219,8 +216,9 @@ Not substituted:
 | Composio, Linear, Slack, Telegram, Firecrawl, Expo push, Turnstile | Off without their keys, with no effect on the loop. |
 
 `pnpm test:dev-local` covers the guard, the routing, the cron schedule and the
-real AI SDK gateway and OpenAI-compatible (ZeroCat) providers against the
-substitutes.
+real OpenAI-compatible Chat Completions provider and LiteLLM-shaped Decisions
+requests against the substitutes. The self-hosted image job separately routes
+through a real LiteLLM container to a synthetic provider.
 
 `pnpm test:local-loop` runs acceptance items 1–7 by default (the five MVP
 items plus the two mailbox items below) through HTTP and the

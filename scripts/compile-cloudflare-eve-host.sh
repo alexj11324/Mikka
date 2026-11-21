@@ -10,6 +10,7 @@ case "${1:-}" in
     node apps/api/scripts/build.mjs
     ;;
   --prebuilt-api) ;;
+  --independent) node scripts/release/runtime-resources.mjs ;;
   *) echo 'Unknown Eve compiler mode' >&2; exit 1 ;;
 esac
 node scripts/package-eve.mjs

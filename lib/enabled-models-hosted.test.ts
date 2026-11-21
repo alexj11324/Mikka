@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
-import { FEATURED_MODELS } from './model-catalog'
-let kind = 'self-hosted', targetReads = 0
+let kind = 'hosted'
 mock.module(new URL('./default-model.ts', import.meta.url).href, { namedExports: {
-  defaultModelTarget: async () => { targetReads++; return kind === 'none' ? null : { kind, serviceUrl: 'https://cloud.example.invalid' } },
+  defaultModelTarget: async () => kind === 'none' ? null : { kind },
 } })
 
 import type { BotSubscriptionChoice } from './bot-model-choice'
 import type { UsableApiKey } from './model-api-keys'
 import { creditsOptionId } from './bot-model-menu-view'
+import { SELF_HOSTED_DEFAULT_CATALOG_ID } from './model-gateway/config'
 
 /** A Mikka 额度 pick (decision 2026-11-15-1900). */
 const CREDITS_MODEL = 'deepseek/deepseek-v4-pro'
@@ -80,26 +80,16 @@ function fixture(ownerId = 'alice', flags: (boolean | Error)[] = [true]) {
 const choose = (f: ReturnType<typeof fixture>, preference: Parameters<typeof resolveBotModelChoice>[4] = {}, keys: UsableApiKey[] = []) =>
   resolveBotModelChoice(f.query as never, f.settings, f.scope, '10000000-0000-4000-8000-000000000005', preference, { keys })
 
-test('hosted settings expose the actual default target when cloud supersedes a configured local provider', async () => {
-  const names = ['MIKKA_EDITION', 'MIKKA_DEFAULT_MODEL_BASE_URL', 'MIKKA_DEFAULT_MODEL_API_KEY', 'MIKKA_DEFAULT_MODEL_ID']
-  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
+test('hosted settings list the models offered by the configured LiteLLM source', async () => {
+  const { readEnabledModels } = await import('./enabled-models')
+  const query = { query: async (sql: string) => ({ rows: sql.includes('FROM "user"') ? [{ enabled: true }] : [] }) } as unknown as Pool
+  const scope = { ownerId: 'fixture-owner', workspaceId: '10000000-0000-4000-8000-000000000001' }
+  process.env.MIKKA_EDITION = 'community'
   try {
-    Object.assign(process.env, { MIKKA_EDITION: 'community', MIKKA_DEFAULT_MODEL_BASE_URL: 'https://provider.example.invalid/v1',
-      MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-fixture-only', MIKKA_DEFAULT_MODEL_ID: 'local-configured-model' })
-    const { readEnabledModels } = await import('./enabled-models')
-    const query = { query: async (sql: string) => ({ rows: sql.includes('FROM "user"') ? [{ enabled: true }] : [] }) } as unknown as Pool
-    const scope = { ownerId: 'fixture-owner', workspaceId: '10000000-0000-4000-8000-000000000001' }
-    const model = async () => (await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models[0].id
-    assert.equal(await model(), 'local-configured-model')
-    kind = 'cloud'
-    assert.equal(await model(), FEATURED_MODELS[0], 'the inactive local provider must not be shown; Mikka 额度 lists the catalogue')
-    assert.equal(targetReads, 2)
-    process.env.MIKKA_EDITION = 'cloud'
-    assert.equal(await model(), FEATURED_MODELS[0])
-    assert.equal(targetReads, 2, 'cloud edition does not read a self-hosted binding')
-  } finally {
-    for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
-  }
+    assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models.map(model => model.id), [SELF_HOSTED_DEFAULT_CATALOG_ID])
+    kind = 'none'
+    assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models, [])
+  } finally { kind = 'hosted'; process.env.MIKKA_EDITION = 'cloud' }
 })
 
 for (const source of ['selected', 'default'] as const) test(`a valid ${source} subscription does not query unrelated hosted policy`, async () => {
@@ -162,8 +152,7 @@ test('no choice and nothing to fill in is no model, never a silent Mikka 额度 
   const configured = kind
   try {
     // A self-hosted server offers only its administrator's model: with nothing to choose, a chat uses it.
-    const { COORDINATOR_MODEL } = await import('./coordinator/model')
-    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'hosted', model: COORDINATOR_MODEL, chosen: false })
+    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'hosted', model: SELF_HOSTED_DEFAULT_CATALOG_ID, chosen: false })
     // A server with no model of its own still has no model to run.
     kind = 'none'
     assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'none', chosen: false })

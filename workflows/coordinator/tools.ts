@@ -9,6 +9,8 @@ import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
 import * as steps from './steps'
 import * as kit from './agent-kit-steps'
+import { interopTool } from './interop-steps'
+import { INTEROP_TOOLS, INTEROP_TOOL_IDS } from '@/lib/interop/tool-schemas'
 import type { NativeToolScope } from './tool-scope'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { factoryDispatchSchema } from '@/lib/factory/dispatch-schema'
@@ -272,6 +274,10 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       inputSchema: z.object({ runId: id }),
       execute: input => steps.stopRun(userId, input, scope, botId),
     }),
+    // Reads, sends and shared Drive across threads and Bots (decision 2026-11-19-2200).
+    ...Object.fromEntries(INTEROP_TOOL_IDS.map(name => [name, tool({ description: INTEROP_TOOLS[name].description,
+      inputSchema: INTEROP_TOOLS[name].inputSchema as z.ZodType<Record<string, unknown>>,
+      execute: (input: Record<string, unknown>) => interopTool(userId, botId, name, input, scope) })])),
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
     read_personal_skill:tool({ description:'Read the full instructions of one skill the person installed. The skills list in your system prompt carries only each skill\'s name and a description; its body is not there. Call this with the skill id before relying on a skill, and do not assume what a skill says from its name.',inputSchema:z.object({skillId:z.uuid()}),execute:input=>kit.readPersonalSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }

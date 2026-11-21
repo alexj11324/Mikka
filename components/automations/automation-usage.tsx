@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAutomationUsage } from '@/hooks/use-automations'
 
-/** 用量: the last 14 days in the automation's own time zone. Spend shows only for the creator and owners/admins. */
+/** 用量: the last 30 days in the automation's own time zone. Spend shows only for the creator and owners/admins. */
 export function AutomationUsagePanel({ workspaceId, id }: { workspaceId: string | null; id: string }) {
   const t = useTranslations('Automations.usage')
   const tAll = useTranslations('Automations')

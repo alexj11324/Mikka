@@ -5,14 +5,17 @@ import { useEffect, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { createBot, getWorkspaceBotDefaults, type BotView } from '@/app/actions/bots'
+import { createBot, getWorkspaceBotDefaults, listBotEnvironments, setBotEffort, type BotView } from '@/app/actions/bots'
+import { listDevices } from '@/app/actions/agents'
+import { MODEL_ROUTING_EFFORTS } from '@/lib/model-routing'
+import type { TaskDestination } from '@/lib/task-destination'
 import { chooseBotModel, getBotModelMenu } from '@/app/actions/execution-settings'
 import { botModelMenuKey, modelGroupHeading, modelGroupTag, modelPriceTag } from '@/hooks/use-bot-model-picker'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import { modelDisplayName } from '@/lib/model-display-name'
 import { useActionError } from '@/lib/use-action-error'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
-import { NO_REPOSITORY, type NewBotChoice, type NewBotDetail } from '@/components/slots/new-bot-contract'
+import { NO_EFFORT, NO_REPOSITORY, type NewBotChoice, type NewBotDetail } from '@/components/slots/new-bot-contract'
 import { NewBot } from '@ui-slot/new-bot'
 
 const NAME_LENGTH = 60
@@ -33,8 +36,12 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   // Undefined until the person picks: the Bot then takes what it would get anyway.
   const [model, setModel] = useState<string | undefined>()
   const [repository, setRepository] = useState<string | undefined>()
+  const [environment, setEnvironment] = useState<string | undefined>()
+  const [machine, setMachine] = useState<string | undefined>()
+  const [effort, setEffort] = useState<string>(NO_EFFORT)
+  const [access, setAccess] = useState<'private' | 'shared'>('private')
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE); setModel(undefined); setRepository(undefined) } }, [open])
+  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE); setModel(undefined); setRepository(undefined); setEnvironment(undefined); setMachine(undefined); setEffort(NO_EFFORT); setAccess('private') } }, [open])
 
   // Read once when the window opens; nothing here refreshes on its own.
   const menu = useSWR<BotModelMenu | null>(open ? [...botModelMenuKey(null), workspaceId] : null, () => getBotModelMenu(null, workspaceId), { shouldRetryOnError: false, revalidateOnFocus: false })
@@ -43,6 +50,13 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
     if (result.error) throw new Error(result.error)
     return result
   }, { shouldRetryOnError: false, revalidateOnFocus: false })
+
+  const environments = useSWR(open ? ['new-bot-environments', workspaceId] : null, async () => {
+    const result = await listBotEnvironments(workspaceId)
+    if (result.error) throw new Error(result.error)
+    return result
+  }, { shouldRetryOnError: false, revalidateOnFocus: false })
+  const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices, { shouldRetryOnError: false, revalidateOnFocus: false })
 
   const modelChoices: NewBotChoice[] = (menu.data?.groups ?? []).flatMap(group => {
     const source = modelGroupHeading(tModel, group)
@@ -71,12 +85,49 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
     onChange: setRepository, disabled: saving || !defaults.data,
   }
 
+  // Environment: undefined keeps the server's pick (the one listing the 仓库 choice, else the workspace default, the first here).
+  const environmentChoices: NewBotChoice[] = (environments.data?.environments ?? []).map(item => ({ value: item.id, label: item.name, detail: item.repositoryKeys[0]?.replace(/^v2\/github\.com\//, '') }))
+  const environmentValue = environment ?? environmentChoices[0]?.value ?? null
+  const environmentDetail: NewBotDetail = {
+    choices: environmentChoices, value: environmentValue,
+    label: environmentChoices.find(choice => choice.value === environmentValue)?.label ?? (environments.error ? tModel('unavailable') : environments.data ? t('noEnvironment') : t('loading')),
+    onChange: setEnvironment, disabled: saving || environmentChoices.length === 0,
+  }
+  // Machine: where the tasks it dispatches run. Unpicked, the person's own 运行位置 decides.
+  const machineChoices: NewBotChoice[] = [
+    { value: 'cloud', label: t('machineCloud') },
+    { value: 'cloudflare', label: t('machineCloudflare') },
+    ...devices.filter(item => item.enabled).map(item => ({ value: item.id, label: item.name, group: t('otherDevices') })),
+  ]
+  const machineDetail: NewBotDetail = {
+    choices: machineChoices, value: machine ?? null,
+    label: machineChoices.find(choice => choice.value === machine)?.label ?? t('machineDefault'),
+    onChange: setMachine, disabled: saving,
+  }
+  const effortChoices: NewBotChoice[] = [{ value: NO_EFFORT, label: t('effortDefault') }, ...MODEL_ROUTING_EFFORTS.map(value => ({ value, label: t(`efforts.${value}`) }))]
+  const effortDetail: NewBotDetail = {
+    choices: effortChoices, value: effort, label: effortChoices.find(choice => choice.value === effort)?.label ?? t('effortDefault'),
+    onChange: setEffort, disabled: saving,
+  }
+  const accessChoices: NewBotChoice[] = [{ value: 'private', label: t('accessPrivate') }, { value: 'shared', label: t('accessShared') }]
+  const accessDetail: NewBotDetail = {
+    choices: accessChoices, value: access, label: accessChoices.find(choice => choice.value === access)!.label,
+    onChange: value => setAccess(value === 'shared' ? 'shared' : 'private'), disabled: saving,
+  }
+  const crewTarget: TaskDestination | undefined = machine === undefined ? undefined
+    : machine === 'cloud' ? { kind: 'cloud' } : machine === 'cloudflare' ? { kind: 'cloud', provider: 'cloudflare' } : { kind: 'device', deviceId: machine }
+
   async function submit() {
     const trimmed = name.trim()
     if (!trimmed || saving) return
     setSaving(true)
     try {
-      const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) }, workspaceId)
+      const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }),
+        ...(environment === undefined ? {} : { environmentId: environment }), ...(crewTarget ? { crewTarget } : {}), ...(access === 'shared' ? { visibility: access } : {}) }, workspaceId)
+      if (effort !== NO_EFFORT) {
+        const saved = await setBotEffort(bot.id, effort, workspaceId).catch(() => ({ error: 'notSaved' }))
+        if (saved.error) toast.error(tModel('notSaved'))
+      }
       // The menu is the Coordinator's: its row shows the Coordinator's model. A new Bot has no saved choice and would
       // follow the default instead, so save what the row shows whenever it is a pick (the person's, or the Coordinator's
       // own choice); an unchosen default is what the new Bot resolves to anyway.
@@ -97,5 +148,8 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   }
 
   return open ? <NewBot onClose={() => onOpenChange(false)} name={name} onName={setName} maxLength={NAME_LENGTH} color={color} shape={shape}
-    onColor={setColor} onShape={setShape} model={modelDetail} repository={repositoryDetail} saving={saving} onSubmit={() => { void submit() }} /> : null
+    onColor={setColor} onShape={setShape} model={modelDetail} repository={repositoryDetail}
+    environment={environmentDetail} machine={machineDetail} effort={effortDetail}
+    // A personal workspace has no one to share with: no Access row there.
+    access={environments.data?.shareable ? accessDetail : undefined} saving={saving} onSubmit={() => { void submit() }} /> : null
 }

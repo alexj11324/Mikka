@@ -95,11 +95,8 @@ import { judgeComputerAction, noServerDecision } from "./decision-judgments"
 import type { ServerDecide } from "./server-decision"
 import { RpcServer, type RpcHandlers } from "./rpc/server"
 import { RunJournal } from "./runs/journal"
-import {
-  baseReport,
-  RunSupervisor,
-  type SupervisorDeps,
-} from "./runs/supervisor"
+import { baseReport } from "./runs/publication"
+import { RunSupervisor, type SupervisorDeps } from "./runs/supervisor"
 import { DEVICE_GATEWAY_UPDATE_REQUIRED_CODE, DeviceGatewayClosedError, DeviceSession, type DeviceSessionVerdict } from "./device-gateway"
 import { deviceRepoSchema } from "@mikka/protocol"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
@@ -539,6 +536,7 @@ export class Daemon {
       startCredential: hosted?.start,
       prepareSubscription: hosted?.prepare,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      prepareRunDrive: this.options.link.prepareRunDrive?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
         stateDir: join(this.paths.adapterState, 'github'), link: this.options.link, signal, onCredential,

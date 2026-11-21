@@ -86,6 +86,7 @@ before(async () => {
     '@/app/actions/model-api-keys': ['getApiKeys'],
     '@/app/actions/environments': ['listEnvironments'],
     '@/app/actions/thread-title-settings': ['getThreadTitleSettings'],
+    '@/app/actions/issue-states': ['getIssueStates'],
   })) mock.module(module, { namedExports: Object.fromEntries(names.map(name => [name, () => { throw new Error('unexpected settings read') }])) })
   mock.module('@/app/actions/bots', { namedExports: {
     listBots: () => { throw new Error('owner-only Bot list cannot replace workspace activity') },

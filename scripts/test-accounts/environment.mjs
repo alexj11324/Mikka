@@ -5,7 +5,7 @@ import { Pool } from 'pg'
 import { readBoundedBody } from './http-body.mjs'
 import { MVP_DECISION_KEY, hasBoundMvpTransport, verifyMvpTransport } from '../../tests/mvp/transport.mjs'
 import { hasBoundDevLocalTransport, verifyDevLocalTransport } from '../dev-local/transport.mjs'
-import { LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from '../dev-local/services.mjs'
+import { LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY, LOCAL_LITELLM_URL } from '../dev-local/services.mjs'
 import { databaseTarget, EnvironmentError } from './database-target.mjs'
 import { dockerDatabaseTarget, validateDockerBinding } from './docker-target.mjs'
 
@@ -55,8 +55,9 @@ export function validateEnvironment(value, env = process.env) {
   if (typeof value.capabilities?.provision !== 'boolean' || value.capabilities.mail !== 'disabled' || typeof value.capabilities.reset !== 'boolean') fail('ENVIRONMENT_CAPABILITIES_INVALID')
   const localTransport = hasBoundDevLocalTransport(env)
   if (env.RESEND_API_KEY && !(env.RESEND_API_KEY === LOCAL_RESEND_KEY && localTransport)) fail('EXTERNAL_MAIL_FORBIDDEN')
-  if (env.ZEROCAT_API_KEY && !(env.ZEROCAT_API_KEY === LOCAL_ZEROCAT_KEY && localTransport)) fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
-  if ((env.AI_GATEWAY_API_KEY && !(env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY && (hasBoundMvpTransport(env) || localTransport))) || ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name]))) fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
+  const localModel = env.MIKKA_LITELLM_MASTER_KEY === LOCAL_LITELLM_KEY && env.MIKKA_LITELLM_URL === LOCAL_LITELLM_URL && localTransport
+  const mvpModel = env.MIKKA_LITELLM_MASTER_KEY === MVP_DECISION_KEY && hasBoundMvpTransport(env)
+  if ((env.MIKKA_LITELLM_MASTER_KEY && !localModel && !mvpModel) || ['AI_GATEWAY_API_KEY', 'ZEROCAT_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name]))) fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
   if (!env.E2E_DATABASE_URL || !env.MIKKA_DATABASE_URL || !env.DATABASE_URL) fail('DATABASE_TARGET_CONFIGURATION_REQUIRED')
   if (env.MIKKA_DATABASE_URL !== env.E2E_DATABASE_URL || env.DATABASE_URL !== env.E2E_DATABASE_URL || (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL)) fail('DATABASE_FALLBACK_MISMATCH')
   const target = databaseTarget(env.E2E_DATABASE_URL)
@@ -74,14 +75,13 @@ export async function loadEnvironment(env = process.env) {
     const stat = await lstat(resolve(path))
     if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || stat.size > 16384) fail('ENVIRONMENT_FILE_UNSAFE')
     const descriptor = JSON.parse(await readFile(resolve(path), 'utf8'))
-    const syntheticGateway = env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY
+    const syntheticGateway = env.MIKKA_LITELLM_MASTER_KEY === MVP_DECISION_KEY || env.MIKKA_LITELLM_MASTER_KEY === LOCAL_LITELLM_KEY
     const syntheticMail = env.RESEND_API_KEY === LOCAL_RESEND_KEY
-    const syntheticZeroCat = env.ZEROCAT_API_KEY === LOCAL_ZEROCAT_KEY
-    if (syntheticGateway || syntheticMail || syntheticZeroCat) {
+    if (syntheticGateway || syntheticMail) {
       // Check every ordinary isolation/credential guard before even the local
       // challenge. Final validation still requires the actual current fetch
       // path to reach the isolated MVP preload; a key or flag is not proof.
-      validateEnvironment(descriptor, { ...env, ...(syntheticGateway ? { AI_GATEWAY_API_KEY: undefined } : {}), ...(syntheticMail ? { RESEND_API_KEY: undefined } : {}), ...(syntheticZeroCat ? { ZEROCAT_API_KEY: undefined } : {}) })
+      validateEnvironment(descriptor, { ...env, ...(syntheticGateway ? { MIKKA_LITELLM_MASTER_KEY: undefined } : {}), ...(syntheticMail ? { RESEND_API_KEY: undefined } : {}) })
       await verifyMvpTransport(env)
       await verifyDevLocalTransport(env)
     }

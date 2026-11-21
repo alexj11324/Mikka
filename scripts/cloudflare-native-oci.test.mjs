@@ -11,7 +11,7 @@ import { buildEnvironment, digestFromRepoDigests, releaseDockerfile, releaseId, 
 
 const publicSha = 'a'.repeat(40)
 const privateSha = 'b'.repeat(40)
-const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: publicSha,
   GITHUB_WORKFLOW_SHA: publicSha, GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main',
   GITHUB_RUN_ID: '90001', GITHUB_RUN_ATTEMPT: '2', GITHUB_ACTOR: 'alexj11324', GITHUB_ACTOR_ID: '183887963',
@@ -48,7 +48,17 @@ test('publication requires the public main build and exact selected overlay', ()
   assert.throws(() => releaseSelection(env, { ...receipt, target: 'renderers' }), /CI_BUILD_TARGET_INVALID/)
 })
 
+test('fresh API publication keeps the independent UI namespace bound to its receipt', () => {
+  const moved = { ...env, MIKKA_PRIVATE_GITHUB_OWNER: 'alexj11324', MIKKA_HOSTED_UI_GITHUB_OWNER: 'aspectly-labs' }
+  const movedReceipt = { ...receipt, overlayCheckout: { ...receipt.overlayCheckout, repository: 'aspectly-labs/mikka-hosted-ui' } }
+  assert.equal(releaseSelection(moved, movedReceipt).privateSha, privateSha)
+  assert.throws(() => releaseSelection(moved, receipt), /CI_OVERLAY_RECEIPT_MISMATCH/)
+  assert.throws(() => releaseSelection(env, movedReceipt), /CI_OVERLAY_RECEIPT_MISMATCH/)
+  assert.equal(receipt.overlayCheckout.repository, 'alexj11324/mikka-hosted-ui')
+})
+
 test('a selected main overlay survives later merges while an unmerged overlay is rejected without changing the checkout', async () => {
+  const fixtureEnv = { ...process.env, MIKKA_HOSTED_UI_GITHUB_OWNER: 'alexj11324' }
   const directory = await mkdtemp(join(tmpdir(),'mikka-overlay-main-'))
   const upstream = join(directory,'upstream'), checkout = join(directory,'checkout')
   const git = (cwd,...args) => execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
@@ -63,7 +73,7 @@ test('a selected main overlay survives later merges while an unmerged overlay is
     git(checkout,'config','url.'+pathToFileURL(upstream).href+'.insteadOf','git@github.com:alexj11324/mikka-hosted-ui.git')
     await writeFile(join(upstream,'source.txt'),'newer main\n')
     git(upstream,'commit','-am','Later main merge')
-    verifyOverlayMain(checkout,pinned)
+    verifyOverlayMain(checkout,pinned,fixtureEnv)
     assert.equal(git(checkout,'rev-parse','HEAD'),pinned)
     assert.equal(await readFile(join(checkout,'source.txt'),'utf8'),'reviewed overlay\n')
     git(checkout,'config','user.name','Fixture')
@@ -72,7 +82,7 @@ test('a selected main overlay survives later merges while an unmerged overlay is
     await writeFile(join(checkout,'source.txt'),'unmerged overlay\n')
     git(checkout,'commit','-am','Unmerged source')
     const unmerged = git(checkout,'rev-parse','HEAD')
-    assert.throws(()=>verifyOverlayMain(checkout,unmerged),/CF_OCI_STAGE_OVERLAY_MAIN_ANCESTRY_FAILED/)
+    assert.throws(()=>verifyOverlayMain(checkout,unmerged,fixtureEnv),/CF_OCI_STAGE_OVERLAY_MAIN_ANCESTRY_FAILED/)
     assert.equal(git(checkout,'rev-parse','HEAD'),unmerged)
   } finally { await rm(directory,{recursive:true,force:true}) }
 })

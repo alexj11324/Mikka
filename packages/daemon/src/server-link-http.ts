@@ -40,6 +40,7 @@ import {
   PROJECT_ENVIRONMENT_HEADER,
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
+  MODEL_GATEWAY_LOOPBACK_HEADER,
   RUN_CREDENTIALS_HEADER,
   INITIAL_REPOSITORY_HEADER,
   MAILBOX_NOTICE_HEADER,
@@ -82,6 +83,9 @@ import {
 } from "./errors"
 import { DAEMON_VERSION } from "./paths"
 import { createRunMailbox } from './run-mailbox'
+import { createRunDrive } from './run-drive'
+import { homedir } from 'node:os'
+import { join as joinPath } from 'node:path'
 import { daemonTracer, routeTemplate } from "./tracing"
 import { runRuntimeTimings } from "./run-runtime-timing"
 import type {
@@ -238,6 +242,11 @@ export class HttpServerLink implements ServerLink {
     return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: (url, init) => this.taskFetch(assignment.runId, 'mailbox_operation', url, init),
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...deviceSessionHeaders, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
   }
+  async prepareRunDrive(assignment: RunAssignment, signal: AbortSignal) {
+    return createRunDrive({ assignment, signal, endpoint: serverUrl(this.baseUrl, '/api/mcp'), root: joinPath(process.env.HOME || homedir(), '.mikka', 'drive'),
+      fetch: (url, init) => this.taskFetch(assignment.runId, 'task_data', url, init),
+      headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...deviceSessionHeaders, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
+  }
   async claimCoordinator(deviceId: string, signal: AbortSignal) {
     const response = await this.send("POST",`/v1/devices/${seg(deviceId)}/coordinator`,{ operation: "claim" },this.credential,{ signal })
     if (response.status === 404) return null // Optional rollout / older server.
@@ -323,6 +332,7 @@ export class HttpServerLink implements ServerLink {
           [PROJECT_ENVIRONMENT_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
+          [MODEL_GATEWAY_LOOPBACK_HEADER]: '1',
           [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,
           [RUN_CREDENTIALS_HEADER]: '1',
           [TASK_MCP_HEADER]: TASK_MCP_VERSION,
@@ -461,11 +471,15 @@ export class HttpServerLink implements ServerLink {
   }
 
   async claimRun(deviceId: string, runId: string, signal?: AbortSignal, options?: { initialRepository: true }): Promise<RunAssignment> {
-    return this.call(
+    const assignment = await this.call(
       "POST",
       devicePaths.claim(checkId(deviceId), checkId(runId)),
       { schema: runAssignmentSchema, claimOf: runId, signal, initialRepository: options?.initialRepository }
     )
+    const model = assignment.modelCredential
+    if (model?.kind === 'provider' && new URL(model.baseUrl).protocol === 'http:'
+      && new URL(model.baseUrl).origin !== new URL(this.baseUrl).origin) throw new Error('Loopback model gateway unavailable')
+    return assignment
   }
   async validateSkillReceipt(runId:string,receiptId:string) {
     return this.call('GET',`/v1/runs/${seg(runId)}/skill-receipt?receiptId=${encodeURIComponent(checkId(receiptId))}`,{schema:skillReceiptRevalidationSchema})
