@@ -4,22 +4,26 @@ import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('hosted Checkout verification on isolated PostgreSQL', { skip: !dbUrl }, async t => {
+  // The runtime captures hosted metering when imported, so bind this fixture first.
+  const old = { edition: process.env.MIKKA_EDITION, secret: process.env.STRIPE_SECRET_KEY, webhook: process.env.STRIPE_WEBHOOK_SECRET }
+  process.env.MIKKA_EDITION = 'cloud'
+  process.env.STRIPE_SECRET_KEY = 'sk_test_fixture'
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fixture'
+  t.after(() => {
+    if (old.edition === undefined) delete process.env.MIKKA_EDITION
+    else process.env.MIKKA_EDITION = old.edition
+    if (old.secret === undefined) delete process.env.STRIPE_SECRET_KEY
+    else process.env.STRIPE_SECRET_KEY = old.secret
+    if (old.webhook === undefined) delete process.env.STRIPE_WEBHOOK_SECRET
+    else process.env.STRIPE_WEBHOOK_SECRET = old.webhook
+  })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../db')
   const { workspacePool } = await import('../workspace-db')
   const { hostedUsage } = await import('./runtime')
   const { applyCardCheckout, applyCardSetup, cardVerificationStatus, workspaceCardStatus } = await import('./card')
-  const old = { secret: process.env.STRIPE_SECRET_KEY, webhook: process.env.STRIPE_WEBHOOK_SECRET }
-  process.env.STRIPE_SECRET_KEY = 'sk_test_fixture'
-  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fixture'
-  t.after(async () => {
-    if (old.secret === undefined) delete process.env.STRIPE_SECRET_KEY
-    else process.env.STRIPE_SECRET_KEY = old.secret
-    if (old.webhook === undefined) delete process.env.STRIPE_WEBHOOK_SECRET
-    else process.env.STRIPE_WEBHOOK_SECRET = old.webhook
-    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
-  })
+  t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
   const owner = await seedUser(pool, 'verify-owner'), member = await seedUser(pool, 'verify-member')
   const workspace = () => seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const fingerprint = `card_${randomUUID()}`

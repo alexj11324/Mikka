@@ -15,6 +15,12 @@ process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 const firstName = (view: { first: { kind: 'cloud' } | { kind: 'device'; name: string } | null }) => view.first?.kind === 'device' ? view.first.name : view.first?.kind ?? null
 
 test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }, async t => {
+  const edition = process.env.MIKKA_EDITION
+  process.env.MIKKA_EDITION = 'cloud'
+  t.after(() => {
+    if (edition === undefined) delete process.env.MIKKA_EDITION
+    else process.env.MIKKA_EDITION = edition
+  })
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'

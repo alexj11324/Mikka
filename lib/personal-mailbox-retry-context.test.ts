@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from './db/commit-effects'
+
+const scheduledAfter = captureFixtureLiveEffects()
 import { type SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { agentRuns, agents, deviceRepos, devices } from './db/schema'
@@ -30,7 +35,13 @@ function queryOf(statement: SQL) {
   return { ...query, sql: normalize(query.sql) }
 }
 const events: { botId?: string | null }[] = [], revoked: string[] = []
+const client = { async query(command: string) {
+  assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command))
+  return { command, rows: [] }
+} } as unknown as PoolClient
+observeCommitEffects(client)
 const tx = {
+  session: { client },
   execute: async () => { throw Error('Unexpected transactional SQL in legacy retry fixture') },
   update(table: unknown) { assert.equal(table, agentRuns); return { set() { return { where() { return { returning: async () => [{ id: lost.id }] } } } } } },
   insert(table: unknown) { assert.equal(table, agentRuns); return { values: async (value: Record<string, unknown>) => { inserted = value } } },
@@ -81,7 +92,15 @@ const database = {
   },
   transaction: async (fn: (transaction: typeof tx) => Promise<unknown>) => {
     assert.ok(resourceLocked && workspaceTransactions > 0, 'the retry APP write must remain inside the resource and membership lease')
-    transactions++; return fn(tx)
+    transactions++
+    const scheduledBefore = scheduledAfter.length
+    await client.query('BEGIN')
+    try {
+      const result = await fn(tx)
+      assert.equal(scheduledAfter.length, scheduledBefore, 'retry effects stay behind COMMIT')
+      await client.query('COMMIT')
+      return result
+    } catch (error) { await client.query('ROLLBACK'); throw error }
   },
 }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: database, withDatabaseClient: () => { throw Error('Held-client work is outside the legacy retry fixture') }, pool: { query: async (statement: string, params: unknown[]) => {
@@ -181,6 +200,7 @@ test('actual reclaim writer keeps the trusted private Bot when it moves the run 
   t.mock.method(Date, 'now', () => observedAt)
   const { reclaimLostRuns } = await import('./run-leases')
   await reclaimLostRuns(lost.userId, now)
+  assert.ok(scheduledAfter.length > 0, 'the real retry writer registers live effects after COMMIT')
   assert.ok(inserted)
   assert.equal(recoveryHandoff.mock.callCount(), 1)
   assert.equal(readmit.mock.callCount(), 0)

@@ -1,13 +1,31 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { before } from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
-import { sendOwnedRunMessage, stopOwnedRun, type RunControlDatabase } from './run-control'
+import type { PoolClient } from 'pg'
+import type { RunControlDatabase } from './run-control'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+import { observeCommitEffects } from './db/commit-effects'
+
+let { sendOwnedRunMessage, stopOwnedRun } = {} as typeof import('./run-control')
+const scheduledAfter = captureFixtureLiveEffects()
+before(async () => {
+  ;({ sendOwnedRunMessage, stopOwnedRun } = await import('./run-control'))
+})
 
 const runId = '11111111-1111-4111-8111-111111111111'
 const dialect = new PgDialect()
 function fixture(status = 'running', stopped: Date | null = null, machineBound = false) {
   const events: string[] = [], messages: unknown[] = [], updates: Record<string, unknown>[] = []
+  let scheduledBefore = scheduledAfter.length
+  const client = { async query(command: string) {
+    assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command))
+    if (command === 'BEGIN') scheduledBefore = scheduledAfter.length
+    else assert.equal(scheduledAfter.length, scheduledBefore, 'effects wait for the native COMMIT acknowledgement')
+    events.push(command.toLowerCase())
+    return { command, rows: [] }
+  } } as unknown as PoolClient
+  observeCommitEffects(client)
   const row = { id: runId, userId: 'owner', status, stopRequestedAt: stopped }
   let where: SQL | undefined, lockHook: (() => Promise<void>) | undefined
   const predicate = (value: SQL) => {
@@ -27,6 +45,7 @@ function fixture(status = 'running', stopped: Date | null = null, machineBound =
     },
   }
   const tx = {
+    session: { client },
     select() { return selection },
     async execute(query: SQL) {
       const q = dialect.sqlToQuery(query)
@@ -40,8 +59,9 @@ function fixture(status = 'running', stopped: Date | null = null, machineBound =
     } } } } },
   }
   const database = { async transaction<T>(fn: (value: typeof tx) => Promise<T>) {
-    events.push('begin')
-    try { const result = await fn(tx); events.push('commit'); return result } catch (error) { events.push('rollback'); throw error }
+    await client.query('BEGIN')
+    try { const result = await fn(tx); await client.query('COMMIT'); return result }
+    catch (error) { await client.query('ROLLBACK'); throw error }
   } } as unknown as RunControlDatabase
   return { database, row, events, messages, updates, onLock(fn: () => Promise<void>) { lockHook = fn } }
 }
@@ -50,6 +70,7 @@ test('an owner message locks and rechecks the live run before inserting', async 
   const f = fixture()
   await sendOwnedRunMessage(f.database, 'owner', { runId, text: 'continue the existing task' })
   assert.deepEqual(f.events, ['begin', 'lock', 'insert', 'commit'])
+  assert.ok(scheduledAfter.length > 0, 'the real live writer registers only after COMMIT')
   assert.equal(f.messages.length, 1)
   assert.deepEqual({ ...(f.messages[0] as object), id: undefined }, { id: undefined, runId, userId: 'owner', text: 'continue the existing task', origin: 'owner', mailboxWakeDepth: -1 })
 })
