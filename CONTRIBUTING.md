@@ -86,6 +86,8 @@ code rejected.
 
 ## How changes are tested
 
+**Local change scope before CI.** Start with `pnpm local:plan` in the task's Linux development machine; it reuses the existing Nx/CI affected graph instead of adding a second test mapping. Execute focused existing package scripts with `pnpm local:check --test=<script>`, and use actual API/CLI/daemon/PG/UI acceptance for behavior changes. After commit, run `pnpm local:ready --test=<script> --accept=test:local-loop` (or `--report=<local-acceptance-report>`); for genuinely non-product changes, record `--no-product-change='tooling: <why>'` instead. `pnpm local:mark-ready --pr=<number>` verifies the saved exact-SHA local evidence before invoking `gh pr ready`. The evidence is ignored local metadata and cannot replace independent CI or truthful PR evidence. See `.agents/skills/local-first/SKILL.md` and the existing `docs/acceptance.md` for legitimate reuse and external-only exceptions.
+
 Slow checks run less often and later. Each layer catches what the one before
 cannot.
 

@@ -5,6 +5,8 @@ import * as provider from './e2b-provider'
 import { connectForCommitEffects } from '../db/commit-effects'
 import { machineChanged, machineCommitted } from '@/lib/live/computer-state'
 import { armDueTimerSoon } from '@/lib/due-timer'
+import { ownE2BKeySql } from '@/lib/secrets/e2b-owner-sql'
+import { E2BKeyError } from '@/lib/secrets/flag'
 
 type Actor={userId:string;workspaceId:string}
 type Runtime=Pick<typeof provider,'createComputer'|'connectComputer'|'installComputerRuntime'>&Partial<Pick<typeof provider,'computerGone'|'computerWorkerSha'|'killComputer'>>
@@ -14,6 +16,8 @@ const LIVE_RUNS=['preparing','running','paused','waiting_input','finishing']
  * Provider idempotency uses the persisted operationId across process loss.
  * The provision lease is not the daemon/worker lease or a permission grant. */
 export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=provider) {
+  const { rows: [key] } = await pool.query<{ configured: boolean }>(`SELECT ${ownE2BKeySql('$1::text')} AS configured`, [actor.userId])
+  if (!key.configured) throw new E2BKeyError('e2b_key_missing')
   const client=await connectForCommitEffects(pool),leaseId=randomUUID()
   let machine:{sandboxId:string|null;operationId:string;runtimeReady:boolean;state:string}|undefined
   try {
@@ -22,7 +26,7 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
     const row=(await client.query(`SELECT * FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2 FOR UPDATE`,[actor.workspaceId,actor.userId])).rows[0]
     if(row.provisionLeaseUntil && new Date(row.provisionLeaseUntil).getTime()>Date.now()) {await client.query('COMMIT');return null}
     machine=row
-    await client.query(`UPDATE cloud_machines SET "provisionLeaseId"=$3,"provisionLeaseUntil"=now()+interval '3 minutes',state='waking' WHERE "workspaceId"=$1 AND "ownerId"=$2`,[actor.workspaceId,actor.userId,leaseId])
+    await client.query(`UPDATE cloud_machines SET "provisionLeaseId"=$3,"provisionLeaseUntil"=now()+interval '3 minutes',state='waking',"errorCode"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2`,[actor.workspaceId,actor.userId,leaseId])
     await machineChanged(client, pool, actor.userId, actor.workspaceId)
     await client.query('COMMIT')
   } catch(error) {await client.query('ROLLBACK');throw error} finally {client.release()}
@@ -49,16 +53,23 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
       if (recorded.rows[0]?.provisionLeaseId !== leaseId) return null
       if (!machine.runtimeReady) await runtime.installComputerRuntime(sandbox)
     }
-    const completed=await pool.query(`UPDATE cloud_machines SET state='running',"runtimeReady"=true,"lastActiveAt"=now(),"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3 AND "sandboxId"=$4 RETURNING "sandboxId"`,[actor.workspaceId,actor.userId,leaseId,sandbox.sandboxId])
+    const completed=await pool.query(`UPDATE cloud_machines SET state='running',"errorCode"=NULL,"runtimeReady"=true,"lastActiveAt"=now(),"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3 AND "sandboxId"=$4 RETURNING "sandboxId"`,[actor.workspaceId,actor.userId,leaseId,sandbox.sandboxId])
     if (completed.rowCount) await machineCommitted(pool, actor.userId, actor.workspaceId)
     // A running machine is checked with E2B once idle for an hour (#1212).
     if (completed.rowCount) armDueTimerSoon('run-recovery')
     return completed.rowCount?sandbox:null
   } catch(error) {
-    const failed = await pool.query(`UPDATE cloud_machines SET state='error',"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3`,[actor.workspaceId,actor.userId,leaseId])
+    const missing = error instanceof E2BKeyError && error.code === 'e2b_key_missing'
+    const failed = await pool.query(`UPDATE cloud_machines SET state=$4,"errorCode"=$5,"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3`,[actor.workspaceId,actor.userId,leaseId,missing ? machine.state : 'error',missing ? null : provisionErrorCode(error)])
     if (failed.rowCount) await machineCommitted(pool, actor.userId, actor.workspaceId)
     throw error
   }
+}
+
+function provisionErrorCode(error: unknown) {
+  const { code, name } = (error && typeof error === 'object' ? error : {}) as { code?: unknown; name?: unknown }
+  if (typeof code === 'string' && /^[a-zA-Z0-9_]{1,64}$/.test(code)) return code
+  return typeof name === 'string' && name !== 'Error' && /^\w{1,64}$/.test(name) ? name : 'provision_failed'
 }
 
 /** Built from another worker commit, and no live run is using its worker. */
