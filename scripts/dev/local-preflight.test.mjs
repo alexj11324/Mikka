@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -62,6 +62,69 @@ test('clean change has stable identity and preserves exact HEAD', t => {
   assert.equal(one.clean, true)
   assert.notEqual(one.head, one.base)
   assert.equal(evidenceIdentity(one), evidenceIdentity(changesFromGit(cwd, base)))
+})
+
+test('native executable modes survive committed, staged and unstaged diffs', t => {
+  for (const phase of ['committed', 'staged', 'unstaged']) {
+    const { cwd, base } = repo(t)
+    chmodSync(join(cwd, 'first.ts'), 0o755)
+    if (phase !== 'unstaged') runGit(cwd, 'add', 'first.ts')
+    if (phase === 'committed') runGit(cwd, 'commit', '--quiet', '-m', 'executable input')
+    const change = changesFromGit(cwd, base).changes.find(item => item.path === 'first.ts')
+    assert.equal(change.status, 'M', phase)
+    assert.equal(change.oldMode, '100644', phase)
+    assert.equal(change.mode, '100755', phase)
+    assert.match(change.oldObject, /^[a-f\d]{40}$/)
+    assert.match(change.newObject, /^[a-f\d]{40}$/)
+  }
+})
+
+test('new symlinks and executable files keep their actual type without following links', t => {
+  for (const staged of [false, true]) {
+    const { cwd, base } = repo(t)
+    symlinkSync('missing-target.ts', join(cwd, 'linked file.ts'))
+    writeFileSync(join(cwd, 'executable file.ts'), 'export {}\n', { mode: 0o755 })
+    if (staged) runGit(cwd, 'add', 'linked file.ts', 'executable file.ts')
+    const changes = changesFromGit(cwd, base).changes
+    assert.equal(changes.find(item => item.path === 'linked file.ts').mode, '120000')
+    assert.equal(changes.find(item => item.path === 'executable file.ts').mode, '100755')
+    assert(changes.every(item => item.status === 'A' && item.oldMode === '000000'))
+  }
+})
+
+test('a later regular content edit cannot erase earlier Git mode changes', t => {
+  const { cwd, base } = repo(t)
+  chmodSync(join(cwd, 'first.ts'), 0o755)
+  runGit(cwd, 'add', 'first.ts')
+  runGit(cwd, 'commit', '--quiet', '-m', 'executable input')
+  chmodSync(join(cwd, 'first.ts'), 0o644)
+  runGit(cwd, 'add', 'first.ts')
+  writeFileSync(join(cwd, 'first.ts'), 'export const number = 2\n')
+  assert.deepEqual(changesFromGit(cwd, base).changes.map(item => [item.oldMode, item.mode]), [
+    ['100644', '100755'], ['100755', '100644'], ['100644', '100644'],
+  ])
+})
+
+test('deletion remains visible when an untracked path reappears and newline paths fail closed', t => {
+  const { cwd, base } = repo(t)
+  runGit(cwd, 'rm', 'first.ts')
+  runGit(cwd, 'commit', '--quiet', '-m', 'remove tracked input')
+  writeFileSync(join(cwd, 'first.ts'), 'export {}\n')
+  assert(changesFromGit(cwd, base).changes.some(item => item.path === 'first.ts' && item.status === 'D'))
+  writeFileSync(join(cwd, 'unexpected\npath.ts'), 'export {}\n')
+  assert.throws(() => changesFromGit(cwd, base), /Newline paths require explicit review/)
+})
+
+test('mode changes are part of the exact local evidence identity', t => {
+  const { cwd, base } = repo(t)
+  chmodSync(join(cwd, 'first.ts'), 0o755)
+  const executable = changesFromGit(cwd, base)
+  chmodSync(join(cwd, 'first.ts'), 0o644)
+  writeFileSync(join(cwd, 'first.ts'), 'export const number = 2\n')
+  const regular = changesFromGit(cwd, base)
+  assert.equal(executable.head, regular.head)
+  assert.deepEqual(executable.changes.map(item => item.path), regular.changes.map(item => item.path))
+  assert.notEqual(evidenceIdentity(executable), evidenceIdentity(regular))
 })
 
 test('Nx suggested tests are affected-only, mandatory broad tasks stay for final CI', () => {

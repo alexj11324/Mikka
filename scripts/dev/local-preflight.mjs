@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -33,10 +33,11 @@ function diffEntries(raw) {
   const parts = raw.split('\0'); parts.pop()
   const changes = []
   for (let i = 0; i < parts.length; i += 2) {
-    const status = parts[i] || ''
+    const header = /^:([0-7]{6}) ([0-7]{6}) ([a-f\d]{40}) ([a-f\d]{40}) ([A-Z]\d*)$/.exec(parts[i] || '')
     const path = parts[i + 1]
-    if (!path || !status) throw new Error('Malformed git --name-status -z output')
-    changes.push({ path, status: status[0] })
+    if (!path || !header) throw new Error('Malformed git --raw -z output')
+    const [, oldMode, mode, oldObject, newObject, status] = header
+    changes.push({ path, status: status[0], oldMode, mode, oldObject, newObject })
   }
   return changes
 }
@@ -48,17 +49,23 @@ export function changesFromGit(root, base = 'origin/main') {
   if (!SHA_RE.test(head)) throw new Error('Invalid HEAD SHA')
   const ancestor = git(root, ['merge-base', base, 'HEAD']).trim()
   const source = [
-    git(root, ['diff', '--name-status', '--no-renames', '-z', `${ancestor}..HEAD`]),
-    git(root, ['diff', '--name-status', '--no-renames', '-z', '--cached']),
-    git(root, ['diff', '--name-status', '--no-renames', '-z']),
+    git(root, ['diff', '--raw', '--no-abbrev', '--no-renames', '-z', `${ancestor}..HEAD`]),
+    git(root, ['diff', '--raw', '--no-abbrev', '--no-renames', '-z', '--cached']),
+    git(root, ['diff', '--raw', '--no-abbrev', '--no-renames', '-z']),
   ]
   const entries = source.flatMap(diffEntries)
-  const untracked = git(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean).map(path => ({ path, status: 'A' }))
+  const untracked = git(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean).map(path => {
+    const file = lstatSync(join(root, path))
+    let mode = null
+    if (file.isSymbolicLink()) mode = '120000'
+    else if (file.isFile()) mode = file.mode & 0o100 ? '100755' : '100644'
+    return { path, status: 'A', oldMode: '000000', mode }
+  })
+  // Preserve distinct rows from every Git layer. A later regular edit must not
+  // hide an earlier mode, type or deletion; the original selector decides scope.
   const seen = new Map()
   for (const entry of [...entries, ...untracked]) {
-    const old = seen.get(entry.path)
-    if (old?.status === 'D') continue
-    seen.set(entry.path, entry)
+    seen.set(JSON.stringify(entry), entry)
   }
   const changes = [...seen.values()].sort((a, b) => a.path.localeCompare(b.path))
   if (changes.some(item => item.path.includes('\n'))) throw new Error('Newline paths require explicit review before Ready')
@@ -66,7 +73,7 @@ export function changesFromGit(root, base = 'origin/main') {
 }
 
 export function localTaskPlan(selection, explicitTests = []) {
-  const changedFiles = selection.files || []
+  const changedFiles = [...new Set(selection.files || [])]
   const scripts = selection.scripts || {}
   const suggested = [...new Set((selection.unit_tasks || [])
     .filter(t => t.reason === 'Nx reverse dependency')
@@ -116,7 +123,7 @@ async function currentPlan(root, options, snapshot) {
   const { buildGraph } = await import('../ci/graph.mjs')
   const { select } = await import('../ci/select.mjs')
   const graph = buildGraph(root)
-  const changes = snapshot.changes.map(item => ({ file: item.path, status: item.status, mode: '100644', oldMode: item.status === 'A' ? '000000' : '100644' }))
+  const changes = snapshot.changes.map(({ path, ...change }) => ({ file: path, ...change }))
   const selected = await select(graph, changes)
   return localTaskPlan({ ...selected, files: changes.map(item => item.file), scripts: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts }, options.tests)
 }
@@ -145,7 +152,7 @@ export async function main(argv = process.argv.slice(2), root = process.cwd()) {
   if (!options.tests.length && !plan.docsOnly) throw new Error('Supply --test=<existing-pnpm-script> after inspecting plan; no automatic full-suite fallback')
   let checks = options.tests.map(script => runScript(root, script, scripts))
   const result = { version: 1, sha: snapshot.head, identity: evidenceIdentity(snapshot),
-    base: snapshot.base, changedFiles: snapshot.changes.map(item => item.path), clean: snapshot.clean,
+    base: snapshot.base, changedFiles: plan.changedFiles, clean: snapshot.clean,
     fullSelection: plan.full, suggestedTasks: plan.suggested, affectedDb: plan.selectedDbSuites,
     checks, acceptance: null, waiver: options.reason, ready: false, observedAt: new Date().toISOString() }
   if (options.command === 'ready') {
