@@ -1,5 +1,3 @@
-import { ChatFileError } from '@/lib/chat-attachments/extract'
-import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
@@ -8,15 +6,12 @@ import { CHAT_FIRST_PAGE, chatUpdate, chatView } from '@/lib/coordinator/store'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { reactionsFor } from '@/lib/reactions'
 import { chatFailure } from '@/lib/chat-failure'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
-import { recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
 import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
-import { coordinatorHistory, pollCoordinatorChat, sendCoordinatorMessage } from '@/app/actions/coordinator'
+import { coordinatorHistory, pollCoordinatorChat } from '@/app/actions/coordinator'
 import { ActionFailureError } from '@/lib/action-error'
-import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
-import { MESSAGE_MAX } from '@/lib/message-limits'
-import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
+import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
 
 const botParam = z.uuid().nullable()
@@ -94,32 +89,6 @@ async function history(userId: string, page: Awaited<ReturnType<typeof chatView>
   return json({ items, sources: page.sources, artifacts: page.artifacts, historyBefore: page.historyBefore ?? null, reactions: await reactionsOf(userId, items) })
 }
 
-/** `submissionId` identifies one immutable send across mobile retries; older clients may omit it. */
-async function handlePOST(request: Request) {
-  const user = await mobileUser(request)
-  noteLogUser(user?.id)
-  if (!user) return unauthorized()
-  if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional(), submissionId: z.uuid().optional() })
-    .refine(value => Boolean(value.text || value.images?.length)).safeParse(await request.json().catch(() => null))
-  if (!parsed.success) return json({ error: 'messageRequired' }, 400)
-  const images = parsed.data.images?.length ? parsed.data.images : undefined
-  if (typeof user[tokenWorkspace] === 'string') {
-    if (!await tokenBotAllowed(user, parsed.data.botId ?? null)) return json({ error: 'botNotFound' }, 404)
-    // No bot named: the Coordinator of the token's workspace, resolved here where the message enters.
-    const botId = await openChatBotId(user, parsed.data.botId)
-    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images, submissionId: parsed.data.submissionId }) }
-    catch (error) {
-      if (error instanceof ChatFileError) return Response.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 400 })
-      if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
-      throw error
-    }
-    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
-    return json({ queued: true }, 202)
-  }
-  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)
-  return result.error ? json(result, 400) : json(result, 202)
-}
-
 export const GET = withRequestLog('/api/mobile/chat', handleGET)
-export const POST = withRequestLog('/api/mobile/chat', handlePOST)
+export const POST = withRequestLog('/api/mobile/chat', () =>
+  Response.json({ error: 'coordinatorSendRetired' }, { status: 410, headers: { 'Cache-Control': 'no-store' } }))

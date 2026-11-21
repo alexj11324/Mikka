@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { hasGitHubOrigin, privateMikkaRepository } from './cloudflare-source.mjs'
 import { childEnvironment, sourceContext, validateReceipt } from './cloudflare-ci.mjs'
 
 const publicSha = 'a'.repeat(40)
 const privateSha = 'b'.repeat(40)
-const githubApiEnvironment = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+const githubApiEnvironment = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: publicSha,
   GITHUB_WORKFLOW_SHA: publicSha, GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main',
   GITHUB_RUN_ID: '90001', GITHUB_RUN_ATTEMPT: '2', GITHUB_ACTOR: 'alexj11324', GITHUB_ACTOR_ID: '183887963',
@@ -198,4 +198,26 @@ test('the unified service producer retains the existing image qualification gate
     assert.ok(workflow.includes('  workflow_dispatch:'))
     assert.ok(!workflow.slice(0, workflow.indexOf('\npermissions:')).includes('  push:'), 'main builds have one producer: ' + name)
   }
+})
+
+
+test('a transferred public workflow retains the repository and actor pins while binding the new owner', () => {
+  const newRepository = 'aspectly-labs/Mikka'
+  const transferred = { ...env, GITHUB_REPOSITORY: newRepository, GITHUB_REPOSITORY_OWNER_ID: '359279274',
+    GITHUB_WORKFLOW_REF: newRepository + '/.github/workflows/cloudflare-api-image.yml@refs/heads/main' }
+  assert.equal(sourceContext(transferred, publicSha, privateSha).repository, newRepository)
+  assert.throws(() => sourceContext({ ...transferred, GITHUB_REPOSITORY_OWNER_ID: env.GITHUB_REPOSITORY_OWNER_ID }, publicSha, privateSha), /CI_PUBLIC_GITHUB_CONTEXT_REQUIRED/)
+  assert.throws(() => sourceContext({ ...transferred, GITHUB_WORKFLOW_REF: env.GITHUB_WORKFLOW_REF }, publicSha, privateSha), /CI_WORKFLOW_REQUIRED/)
+})
+
+test('private UI ownership can move independently of operations during the staged transfer', () => {
+  for (const privateOwner of ['', 'alexj11324', 'aspectly-labs']) {
+    for (const uiOwner of ['', 'alexj11324', 'aspectly-labs']) {
+      const env = { MIKKA_PRIVATE_GITHUB_OWNER: privateOwner, MIKKA_HOSTED_UI_GITHUB_OWNER: uiOwner }
+      assert.equal(privateMikkaRepository('mikka-hosted-ui', env), `${uiOwner || privateOwner || 'alexj11324'}/mikka-hosted-ui`)
+      assert.equal(privateMikkaRepository('mikka-cloud', env), `${privateOwner || 'alexj11324'}/mikka-cloud`)
+    }
+  }
+  assert.throws(() => privateMikkaRepository('mikka-hosted-ui', { MIKKA_HOSTED_UI_GITHUB_OWNER: 'foreign' }), /CI_PRIVATE_REPOSITORY_OWNER_REQUIRED/)
+  assert.throws(() => privateMikkaRepository('mikka-cloud', { MIKKA_PRIVATE_GITHUB_OWNER: 'foreign', MIKKA_HOSTED_UI_GITHUB_OWNER: 'aspectly-labs' }), /CI_PRIVATE_REPOSITORY_OWNER_REQUIRED/)
 })

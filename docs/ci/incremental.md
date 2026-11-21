@@ -50,6 +50,15 @@ imports in those scanners. The source job still runs the existing whole-reposito
 frontend source tests; this is deliberate retained coverage, not a performance
 claim.
 
+Site search runs the full root typecheck once through its existing `pnpm build`,
+before compiled HTTP acceptance. Its earlier preparation step retains generated
+route verification and lint. The same build/typecheck remains required on a
+standalone dispatch. Both PostgreSQL 17 services, Better Auth, authorization and
+HTTP assertions retain their independent runtime coverage. The separate Source
+checks job still owns unconditional repository-wide static validation; results
+from a different runner image or Node patch are not treated as identical-input
+cache hits. See the [recorded before sample](2984-site-search-checks.json).
+
 ## Trust and database boundaries
 
 CI calls `ci-selection.yml` once, then passes `selected: true` to each selected
@@ -120,7 +129,20 @@ CI_TIMINGS_FILE=/tmp/timings.json node scripts/ci/timings.mjs RUN_ID_1 RUN_ID_2
 ```
 
 CI prints areas, reasons, Nx affected projects/commands, suites and shard matrix.
-The stable gates record the final selected-job conclusion plus actual completed job durations from one read-only Actions API request. The timing summary labels partial runner consumption while other gates/jobs are still running; API failures explicitly leave timing unavailable, without replacing enforcement. Job/step timestamps
+The stable gates record the final selected-job conclusion plus completed job
+durations from read-only Actions metadata. Each gate reads its own
+`GITHUB_RUN_ATTEMPT`; the collector reads the latest attempt and paginates that
+attempt's jobs. Both use the attempt endpoint's `created_at` for elapsed and
+initial queue time. The receipt keeps the original run's `run_created_at` and
+`run_lifetime_seconds` separately, including earlier attempts and time before a
+retry. Per-job queue time starts at that job's `created_at`, excluding dependency
+wait. A successful job retained by a failed-job retry keeps its original
+timestamps and `retained_seconds`, with zero new execution and no new queue time.
+Only jobs executed in the measured attempt contribute to runner-minutes.
+
+The timing summary labels partial runner consumption while other gates/jobs are
+still running; API failures explicitly leave timing unavailable, without
+replacing enforcement. Job/step timestamps
 are available through the timing collector; [#1699's evidence](1699-results.md)
 separates waiting from runner consumption. `workflow_dispatch` and Monday 03:23
 UTC run the full CI even without source changes.

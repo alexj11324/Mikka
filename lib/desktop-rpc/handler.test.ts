@@ -156,7 +156,6 @@ test('registry schemas reject forged authority, malformed nested input and extra
     ['desktop.workspaceLink', ['valid-slug', { userId: peer }]],
     ['desktop.workspaceLink', ['../private']],
     ['workspace.switchWorkspace', [{ workspaceId: owner, ownerId: peer }]],
-    ['coordinator.sendCoordinatorMessage', ['hello', null, null, owner, { kind: 'device', deviceId: 'invalid' }]],
     ['issue-metadata.updateIssueMetadata', [{ id: owner, revision: 1, patch: { userId: peer } }]],
     ['account.changePassword', [{ currentPassword: 'password', newPassword: 'password', userId: peer }]],
     ['workspace-secrets.createSecret', [{ name: 'KEY', kind: 'secret', value: 'fixture', scope: { type: 'repository', repository: {} } }]],
@@ -237,33 +236,8 @@ test('Task presentation batch rejects forged authority and oversized input befor
   assert.equal(calls, 2, 'empty and bounded inputs still enter the reader and its membership checks')
 })
 
-test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
-  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
-  const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]
-  for (const args of [['hello'], legacy, [...legacy, undefined], [...legacy, peer], [...legacy, peer.toUpperCase()]]) {
-    assert.equal(schema.safeParse(args).success, true)
-  }
-  for (const expected of [null, '', 'invalid', { workspaceId: peer }, { userId: owner }]) {
-    assert.equal(schema.safeParse([...legacy, expected]).success, false)
-  }
-  assert.equal(schema.safeParse([...legacy, peer, { admin: true }]).success, false)
-})
-
-test('Coordinator task titles cross the shared Web and desktop RPC boundary', () => {
-  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
-  const args = ['Task description', null, null, owner, undefined, undefined, undefined, undefined, undefined]
-  for (const workspaceId of [undefined, peer]) {
-    const parsed = schema.safeParse([...args, workspaceId, '  修复登录后回跳  '])
-    assert.equal(parsed.success, true)
-    if (parsed.success) {
-      assert.ok(Array.isArray(parsed.data))
-      assert.equal(parsed.data[10], '修复登录后回跳')
-    }
-    for (const title of ['', ' ', 'x'.repeat(61), 'two\nlines', null, { admin: true }]) {
-      assert.equal(schema.safeParse([...args, workspaceId, title]).success, false)
-    }
-  }
-  assert.equal(schema.safeParse([...args, peer, 'Title', { admin: true }]).success, false)
+test('retired Coordinator submission has no registered RPC schema', () => {
+  assert.equal(Object.hasOwn(desktopActionSchemas, 'coordinator.sendCoordinatorMessage'), false)
 })
 
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {

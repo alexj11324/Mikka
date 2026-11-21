@@ -21,7 +21,7 @@ test('reads the commit production serves through the alias', async () => {
 
 const OTHER = 'b'.repeat(40)
 const webRun = overrides => ({ id: 70, run_attempt: 2, head_sha: SHA, head_branch: 'main', path: '.github/workflows/web-deploy.yml',
-  repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' },
+  repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } }, head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } },
   event: 'push', status: 'completed', conclusion: 'success', ...overrides })
 const buildJob = overrides => ({ name: 'deploy', head_sha: SHA, status: 'completed', conclusion: 'success',
   steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
@@ -43,7 +43,7 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], publisher = 'ac
         assert.equal(url.searchParams.get('branch'), 'main')
         return Response.json({ workflow_runs: runs(elapsed) })
       }
-      assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/2/jobs')
+      assert.equal(url.pathname, '/repositories/1427517699/actions/runs/70/attempts/2/jobs')
       return Response.json({ total_count: 1, jobs: [typeof job === 'function' ? job(elapsed, value => { elapsed = value }) : job] })
     }
     assert.equal(input, PRODUCTION_VERSION_URL)
@@ -492,4 +492,23 @@ test('a ninety-minute wait stops while required Web step evidence remains pendin
   assert.equal(fixture.elapsed(), 90 * 60_000)
   assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0,
     'matching public output cannot replace unfinished required Web step evidence')
+})
+
+
+test('Web evidence uses immutable repository API routes and accepts the transferred canonical comparison', async () => {
+  const repository = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
+  const f = webFixture({ runs: () => [webRun({ repository, head_repository: repository })] })
+  assert.equal((await f.run()).webRunId, 70)
+  assert.ok(f.calls.filter(call => call.origin === 'https://api.github.com')
+    .every(call => call.path.startsWith('/repositories/1427517699/')))
+  assert.equal(await containsDesktopSource({ expectedBuild: SHA, publicCommit: OTHER, token: 'fixture',
+    fetchImpl: async input => {
+      assert.equal(new URL(input).pathname, '/repositories/1427517699/compare/' + SHA + '...' + OTHER)
+      return Response.json({ url: 'https://api.github.com/repos/aspectly-labs/Mikka/compare/' + SHA + '...' + OTHER,
+        base_commit: { sha: SHA }, merge_base_commit: { sha: SHA }, status: 'ahead', ahead_by: 1, behind_by: 0 })
+    } }), true)
+  for (const wrong of [{ ...repository, id: 42 }, { ...repository, owner: { id: 183887963 } },
+    { ...repository, full_name: 'foreign/Mikka' }]) {
+    await assert.rejects(webFixture({ runs: () => [webRun({ repository: wrong, head_repository: wrong })], budget: 1 }).run(), /matchingWebDeploymentTimedOut/)
+  }
 })

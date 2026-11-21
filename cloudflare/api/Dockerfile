@@ -14,7 +14,7 @@ COPY --from=release --chown=node:node /lib/ ./lib/
 COPY --from=release --chown=node:node /packages/ ./packages/
 COPY --from=release --chown=node:node /scripts/ ./scripts/
 COPY --from=release --chown=node:node /mikka-build.json /world-business.mjs ./
-COPY --chown=node:node start.mjs ./
+COPY --chown=node:node start.mjs ops-alert-forwarder.mjs ./
 RUN ln -s server/node_modules node_modules
 USER node
 RUN --network=none node start.mjs verify-image

@@ -83,10 +83,16 @@ trusted workflow itself starts automatically only after it exists on `main`.
 
 There are two intentionally different classes of PR checks:
 
-- **Required checks always run**, even on drafts: `UI policy (strict)`,
-  `Production build and browser interactions`, `Browser tests (before merge)`
-  and external GitGuardian. A skipped required job can be reported as
-  successful by GitHub, so draft status must never authorize a bypass.
+- **Required check names never become false green on drafts**: in the main `CI`
+  workflow, the lightweight selector and required aggregators (`UI policy
+  (strict)`, `Production build and browser interactions`) run on Draft PRs;
+  those aggregators explicitly **fail** until the PR is Ready. Core, Integration,
+  Source, Daemon, Analytics, Governance and DB runner-heavy jobs are deferred.
+  `ready_for_review` re-runs the complete applicable protected verification
+  even if the commit SHA has not changed. `Browser tests (before merge)` and
+  external GitGuardian retain their original workflows. A skipped required
+  job can be reported successful by GitHub; these named aggregators must never
+  skip or accept the draft as complete.
 - **Non-required specialized acceptances** (`E2B additive runtime release`
   offline PR test, E2B subscription custody, Read cache API acceptance,
   SSH device backend, Site search read contract and Unattended sandbox
@@ -100,8 +106,10 @@ There are two intentionally different classes of PR checks:
   and TestFlight-oriented review. Other specialized evidence may have its
   own intentional manual or source-version trigger.
 
-This reduces runner allocation without mistaking a draft-only skipped result
-for proof that a ready PR is safe to merge.
+This reduces runner allocation during the local red→green cycle without
+mistaking a draft-only skipped result for proof that a Ready PR is safe to
+merge. Draft check failure means "not yet a merge candidate," not an ordinary
+product regression. Main pushes and merge groups continue normal full coverage.
 
 ## Main pushes: postmerge checks
 
@@ -177,6 +185,16 @@ dispatch of **E2B additive runtime release** on current main with `reason` and
 `cloudflare_receipt` also starts it; a dispatch without a receipt fails before
 any template builder starts. Every gate rechecks the receipt against the live
 gateway and current main.
+
+The Coding Workspace, Task VM and Task Secret consumers accept this official
+producer's `workflow_run` event alongside its retained push/manual events. The
+event is only a pointer: their pre-checkout and shared guards confirm the fixed
+workflow identity, repository, exact main source and latest attempt through the
+GitHub API. Existing source selection, publication evidence and pre-credential
+checks still apply. A successful run with skipped publication does not prove a
+validated and published runtime. The finite Factory visual-evidence window
+below keeps its separate selection rules. The source-bound counterexample and
+retained refusal cases are recorded in the [#2984 evidence](../../docs/ci/2984-runtime-consumers.json).
 
 To retry after an external service recovers, dispatch the same way; the Actions
 dispatch event records the reason. Manual dispatch always runs validation, even for a matching worker. Changed
@@ -317,6 +335,10 @@ and [measured results](../../docs/ci/1699-results.md).
 
 Selected reusable jobs consume CI's trusted decision without running another
 selector. The Analytics conclusion contributes to `UI policy (strict)`.
+The actual Analytics build, SSR checks and browser run own the `analytics-ssr`
+check name; no second runner summarizes that job. An absent or invalid trusted
+selection fails before setup, and the parent gate rejects selected runs that
+fail, cancel or skip. See the [measured queue samples](../../docs/ci/2984-analytics-baseline.json).
 Independent dispatches still classify their changes.
 Desktop checks and Electron acceptance run on Linux. Mac packaged acceptance,
 local-driver permission probes and installer acceptance are removed from CI;

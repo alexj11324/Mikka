@@ -347,6 +347,22 @@ test('the private LiteLLM bridge forwards only the model routes with their auth 
   assert.equal(seen.length, 7)
 })
 
+test('only a validated hosted correlation tag crosses the private LiteLLM transport and the original ACK is untouched', async () => {
+  const { liteLlmRequest } = await import('../../../cloudflare/api/ingress/services.mjs')
+  const callId = 'mikka-hosted:00000000-0000-4000-8000-000000000001:wrun_native:step_model:1'
+  let received
+  const response = new Response('paid stream', { headers: { 'x-litellm-call-id': callId, 'x-litellm-response-cost': '0' } })
+  const binding = { fetch: async request => { received = request; return response } }
+  const request = value => new Request('https://litellm.internal/v1/chat/completions', {
+    method: 'POST', body: '{}', headers: { authorization: 'Bearer internal', 'x-litellm-call-id': value },
+  })
+  assert.equal(await liteLlmRequest(request(callId), binding), response)
+  assert.equal(received.headers.get('x-litellm-call-id'), callId)
+  received = undefined
+  assert.equal((await liteLlmRequest(request('untrusted arbitrary value'), binding)).status, 400)
+  assert.equal(received, undefined)
+})
+
 test('the API binds the LiteLLM service only when a release names one, and the service exposes only model routes', async () => {
   const input = { release: id, origin: 'https://test.example', image: 'registry.cloudflare.com/' + '0'.repeat(32) + '/mikka-api@sha256:' + '2'.repeat(64) }
   assert.equal(ingressConfig(input).services, undefined)

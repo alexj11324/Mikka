@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assessAudit } from './audit-policy.mjs'
@@ -9,12 +10,26 @@ import { artifactInventory, pinRuntime, sealArtifact, stageDesktop, verifyArtifa
 import { workspaceSbom } from './workspace-sbom.mjs'
 
 const sourceSha = 'a'.repeat(40), repository = 'alexj11324/Mikka'
+
+test('API image merge queue admission is confined to the paired bot identity on main push', async () => {
+  const yaml = createRequire(import.meta.url)('js-yaml')
+  const workflow = yaml.load(await readFile(new URL('../../.github/workflows/cloudflare-api-image.yml', import.meta.url), 'utf8'))
+  const allowed = new Function('github', `return ${workflow.jobs['service-plan'].if}`)
+  const github = { repository_id: '1427517699', repository_owner_id: '359279274', ref: 'refs/heads/main', event_name: 'push',
+    actor_id: '118344674', actor: 'github-merge-queue[bot]', triggering_actor: 'github-merge-queue[bot]' }
+  assert.equal(allowed(github), true)
+  assert.equal(allowed({ ...github, triggering_actor: 'alexj11324' }), true)
+  assert.equal(allowed({ ...github, actor_id: '183887963', actor: 'alexj11324', triggering_actor: 'alexj11324' }), true)
+  for (const patch of [{ event_name: 'workflow_dispatch' }, { event_name: 'pull_request' }, { ref: 'refs/heads/feature' },
+    { repository_id: '7' }, { repository_owner_id: '7' }, { actor_id: '7' }, { actor: 'outsider' },
+    { actor_id: undefined }, { triggering_actor: 'outsider' }]) assert.equal(allowed({ ...github, ...patch }), false)
+})
 const identity = { repository, sha: sourceSha, runId: '42', kind: 'github-actions-main' }
 const run = (workflow, extra = {}) => ({ id: 1, head_sha: sourceSha, event: 'push', head_branch: 'main',
-  repository: { full_name: repository }, path: `.github/workflows/${workflow}`, status: 'completed', conclusion: 'success', ...extra })
+  repository: { id: 1427517699, full_name: repository, owner: { id: 183887963 } }, path: `.github/workflows/${workflow}`, status: 'completed', conclusion: 'success', ...extra })
 
 test('release identity and exact-SHA checks reject fork/PR/old checks and a newer failed run', async () => {
-  const env = { GITHUB_REPOSITORY: repository, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'push', GITHUB_SHA: sourceSha, GITHUB_RUN_ID: '42' }
+  const env = { GITHUB_REPOSITORY: repository, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'push', GITHUB_SHA: sourceSha, GITHUB_RUN_ID: '42' }
   assert.deepEqual(releaseIdentity(env), identity)
   // A release started by the Cloudflare gateway observation keeps the same main-commit identity.
   assert.deepEqual(releaseIdentity({ ...env, GITHUB_EVENT_NAME: 'workflow_run' }), identity)
@@ -34,6 +49,28 @@ test('release identity and exact-SHA checks reject fork/PR/old checks and a newe
   await assert.rejects(waitForReleaseChecks(identity, { token: 'unit-fixture-only', timeoutMs: 0,
     fetchImpl: async () => Response.json({ workflow_runs: [] }) }), /releaseChecksIncomplete/)
   await assert.rejects(waitForReleaseChecks(identity, { token: 'unit-fixture-only', fetchImpl: async () => new Response(null, { status: 403 }) }), /releaseChecksUnavailable/)
+})
+
+test('native release identity admits only the coherent transferred repository and retains original checks', async () => {
+  const env = { GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+    GITHUB_REPOSITORY_OWNER_ID: '359279274', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'push',
+    GITHUB_SHA: sourceSha, GITHUB_RUN_ID: '42' }
+  const transferred = releaseIdentity(env)
+  assert.equal(transferred.repository, 'aspectly-labs/Mikka')
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '42' }, { GITHUB_REPOSITORY_OWNER_ID: '183887963' },
+    { GITHUB_REPOSITORY: 'foreign/Mikka' }, { GITHUB_REPOSITORY_OWNER_ID: '' }]) {
+    assert.throws(() => releaseIdentity({ ...env, ...patch }), /releaseMainIdentityRequired/)
+  }
+  assert.equal(checkWorkflowRuns(transferred, RELEASE_WORKFLOWS[0], [run(RELEASE_WORKFLOWS[0])]).state, 'success')
+  for (const repository of [{ id: 42, full_name: 'aspectly-labs/Mikka' },
+    { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 183887963 } }]) {
+    assert.equal(checkWorkflowRuns(transferred, RELEASE_WORKFLOWS[0], [run(RELEASE_WORKFLOWS[0], { repository })]).state, 'pending')
+  }
+  await waitForReleaseChecks(transferred, { token: 'fixture', fetchImpl: async (url, options) => {
+    assert.equal(options.redirect, 'error')
+    assert.equal(url.pathname, '/repositories/1427517699/actions/workflows/ui-policy.yml/runs')
+    return Response.json({ workflow_runs: [run(RELEASE_WORKFLOWS[0])] })
+  } })
 })
 
 test('artifact, SBOM, source, source-lock and trusted manifest digest stay bound across publication/rollback', async () => {
@@ -172,5 +209,21 @@ test('third-party actions in workflows and local composite actions use immutable
         if (!ref.startsWith('./')) assert.match(ref, /^[^@]+@[a-f0-9]{40}$/, `${folder}/${name}: ${ref}`)
       }
     }
+  }
+})
+
+test('sealed artifacts retain either approved repository name across a transfer', async t => {
+  const { rm } = await import('node:fs/promises')
+  const root = await mkdtemp(join(tmpdir(), 'release-transfer-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const directory = join(root, 'artifact'), sourceLock = join(root, 'lock')
+  await mkdir(directory)
+  await writeFile(sourceLock, 'fixture-lock')
+  await writeFile(join(directory, 'sbom.cdx.json'), JSON.stringify({ bomFormat: 'CycloneDX', metadata: { component: { name: 'mikka', version: '1.0.0' } }, components: [] }))
+  for (const repository of ['alexj11324/Mikka', 'aspectly-labs/Mikka', 'foreign/Mikka']) {
+    const sealed = await sealArtifact({ directory, sourceSha, identity: { ...identity, repository }, sourceLock })
+    const input = { directory, sourceSha, sourceLock, buildRunId: identity.runId, expectedManifestSha256: sealed.sha256 }
+    if (repository === 'foreign/Mikka') await assert.rejects(verifyArtifact(input), /releaseSourceMismatch/)
+    else assert.equal((await verifyArtifact(input)).sourceSha, sourceSha)
   }
 })

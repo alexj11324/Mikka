@@ -20,11 +20,12 @@ Use this guide to prepare, verify and submit changes to Mikka.
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
   or `ci`.
-- For code changes, run the source checks in cloud Linux before you push.
+- **Debug before requesting final CI.** Work in isolated cloud Linux, not on the developer's Mac. While editing, run the affected lint, type, unit, database and real API/CLI entry-point checks red→green; do not wait on GitHub Actions to discover ordinary HTTP, schema, generated-code or daemon failures. Push small commits to a Draft PR for recovery, and continue local debugging while its fast fail-closed checks execute. Before marking Ready, run `pnpm check`, an affected local build when needed, and the real changed-flow acceptance against isolated dependencies; record exact commands, exits and source. The final protected CI then independently verifies the candidate.
 
   ```sh
   pnpm install
-  pnpm check
+  # During development: affected checks and local runtime/API/CLI red→green
+  # Before Ready: complete the relevant local acceptance and pnpm check
   ```
 
 - Work is assigned through a GitHub issue to one agent, who owns it end to
@@ -85,6 +86,8 @@ code rejected.
 
 ## How changes are tested
 
+**Local change scope before CI.** Start with `pnpm local:plan` in the task's Linux development machine; it reuses the existing Nx/CI affected graph instead of adding a second test mapping. Execute focused existing package scripts with `pnpm local:check --test=<script>`, and use actual API/CLI/daemon/PG/UI acceptance for behavior changes. After commit, run `pnpm local:ready --test=<script> --accept=test:local-loop` (or `--report=<local-acceptance-report>`); for genuinely non-product changes, record `--no-product-change='tooling: <why>'` instead. `pnpm local:mark-ready --pr=<number>` verifies the saved exact-SHA local evidence before invoking `gh pr ready`. The evidence is ignored local metadata and cannot replace independent CI or truthful PR evidence. See `.agents/skills/local-first/SKILL.md` and the existing `docs/acceptance.md` for legitimate reuse and external-only exceptions.
+
 Slow checks run less often and later. Each layer catches what the one before
 cannot.
 
@@ -95,13 +98,17 @@ cannot.
    traffic. Exercise the changed flow through the API and CLI with the local
    database and daemon when relevant. See the
    [development workflow](docs/dev-workflow.md).
-2. **Every pull request and push to main** (CI, `ui-policy.yml`): trusted
+2. **Ready pull requests, merge groups and main pushes** (CI, `ui-policy.yml`): trusted
    Nx Core selection runs affected unit, daemon and PostgreSQL suites plus the
-   existing source/security policies. PR checks use GitHub's synthetic merge
-   candidate; the full DB inventory is validated even when execution is skipped.
-   Selected DB suites keep PG17 isolation, clone databases and strict no-skip
-   summaries across 1–4 dynamic shards. Required gate names stay stable; every
-   selected lane must succeed. Weekly and manual runs cover the full inventory.
+   existing source/security policies. A Draft PR still runs its lightweight selector
+   and named aggregate checks, which **fail explicitly** until Ready; it does not
+   allocate the expensive Core, Integration, Source, Daemon or database runners.
+   `ready_for_review` runs the full selected verification at the same source SHA.
+   Ready PR checks use GitHub's synthetic merge candidate; the complete DB
+   inventory is validated even when DB execution is not selected. Selected DB
+   suites keep PG17 isolation, clone databases and strict no-skip summaries
+   across 1–4 dynamic shards. Required gate names stay stable; every selected
+   lane must succeed. Weekly and manual runs cover the full inventory.
    See the [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
@@ -138,15 +145,18 @@ preserved evidence before deleting any test. See
 
 ### Draft PR checks
 
-Keep work-in-progress pull requests as drafts. Mandatory CI and security
-checks still run on draft heads because GitHub counts conditionally skipped
-required checks as successful; we do not replace merger proof with that
-status. Standalone non-required HTTP, runtime, E2B, search and SSH checks may
-defer runner allocation while drafting. Mark a PR **Ready for review** when
-its source and focused proof are ready: the `ready_for_review` event triggers
-all applicable deferred checks on the current head without requiring a
-meaningless new commit. Every real selected acceptance still has to pass
-before the PR can merge, including exact-source production release gates.
+Keep work-in-progress pull requests as drafts to preserve independent pushed
+checkpoints. On Draft source changes the required `CI` check **does run but
+fails closed by design**, with expensive selected runner work deferred; GitHub
+can treat an ordinary skipped required job as successful, so the required
+aggregate check must never be skipped or shown green for a Draft. External
+GitGuardian remains active. Standalone non-required HTTP, runtime, E2B,
+search and SSH checks may also defer while drafting. Mark a PR **Ready for
+review** only after local red→green, affected build and actual flow acceptance
+are recorded: the `ready_for_review` event runs all applicable selected
+protected checks on the same code SHA without a meaningless new commit.
+Every real selected acceptance still must pass before Merge, including
+exact-source production release gates.
 
 ### Before asking Alex: look at how leading products do it
 

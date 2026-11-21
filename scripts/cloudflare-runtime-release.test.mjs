@@ -34,7 +34,7 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
 api.publicBuildSettings = { publicSha, privateSha: overlaySha, publication: 'registry-only', NEXT_PUBLIC_POSTHOG_KEY: 'public-analytics',
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_public', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'public-turnstile', NEXT_PUBLIC_COMPUTER_ENABLED: '1' }
 api.publicBuildSettingsSha256 = createHash('sha256').update(JSON.stringify(api.publicBuildSettings)).digest('hex')
-const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: publicSha,
   GITHUB_WORKFLOW_SHA: publicSha, GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-eve-image.yml@refs/heads/main',
   GITHUB_ACTOR: 'alexj11324', GITHUB_ACTOR_ID: '183887963', GITHUB_TRIGGERING_ACTOR: 'alexj11324',
@@ -471,4 +471,15 @@ test('hosted model budget backport admits only the reviewed constant and restore
     assert.equal(normal.status, 0, normal.stderr)
     assert.equal((await readFile(environment.COMPILED_POLICY_OBSERVATION, 'utf8')).split(' ')[0], sha(original), 'absent input keeps the original compiler path')
   } finally { await rm(work, { recursive: true, force: true }) }
+})
+
+
+test('an organization runtime publisher accepts an unchanged protected API receipt from before transfer', () => {
+  const repository = 'aspectly-labs/Mikka'
+  const transferred = { ...env, GITHUB_REPOSITORY: repository, GITHUB_REPOSITORY_OWNER_ID: '359279274',
+    GITHUB_WORKFLOW_REF: repository + '/.github/workflows/cloudflare-eve-image.yml@refs/heads/main' }
+  const original = JSON.stringify(api)
+  assert.equal(releaseIdentity(transferred, 'eve', api).repository, repository)
+  assert.equal(JSON.stringify(api), original)
+  assert.throws(() => releaseIdentity(transferred, 'eve', { ...api, repository }), /cloudflare-api-image/)
 })

@@ -8,12 +8,14 @@ import { runtimeInputsDigest, pushRuntimeInputs, releaseDecision, findFailedInpu
 
 const digest = 'a'.repeat(40)
 const sha = 'b'.repeat(40)
+const repository = { full_name: 'alexj11324/Mikka', id: 1427517699, owner: { id: 183887963 } }
+const transferredRepository = { ...repository, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
 const options = { digest, token: 'test', currentRunId: 99 }
 const artifact = { name: `e2b-runtime-inputs-${digest}`, expired: false, created_at: '2026-11-09T20:01:00Z',
-  workflow_run: { id: 10, head_branch: 'main', head_sha: sha } }
+  workflow_run: { id: 10, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: sha } }
 const run = { id: 10, run_attempt: 2, head_sha: sha, head_branch: 'main', event: 'push',
   path: '.github/workflows/e2b-official-runtime.yml', status: 'completed', conclusion: 'failure',
-  run_started_at: '2026-11-09T20:00:00Z', repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' } }
+  run_started_at: '2026-11-09T20:00:00Z', repository, head_repository: repository }
 const buildStep = 'Build private versioned candidates and require official file conservation'
 const gateStep = 'Require real Claude Code and Codex subscriptions on the private candidates'
 function api({ artifacts = [artifact], previousRun = run, steps = [{ name: buildStep, conclusion: 'failure' }], pages = 1 } = {}) {
@@ -222,7 +224,7 @@ test('a Cloudflare promotion compares against the last published release, not th
 test('the last published source is the newest successful release whose templates were made public', async () => {
   const published = 'd'.repeat(40), publish = 'Make only fully accepted candidates public'
   const releaseRun = (id, headSha, extra = {}) => ({ id, run_attempt: 1, head_sha: headSha, head_branch: 'main', event: 'workflow_run',
-    path: '.github/workflows/e2b-official-runtime.yml', repository: { full_name: 'alexj11324/Mikka' }, ...extra })
+    path: '.github/workflows/e2b-official-runtime.yml', repository, ...extra })
   const runs = [releaseRun(30, 'e'.repeat(40), { event: 'push' }), releaseRun(29, 'f'.repeat(40)),
     releaseRun(28, 'c'.repeat(40), { path: '.github/workflows/other.yml' }), releaseRun(27, published, { event: 'workflow_dispatch' })]
   const jobs = { 29: [{ name: 'check', head_sha: 'f'.repeat(40), steps: [] }],
@@ -244,4 +246,43 @@ test('the last published source is the newest successful release whose templates
   jobs[27][0].steps[0].conclusion = 'skipped'
   assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), null)
   assert.equal(await lastPublishedSource({ token: 'test', fetchImpl, maxRuns: 1 }), null)
+})
+
+
+test('historical old and transferred failures are recognized through the immutable repository endpoint', async () => {
+  for (const recorded of [repository, transferredRepository]) {
+    const previousRun = { ...run, repository: recorded, head_repository: recorded }
+    const mock = api({ previousRun })
+    assert.equal(await findFailedInputs({ ...options, ...mock }), 10)
+    assert.ok(mock.calls.every(url => url.pathname.startsWith('/repositories/1427517699/')))
+    assert.equal(previousRun.repository.full_name, recorded.owner.id === 183887963 ? 'alexj11324/Mikka' : 'aspectly-labs/Mikka')
+  }
+})
+
+test('mixed and foreign historical identities cannot suppress a runtime retry', async () => {
+  for (const recorded of [
+    { ...repository, id: 1 }, { ...repository, full_name: 'foreign/Mikka' },
+    { ...repository, owner: { id: 359279274 } },
+    { ...repository, full_name: transferredRepository.full_name },
+  ]) {
+    for (const field of ['repository', 'head_repository'])
+      assert.equal(await findFailedInputs({ ...options, ...api({ previousRun: { ...run, [field]: recorded } }) }), null)
+  }
+})
+
+test('published source accepts official historical names and rejects incoherent repository claims', async () => {
+  for (const [recorded, expected] of [[repository, sha], [transferredRepository, sha],
+    [{ full_name: repository.full_name, id: repository.id }, sha],
+    [{ ...repository, id: 1 }, null], [{ ...repository, owner: { id: 359279274 } }, null],
+    [{ ...repository, full_name: 'foreign/Mikka' }, null]]) {
+    const fetchImpl = async input => {
+      const url = new URL(input)
+      assert.ok(url.pathname.startsWith('/repositories/1427517699/'))
+      return url.pathname.endsWith('/runs')
+        ? Response.json({ total_count: 1, workflow_runs: [{ ...run, event: 'workflow_run', repository: recorded }] })
+        : Response.json({ total_count: 1, jobs: [{ name: 'subscriptions', head_sha: sha,
+          steps: [{ name: 'Make only fully accepted candidates public', conclusion: 'success' }] }] })
+    }
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), expected)
+  }
 })
