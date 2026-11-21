@@ -812,6 +812,7 @@ export class CodexAdapter implements AgentAdapter {
         data: {
           ...usage,
           turnUsage,
+          model: runtimeModel ?? undefined,
           // Priced later with the LiteLLM table (ADR 0003).
           costUsd: null,
           source: "codex app-server thread/tokenUsage",

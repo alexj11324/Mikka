@@ -9,6 +9,9 @@ it("reports both cache buckets from the Claude result", () => {
   expect(claudeChunks(message)).toMatchObject([
     { type: "data-usage", data: { inputTokens: 10, outputTokens: 3, cacheReadTokens: 80, cacheWriteTokens: 20 } },
   ])
+  expect(claudeChunks(message, "claude-sonnet-5")).toMatchObject([
+    { type: "data-usage", data: { model: "claude-sonnet-5" } },
+  ])
 })
 
 // Claude Code 2.1.305's ToolSearch result for a `select:` query, as sent to the model.

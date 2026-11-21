@@ -65,11 +65,11 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       VALUES ($1,$2,$3,$4,$5,1,'codex_cli','gpt-5')`, [binding, admin, ws.id, agent, connection])
     await pool.query(`INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)`, [runId, binding])
-    const usage = (inputTokens: number, outputTokens: number) => ({ type: 'data-usage',
+    const usage = (inputTokens: number, outputTokens: number, model?: string) => ({ type: 'data-usage',
       data: { inputTokens: 999, outputTokens: 999, turnUsage: { inputTokens, outputTokens },
-        costUsd: 12, billingSource: 'credits', runId: otherRunId, messageId: 'forged-attribution' } })
+        costUsd: 12, billingSource: 'credits', runId: otherRunId, messageId: 'forged-attribution', model } })
     await send(runId, 1, [{ type: 'start', messageId }])
-    const tail = [usage(23, 7), { type: 'start', messageId: nextMessageId }, usage(9, 2)]
+    const tail = [usage(23, 7, 'gpt-6-luna'), { type: 'start', messageId: nextMessageId }, usage(9, 2)]
     await send(runId, 2, tail)
     await send(runId, 2, tail)
     await send(otherRunId, 2, tail)
@@ -77,10 +77,10 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const { rows } = await pool.query(`SELECT "usageRunId","usageThreadId","usageMessageId",model,"billingSource",
       "costMicroUsd","freeMicroUsd"::int AS free,"purchasedMicroUsd"::int AS purchased,"holdMicroUsd"::int AS held,
       "inputTokens"::int AS input,"outputTokens"::int AS output FROM hosted_usage WHERE "usageRunId"=ANY($1::uuid[]) ORDER BY id`, [[runId, otherRunId]])
-    const row = { usageRunId: runId, usageThreadId: runId, model: 'gpt-5', billingSource: 'subscription',
+    const row = { usageRunId: runId, usageThreadId: runId, billingSource: 'subscription',
       costMicroUsd: null, free: 0, purchased: 0, held: 0 }
-    assert.deepEqual(rows, [{ ...row, usageMessageId: messageId, input: 23, output: 7 },
-      { ...row, usageMessageId: nextMessageId, input: 9, output: 2 }])
+    assert.deepEqual(rows, [{ ...row, usageMessageId: messageId, model: 'gpt-6-luna', input: 23, output: 7 },
+      { ...row, usageMessageId: nextMessageId, model: 'unknown', input: 9, output: 2 }])
   })
   await t.test('Claude subscription input includes both prompt-cache buckets', async () => {
     const { POST } = await import('../app/v1/runs/[runId]/events/route')

@@ -44,8 +44,8 @@ function reportsExecution(chunk: Record<string, unknown>): boolean {
 }
 
 async function subscriptionRun(runId: string) {
-  const { rows: [run] } = await pool.query<{ workspaceId: string; ownerId: string; model: string; route: string }>(`
-    SELECT r."workspaceId",r."userId" AS "ownerId",b."modelId" AS model,b.route
+  const { rows: [run] } = await pool.query<{ workspaceId: string; ownerId: string; route: string }>(`
+    SELECT r."workspaceId",r."userId" AS "ownerId",b.route
     FROM byos_native_runs n JOIN agent_runs r ON r.id=n."runId"
     JOIN byos_bindings b ON b.id=n."bindingId"
     WHERE r.id=$1 AND r."workspaceId" IS NOT NULL`, [runId])
@@ -68,7 +68,10 @@ function subscriptionUsage(chunk: Record<string, unknown>, route: string) {
   const cacheReadTokens = codex ? null : cacheTokens(data.cacheReadTokens)
   const cacheWriteTokens = codex ? null : cacheTokens(data.cacheWriteTokens)
   const inputTokens = input + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0)
-  return Number.isSafeInteger(inputTokens) ? { inputTokens, outputTokens: output, cacheReadTokens, cacheWriteTokens } : null
+  if (!Number.isSafeInteger(inputTokens)) return null
+  const observed = typeof data.model === 'string' ? data.model.trim() : ''
+  const model = observed && observed.length <= 500 ? observed : 'unknown'
+  return { model, usage: { inputTokens, outputTokens: output, cacheReadTokens, cacheWriteTokens } }
 }
 
 export async function persistRunEventBatch(runId: string, fromSeq: number, input: Record<string, unknown>[], mask: Masker) {
@@ -92,15 +95,15 @@ export async function persistRunEventBatch(runId: string, fromSeq: number, input
     const fresh = freshChunks(chunks, fromSeq, inserted.map(row => row.seq))
     if (subscription) {
       for (const { seq } of inserted) {
-        const usage = subscriptionUsage(chunks[seq - fromSeq], subscription.route)
-        if (!usage) continue
+        const receipt = subscriptionUsage(chunks[seq - fromSeq], subscription.route)
+        if (!receipt) continue
         const { rows: [start] } = await tx.execute<{ messageId: string | null }>(sql`
           SELECT chunk->>'messageId' AS "messageId" FROM run_chunks
           WHERE "runId"=${runId} AND seq<${seq} AND chunk->>'type'='start'
           ORDER BY seq DESC LIMIT 1`)
         const messageId = start?.messageId && /^[\w.-]{1,200}$/.test(start.messageId) ? start.messageId : null
-        await recordExternalModelUsage(tx, { ...subscription, id: `subscription:${runId}:${seq}`, runId,
-          messageId, source: 'subscription', cost: null, usage })
+        await recordExternalModelUsage(tx, { ...subscription, ...receipt, id: `subscription:${runId}:${seq}`, runId,
+          messageId, source: 'subscription', cost: null })
       }
     }
     await recordLastReply(tx, runId, fresh, mask)
