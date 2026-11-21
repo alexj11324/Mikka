@@ -272,21 +272,6 @@ test('API requests stay in their effective workspace on thread, evidence, propos
     assert.equal((await pool.query('SELECT status FROM pending_actions WHERE id=$1', [others])).rows[0].status, 'pending')
   })
 
-  await t.test('local computer reviews: the list and a decision', async () => {
-    const route = await import('../app/api/devices/computer/route')
-    const reviews = [randomUUID(), randomUUID()]
-    await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=ANY($1::uuid[])`, [[ownRun, otherRun]])
-    try {
-      for (const [index, runId] of [ownRun, otherRun].entries()) {
-        await pool.query(`INSERT INTO local_computer_reviews (id,"deviceId","runId","userId",target,call,digest,"expiresAt","seenAt") VALUES ($1,$2,$3,$4,'screen','{}',$5,now()+interval '5 minutes',now())`, [reviews[index], device, runId, owner, String(index).repeat(64)])
-      }
-      const listed = await call(route.GET, '/api/devices/computer', {})
-      assert.deepEqual(listed.body.requests.map((item: { id: string }) => item.id), [reviews[0]])
-      assert.equal((await call(route.POST, '/api/devices/computer', {}, { id: reviews[1], digest: '1'.repeat(64), approve: true })).status, 409)
-      assert.equal((await pool.query('SELECT decision FROM local_computer_reviews WHERE id=$1', [reviews[1]])).rows[0].decision, null)
-    } finally { await pool.query(`UPDATE agent_runs SET status='succeeded',"leaseExpiresAt"=NULL WHERE id=ANY($1::uuid[])`, [[ownRun, otherRun]]) }
-  })
-
   await t.test('chat reactions and a Bot chat preference', async () => {
     const reactions = await import('../app/api/mobile/reactions/route')
     const botRoute = await import('../app/api/mobile/bots/[id]/route')

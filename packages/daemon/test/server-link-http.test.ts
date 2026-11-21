@@ -250,17 +250,7 @@ describe("HttpServerLink", () => {
     expect(() => new HttpServerLink('https://attacker.example/mikka', fetcher, '1', previewSecret)).toThrow('Invalid preview transport')
     expect(() => new HttpServerLink('http://fixture.vercel.app/mikka', fetcher, '1', previewSecret)).toThrow('Invalid preview transport')
   })
-  it("sends exact computer reviews over the authenticated device channel", async () => {
-    const id = crypto.randomUUID(), runId = crypto.randomUUID(), digest = 'a'.repeat(64)
-    const { fetch, calls } = scripted(call => call.path.endsWith('/register')
-      ? json({ deviceId: 'dev-1', workspaceId: crypto.randomUUID() }, 201)
-      : json({ decisions: [{ id, digest, approve: true }] }))
-    const link = new HttpServerLink('http://server.test', fetch)
-    await link.registerDevice('fixture-device-session', INFO)
-    const request = { id, runId, target: 'b'.repeat(64), display: ':2', call: { name: 'click' as const, arguments: { x: 3, y: 4 } }, expiresAt: Date.now() + 60000, digest }
-    expect(await link.syncComputerReviews('dev-1', [request])).toEqual([{ id, digest, approve: true }])
-    expect(calls[1]).toMatchObject({ method: 'POST', path: '/v1/devices/dev-1/computer', auth: 'Bearer fixture-device-session', body: { requests: [request] } })
-  })
+
   it("registers with the session and the client version header", async () => {
     const { fetch, calls } = scripted(() =>
       json({ deviceId: "dev-1", workspaceId: crypto.randomUUID() }, 201)
@@ -549,22 +539,6 @@ describe("mikka daemon login (device authorization)", () => {
   })
 })
 
-describe('HttpServerLink.decide', () => {
-  const request = { purpose: 'computer-action' as const, input: 'click Send', questions: [{ type: 'predicate' as const, name: 'safe', instructions: 'Is it safe?' }] }
-  it('posts the request to the run decision route and keys answers by name', async () => {
-    const { fetch, calls } = scripted(() => json({ answers: [{ type: 'predicate', name: 'safe', probability: 0.9 }, { type: 'choice', name: 'level', choice: 'low' }] }))
-    const answers = await new HttpServerLink('http://server.test', fetch).decide('run/1', request)
-    expect(calls[0]).toMatchObject({ method: 'POST', path: '/v1/runs/run%2F1/decision', body: request })
-    expect(answers?.get('safe')).toEqual({ type: 'predicate', name: 'safe', probability: 0.9 })
-    expect(answers?.get('level')).toEqual({ type: 'choice', name: 'level', choice: 'low' })
-  })
-  it('returns null for no decision, a refusal, a server error or a malformed response', async () => {
-    for (const response of [() => json({ answers: null }), () => json({ error: 'decisionUnavailable' }, 409), () => json({}, 503), () => json({ answers: [{ type: 'predicate', name: 'safe' }] }), () => { throw new TypeError('offline') }]) {
-      const { fetch } = scripted(response)
-      expect(await new HttpServerLink('http://server.test', fetch).decide('run-1', request)).toBeNull()
-    }
-  })
-})
 
 it('requests and decodes the initial repository only on the explicitly selected claim', async () => {
   const calls: { path: string; initial: string | null }[] = []

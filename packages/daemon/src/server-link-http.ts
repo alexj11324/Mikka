@@ -24,14 +24,12 @@ import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-g
 import { z } from "zod"
 import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
 import { ToolApprovalGate } from "./agents/tool-approval"
-import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { TASK_MCP_HEADER, TASK_MCP_VERSION } from '@mikka/protocol'
 import { nativeBrokerContextSchema, nativeLeaseSchema, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeBrokerRequest } from '@mikka/protocol/subscription'
-import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
 import {
@@ -206,17 +204,6 @@ export class HttpServerLink implements ServerLink {
     if (assignment.policy.networkCeiling) Object.freeze(assignment.policy.networkCeiling)
     Object.freeze(assignment.policy)
     return context
-  }
-  /** Asks the server's Decisions API for one run. Never throws; null on any failure. */
-  decide: ServerDecide = async (runId, request, signal) => {
-    const answer = z.discriminatedUnion('type', [
-      z.object({ type: z.literal('predicate'), name: z.string(), probability: z.number() }),
-      z.object({ type: z.literal('choice'), name: z.string(), choice: z.string() }),
-    ])
-    try {
-      const { answers } = await this.call('POST', `/v1/runs/${seg(runId)}/decision`, { body: request, schema: z.object({ answers: z.array(answer).nullable() }), signal, timeoutMs: 6000 })
-      return answers ? new Map<string, ServerDecisionAnswer>(answers.map(item => [item.name, item])) : null
-    } catch { return null }
   }
 
   async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
@@ -483,10 +470,6 @@ export class HttpServerLink implements ServerLink {
   }
   async validateSkillReceipt(runId:string,receiptId:string) {
     return this.call('GET',`/v1/runs/${seg(runId)}/skill-receipt?receiptId=${encodeURIComponent(checkId(receiptId))}`,{schema:skillReceiptRevalidationSchema})
-  }
-  async syncComputerReviews(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal) {
-    const result = await this.call("POST", computerSyncPath(checkId(deviceId)), { body: { requests }, schema: computerSyncResponse, signal })
-    return result.decisions
   }
   async localComputerAuthority(deviceId: string, runId: string) {
     return this.call('GET', `${devicePaths.claim(checkId(deviceId), checkId(runId)).replace(/\/claim$/, '')}/computer-authority`, {

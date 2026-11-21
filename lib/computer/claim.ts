@@ -51,7 +51,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
  * and to that run's own thread machine. Binding and claim use the same run row lock.
  * A run frozen on an API key has no subscription binding (null): its key
  * was checked and recorded for it by `validateRunApiKey` before the claim. */
-export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
+export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; permission: ComputerPermission } | null> {
   const { rows: [stored] } = await pool.query<{ workspaceId: string | null }>(
     'SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3',
     [runId, actor.userId, deviceId])
@@ -96,7 +96,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     taskActivityChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
-    return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, policyVersion: policy?.version ?? 0, permission }
+    return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, permission }
   } catch (error) { await client.query('ROLLBACK'); if (error instanceof ExecutionIdentityError) return null; throw error } finally { client.release() }
   })
 }

@@ -11,8 +11,6 @@ import { queueCloudRun } from '../../lib/computer/queue-run'
 import { ensureBotRuntime } from '../../lib/computer/bot-runtime'
 import { bindBotSubscription } from '../../lib/computer/bot-subscription'
 import { claimCloudRun } from '../../lib/computer/claim'
-import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
-import { computerSyncBody } from '@mikka/protocol/computer'
 
 let stage = 'initialize'
 async function main() {
@@ -32,7 +30,6 @@ async function main() {
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz, "sessionOpenedAt" timestamptz, "sessionClosedAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz)')
     await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     await pool.query(await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8'))
-    await pool.query(await readFile(new URL('../../drizzle/20261027164510_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027164511_cloud_device_scope.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027164512_cloud_worker_leases.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027164513_computer_run_approvals.sql', import.meta.url), 'utf8'))
@@ -56,7 +53,6 @@ async function main() {
     let renewed = false
     const replacement = `orv_${randomBytes(32).toString('base64url')}`
     const expectedHash = createHash('sha256').update(replacement).digest('hex')
-    const approved = new Set<string>(), operations: string[] = []
     const active = sandbox
     const observe = (async () => {
       while (!done) {
@@ -66,32 +62,20 @@ async function main() {
           const verified = await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1 AND "userId"=$2 AND "boundDeviceId"=$3 AND "boundWorkspaceId"=$4 AND "revokedAt" IS NULL RETURNING id', [item.hash, actor.userId, item.deviceId, actor.workspaceId])
           if (verified.rowCount) await pool.query('UPDATE devices SET "lastSeenAt"=now(),harnesses=$3 WHERE id=$1 AND "ownerId"=$2', [item.deviceId, actor.userId, JSON.stringify(item.harnesses)])
         }
-        if (observedDevice) {
-          const review = await active.files.read('/tmp/mikka-worker-review.json', { user: 'root' }).catch(() => null)
-          if (review) {
-            const snapshots = computerSyncBody.parse({ requests: JSON.parse(review) }).requests
-            let existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
-            if (snapshots.length && !renewed) {
-              // Switch credentials while a real task is waiting for approval.
-              await active.files.write('/tmp/mikka-worker-renewal.next', JSON.stringify({ credential: replacement }), { user: 'user' })
-              await active.commands.run('mv /tmp/mikka-worker-renewal.next /tmp/mikka-worker-renewal.json', { user: 'user' })
-              const deadline = Date.now() + 50_000
-              while (Date.now() < deadline && !renewed) {
-                const current = await active.files.read('/tmp/mikka-worker-registration.json', { user: 'root' }).catch(() => null)
-                renewed = Boolean(current && JSON.parse(current).hash === expectedHash)
-                if (!renewed) await new Promise(resolve => setTimeout(resolve, 500))
-              }
-              assert.ok(renewed, 'worker re-registers with the replacement while the task is active')
-              existing = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
+        // Switch credentials while the task is mid-flight: first desktop
+        // activity proves the leased worker is executing its run.
+        if (observedDevice && !renewed) {
+          const desktop = await active.files.read('/tmp/mikka-xev.log', { user: 'root' }).catch(() => null)
+          if (desktop?.trim()) {
+            await active.files.write('/tmp/mikka-worker-renewal.next', JSON.stringify({ credential: replacement }), { user: 'user' })
+            await active.commands.run('mv /tmp/mikka-worker-renewal.next /tmp/mikka-worker-renewal.json', { user: 'user' })
+            const deadline = Date.now() + 50_000
+            while (Date.now() < deadline && !renewed) {
+              const current = await active.files.read('/tmp/mikka-worker-registration.json', { user: 'root' }).catch(() => null)
+              renewed = Boolean(current && JSON.parse(current).hash === expectedHash)
+              if (!renewed) await new Promise(resolve => setTimeout(resolve, 500))
             }
-            for (const request of snapshots) if (!approved.has(request.id)) {
-              if (approved.size === 0) assert.equal(await decideComputerReview(pool, actor, request.id, request.digest, true, 'run'), true)
-              else assert.ok(existing.some(decision => decision.id === request.id && decision.digest === request.digest && decision.approve), 'later operation receives this run’s approval')
-              approved.add(request.id); operations.push(request.call.name)
-            }
-            const decisions = await syncComputerReviews(pool, observedDevice, actor.userId, snapshots)
-            await active.files.write('/tmp/mikka-worker-decisions.next', JSON.stringify(decisions), { user: 'user' })
-            await active.commands.run('mv /tmp/mikka-worker-decisions.next /tmp/mikka-worker-decisions.json', { user: 'user' })
+            assert.ok(renewed, 'worker re-registers with the replacement while the task is active')
           }
         }
         await new Promise(resolve => setTimeout(resolve, 500))
@@ -113,8 +97,8 @@ async function main() {
       assert.deepEqual(await ensureBotRuntime(pool, actor, bot.id, sandbox, worker.deviceId), runtimes)
       stage = 'install guarded driver probe'
       await sandbox.files.write('/home/user/.mikka/driver-probe.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'user' })
-      await sandbox.files.write('/home/user/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)},policyVersion:Number(process.argv[2])});\n`, { user: 'user' })
-      const probe = (version = 0) => sandbox!.commands.run(`node /home/user/.mikka/guard-probe.mjs ${version}`, { user: 'user', timeoutMs: 30_000 })
+      await sandbox.files.write('/home/user/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'user' })
+      const probe = () => sandbox!.commands.run(`node /home/user/.mikka/guard-probe.mjs`, { user: 'user', timeoutMs: 30_000 })
       stage = 'deny agent while person controls'
       await store.operate(actor, bot.id, 'takeover')
       const before = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'user' })
@@ -123,7 +107,7 @@ async function main() {
       assert.equal(after.stdout, before.stdout)
       await store.operate(actor, bot.id, 'handback')
       stage = 'deny another Bot'
-      await sandbox.files.write('/home/user/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)},policyVersion:0});\n`, { user: 'user' })
+      await sandbox.files.write('/home/user/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)}});\n`, { user: 'user' })
       await assert.rejects(sandbox.commands.run('node /home/user/.mikka/wrong-bot-probe.mjs', { user: 'user', timeoutMs: 30_000 }))
       stage = 'allow agent after handback'
       await probe()
@@ -137,8 +121,7 @@ async function main() {
       await store.operate(actor, bot.id, 'wake')
       await assert.rejects(probe(), 'waking must not bypass the workspace denial')
       await store.setPolicy(actor.workspaceId, 'allow')
-      await assert.rejects(probe(), 'a stale run stays blocked after re-enablement')
-      await probe(2)
+      await probe()
       stage = 'serialize takeover with an active operation'
       await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/user/.mikka/lock-held; exec sleep 2'", { user: 'user', background: true, timeoutMs: 0 })
       await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/user/.mikka/lock-held && exit 0; sleep .1; done; exit 1', { user: 'user', timeoutMs: 7_000 })
@@ -177,13 +160,12 @@ async function main() {
       }
       assert.equal(completion?.stopReason, 'submitted')
       assert.ok(renewed)
-      assert.deepEqual(operations, ['get_desktop_state', 'click', 'press_key', 'scroll'])
       const desktopEvents = await sandbox.files.read('/tmp/mikka-xev.log', { user: 'root' })
       assert.match(desktopEvents, /keysym[^\n]*Tab/, 'the approved key reached the desktop window')
       assert.match(desktopEvents, /button 5/, 'the approved scroll reached the desktop window')
       const event = JSON.parse(await sandbox.files.read('/tmp/mikka-worker-computer-event.json', { user: 'root' }))
       assert.deepEqual(event, { type: 'data-computer', data: { botId: bot.id, runId, task: 'FULL_COMPUTER', state: 'working' } })
-      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, workspacePolicyDeniesDriver: true, workspacePolicyWaitsForOperation: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotClickKeyScrollApproved: true, keyboardAndScrollReachedWindow: true, computerEventMatchesBot: true }))
+      console.log(JSON.stringify({ syntheticRegistration: true, workerReused: true, credentialPrivate: true, credentialRenewed: true, pinnedSource: true, otherBotDenied: true, taskLeasePrivate: true, workspacePolicyDeniesDriver: true, workspacePolicyWaitsForOperation: true, takeoverDeniesAgent: true, handbackAllowsAgent: true, takeoverWaitsForOperation: true, syntheticBotTaskSubmitted: true, screenshotClickKeyScrollExecuted: true, keyboardAndScrollReachedWindow: true, computerEventMatchesBot: true }))
     } finally { done = true; await observe }
   } catch (error) {
     if (sandbox && stage === 'check mock service') {

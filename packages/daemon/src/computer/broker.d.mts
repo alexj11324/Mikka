@@ -1,13 +1,4 @@
 import type { CaptureCall, ComputerDriver, ComputerCall } from "./driver.mjs";
-export interface PendingComputerRequest {
-  id: string;
-  runId: string;
-  target: string;
-  display?: string;
-  call: ComputerCall;
-  expiresAt: number;
-  digest: string;
-}
 export class ComputerBroker {
   constructor(options: {
     driver: ComputerDriver | null;
@@ -19,8 +10,6 @@ export class ComputerBroker {
     capture?: (runId: string, call: CaptureCall, signal?: AbortSignal) => Promise<unknown>;
     now?: () => number;
     ttl?: number;
-    /** Under `ask`: the Decisions API's call on one action. false executes, true goes to review, null executes (logged). Absent: every action is reviewed. */
-    needsPerson?: (runId: string, evidence: { call: ComputerCall; recent: string[] }, signal?: AbortSignal) => Promise<boolean | null>;
   });
   spec(
     runId: string,
@@ -30,11 +19,7 @@ export class ComputerBroker {
   listen(): Promise<void>;
   request(token: string, value: unknown, signal?: AbortSignal): Promise<unknown>;
   captureRequest(token: string, value: unknown, signal?: AbortSignal): Promise<{ result: unknown } | { error: string; detail?: string }>;
-  list(): PendingComputerRequest[];
-  /** Calls `listener` whenever a pending review appears or goes; returns the unsubscribe. */
-  onPendingChange(listener: () => void): () => void;
   revoke(token: string): void;
-  decide(id: string, digest: string, approve: boolean): Promise<{ ok: true }>;
   suspend(): void;
   close(): Promise<void>;
 }

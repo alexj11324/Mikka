@@ -91,8 +91,6 @@ import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { daemonTracer, runIdHash } from "./tracing"
 import { decide, pushDecision, runPolicy } from "./permissions"
-import { judgeComputerAction, noServerDecision } from "./decision-judgments"
-import type { ServerDecide } from "./server-decision"
 import { RpcServer, type RpcHandlers } from "./rpc/server"
 import { RunJournal } from "./runs/journal"
 import { baseReport } from "./runs/publication"
@@ -114,7 +112,6 @@ import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
 import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
-import { followWebComputerReviews } from "./computer/web-review"
 import { DeviceWorkSignal } from "./device-work-signal"
 import { localComputerMcp } from "./computer/local-grant.mjs"
 
@@ -317,8 +314,6 @@ export class Daemon {
   /** Resolved when a credential arrives (`device.setCredential`). */
   private credentialArrived = new Set<() => void>()
   private deviceType: "laptop" | "server" | undefined
-  private reviewAbort: AbortController | null = null
-  private reviewLoop: Promise<void> = Promise.resolve()
   private cloudComputerBroker: ComputerBroker | null = null
   private localComputerDriver: ComputerDriver | null = null
   private localComputerBroker: ComputerBroker | null = null
@@ -389,12 +384,11 @@ export class Daemon {
     this.options.link.onUpgradeRequired?.(latest => this.enterUpdateRequired(latest))
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
-    if (this.localComputerDriver && this.options.link.syncComputerReviews) {
+    if (this.localComputerDriver) {
       this.localComputerBroker = new ComputerBroker({
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
         transport: 'tcp',
-        needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const assignment = this.journal.get(runId)?.assignment
           return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&
@@ -407,7 +401,7 @@ export class Daemon {
           const recheck = async () => {
             const current = this.journal.get(runId)?.assignment.localComputer
             context.assertLive()
-            if (!this.supervisor.computerRunAllowed(runId) || !current || current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
+            if (!this.supervisor.computerRunAllowed(runId) || !current || current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.permission !== initial.permission)
               throw new Error('Local computer authority changed')
           }
           try {
@@ -433,10 +427,9 @@ export class Daemon {
       }
       const executeOrdinary = async (current: typeof driver, call: import('./computer/driver.mjs').ComputerCall, display: string | undefined, runId: string, assertLive: () => void) => {
         const computer = liveComputer(runId, display)
-        return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion }, assertLive)
+        return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId }, assertLive)
       }
       this.cloudComputerBroker = new ComputerBroker({ driver, socketPath: join(paths.dataDir, 'computer.sock'),
-        needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const entry = this.journal.get(runId)
           return Boolean(!this.stopped && this.registered && cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) && this.supervisor?.computerRunAllowed(runId))
@@ -1371,18 +1364,6 @@ export class Daemon {
     ]
   }
 
-  /** The server's Decisions API for this daemon's runs; no answer until the link provides one. */
-  private serverDecide(): ServerDecide {
-    const link = this.options.link
-    return link.decide ? link.decide.bind(link) : noServerDecision
-  }
-
-  /** Under computer `ask`: whether one action needs the person, judged with the run's task. */
-  private computerNeedsPerson() {
-    return (runId: string, evidence: { call: unknown; recent: string[] }, signal?: AbortSignal) =>
-      judgeComputerAction(this.serverDecide(), runId, { ...evidence, task: this.journal.get(runId)?.assignment.prompt }, signal)
-  }
-
   /** What every real adapter of this daemon is built with, subscription runs included. */
   private adapterOptions() {
     const sandbox = this.agentSandbox()
@@ -1475,19 +1456,11 @@ export class Daemon {
     }
     // Only Mikka's own daemon operations; the server sends the settings (docs/operations/tracing.md, "Daemon").
     if (!this.stopped) daemonTracer.configure(tracing, { version: DAEMON_VERSION })
-    const computerBroker = this.localComputerBroker ?? this.cloudComputerBroker ?? this.options.computerBroker
-    if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
     if (this.options.hostedSubscriptions && !this.stopped) this.options.taskRegistered?.()
     if (this.options.hostedSubscriptions && this.options.e2bContainerRuntime && workspaceId && !this.stopped) {
       try { writeCloudRegistration(this.paths.dataDir, deviceId, workspaceId, credential) }
       catch { this.log.warn({ event: 'cloud_registration_notice_failed' }, 'Cloud registration notification unavailable') }
-    }
-    if (computerBroker && !this.stopped) {
-      this.reviewAbort?.abort()
-      const abort = new AbortController()
-      this.reviewAbort = abort
-      this.reviewLoop = followWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal, this.workSignal, () => this.session?.redial())
     }
   }
 
@@ -1623,8 +1596,6 @@ export class Daemon {
     this.server = "unregistered"
     this.revokeLocalComputerGrants()
     this.registered = false
-    this.reviewAbort?.abort()
-    this.reviewAbort = null
     this.saveDevice({ credential: undefined })
     for (const runId of this.supervisor?.activeRunIds() ?? []) {
       void this.supervisor.cancel(runId).catch(() => this.log.warn({ run_id: runId }, 'could not stop revoked session'))
@@ -1884,8 +1855,6 @@ export class Daemon {
       },
       "daemon.update": async () => ({ state: await this.requestUpdate() }),
       "device.setCredential": (raw) => {
-        this.reviewAbort?.abort()
-        this.reviewAbort = null
         const { credential, workspaceId, traceContext } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
@@ -1904,8 +1873,6 @@ export class Daemon {
         return { ok: true as const }
       },
       "device.clearCredential": () => {
-        this.reviewAbort?.abort()
-        this.reviewAbort = null
         // Signed out in the app: stop talking to the server as that person.
         // The device id stays, so signing in again keeps the device.
         this.saveDevice({ credential: undefined })
@@ -2043,8 +2010,6 @@ export class Daemon {
     this.lifetime.abort()
     for (const arrived of [...this.credentialArrived]) arrived()
     await this.session?.stop()
-    this.reviewAbort?.abort()
-    await this.reviewLoop.catch(() => undefined)
     await this.syncing
     await this.checkpointScan
     // A commands read starts claims outside the pass. Abort their HTTP

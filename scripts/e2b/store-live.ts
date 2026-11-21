@@ -10,9 +10,7 @@ import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
 import { bindComputerRun } from '../../lib/computer/run-binding'
-import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
-import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 
 async function main() {
   const url = new URL(process.env.COMPUTER_TEST_DATABASE_URL ?? '')
@@ -30,7 +28,6 @@ async function main() {
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, status text NOT NULL, "deviceId" uuid, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz)')
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, enabled boolean NOT NULL DEFAULT true)')
     await pool.query(await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8'))
-    await pool.query(await readFile(new URL('../../drizzle/20261027164510_local_computer_reviews.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027164513_computer_run_approvals.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261027164515_workspace_computer_policy.sql', import.meta.url), 'utf8'))
     const store = new ComputerStore(pool)
@@ -62,7 +59,7 @@ async function main() {
     assert.equal((await store.state(actor, bot.id)).control, 'user')
     await store.operate(actor, bot.id, 'handback')
     assert.equal((await store.state(actor, bot.id)).control, 'agent')
-    // Real database decision -> broker -> pinned CUA driver in the E2B desktop.
+    // Real grant -> broker -> pinned CUA driver in the E2B desktop.
     // The click is a fixed test action on a disposable blank desktop.
     const runId = randomUUID(), deviceId = randomUUID()
     await pool.query('INSERT INTO devices (id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
@@ -79,17 +76,9 @@ async function main() {
     })
     try {
       const grant = broker.spec(runId, 'ask', { display: ':1' })!
-      const operation = broker.request(grant.token, { name: 'click', arguments: { x: 500, y: 500 } })
-      const snapshots = webComputerSnapshots(broker)
-      await syncComputerReviews(pool, deviceId, actor.userId, snapshots)
-      const pending = (await store.state(actor, bot.id)).pendingApproval!
-      assert.equal(pending.id, snapshots[0].id)
-      assert.equal(executed, 0)
-      assert.equal(await decideComputerReview(pool, actor, pending.id, pending.digest, true), true)
-      await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
-      assert.equal(await operation, 'clicked')
+      assert.equal(await broker.request(grant.token, { name: 'click', arguments: { x: 500, y: 500 } }), 'clicked')
       assert.equal(executed, 1)
-      console.log('live stage: database approval drove the Bot desktop via CUA')
+      console.log('live stage: run grant drove the Bot desktop click via CUA')
     } finally { await broker.close() }
     await sandbox.files.write('/workspace/acceptance-marker', 'preserved')
     await sandbox.betaPause()

@@ -5,14 +5,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { bindFixtureWorkspaceDatabase, createFixtureWorkspaceTables } from '../../tests/helpers/workspace-database'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
-import { createServer } from 'node:http'
-import { once } from 'node:events'
-import { observePoolCommits } from '../db/commit-effects'
 import { ComputerStore } from './store'
 import { createComputerHandler } from './handler'
 import { bindComputerRun } from './run-binding'
 import { claimCloudRun, claimLocalRun } from './claim'
-import { syncComputerReviews, decideComputerReview } from './reviews'
 import { provisionCloudDevice, renewCloudDeviceToken } from './cloud-device'
 import { claimWorkerLease, renewWorkerLease, releaseWorkerLease } from './worker-lease'
 import { startCloudWorker } from './cloud-worker'
@@ -22,7 +18,6 @@ import { authorizedAccessName } from '../subscription-access-snapshot'
 import { ensureBotRuntime } from './bot-runtime'
 import { bindBotSubscription } from './bot-subscription'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
-import { applyWebComputerDecisions, webComputerSnapshots } from '../../packages/daemon/src/computer/web-review'
 import type * as provider from './e2b-provider'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
@@ -34,14 +29,14 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
-  let created = 0, failSync = false, failStart = false, epoch = 0, computerAllowed = true, computerPolicyVersion = 0
-  const syncedLeases: { sandboxId: string; policyVersion: number; computerAllowed?: boolean; display: number }[] = []
+  let created = 0, failSync = false, failStart = false, epoch = 0, computerAllowed = true
+  const syncedLeases: { sandboxId: string; computerAllowed?: boolean; display: number }[] = []
   const runtime = {
     async createComputer() { created++; return { sandboxId: created === 1 ? 'sandbox-test' : `sandbox-owner-${created}` } },
     async connectComputer(_workspaceId: string, sandboxId: string) { return { sandboxId } },
     async computerState() { return 'sleeping' },
     async installComputerRuntime() {}, async startDesktop() { if (failStart) throw new Error('start response lost') },
-    async syncDesktopLease(sandbox: { sandboxId: string }, lease: { epoch: number; computerAllowed?: boolean; policyVersion: number; display: number }) { syncedLeases.push({ sandboxId: sandbox.sandboxId, ...lease }); epoch = lease.epoch; computerAllowed = lease.computerAllowed === true; computerPolicyVersion = lease.policyVersion; if (failSync) throw new Error('transport failed') },
+    async syncDesktopLease(sandbox: { sandboxId: string }, lease: { epoch: number; computerAllowed?: boolean; display: number }) { syncedLeases.push({ sandboxId: sandbox.sandboxId, ...lease }); epoch = lease.epoch; computerAllowed = lease.computerAllowed === true; if (failSync) throw new Error('transport failed') },
     async viewerGrant() { return { url: 'wss://test.invalid', expiresAt: new Date().toISOString() } },
   } as unknown as typeof provider
   const actor = { userId: 'alice', workspaceId: randomUUID() }
@@ -85,8 +80,6 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(scopeMigration); await pool.query(scopeMigration)
     const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027164512_cloud_worker_leases.sql', import.meta.url), 'utf8')
     await pool.query(workerLeaseMigration); await pool.query(workerLeaseMigration)
-    const reviewMigration = await readFile(new URL('../../drizzle/20261027164510_local_computer_reviews.sql', import.meta.url), 'utf8')
-    await pool.query(reviewMigration); await pool.query(reviewMigration)
     const runApprovalMigration = await readFile(new URL('../../drizzle/20261027164513_computer_run_approvals.sql', import.meta.url), 'utf8')
     await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
     await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, "removedAt" timestamptz, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "remoteUrl" text, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
@@ -156,13 +149,13 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const clock = t.mock.method(Date, 'now', () => now)
     const queries = t.mock.method(pool, 'query', async (sql: string, values: unknown[]) => {
       const result = await query(sql, values)
-      if (sql.includes('FROM local_computer_reviews')) now = leaseExpiresAt
+      if (sql.includes('LEFT JOIN cloud_machines')) now = leaseExpiresAt
       return result
     })
     try {
       const expiredDuringRead = await computer(new Request(computerUrl), bot.id)
       assert.equal(expiredDuringRead.status, 200)
-      assert.deepEqual(await expiredDuringRead.json(), { machine: 'error', control: 'idle', live: { workspaceId: actor.workspaceId } }, 'a lease expiring during the review query offers retry in the same response')
+      assert.deepEqual(await expiredDuringRead.json(), { machine: 'error', control: 'idle', live: { workspaceId: actor.workspaceId } }, 'a lease expiring during the read offers retry in the same response')
     } finally {
       queries.mock.restore()
       clock.mock.restore()
@@ -348,14 +341,14 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // Holding the Bot's desktop holds only work on that desktop. A repository task on its own task
     // machine (no desktop) and a computer task on its own thread machine's desktop are neither.
     const repositoryThread = await onThreadMachine(allowedRepository.runId)
-    assert.deepEqual(await claimCloudRun(pool, actor, allowedRepository.runId, repositoryThread, new Date(Date.now() + 30000), cloudSubscription, undefined, undefined, false), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'deny' })
+    assert.deepEqual(await claimCloudRun(pool, actor, allowedRepository.runId, repositoryThread, new Date(Date.now() + 30000), cloudSubscription, undefined, undefined, false), { botId: bot.id, ownerId: actor.userId, display: ':1', permission: 'deny' })
     await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [allowedRepository.runId])
     await store.operate(actor, bot.id, 'takeover')
     const hold = (await pool.query('SELECT control,"controlledBy","controlUntil",epoch FROM bot_desktops WHERE "botId"=$1', [bot.id])).rows[0]
     assert.equal(hold.control, 'user')
     assert.equal(hold.controlledBy, actor.userId)
     assert.ok(new Date(hold.controlUntil).getTime() > Date.now())
-    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' }, 'a computer task on its own thread machine claims while the Bot desktop is held')
+    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', permission: 'allow' }, 'a computer task on its own thread machine claims while the Bot desktop is held')
     await store.operate(actor, bot.id, 'takeover')
     const threadRuns = async () => (await pool.query('SELECT id,status,"pauseReason","resumeStatus" FROM agent_runs WHERE id=ANY($1::uuid[])', [[allowedRepository.runId, queued.runId]])).rows.sort((a, b) => a.id === allowedRepository.runId ? -1 : b.id === allowedRepository.runId ? 1 : 0).map(({ status, pauseReason, resumeStatus }) => ({ status, pauseReason, resumeStatus }))
     const unpaused = [{ status: 'running', pauseReason: null, resumeStatus: null }, { status: 'preparing', pauseReason: null, resumeStatus: null }]
@@ -387,7 +380,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [cloudThread])
     const cloudClaims = await Promise.all([claimCloudRun(pool, actor, cloudRun, cloudThread, deadline, cloudSubscription), claimCloudRun(pool, actor, cloudRun, cloudThread, deadline, cloudSubscription)])
     assert.equal(cloudClaims.filter(Boolean).length, 1)
-    assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
+    assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1', permission: 'allow' })
     const runId = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId",status,"workspaceId") VALUES ($1,$2,$3,$4)', [runId, actor.userId, 'queued', actor.workspaceId])
     await assert.rejects(bindComputerRun(pool, bob, runId, bobBot.id), { status: 404 })
@@ -420,75 +413,19 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await claimLocalRun(pool, subscriptionRun, deviceId, new Date(Date.now() + 30000), bindingId), 'claimed')
     assert.equal((await pool.query('SELECT "bindingId" FROM byos_native_runs WHERE "runId"=$1', [subscriptionRun])).rows[0].bindingId, bindingId)
     await pool.query('UPDATE agent_runs SET status=$2,"leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [runId, 'running'])
-    const reviewValue = { id: randomUUID(), runId, target: 'f'.repeat(64), display: ':1', call: { name: 'click' as const, arguments: { x: 3, y: 4 } }, expiresAt: Date.now() + 120000 }
-    const review = { ...reviewValue, digest: createHash('sha256').update(JSON.stringify(reviewValue)).digest('hex') }
-    await assert.rejects(syncComputerReviews(pool, deviceId, bob.userId, [review]))
-    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [{ ...review, display: ':2' }]))
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [review]), [])
-    const visible = await store.state(actor, bot.id)
-    assert.equal(visible.pendingApproval?.digest, review.digest)
-    assert.deepEqual(visible.pendingApproval?.action, { tool: 'click', x: 3, y: 4 })
-    assert.equal((await store.state(actor, another.id)).pendingApproval, undefined)
-    assert.equal(await decideComputerReview(pool, otherWorkspace, review.id, review.digest, true), false)
-    assert.equal(await decideComputerReview(pool, actor, review.id, '0'.repeat(64), true), false)
-    // #1212: the decision pushes the device through its gateway, so the daemon applies it now instead of syncing every second.
-    const pushes: string[] = []
-    const gateway = createServer((request, response) => { pushes.push(`${request.method} ${request.url}`); response.writeHead(204).end() })
-    gateway.listen(0, '127.0.0.1')
-    await once(gateway, 'listening')
-    const saved = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
-    process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${(gateway.address() as { port: number }).port}`
-    process.env.DEVICE_GATEWAY_PUSH_SECRET = 'computer-review-test-only'
-    // With the gateway configured, live invalidations ride along; they need commit tracking, as the app's pool has.
-    observePoolCommits(pool)
-    const devicePush = `POST /v1/devices/${deviceId}/push`
-    try {
-      assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), true)
-      for (let i = 0; i < 100 && !pushes.includes(devicePush); i++) await new Promise(resolve => setTimeout(resolve, 10))
-      assert.equal(pushes.filter(push => push === devicePush).length, 1)
-    } finally {
-      for (const [name, value] of [['DEVICE_GATEWAY_URL', saved.url], ['DEVICE_GATEWAY_PUSH_SECRET', saved.secret]] as const) {
-        if (value === undefined) delete process.env[name]; else process.env[name] = value
-      }
-      gateway.closeAllConnections()
-      await new Promise<void>(resolve => gateway.close(() => resolve()))
-    }
-    assert.equal((await store.state(actor, bot.id)).pendingApproval, undefined)
-    assert.equal(await decideComputerReview(pool, actor, review.id, review.digest, true), false)
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [review]), [{ id: review.id, digest: review.digest, approve: true }])
     let executions = 0
     const broker = new ComputerBroker({ socketPath: `/tmp/unused-computer-${randomUUID()}`,
       driver: { installed: true, version: 'fixture', path: '/fake', fingerprint: 'f'.repeat(64) }, permitted: id => id === runId,
       execute: async (_, call, display) => { executions++; assert.equal(display, ':1'); return call },
     })
     try {
-      // Legacy compatibility only: the server no longer issues 'ask' grants
-      // (2026-10-30), but a daemon that received one before can still finish.
-      const grant = broker.spec(runId, 'ask', { display: ':1' })!
-      const pending = broker.request(grant.token, { name: 'click', arguments: { x: 7, y: 8 } })
-      const snapshots = webComputerSnapshots(broker)
-      assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, snapshots), [])
-      const request = (await store.state(actor, bot.id)).pendingApproval!
-      assert.equal(request.id, snapshots[0].id)
-      assert.equal(executions, 0)
-      assert.equal(await decideComputerReview(pool, actor, request.id, request.digest, true), true)
-      await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
-      assert.deepEqual(await pending, { name: 'click', arguments: { x: 7, y: 8 } })
+      // No approval step: an allowed grant's calls execute directly.
+      const grant = broker.spec(runId, 'allow', { display: ':1' })!
+      assert.deepEqual(await broker.request(grant.token, { name: 'click', arguments: { x: 7, y: 8 } }), { name: 'click', arguments: { x: 7, y: 8 } })
       assert.equal(executions, 1)
-      await applyWebComputerDecisions(broker, await syncComputerReviews(pool, deviceId, actor.userId, snapshots))
-      assert.equal(executions, 1, 'replayed decisions cannot execute again')
+      await assert.rejects(broker.request(randomUUID(), { name: 'click', arguments: { x: 7, y: 8 } }), 'an unadmitted run is refused')
+      assert.equal(executions, 1)
     } finally { await broker.close() }
-    const makeReview = (currentRun: string, x: number) => {
-      const value = { id: randomUUID(), runId: currentRun, target: 'f'.repeat(64), display: ':1', call: { name: 'click' as const, arguments: { x, y: 4 } }, expiresAt: Date.now() + 120000 }
-      return { ...value, digest: createHash('sha256').update(JSON.stringify(value)).digest('hex') }
-    }
-    const grantReview = makeReview(runId, 10)
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [grantReview]), [])
-    assert.equal(await decideComputerReview(pool, otherWorkspace, grantReview.id, grantReview.digest, true, 'run'), false)
-    assert.equal(await decideComputerReview(pool, actor, grantReview.id, grantReview.digest, false, 'run'), false)
-    assert.equal(await decideComputerReview(pool, actor, grantReview.id, grantReview.digest, true, 'run'), true)
-    const laterReview = makeReview(runId, 11)
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [laterReview]), [{ id: laterReview.id, digest: laterReview.digest, approve: true }])
     // No row means allow; storing the default allow is not a transition.
     assert.equal(await store.policy(otherWorkspace.workspaceId), 'allow')
     await store.setPolicy(otherWorkspace.workspaceId, 'allow')
@@ -505,8 +442,6 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const stoppedQueued = (await pool.query('SELECT status,"finishedAt" FROM agent_runs WHERE id=$1', [secondRunId])).rows[0]
     assert.equal(stoppedQueued.status, 'stopped')
     assert.ok(stoppedQueued.finishedAt, 'queued cloud threads end when workspace access is revoked')
-    assert.equal(await decideComputerReview(pool, actor, laterReview.id, laterReview.digest, true), false)
-    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 20)]), /Run or desktop unavailable/)
     await assert.rejects(queueCloudRun(pool, actor, cloudInput), { status: 409 })
     const deniedRepository = await queueCloudRun(pool, actor, { ...repositoryInput, issueId: await queueTask() })
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [deniedRepository.runId])).rows[0].status, 'queued', 'a deny workspace still queues a repository task')
@@ -523,26 +458,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await store.setPolicy(actor.workspaceId, 'allow')
     assert.equal(computerAllowed, true)
     assert.equal((await pool.query('SELECT version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].version, 2)
-    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 21)]), /Run or desktop unavailable/, 're-enabling cannot revive a stopped run')
-    // Continue the remaining independent review cases with fresh simulated runs.
-    await pool.query('UPDATE agent_runs SET status=$2,"stopRequestedAt"=NULL WHERE id=ANY($1::uuid[])', [[runId, secondRunId], 'running'])
-    await pool.query('UPDATE computer_run_bindings SET "approvedForRun"=true WHERE "runId"=$1', [runId])
-    const keyValue = { id: randomUUID(), runId, target: 'f'.repeat(64), display: ':1', call: { name: 'press_key' as const, arguments: { key: 'tab', modifiers: ['shift' as const] } }, expiresAt: Date.now() + 120000 }
-    const keyReview = { ...keyValue, digest: createHash('sha256').update(JSON.stringify(keyValue)).digest('hex') }
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [keyReview]), [{ id: keyReview.id, digest: keyReview.digest, approve: true }])
-    await pool.query('UPDATE agent_runs SET status=$2,"deviceId"=$3,"leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [secondRunId, 'running', deviceId])
-    const otherRunReview = makeReview(secondRunId, 12)
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [otherRunReview]), [], 'a different run on the same Bot needs its own approval')
-    const scrollValue = { id: randomUUID(), runId: secondRunId, target: 'f'.repeat(64), display: ':1', call: { name: 'scroll' as const, arguments: { direction: 'down' as const, amount: 2, x: 10, y: 20 } }, expiresAt: Date.now() + 120000 }
-    const scrollReview = { ...scrollValue, digest: createHash('sha256').update(JSON.stringify(scrollValue)).digest('hex') }
-    assert.deepEqual(await syncComputerReviews(pool, deviceId, actor.userId, [scrollReview]), [])
-    assert.deepEqual((await store.state(actor, bot.id)).pendingApproval?.action, { tool: 'scroll', text: 'down × 2', x: 10, y: 20 })
-    assert.equal(await decideComputerReview(pool, actor, scrollReview.id, scrollReview.digest, true), true)
-    await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()-interval \'1 second\' WHERE id=$1', [runId])
-    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 13)]), /Run or desktop unavailable/)
-    await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now()+interval \'5 minutes\' WHERE id=$1', [runId])
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
-    await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [review]))
     const startedId = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId",status,"workspaceId") VALUES ($1,$2,$3,$4)', [startedId, actor.userId, 'running', actor.workspaceId])
     await assert.rejects(bindComputerRun(pool, actor, startedId, bot.id), { status: 409 })
@@ -569,7 +485,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const heldStateQueries = t.mock.method(pool, 'query')
     try {
       assert.equal((await store.state(actor, bot.id)).control, 'user')
-      assert.equal(heldStateQueries.mock.callCount(), 2, 'one scoped snapshot and one current approval read')
+      assert.equal(heldStateQueries.mock.callCount(), 1, 'one scoped snapshot read')
     } finally { heldStateQueries.mock.restore() }
     // Takeover pauses the bot: the desktop lease names the person, and the
     // trusted lease driver (scripts/e2b/lease-driver.py) refuses every bot
@@ -606,12 +522,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.deepEqual(displays, [1, 2, 3], 'uncertain start keeps its binding rather than leaking its desktop to a later bot')
     await store.setPolicy(actor.workspaceId, 'deny')
     await store.setPolicy(actor.workspaceId, 'allow')
-    assert.equal(computerPolicyVersion, 4)
     assert.equal((await pool.query('SELECT "approvedForRun" FROM computer_run_bindings WHERE "runId"=$1', [runId])).rows[0].approvedForRun, false, 'a policy transition revokes old run-scoped approval')
     const allowedRun = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId","workspaceId") VALUES ($1,$2,$3,$4,$5,$6)', [allowedRun, actor.userId, consumer, 'queued', worker.deviceId, actor.workspaceId])
     await bindComputerRun(pool, actor, allowedRun, bot.id)
-    assert.deepEqual(await claimCloudRun(pool, actor, allowedRun, await onThreadMachine(allowedRun), new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 4, permission: 'allow' })
+    assert.deepEqual(await claimCloudRun(pool, actor, allowedRun, await onThreadMachine(allowedRun), new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', permission: 'allow' })
     const directLocal = randomUUID()
     await pool.query(`INSERT INTO agent_runs (id,"userId","botId","deviceId",status,"machineAuthority","leaseExpiresAt","workspaceId")
       VALUES ($1,$2,$3,$4,'running',true,now()+interval '5 minutes',$5)`, [directLocal, actor.userId, bot.id, deviceId, actor.workspaceId])
@@ -619,39 +534,20 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const revokedLocal = (await pool.query('SELECT "stopRequestedAt","leaseExpiresAt"<=now() AS expired FROM agent_runs WHERE id=$1', [directLocal])).rows[0]
     assert.ok(revokedLocal.stopRequestedAt, 'policy revocation stops a direct local runner without a computer_run_binding')
     assert.equal(revokedLocal.expired, true)
-    assert.equal(computerPolicyVersion, 5, 'the driver guard fences grants from the previous policy version')
     await store.setPolicy(actor.workspaceId, 'allow')
-    assert.equal(computerPolicyVersion, 6)
 
-    // A Bot on :3 can dispatch a dedicated thread on its own :1. Both sync
-    // and the owner decision must use the thread binding, never the Bot's X11.
+    // A Bot on :3 can dispatch a dedicated thread on its own :1.
     const threadRun = randomUUID(), threadDevice = randomUUID()
     await pool.query(`INSERT INTO devices(id,"ownerId",kind,"sessionOpenedAt") VALUES ($1,$2,'cloud',now())`, [threadDevice, actor.userId])
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES ($1,$2,$3,$4,'running',now()+interval '5 minutes',$5)`, [threadRun, actor.userId, consumer, threadDevice, actor.workspaceId])
     await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [threadRun, later.id, actor.workspaceId, actor.userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,$4,'sandbox-thread','snapshot-thread',$5,'running',$6)`, [threadRun, actor.workspaceId, actor.userId, later.id, randomUUID(), threadDevice])
-    const threadReview = makeReview(threadRun, 50)
-    const { digest: _oldDigest, ...wrongDisplay } = { ...threadReview, display: ':3' }
-    await assert.rejects(syncComputerReviews(pool, threadDevice, actor.userId, [{ ...wrongDisplay, digest: createHash('sha256').update(JSON.stringify(wrongDisplay)).digest('hex') }]), /Run or desktop unavailable/)
-    await assert.rejects(syncComputerReviews(pool, worker.deviceId, actor.userId, [threadReview]), /Run or desktop unavailable/)
-    assert.deepEqual(await syncComputerReviews(pool, threadDevice, actor.userId, [threadReview]), [])
-    assert.equal(await decideComputerReview(pool, bob, threadReview.id, threadReview.digest, true), false)
-    assert.equal(await decideComputerReview(pool, otherWorkspace, threadReview.id, threadReview.digest, true), false)
-    assert.equal(await decideComputerReview(pool, actor, threadReview.id, threadReview.digest, true, 'run'), true)
-    assert.deepEqual(await syncComputerReviews(pool, threadDevice, actor.userId, [threadReview]), [{ id: threadReview.id, digest: threadReview.digest, approve: true }])
-    const subsequent = makeReview(threadRun, 51)
-    assert.deepEqual(await syncComputerReviews(pool, threadDevice, actor.userId, [subsequent]), [{ id: subsequent.id, digest: subsequent.digest, approve: true }])
-    const askingAgain = makeReview(threadRun, 52)
     await store.setPolicy(actor.workspaceId, 'deny')
     assert.equal((await pool.query('SELECT "approvedForRun" FROM computer_run_bindings WHERE "runId"=$1', [threadRun])).rows[0].approvedForRun, false)
     const threadLease = syncedLeases.filter(lease => lease.sandboxId === 'sandbox-thread').at(-1)
-    assert.equal(threadLease?.policyVersion, 7)
     assert.equal(threadLease?.computerAllowed, false, 'deny reaches the dedicated driver before policy commit')
     assert.equal(threadLease?.display, 1)
-    await assert.rejects(syncComputerReviews(pool, threadDevice, actor.userId, [askingAgain]), /Run or desktop unavailable/)
     await store.setPolicy(actor.workspaceId, 'allow')
-    assert.equal(syncedLeases.filter(lease => lease.sandboxId === 'sandbox-thread').at(-1)?.policyVersion, 8)
-    assert.equal(await decideComputerReview(pool, actor, askingAgain.id, askingAgain.digest, true), false)
   } finally {
     console.log(`Retained computer test schema: ${schema}`)
     await closeWorkspace(); await pool.end(); await admin.end()

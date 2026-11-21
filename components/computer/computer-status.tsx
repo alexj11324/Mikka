@@ -18,7 +18,6 @@ export function computerStatus(state: ComputerState | undefined): ComputerStatus
   if (state.machine === 'waking') return 'waking'
   if (state.machine === 'error') return 'failed'
   if (state.control === 'user') return 'user'
-  if (state.pendingApproval) return 'approval'
   return state.control === 'agent' ? 'working' : 'running'
 }
 
@@ -26,7 +25,7 @@ export function computerStatus(state: ComputerState | undefined): ComputerStatus
 export function taskStatus(task: ComputerTaskState, state: ComputerState | undefined, runId: string): ComputerStatus {
   if (task === 'done' || task === 'failed') return task
   if (state?.machine === 'sleeping' || state?.machine === 'waking') return state.machine
-  if (state?.pendingApproval?.runId === runId || task === 'approval') return 'approval'
+  if (task === 'approval') return 'approval'
   if (state?.control === 'user') return 'user'
   return 'working'
 }
