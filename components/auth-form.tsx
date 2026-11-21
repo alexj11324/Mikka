@@ -210,16 +210,16 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   }
   const registering = mode === 'sign-up'
   const turnstile = useRef<TurnstileHandle>(null)
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [hasToken, setHasToken] = useState(false)
   const tokenRef = useRef<string | null>(null)
   const [verificationFailed, setVerificationFailed] = useState(false)
   const verificationRequired = registering && Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
   const receiveToken = useCallback((token: string | null) => {
     tokenRef.current = token
-    setTurnstileToken(token)
+    setHasToken(Boolean(token))
     if (token) setVerificationFailed(false)
   }, [])
-  function retryVerification() {
+  function resetVerification() {
     receiveToken(null)
     turnstile.current?.reset()
   }
@@ -249,7 +249,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     } catch { setError(t('connectionFailed')) }
     finally {
       // A Turnstile token is single-use, accepted or not.
-      if (registering) retryVerification()
+      if (registering) resetVerification()
       endSubmit()
     }
   }
@@ -306,9 +306,9 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }} /> : null
   if (serverPicker && selectedWebServer()) return <Auth registering={false} addAccount={addAccount} next={returnPath}>{serverPicker}</Auth>
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} verificationPending={verificationRequired && !turnstileToken} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <>
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} verificationPending={verificationRequired && !hasToken} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <>
       <Turnstile ref={turnstile} onToken={receiveToken} />
-      {verificationFailed && <Button type="button" variant="outline" disabled={pending} onClick={retryVerification}>{t('retryVerification')}</Button>}
+      {verificationFailed && <Button type="button" variant="outline" disabled={pending} onClick={resetVerification}>{t('retryVerification')}</Button>}
     </> : undefined} sso={!registering ? <AuthSso callbackURL={ssoCallbackURL} disabled={pending} /> : undefined} />
     {serverPicker}
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
