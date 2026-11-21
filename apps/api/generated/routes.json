@@ -911,6 +911,15 @@
       "sourceHash": "b06f9c685cbf147c32ea37d2b60f92475bae5db7b3308ebf3b50ae82eb85bd4a"
     },
     {
+      "path": "/mikka/api/devices/[deviceId]/detail",
+      "template": "/api/devices/[deviceId]/detail",
+      "source": "app/api/devices/[deviceId]/detail/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "dad67c5802c32965a89813015101b118a4f04bf464f49a49e341314098d55c03"
+    },
+    {
       "path": "/mikka/api/drive/scopes",
       "template": "/api/drive/scopes",
       "source": "app/api/drive/scopes/route.ts",
@@ -3190,6 +3199,15 @@
         "GET"
       ],
       "sourceHash": "72062f9dae38b3ea0252555bedae23a5e1a6c89170771430cb41fc79ee7470fb"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/activity",
+      "template": "/api/workspaces/[workspaceId]/activity",
+      "source": "app/api/workspaces/[workspaceId]/activity/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "ab61a413ad238f409182364e463119beaad77764e8b97c7f7db36c92bde4ce1b"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/audit-log",
