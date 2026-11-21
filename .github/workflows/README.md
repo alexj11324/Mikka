@@ -28,9 +28,10 @@ bindings. Current workflow files define the triggers and selected coverage.
   have been migrated and verified.
 
 `local-device-node22.yml` now runs an actual app/Eve build and startup smoke
-on Node 22 and 24, retaining the daemon and installer tests. The core,
-integration and PG17 database jobs above also run the selected suites on both
-majors; the original Node 24 protected-check names stay unchanged.
+on Node 22 and 24, retaining the daemon and installer tests. The main CI's
+core, integration, and PG17 database jobs run the selected suites on Node 24
+for pull requests. They run on both majors for merge candidates, main pushes,
+and manual or scheduled runs.
 
 ## Focused governance acceptance and superseded PR runs
 
