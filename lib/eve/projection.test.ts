@@ -72,6 +72,7 @@ test('preparation refusals and safe references project without publishing hook d
     { error: { code: 'HOOK_FAILED', message: 'Hook "hooks/product.ts" failed: executionModelUnknown' }, expected: 'executionModelUnknown' },
     { error: { code: 'HOOK_FAILED', message: 'Hook "agent/hooks/product" failed: private diagnostic', id: reference, hint: 'private body' }, expected: `HOOK_FAILED · ref ${reference}` },
     { error: { code: 'MODEL_FAILED', message: 'private diagnostic', id: reference }, expected: `MODEL_FAILED · ref ${reference}` },
+    { error: { code: 'reconnect_required', message: 'private diagnostic', id: reference }, expected: `reconnect_required · ref ${reference}` },
     { error: { code: 'HOOK_FAILED', message: 'Hook "agent/hooks/product" failed: cloudComputerUnavailable' }, expected: 'HOOK_FAILED' },
     { error: { code: 'HOOK_FAILED', message: 'Hook "agent/hooks/product" failed: executionModelUnknown private diagnostic' }, expected: 'HOOK_FAILED' },
     { error: { code: 'OTHER_FAILED', message: 'Hook "agent/hooks/product" failed: executionModelUnknown' }, expected: 'OTHER_FAILED' },

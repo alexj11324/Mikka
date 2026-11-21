@@ -25,7 +25,6 @@ const modelPicks: (string | null)[] = []
 // A chat whose welcome failed: its read, the model menu's 可用, the refusal code and whether the tab is visible.
 let chatData: Record<string, unknown> | null = null
 let menu: unknown = undefined
-let refusalCode: string | null = null
 let visibility: 'visible' | 'hidden' = 'visible'
 let versionReads = 0
 let pageRefreshRequired = false
@@ -69,7 +68,6 @@ mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, {
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: { getBotModelMenu: async () => ({}) } })
 mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => (key: string) => `Errors.${key}` } })
-mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => refusalCode } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
   checkPageBuildBeforeAction: () => buildCheck(),
   markPageNeedsRefresh: () => { pageRefreshRequired = true }, pageNeedsRefresh: () => pageRefreshRequired, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
@@ -140,7 +138,7 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { streamStatus = 'idle'; streamError = false; welcomeCalls = 0; welcomeReply = { queued: true }; chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { streamStatus = 'idle'; streamError = false; welcomeCalls = 0; welcomeReply = { queued: true }; chatData = null; menu = undefined; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
@@ -177,6 +175,22 @@ for (const full of [true, false]) for (const live of [true, false]) test(`a ${li
   assert.equal(notice.querySelector('a')?.getAttribute('href'), '/settings?section=models')
   assert.equal(calls, 0)
   assert.equal(submissions, 0)
+})
+
+for (const full of [true, false]) test(`a referenced subscription refusal keeps settings and Details in ${full ? 'full' : 'embedded'} chat`, async () => {
+  chatEnabled = true
+  chatError = 'reconnect_required · ref fixture-reference'
+  chatItems = [{ id: 'fixture-referenced-refusal', position: 1, from: 'person', text: 'fixture request', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: { kind: 'subscription', notice: 'reconnect', raw: chatError } }]
+  await act(async () => root.render(<CoordinatorChat embedded={full ? undefined : artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  const notice = container.querySelector('[data-subscription-refusal="reconnect"]')
+  assert.ok(notice)
+  assert.equal(notice.querySelector('a')?.getAttribute('href'), '/settings?section=models')
+  assert.doesNotMatch(notice.textContent ?? '', /Coordinator.resend|Common.retry/)
+  const details = container.querySelector('[data-slot="run-error-details"]')!
+  assert.ok(details)
+  await act(async () => (details.querySelector('button') as HTMLElement).click())
+  assert.match(details.textContent ?? '', /reconnect_required · ref fixture-reference/)
+  assert.equal(calls, 0)
 })
 
 for (const code of ['executionModelUnknown', 'HOOK_FAILED', 'HOOK_FAILED · ref fixture-reference']) test(`the failure code ${code} does not itself create composer load or unavailable warnings`, async () => {
@@ -493,7 +507,6 @@ test('an idle page detects the new build on its minute probe and keeps the draft
 const welcomeFailed = (error = 'Error: verification_required') => {
   chatItems = [{ id: 'fixture-welcome', position: 1, from: 'coordinator', text: '', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:00:00Z', welcome: true, failure: { kind: 'hosted', code: 'verification_required' } }]
   chatData = { items: chatItems, enabled: true, working: false, error, artifacts: {} }
-  refusalCode = error.includes('verification_required') ? 'verification_required' : error
 }
 const chat = () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />)
 

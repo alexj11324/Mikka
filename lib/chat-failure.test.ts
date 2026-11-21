@@ -37,6 +37,17 @@ test('generic failure references remain available to Details without changing kn
   assert.deepEqual(failureMessageKey(failure), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
 })
 
+test('known refusals keep their recovery and safe reference in Details', () => {
+  for (const [code, expected] of [
+    ['reconnect_required', { kind: 'subscription', notice: 'reconnect' }],
+    ['points_exhausted', { kind: 'hosted', code: 'points_exhausted' }],
+    ['wake_exhausted', { kind: 'wake', code: 'wake_exhausted' }],
+  ] as const) {
+    const error = `${code} · ref fixture-reference`
+    assert.deepEqual(chatFailure({ working: false, error }), { ...expected, raw: error })
+  }
+})
+
 test('exhausted tool recovery has a stable friendly failure and retry',()=>{
   const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
   assert.deepEqual(failure,{kind:'failed',reason:'tools',raw:'model_tool_unavailable'})

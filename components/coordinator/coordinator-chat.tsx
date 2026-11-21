@@ -83,9 +83,6 @@ import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/com
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { usePaywall } from '@/components/billing/paywall'
-import { hostedRefusal } from '@/lib/billing/verification-client'
-import { subscriptionRefusal } from '@/lib/subscription-refusal'
-import { chatBalanceRefusal } from '@/lib/chat-balance'
 import { chatFailure } from '@/lib/chat-failure'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
@@ -359,19 +356,19 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   })
   const workingEnter = loaded.current && !workingAtOpen.current
   const entering = (item: (typeof items)[number]) => arriving(`item-${item.position}`) && !(item.from === 'coordinator' && item.position <= streamedThrough.current)
+  const liveFailure = data?.error && !working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
-  const refusal = working ? null : hostedRefusal(data?.error)
+  const refusal = liveFailure?.kind === 'hosted' ? liveFailure.code : null
   // The chosen subscription refused it: the mapped line, never the raw step error.
-  const declined = working || refusal ? null : subscriptionRefusal(data?.error)
-  const apiBalance = !working && !refusal && !declined && chatBalanceRefusal(data?.error)
+  const declined = liveFailure?.kind === 'subscription' ? liveFailure.notice : null
+  const apiBalance = liveFailure?.kind === 'failed' && liveFailure.reason === 'balance'
   // 重试 on any failed reply, never on a wake still being retried by the server.
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
-  const liveFailure = data?.error && !working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
   const cloudCode = liveFailure?.kind === 'failed' ? liveFailure.cloudCode : undefined
   const [welcomeNeedsModel, setWelcomeNeedsModel] = useState(false)
   const modelRequired = (liveFailure?.kind === 'failed' && liveFailure.reason === 'modelRequired') || (welcomeNeedsModel && !working && !items.length && !stream.replies.length)
   const liveRaw = liveFailure?.raw ?? null
-  const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
+  const wakeError = liveFailure?.kind === 'wake' ? liveFailure.code : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   // A failed turn's own line already says why; this one is only for a chat with no Coordinator to answer.
   const unanswered = data?.enabled === false && !data.error && items.findLast(item => item.from !== 'event')?.from === 'person'
