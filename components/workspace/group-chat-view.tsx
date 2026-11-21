@@ -265,7 +265,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
     }}
       beforeComposer={referenceWorkspace && <ThreadReferencePicker key={group.id} draft={draft} workspaceId={referenceWorkspace} input={composerInput} onChange={setDraft} />}
       composer={<ChatComposer leadingControls={<ChatComposerAttachment />} ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
-        model={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
+        leftControls={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />} />
   </section>
 }
