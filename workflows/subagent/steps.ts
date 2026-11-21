@@ -39,9 +39,17 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
         await store.update(actor,botId,id,'running','Approval expired; observing current page')
         return 'running'
       }
+      // A recorded decision is a known outcome: release the binding and keep
+      // observing instead of holding the task for a person.
+      if(previous?.action==='browser_operation' && previous.status!=='running') {
+        await pool.query(`UPDATE bot_subagents SET "activeActionId"=NULL WHERE id=$1 AND "ownerId"=$2`,[id,actor.userId])
+        await store.update(actor,botId,id,'running','Decision recorded; observing current page')
+        return 'running'
+      }
       // Direct browser actions keep no pending_actions replay record: a bound
       // action id that survives a process loss has an unknown outcome and is
-      // never repeated blindly.
+      // never repeated blindly. A legacy row still 'running' means the old
+      // executor was lost mid-flight, which is equally unknown.
       if(!previous || previous.action==='browser_operation') {
         await store.update(actor,botId,id,'needs_you','Action outcome unknown; do not repeat blindly')
         return 'waiting'
