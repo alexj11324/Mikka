@@ -413,6 +413,8 @@ test('credential preparation failure ends its claimed run without exposing crede
   assert.equal(response.status, 409)
   assert.equal(probe.run.status, 'failed')
   assert.equal(probe.run.stopReason, 'blocked')
+  const scheduled = (probe as typeof probe & { scheduledAfter?: unknown[] }).scheduledAfter ?? []
+  assert.ok(scheduled.length > 0, 'the autocommitted credential failure registers live invalidation')
   assert.doesNotMatch(await response.text(), /private-provider|fixture-claim|prompt|subscriptionLease/)
 })
 

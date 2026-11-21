@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from '../db/commit-effects'
 import { coordinatorMessages, coordinatorSessions } from '../db/schema'
 
 // The safety floor (decision 2026-11-02-1600): a GitHub token never persists in
@@ -10,7 +12,13 @@ const token = 'ghu_' + 'S'.repeat(36)
 const inserted: unknown[] = []
 const updates: Record<string, unknown>[] = []
 let memory = ''
+const client = { async query(command: string) {
+  assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command))
+  return { command, rows: [] }
+} } as unknown as PoolClient
+observeCommitEffects(client)
 const tx = {
+  session: { client },
   async execute() { return { rows: [] } },
   insert(table: unknown) {
     return { values(value: unknown) {
@@ -29,7 +37,16 @@ const tx = {
   },
 }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-stub('../db/index.ts', { db: { ...tx, transaction: async <T>(fn: (value: typeof tx) => Promise<T>) => fn(tx) }, pool: { query: async () => ({ rows: [{ present: false }] }) } })
+stub('../db/index.ts', { db: { ...tx, transaction: async <T>(fn: (value: typeof tx) => Promise<T>) => {
+  const scheduledBefore = scheduledAfter.length
+  await client.query('BEGIN')
+  try {
+    const result = await fn(tx)
+    assert.equal(scheduledAfter.length, scheduledBefore, 'masked chat effects wait for COMMIT')
+    await client.query('COMMIT')
+    return result
+  } catch (error) { await client.query('ROLLBACK'); throw error }
+} }, pool: { query: async () => ({ rows: [{ present: false }] }) } })
 stub('../credentials/chat-guard.ts', { assertCredentialSafeChat: async () => undefined })
 stub('../agent-runs.ts', { visibleRuns: () => {}, readRun: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
@@ -51,6 +68,7 @@ test('assistant text, tool results and the stored warning are saved with GitHub 
     { role: 'assistant', content: [{ type: 'text', text: `Here: ${token}` }, { type: 'tool-call', toolCallId: 'c1', toolName: 'github_api', input: { path: '/user' } }] },
     { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'github_api', output: { type: 'json', value: { status: 200, data: { note: `token ${token}` } } } }] },
   ], `failed with ${token}`, 'bot')
+  assert.ok(scheduledAfter.length > 0, 'the real chat writer registers its committed invalidation')
   const saved = JSON.stringify(inserted)
   assert.doesNotMatch(saved, new RegExp(token))
   assert.match(saved, /\[secret:github-token\]/)

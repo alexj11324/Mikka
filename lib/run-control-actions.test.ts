@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { afterEach, before, mock, test } from 'node:test'
 import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from './db/commit-effects'
 import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
@@ -65,6 +67,12 @@ const database = {
   select() { return new Selection() },
   async transaction(callback: (tx: unknown) => Promise<void>) {
     current.transactions++
+    const scheduledBefore = scheduledAfter.length
+    const client = { async query(command: string) {
+      assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command))
+      return { command, rows: [] }
+    } } as unknown as PoolClient
+    observeCommitEffects(client)
     const selection = {
       from(table: unknown) { assert.equal(table, agentRuns); return selection },
       condition: undefined as SQL | undefined,
@@ -81,7 +89,9 @@ const database = {
         return query.params.includes(runId) && query.params.includes(current.run.userId) ? [{ ...current.run }] : []
       },
     }
-    await callback({
+    await client.query('BEGIN')
+    try { await callback({
+      session: { client },
       select: () => selection,
       insert(table: unknown) { assert.equal(table, runMessages); return { async values(value: typeof current.messages[number]) { current.messages.push(value) } } },
       update(table: unknown) { assert.equal(table, agentRuns); return { set(value: { stopRequestedAt: Date }) { return { async where(condition: SQL) {
@@ -90,6 +100,9 @@ const database = {
         current.run.stopRequestedAt = value.stopRequestedAt; current.updates++
       } } } } },
     })
+      assert.equal(scheduledAfter.length, scheduledBefore, 'thread actions cannot schedule live effects before COMMIT')
+      await client.query('COMMIT')
+    } catch (error) { await client.query('ROLLBACK'); throw error }
   },
 }
 // The fixture resolves only the owner's same-issue chain. A continuation stays
@@ -336,7 +349,9 @@ test('actual send rechecks completion after the first readable-thread snapshot',
 
 test('actual stop action is idempotent for the owner and rejects ended/stopping sends', async () => {
   current = fixture(); viewer = 'owner'; chainReads.length = 0
+  const scheduledBefore = scheduledAfter.length
   assert.deepEqual(await actions.stopRun(runId), { stoppedRunIds: [runId] })
+  assert.ok(scheduledAfter.length > scheduledBefore, 'the real stop writer registers committed list invalidation')
   assert.ok(chainReads.includes('chain'), 'stop resolves the run chain first')
   const stoppedAt = current.run.stopRequestedAt
   assert.ok(stoppedAt instanceof Date)

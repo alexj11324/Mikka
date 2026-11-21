@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
 import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from './db/commit-effects'
 import { agentRuns, agents, bots, devices } from './db/schema'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { makeSnapshot } from './agent-kit/definition'
@@ -121,7 +123,7 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
   const client = { release() {}, async query(sql: string, params: unknown[] = []) {
     queries.push(sql)
     requireFixtureProjectLease(owner, workspaceId)
-    if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { rows: [] }
+    if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { command: sql, rows: [] }
     if (sql.startsWith('SELECT pg_advisory_xact_lock')) {
       assert.deepEqual(params, [`computer-policy:${workspaceId}`])
       return { rows: [] }
@@ -180,6 +182,8 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
     assert.deepEqual(params, [repoId, agentId, owner, issueId, workspaceId, null])
     return { rows: [{ ...cloudRepository, harness: 'codex' }] }
   } } as unknown as Parameters<typeof queueCloudRun>[0]
+  observeCommitEffects(client as unknown as PoolClient, queuePool)
+  const scheduledBefore = scheduledAfter.length
   const untrusted = { workspaceId: 'forged-body-namespace' }
   const input = { botId, issueId, agentId, deviceRepoId: repoId, title: 'Fixture', body: '', model: 'fixture', execution, ...untrusted }
   await queueCloudRun(queuePool, { userId: owner, workspaceId }, input)
@@ -187,6 +191,7 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
   assert.deepEqual((snapshot as { projectExecution: ProjectExecutionSnapshot }).projectExecution, projectSnapshot)
   assert.equal(projectLeaseActive, false)
   assert.equal(queries.at(-1), 'COMMIT')
+  assert.ok(scheduledAfter.length > scheduledBefore, 'the queue registers live effects after its native COMMIT')
   const beforeRefusal = queries.length, beforeSnapshot = snapshot
   projectDenied = true
   try { await assert.rejects(queueCloudRun(queuePool, { userId: owner, workspaceId }, input), { code: 'projectRepositoryDenied' }) }

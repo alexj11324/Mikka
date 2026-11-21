@@ -1,4 +1,5 @@
 import { after, before, mock, type TestContext } from 'node:test'
+import * as serverRuntime from '../../lib/server-runtime/server'
 
 /** Writer fixtures run the real live fan-out, including the community edition's
  * independent PostgreSQL LISTEN session. Own that runtime alongside the pools:
@@ -40,21 +41,19 @@ export function captureFixtureLiveEffects() {
     BETTER_AUTH_SECRET: 'synthetic-unit-commit-fixture', DEVICE_GATEWAY_URL: undefined,
     DEVICE_GATEWAY_PUSH_SECRET: undefined, VERCEL: undefined }
   const previous = Object.fromEntries(Object.keys(environment).map(key => [key, process.env[key]]))
-  const scheduled: Parameters<typeof import('../../lib/server-runtime/server').after>[0][] = []
-  let scheduler: { restore(): void } | undefined
+  const scheduled: Parameters<typeof serverRuntime.after>[0][] = []
+  const scheduler = mock.module(new URL('../../lib/server-runtime/server.ts', import.meta.url).href, {
+    namedExports: { ...serverRuntime, after: (work: Parameters<typeof serverRuntime.after>[0]) => { scheduled.push(work) } },
+  })
   // Register at module scope, alongside the caller's hooks. Registering after()
   // inside before() would restore the environment before any test body runs.
-  before(async () => {
+  before(() => {
     for (const [key, value] of Object.entries(environment)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value
     }
-    const runtime = await import('../../lib/server-runtime/server')
-    scheduler = mock.module(new URL('../../lib/server-runtime/server.ts', import.meta.url).href, {
-      cache: true, namedExports: { ...runtime, after: (work: Parameters<typeof runtime.after>[0]) => { scheduled.push(work) } },
-    })
   })
   after(() => {
-    scheduler?.restore()
+    scheduler.restore()
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value
     }

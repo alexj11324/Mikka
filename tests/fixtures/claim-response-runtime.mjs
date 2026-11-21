@@ -180,6 +180,15 @@ export async function environmentSecretSnapshot(...args){
 `
 const dbSource = `import assert from 'node:assert/strict'
 import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+import {observeCommitEffects} from ${JSON.stringify(new URL('../../lib/db/commit-effects.ts', import.meta.url).href)}
+
+// Failure updates below are autocommitted. Keep their real notification scope
+// distinct from the separately checked-out, read-only claim transaction.
+const committedWriter={async query(command){
+  assert.equal(command,'UPDATE')
+  return {command,rows:[]}
+}}
+observeCommitEffects(committedWriter)
 
 function query(columns){
   let table
@@ -203,6 +212,7 @@ function update(value){
       const same=(a,b)=>a instanceof Date||b instanceof Date?a!=null&&b!=null&&new Date(a).getTime()===new Date(b).getTime():a===b
       const changed=table==='agent_runs'&&terms.every(([,column,index])=>same(p.run[column],rendered.params[Number(index)-1]))&&nulls.every(([,column])=>p.run[column]==null)
       if(changed)Object.assign(p.run,values)
+      await committedWriter.query('UPDATE')
       return changed?[{id:p.run.id}]:[]
     }
     let result
@@ -211,7 +221,7 @@ function update(value){
   }}}}
 }
 let checkedOutClient
-export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
+export const db={session:{client:committedWriter},select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
   if (sql === 'SELECT 1 FROM thread_reply_versions WHERE "resultRunId"=$1 AND "userId"=$2 AND "workspaceId"=$3') {
@@ -371,7 +381,7 @@ registerHooks({
   },
   load(url,context,next){
     if(url==='claim-fixture:empty')return {format:'module',source:'export {}',shortCircuit:true}
-    if(url==='claim-fixture:next-server')return {format:'module',source:`export {NextResponse,NextRequest} from ${JSON.stringify(nextServer)};export function after(){}`,shortCircuit:true}
+    if(url==='claim-fixture:next-server')return {format:'module',source:`export {NextResponse,NextRequest} from ${JSON.stringify(nextServer)};export function after(work){const p=globalThis.claimResponseProbe;if(!p)throw new Error('Claim scheduling requires its fixture');(p.scheduledAfter??=[]).push(work)}`,shortCircuit:true}
     if(url.startsWith('claim-fixture:'))return {format:'module',source:decodeURIComponent(url.slice('claim-fixture:'.length)),shortCircuit:true}
     return next(url,context)
   },

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test, { before, mock } from 'node:test'
 import { threadResourcePreflight, withThreadProjectResources } from '../../tests/support/thread-project-resources-fixture'
 import { REGISTRATION_COMPLETE } from '../computer/registration-command'
+import type { PoolClient } from 'pg'
+import { observeCommitEffects } from '../db/commit-effects'
 
 // The real runtime-maintenance orchestration, with storage/receipt and cloud
 // transport boundaries mocked. The same path's immutable SQL receipts and
@@ -62,6 +64,7 @@ function fixture() {
   let released = false
   const query = async (sql: string, values: unknown[] = []) => {
     queries.push(sql)
+    if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { command: sql, rows: [], rowCount: 0 }
     const result = (rows: unknown[]) => ({ rows, rowCount: rows.length })
     const preflight = threadResourcePreflight(sql, values, run)
     if (preflight) return preflight
@@ -107,6 +110,8 @@ function fixture() {
   }
   const client = { query, release: () => { released = true } }
   const pool = { query, connect: async () => client } as never
+  observeCommitEffects(client as unknown as PoolClient, pool)
+  observeCommitEffects(pool)
   const box = { sandboxId: machine.sandboxId,
     files: { read: async () => 'b'.repeat(40), write: async () => { state.steps.push('bootstrap') } },
     commands: { run: async () => { state.steps.push('worker'); return { stdout: REGISTRATION_COMPLETE + '\n' } } },
@@ -133,7 +138,9 @@ function fixture() {
 
 test('receipt-bound preclaim spec recovery refreshes the retained runtime without inventing a failed-child SID', async () => {
   const f = fixture(), before = structuredClone(f.run)
+  const scheduledBefore = scheduledAfter.length
   assert.deepEqual(await f.execute(), { runId: f.run.id, state: 'running' })
+  assert.ok(scheduledAfter.length > scheduledBefore, 'the real recovery writer registers live effects')
   assert.deepEqual(f.run, before, 'runtime preparation retains the historical failure and null actual SID')
   for (const boundary of ['provider', 'connect', 'stage', 'switch', 'bootstrap', 'verify']) assert.ok(f.state.steps.includes(boundary), boundary)
   assert.ok(f.state.steps.filter(step => step === 'receipt').length >= 4, 'the proof is revalidated across provider and maintenance boundaries')
