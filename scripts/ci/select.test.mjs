@@ -127,7 +127,6 @@ test('every heavy consumer uses the same trusted triage and required names remai
 
 test('the actual required gate scripts reject drafts, unselected failures and selected skips', () => {
   const workflow = yaml.load(readFileSync('.github/workflows/ui-policy.yml','utf8'))
-  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
     const steps = workflow.jobs[job].steps
     const draftGate = steps.find(step => step.name === 'Draft PR is not a validated merge candidate')
@@ -136,6 +135,9 @@ test('the actual required gate scripts reject drafts, unselected failures and se
       if (draft) assert.equal(spawnSync('bash', ['-e', '-c', draftGate.run], { env: { PATH: process.env.PATH, GITHUB_STEP_SUMMARY: '/dev/null' } }).status, 1)
     }
     const script = steps.find(step => step.name?.startsWith('Require every selected ')).run
+    const declared = script.match(/for name in ([A-Z ]+); do/)
+    const names = declared ? declared[1].split(/\s+/) : []
+    if (job === 'ui-policy') assert.ok(names.length, 'the gate names the results it requires')
     const run = overrides => {
       const env = {
         PATH: process.env.PATH,
@@ -144,7 +146,7 @@ test('the actual required gate scripts reject drafts, unselected failures and se
         EXPECT_DB: 'true',
         DB_RESULT: 'success',
       }
-      for (const key of uiChecks) {
+      for (const key of names) {
         env['EXPECT_' + key] = 'true'
         env[key] = 'success'
       }
@@ -154,7 +156,7 @@ test('the actual required gate scripts reject drafts, unselected failures and se
     assert(run({}))
     assert(!run({CHANGES_RESULT:'failure'}))
     for(const result of ['skipped','failure','cancelled','timed_out','']) {
-      if(job==='ui-policy') for(const key of uiChecks) assert(!run({[key]:result}))
+      if(job==='ui-policy') for(const key of names) assert(!run({[key]:result}))
       else assert(!run({DB_RESULT:result}))
     }
     if (job === 'ui-policy') {
@@ -164,7 +166,7 @@ test('the actual required gate scripts reject drafts, unselected failures and se
         for (const result of ['success', 'skipped', 'failure', 'cancelled', 'timed_out', ''])
           assert(run({ ['EXPECT_' + retired]: 'true', [retired]: result }), `a retired ${retired} result does not affect the automatic gate`)
       }
-      for (const key of uiChecks) {
+      for (const key of names) {
         assert(run({['EXPECT_' + key]: 'false', [key]: 'skipped'}), key)
         for (const result of ['success', 'failure', 'cancelled']) {
           assert(!run({['EXPECT_' + key]: 'false', [key]: result}), key)

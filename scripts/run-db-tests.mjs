@@ -9,7 +9,7 @@ import { availableParallelism } from 'node:os'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { posix, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
@@ -504,6 +504,18 @@ export function runScript(command, args, options) {
   })
 }
 
+const blockingStdio = fileURLToPath(new URL('./ci/blocking-stdio.mjs', import.meta.url))
+
+// Force-exit can return before libc/libuv flushes the TAP summary. A single
+// node --test command gets a blocking stdio handle so the summary is in the
+// pipe before exit. Shell chains stay on pnpm so each command keeps its flags.
+export function launch(script, command) {
+  if (typeof command === 'string' && command.startsWith('node ') && command.includes('--test-force-exit') && !/['"\\&|;]/.test(command)) {
+    return [process.execPath, ['--import', blockingStdio, ...command.slice(5).trim().split(/\s+/)]]
+  }
+  return ['pnpm', ['-s', script]]
+}
+
 export function concurrency(value, fallback = DEFAULT_CONCURRENCY) {
   if (value === undefined || value === '') return fallback
   if (!/^[1-9]\d?$/.test(value)) throw new Error('DB_TEST_CONCURRENCY must be an integer from 1 to 99')
@@ -550,7 +562,8 @@ export async function main({ root = '.', env = process.env, run = runScript, clo
     const timings = []
     const execute = async ({ script, database }) => {
       const started = now()
-      const result = await run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: suiteEnv(env, database), maxBuffer: 64 << 20, script })
+      const [bin, args] = launch(script, scripts[script])
+      const result = await run(bin, args, { cwd: root, encoding: 'utf8', env: suiteEnv(env, database), maxBuffer: 64 << 20, script })
       const seconds = Math.round((now() - started) / 100) / 10
       timings.push({ script, seconds })
       console.log(`::group::pnpm ${script} (${database ?? 'template database'}, ${seconds}s)`)

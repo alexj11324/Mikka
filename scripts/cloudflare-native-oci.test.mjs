@@ -7,6 +7,7 @@ import {join} from 'node:path'
 import {pathToFileURL} from 'node:url'
 import test from 'node:test'
 import { sourceContext } from './cloudflare-ci.mjs'
+import { privateMikkaRepository } from './cloudflare-source.mjs'
 import { buildEnvironment, digestFromRepoDigests, releaseDockerfile, releaseId, releaseSelection, validatePrepared, publicReceipt, verifyOverlayMain } from './cloudflare-native-oci.mjs'
 
 const publicSha = 'a'.repeat(40)
@@ -70,7 +71,8 @@ test('a selected main overlay survives later merges while an unmerged overlay is
     git(upstream,'add','source.txt');git(upstream,'commit','-m','Reviewed main')
     const pinned = git(upstream,'rev-parse','HEAD')
     git(directory,'clone','--depth=1',pathToFileURL(upstream).href,checkout)
-    git(checkout,'config','url.'+pathToFileURL(upstream).href+'.insteadOf','git@github.com:alexj11324/mikka-hosted-ui.git')
+    const remote = 'git@github.com:' + privateMikkaRepository('mikka-hosted-ui', fixtureEnv) + '.git'
+    git(checkout,'config','url.'+pathToFileURL(upstream).href+'.insteadOf',remote)
     await writeFile(join(upstream,'source.txt'),'newer main\n')
     git(upstream,'commit','-am','Later main merge')
     verifyOverlayMain(checkout,pinned,fixtureEnv)
