@@ -42,6 +42,37 @@ Job queue is `started_at - created_at`; execution is
 CI wall time is the last job completion minus attempt creation. Parallel job
 queues and runner time are never summed and described as elapsed wall time.
 
+### Integration checkpoint after the repository transfer
+
+On 2026-11-21, this documentation branch normally integrates main
+`ed905baee7482c43b29e8b15480ebbae160278c1`, the original Owner's #2994 merge.
+Its 19 changed paths are retained, including the three repaired CI test
+locators and isolated Cloudflare source fixture. The overlapping development
+guide retains both that Owner's `Ready for review` wording and this PR's
+dependency-based merge procedure. No unmerged Owner implementation is copied.
+
+The following is a dated result snapshot, not a replacement for the single
+issue progress comment. Five public implementation PRs have merged. The
+private repair and four later public repairs remain unmerged at this checkpoint;
+their local proofs are not final protected CI or release acceptance.
+
+| Finding | Code-delivery state | Source-specific proof and remaining boundary |
+| --- | --- | --- |
+| SDLC-001 / #2986 Analytics allocation | Merged `040362591abbcb95d825311e5577bd27caa92b10` | Exact focused regression and main CI passed; observed summary allocation removed, no whole-CI speed claim |
+| SDLC-002 / #2987 bootstrap cache | Merged `8cddaa7c48c97ce0092c3ea028519fc9d0ff6069` | Exact PG17 and DB regressions passed; unchanged ledger at measured setup cost |
+| SDLC-003 / #2988 retry accounting | Merged `603d1d95f0266827549f858624a872920344034a` | Exact five-case regression and main CI passed; two original retry counterexamples |
+| SDLC-004 / private Cloud #418 migration preflight | Unmerged; exact head retained in private review | Independent 13/13 migration and 55/55 pipeline cases; existing qualified-ancestor contract applies, but the current-head GitGuardian receipt is missing |
+| SDLC-005 / #2993 repeated Site typecheck | Merged `128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87` | Exact optimization and main CI passed; integrated tree has real build/HTTP proof, later local full-build attempt remains blocked |
+| SDLC-006 / #2995 producer event admission | Merged `ee36d52f3ee391ddd529f1135ff86fa8f55bd99d` | Exact 68/68 offline contracts and main CI passed; no live publication or product task claimed |
+| SDLC-007 / [#3000](https://github.com/aspectly-labs/Mikka/pull/3000) runtime history | Ready, unmerged `8b5de3dacd3771737b0e25974c195deb057817e8` | Nine original reviewed blobs and 19 Owner blobs preserved; new integration review [6001494107](https://github.com/aspectly-labs/Mikka/pull/3000#pullrequestreview-6001494107). Final CI and GitGuardian remain incomplete |
+| SDLC-008 / [#3002](https://github.com/aspectly-labs/Mikka/pull/3002) consumer identity | Draft, unmerged `249e3911f590eb7ead883bb35989ac5524af0fba` | Normal integration includes #3000's existing reader. The additional real legacy-API 301 path is reproduced by 16 pass/one fail, then 17/17 after the existing immutable-ID API is used; final delta review and CI remain required |
+| SDLC-009 / [#3004](https://github.com/aspectly-labs/Mikka/pull/3004) marketing source admission | Ready, unmerged `ab7fbd7ee8f757a00333e09747610351f5d01b51` | Original source step 86/86, original marketing eight cases and independent review passed. No actual marketing dispatch/private build/publication sample; final CI and GitGuardian remain incomplete |
+| SDLC-010 / [#3007](https://github.com/aspectly-labs/Mikka/pull/3007) publication consumer contract | Draft, unmerged `b6ea2ca78cd000cb46d218936eec5871a0a96f71` | Three original suites reproduce 61 pass/three fail from retired job/report/source assumptions. A real historical publication and archive are available; this checkpoint has no repaired GREEN or new live acceptance |
+
+The first six rows' complete metrics and merge receipts remain below. Later
+rows retain their original PR ownership, dependencies and exact-version proof;
+they are not included in the five-merge denominator.
+
 ## A. Observed delivery baseline
 
 All rows below use attempt 1. Full source SHAs, every job and original timestamps
@@ -112,11 +143,34 @@ declare every command in the repository globally optimal.
 | Repeated CI timing logic on retries | Correct the existing collector/summary in #2988; no new poller or validator |
 | Automatic runtime producer emits `workflow_run`, but three consumers admit only older event types | Repair eight existing event checks in #2995; preserve fixed workflow identity, repository/source/attempt/receipt checks and pre-credential revalidation |
 | Runtime publication history recognizes the retired `subscriptions` job and equates workflow head with published source | #3000 repairs the existing reader and shared artifact binding: real historical ZIP/source counterexample, original Node RED and independent61/61 GREEN; exact protected CI/merge remain pending. No paid rebuild is triggered for measurement |
+| Repository transfer leaves active consumers and public marketing admission tied to an old owner/name pair | Reuse the existing finite official profiles and immutable repository ID in #3002/#3004; preserve coherent owner/name, original actors where enforced, source/attempt and credential boundaries. No parallel identity registry |
+| Publication consumers retain fields/jobs formally removed by accepted #2789 | #3007 reconciles the existing consumers with the producer's actual contract and #3000 reader; real product subscription, tool, version, terminal-state and cleanup assertions remain unchanged |
 
 Seven original job logs underlying the typecheck comparison are in
 [2984-typecheck-assessment.json](2984-typecheck-assessment.json). Identical command
 spelling across different environments is not sufficient evidence of duplicate
 validation. Existing image reuse remains the single supported build reuse path.
+
+### Transfer delta and original-owner deduplication
+
+The [transfer audit](2984-transfer-delta.md) and its
+[machine-readable inventory](2984-transfer-delta.json) retain the later fixed
+source `6fe25cf9413d4078ce350a97e284c33f1efa9de7` and its original capture
+time. All 54 workflows have a disposition: 17 have no active old-identity
+predicate, 14 already use the official profiles, six have original #2994
+repairs, three belong to SDLC-008, 13 retain distinct production or finite
+historical acceptance scope, and one exposes SDLC-009. The audit examines all
+2,570 changed-file records from 50 open PRs and 139 exact-main runs in its
+recorded window, including eight push runs. These denominators do not replace
+the earlier CI performance sample.
+
+The original audit precedes #2994's completed CI and normal merge. Those
+results are now integrated through `ed905bae`; the dated audit's queued-state
+observations are historical. The six original-owner workflow fixes are not
+claimed as #2984 implementation. Historical URLs and signed receipts, the
+unchanged Alex actor, the different `Mikka-handoff` repository and the finite
+Factory #1789/#1783 scope remain deliberate exclusions. No dormant manual
+release predicate is widened to manufacture a new execution sample.
 
 ### Measured changes
 
@@ -182,9 +236,12 @@ head40571ce6c780d4044f3c664099e060c857085879 already repairs those same three
 locators/contracts, preserving the negative result matrix and explicitly
 checking Draft refusal. No parallel fix or copied unmerged Owner code was
 made. Original#3001 also updates its own Ready/local-first instructions.
-Final integration waits for the original repairs to land normally; queued or
-failed current-main checks are not described as green. This dependency does
-not complete B1, the fixture journey, or either original product epic.
+The original repair subsequently merged normally as
+`ed905baee7482c43b29e8b15480ebbae160278c1` and is integrated here. Its 34
+native check runs are Actions results; the missing GitGuardian receipt is
+separately documented below and is not retrospectively counted as success.
+The old 51-case RED remains a result for its old source. This integration
+does not complete B1, the fixture journey or either original product epic.
 
 ## C. Earlier migration diagnosis without deployment authority
 
@@ -216,17 +273,23 @@ creation. These are different environments and workloads: the result demonstrate
 an earlier actionable diagnosis, not a causal 867-second CI speedup. The migration
 safety rejection is preserved.
 
-The private change passed 13/13 migration contracts and 55/55 related pipeline
-contracts. At this checkpoint its exact protected Cloud qualification is still
-required. An old successful qualification, including one that legitimately
-authorizes an ancestor for existing release operations, is not current-head CI.
-The original reader rejects that substitution. Local tests and GitGuardian
-success do not complete Cloud #418. The available connector has no workflow
-dispatch operation and the CLI has no authenticated session. The secure browser
-login request was aborted by the user. No new login request, borrowed token,
-new trigger, source substitution or permission change bypasses that boundary.
-The original protected qualification, normal merge and exact merged validation
-remain required.
+The normally integrated private change passed 13/13 migration contracts and
+55/55 related pipeline contracts, independently verified by
+[review 6001310457](https://github.com/aspectly-labs/mikka-cloud/pull/418#pullrequestreview-6001310457).
+That review corrects an earlier extra gate: the original operations contract
+permits a trusted qualified ancestor to cover a later fixed operations source,
+including release-script changes. The existing call graph, tests, native
+ancestry and original `44774644281/1` qualification were checked. Its 22 stages
+and actual artifact `14648988863` share digest
+`a09564e7ece89911c52b1926e7fb64610c8e43ddf4a38869a1dbd389b68b2df5`.
+This is legitimate reuse under the owning contract, not new CLI coverage in an
+old CI run. No extra registry publication, new trigger or weaker qualification
+rule is introduced for this source-only tool.
+
+The current private head still lacks its original GitGuardian check receipt;
+an earlier head's success cannot replace it. Normal merge and exact merged
+regression remain required after applicable existing security gates. Full
+private source identities and operations code stay in the private PR.
 
 ## D. Reproducible environment and real failures
 
@@ -242,7 +305,7 @@ rejects AF_UNIX socket construction. An independent minimal socket construction
 confirmed the capability failure; no application assertion was changed. The
 corresponding actual GitHub runner daemon/Node jobs passed at the reviewed heads.
 
-The fixed official fixture from original #2969 was built with its pinned public
+The earlier official fixture from original #2969 was built with its pinned public
 source and approved read-only UI overlay. Missing overlay dependencies and the
 existing verified FFmpeg package were repaired through their original setup.
 The failed complete build remains failed; successful continuation of its
@@ -259,10 +322,30 @@ contains the original fixed source, root cause and reproduction. Fresh readback
 of the Owner's later head `d30f6ec4a4a1b66278587442e7fd91676ab2f709` finds the
 preload now resolves its root from `import.meta.url`, independent of child cwd.
 That is an original-owner code correction, still on the unmerged Draft at this
-observation. It has not been relabelled as a new runtime or browser pass; the
-old failure remains attached to its old source. The B1 replay above verifies the repaired preload against a minimal synthetic
+observation. The old failure remains attached to its old source. The B1 replay
+above verifies the repaired preload against a minimal synthetic
 manifest. It does not move/copy an actual build manifest as a startup workaround,
 remove preload, change the readiness budget or take over that branch.
+
+A later complete invocation of the original
+`node scripts/build-application.mjs --local-fixture` at exact
+`d30f6ec4a4a1b66278587442e7fd91676ab2f709` succeeds in 283.690083369 seconds
+(n=1, 2026-11-21 00:37:13.302974–00:41:56.993031 UTC). Its
+[public build receipt](2984-fixture-build.json) records the unchanged tracked
+source, actual output manifest/log digests and the read-only pinned official
+overlay boundary. The private overlay SHA and code are not copied here.
+Provider credentials were not inherited, and native telemetry was disabled.
+
+The subsequent [original backend fixture execution](2984-fixture-backend.json)
+at that same public source uses Node24.22.3 and PostgreSQL17.12. It verifies the
+actual `local-fixture` build manifest, runs `prepareFixture` in 3,781 ms with
+396 migration ledger records, and successfully starts the original six scenes
+(`empty`, `board`, `task`, `automations`, `bot-settings`, `pulls`). Chromium
+then fails during launch, before a browser, context or page is created:
+`process_singleton_posix.cc` reports `socket()` EPERM. This is an execution
+environment failure before a product journey, not a failing product assertion.
+The original fixture, database client and PostgreSQL close normally at
+00:50:08.904 UTC; `pg_ctl status` exits 3 and no server remains running.
 
 Completed UI→API→DB→new-browser-readback rounds are **0** at this checkpoint.
 Two runs of the original seed smoke each passed six scenarios with identical
@@ -416,17 +499,62 @@ to recreate deleted E2B candidates or change a dispatch's original source.
 E2B's original cleanup/replacement procedure remains authoritative.
 
 This checkpoint is not closure of #2984. Remaining original-owner dependencies
-are the fixture child-start fix and chat acceptance, real staging admission and
-production acceptance. This remediation still owns the private #418 exact-head
-qualification/merge, completed protected post-merge observations and this
-documentation PR's own review/CI/merge. The automatic-E2B event contract repair
+are #2969's normal delivery, actual fixture/browser and chat acceptance, real
+staging admission and production acceptance. The child's corrected startup is
+now independently observed; a completed browser journey is not. This
+remediation still owns private #418's applicable current-head security checks,
+normal merge/regression, the four later public repairs in the checkpoint table,
+completed protected post-merge observations and this documentation PR's own
+review/CI/merge. The automatic-E2B event contract repair
 is merged and independently verified at its merge source; live publication is
 not claimed. The publication-history job/source mismatch is implemented in#3000 at
-head275cf937d8de19da2baa761aa3567930b880fe84, with independent61/61 original
+head8b5de3dacd3771737b0e25974c195deb057817e8, with independent61/61 original
 Node cases and the actual46376-byte historical ZIP digest verified. Its
-[fixed-source evidence](https://github.com/aspectly-labs/Mikka/blob/275cf937d8de19da2baa761aa3567930b880fe84/docs/ci/2984-runtime-reuse.json)
+[fixed-source evidence](https://github.com/aspectly-labs/Mikka/blob/8b5de3dacd3771737b0e25974c195deb057817e8/docs/ci/2984-runtime-reuse.json)
 keeps original metadata, closed-adapter transport and true archive-byte checks
 separate. It still requires protectedCI, normal merge and exact merged-source
-verification. Remaining repository-transfer consumer boundaries are being
-checked against existing Owner work; no unverified fleet-wide recovery is claimed. The live progress comment tracks these without
-creating a second issue ledger.
+verification. The main integration retains the nine reviewed implementation
+blobs. Its first local invocation passes 96 tests but fails to start the Task
+file because the original `tsx` loader was omitted; only that unstarted file
+is then run correctly and passes 16/16. The failed invocation remains failed,
+and these results are not described as one all-green run.
+
+SDLC-010 uses the real historical producer `44140435060/1`, nine jobs and
+artifact `14354323589`: the three templates are public/ready, while its
+publication contract legitimately has no retired `subscriptionAcceptance`.
+The actual published source `b53e8f369ff23eb062b1cc8509e499a60ec0bbe0`
+differs from workflow head `5189fa615cfd7ce281ce7c7e17e477206dba2254`.
+These are an actual historical receipt and fixed-source rejection examples,
+not a newly executed publication or proof of a product subscription task.
+Accepted #2789 merged as `25302463243fe27d86a74d4610ac2e6ad3750b3f`;
+its retained product subscription/tool/version/terminal/cleanup requirements
+are unchanged by this documentation correction.
+
+### GitGuardian remains required; absent checks remain unverified
+
+The [native GitGuardian assessment](2984-gitguardian-transfer.md) and
+[public-safe records](2984-gitguardian-transfer.json) distinguish the existing
+project requirement from the administrator settings visible to this identity.
+Current AGENTS, CONTRIBUTING, workflow README and accepted #2997 preserve the
+original external check. The visible public branch metadata lists three
+Actions contexts; the full protection API is inaccessible. Neither observation
+waives GitGuardian, and this work changes no protection or App configuration.
+
+The purposive before/after public sample has one head each: #2986 has a real
+GitGuardian App46505 success; post-transfer #2994 has 34 Actions check runs,
+eight non-GitGuardian suites and zero statuses. The private Cloud sample has
+three earlier scanned heads and three later heads missing scans, including
+#418. Hosted UI has three current heads with successful historical scans but
+zero observed new post-transfer heads. These are not fleet trigger rates, and
+Hosted UI's old success does not establish that a new push will scan. A
+zero-status `pending` result does not mean GitGuardian is queued.
+
+The missing check creation is proven for those exact samples; its installation,
+repository-selection, event-delivery or provider-configuration cause remains
+unknown. No original transfer Owner receipt located in the sampled discussions
+claims GitGuardian App migration is complete. The existing repository/App
+integration Owner must restore and verify the applicable exact-head native
+receipt. This is an external integration dependency, not authorization to
+replace the scanner, use another identity, add a new gate or reduce the original
+requirement. The live progress comment tracks this and the unfinished work
+without creating a second issue ledger.

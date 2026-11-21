@@ -183,7 +183,7 @@ retry only failed candidate/gate jobs: cleanup has removed their candidates.
 After the candidate and receipt checks pass, the workflow makes the candidates
 public and keeps the
 release report (all three IDs, their official base kinds, worker digest, source
-commit and measured models) as an immutable artifact for the private Cloudflare
+commit and original candidate evidence) as an immutable artifact for the private Cloudflare
 API deployment. Old template IDs and aliases are never updated or deleted. A
 failure before publication leaves the selected release unchanged. Publication
 verifies the candidate's source, run, attempt and report digests. The private
@@ -257,16 +257,15 @@ retained as workflow artifacts; credentials and raw task logs are excluded.
 
 ## GitHub branch protection (separate repository setting)
 
-Keep required status checks enabled. Disable **Require branches to be up to
-date before merging** (GitHub's *loose* status-check mode), as in Codex.
-Moving `main` does not by itself force every otherwise-mergeable PR to rebase
-or rerun its existing checks. Git merge conflicts and PR-head changes still
-need resolution and a fresh check; integration risks can require additional
-targeted tests.
-
-This branch-protection toggle **cannot be changed by editing workflow YAML**.
-Verify it in `Settings > Branches > main > Edit`, and do not claim that the
-repository is already in loose mode without verifying its effective settings.
+Keep the existing protection and required checks. Read the effective repository
+settings; workflow YAML and a permission-denied administration API cannot
+establish them. Do not change protection to shorten a validation cycle. Follow
+the single [merge procedure](../../docs/dev-workflow.md#5-ownership-and-merging):
+normally integrate `main` when protection requires it, a conflict exists or a
+relevant landed change requires verification, then validate that candidate.
+An unrelated main change does not justify a rebase or an invented up-to-date
+requirement. Missing external-check evidence is not a successful check or an
+exemption from its existing requirement.
 
 Do not skip the required gates, silently accept failed/skipped dependencies or
 publish from a red PR. The workflows bootstrap the trusted Nx selector from

@@ -23,8 +23,7 @@ jobs:
   screenshots:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
-      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
-      github.repository_owner_id == '183887963'
+      (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
     runs-on: macos-26
     timeout-minutes: 120
     permissions:
@@ -148,8 +147,7 @@ jobs:
     name: Credential-free native driver preflight
     if: >-
       github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') &&
-      github.ref != 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
-      github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
+      github.ref != 'refs/heads/main' && (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
     runs-on: macos-26
     timeout-minutes: 25
     permissions:

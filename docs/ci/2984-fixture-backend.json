@@ -1,0 +1,62 @@
+{
+  "publicSource": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+  "startedAt": "2026-11-21T00:49:46.932Z",
+  "finishedAt": "2026-11-21T00:50:08.904Z",
+  "node": "v24.22.3",
+  "officialOverlayRecordedPrivatelyInOriginalBuildReceipt": true,
+  "completedBrowserJourneys": 0,
+  "stages": [
+    {
+      "stage": "inputs-verified",
+      "at": "2026-11-21T00:49:47.148Z",
+      "manifestTarget": "local-fixture",
+      "manifestSha256": "d803d3084af1d0730762084031f707c00421002cc44390cd8cabd35ff3620e69",
+      "clean": true
+    },
+    {
+      "stage": "postgres-started",
+      "at": "2026-11-21T00:49:48.459Z",
+      "database": "mikka_2984_b1_e2e",
+      "address": "127.0.0.1",
+      "port": 44893,
+      "version": "PostgreSQL 17.12 (Debian 17.12-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+    },
+    {
+      "stage": "original-prepareFixture-passed",
+      "at": "2026-11-21T00:49:52.243Z",
+      "elapsedMs": 3781,
+      "migrationCount": 396
+    },
+    {
+      "stage": "original-startFixture-passed",
+      "at": "2026-11-21T00:49:57.716Z",
+      "origin": "http://127.0.0.1:40261",
+      "scenes": [
+        "empty",
+        "board",
+        "task",
+        "automations",
+        "bot-settings",
+        "pulls"
+      ],
+      "target": "local-fixture"
+    }
+  ],
+  "browserFailure": {
+    "phase": "chromium.launch, before browser/context/page creation",
+    "classification": "execution environment socket permission",
+    "reason": "process_singleton_posix.cc:297 socket() failed: Operation not permitted (1)",
+    "productE2EAttemptStarted": false
+  },
+  "cleanup": {
+    "reason": "setup_failure",
+    "browserNotStarted": true,
+    "fixtureClosed": true,
+    "databaseClientClosed": true,
+    "postgresStopped": true,
+    "postgresStatusExit": 3,
+    "postgresStillRunning": false
+  },
+  "originalReceiptSha256": "edea1be27c7a9905485d0f526197eb8c78c2dfbf9cdd9ea38ee6c3f943944718",
+  "failureLogSha256": "0185156df6e50336478baf07979dd14d04f9fd0e062c8c9ae6137351576d8a29"
+}
