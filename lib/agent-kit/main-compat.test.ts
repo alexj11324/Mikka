@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto'
 import {after, afterEach, before, beforeEach, mock, test} from 'node:test'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
+import type { PoolClient } from 'pg'
 import {defaultRunPolicy} from '@mikka/protocol/agent-policy'
 import {REPO_ORIGIN_HEADER} from '@mikka/protocol/device'
 import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
@@ -11,6 +12,7 @@ import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
 import * as serverRuntime from '../server-runtime/server'
+import { observeCommitEffects } from '../db/commit-effects'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const otherWorkspace=randomUUID()
@@ -267,9 +269,9 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    const sql=compactSql(raw);calls.push({sql:raw,args})
    assert.equal(scheduledAfter.length,0,'a queue write cannot schedule response work before its COMMIT')
    assert.equal(connected,true);assert.equal(memberLease,true);requireResourceLease(owner,workspace)
-   if(sql==='BEGIN'){assert.deepEqual(args,[]);assert.equal(transactionOpen,false);transactionOpen=true;return fixtureRows([])}
+   if(sql==='BEGIN'){assert.deepEqual(args,[]);assert.equal(transactionOpen,false);transactionOpen=true;return {...fixtureRows([]),command:sql}}
    assert.equal(transactionOpen,true,'every queue read/write uses the same APP transaction')
-   if(sql==='COMMIT'||sql==='ROLLBACK'){assert.deepEqual(args,[]);transactionOpen=false;return fixtureRows([])}
+   if(sql==='COMMIT'||sql==='ROLLBACK'){assert.deepEqual(args,[]);transactionOpen=false;return {...fixtureRows([]),command:sql}}
    if(sql==='SELECT pg_advisory_xact_lock(hashtextextended($1,0))'){
     assert.equal(args.length,1)
     assert.ok(args[0]===`computer-policy:${workspace}`||(priorRun&&typeof args[0]==='string'&&/^computer-task:[0-9a-f]{64}$/.test(args[0])))
@@ -333,6 +335,7 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    throw new Error(`Unexpected cloud queue SQL: ${sql}`)
   },
  }
+ observeCommitEffects(client as unknown as PoolClient)
  const pool={
   connect:async()=>{assert.equal(connected,false);assert.equal(memberLease,true);requireResourceLease(owner,workspace);connected=true;connections++;return client},
   query:async(raw:string,args:unknown[])=>{
