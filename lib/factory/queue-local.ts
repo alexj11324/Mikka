@@ -15,6 +15,7 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   // on this default.
   const source = dispatch.source ?? null
   const origin = dispatch.origin ?? 'web'
+  if (await (await import('@/lib/code-review/request-authority')).requestedCodeReviewReadOnly(userId, sourceEventId)) input = { ...input, readOnly: true }
   input = { ...input, policyCeiling: await continuedRunPolicyCeiling(pool, userId, input.issueId, input.threadRunId, input.policyCeiling) }
   // A new thread takes the effort its request asked for (an automation's), when its model takes one.
   if (input.modelDispatch && sourceEventId && !input.threadRunId && typeof input.model === 'string')

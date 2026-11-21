@@ -30,6 +30,7 @@ import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
 import { mailboxCatalogueSchema } from './mailbox'
 import { taskSecretAccessSchema } from './task-secrets'
+import { taskBranchSchema } from './orchestrator'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -367,6 +368,8 @@ export const MODEL_GATEWAY_LOOPBACK_HEADER = "x-mikka-model-gateway-loopback"
 export const RUN_CREDENTIALS_HEADER = "x-mikka-run-credentials"
 /** Only the first cloud claim can replace that sync's repository discovery. */
 export const INITIAL_REPOSITORY_HEADER = "x-mikka-initial-repository"
+/** The daemon accepts a configured prefix in the task's GitHub delivery branch. */
+export const CUSTOM_TASK_BRANCH_HEADER = "x-mikka-custom-task-branch"
 
 const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.test(value))
 /** Background refresh response; null means the provider set no expiry. */
@@ -503,7 +506,7 @@ export const runAssignmentSchema = z.object({
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**
-   * The issue's branch (`mikka/<team>-<number>`, ADR 0024): every run of
+   * The issue's branch (default `mikka/<team>-<number>`, ADR 0024): every run of
    * the issue pushes its verified commit here, so one pull request follows
    * the issue across fix rounds. A run that starts a new worktree builds on
    * this branch from the remote when it exists. Without it the daemon
@@ -540,7 +543,7 @@ export const runAssignmentSchema = z.object({
    */
   github: z.object({
     endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
-    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/).optional(),
+    branch: taskBranchSchema.optional(),
     token: runGitHubCredentialSchema.shape.token.optional(),
     expiresAt: runGitHubCredentialSchema.shape.expiresAt.optional(),
   }).strict().refine(value => Boolean(value.token) === (value.expiresAt !== undefined), { message: 'A prepared GitHub token includes its natural expiry', path: ['expiresAt'] }).optional(),

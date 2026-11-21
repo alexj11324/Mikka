@@ -157,7 +157,8 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         const policy = await steps.githubCallAllowedStep(userId, botId)
         if (policy === 'deny') return { error: 'githubActionDenied' }
         if (policy === 'unavailable') return { error: 'githubPolicyUnavailable' }
-        return steps.githubMcp(userId, input, scope)
+        const request = options.taskEventId ?? options.sourceEventId
+        return request ? steps.githubMcp(userId, input, scope, { botId, sourceEventId: request }) : steps.githubMcp(userId, input, scope)
       },
     }),
     ...(computerEnabled ? {

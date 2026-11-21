@@ -20,6 +20,7 @@ type McpResult = { tools: unknown[]; nextCursor: string | null } | Record<string
  */
 export async function runMcpCommand(target: () => Promise<McpTarget>, command: McpCommand, dependencies: McpDependencies = {}, hooks: {
   ready?: () => Promise<unknown>; code?: (error: unknown) => string | undefined;
+  beforeCall?: (client: MCPClient, command: Extract<McpCommand, { name: string }>, signal: AbortSignal) => Promise<unknown>;
 } = {}): Promise<McpResult | { error: string }> {
   let client: MCPClient | undefined
   let transport: ReturnType<typeof publicMcpFetch> | undefined
@@ -43,6 +44,7 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
     await hooks.ready?.()
     stage = 'name' in command ? 'call' : 'list'
     if ('name' in command) {
+      await hooks.beforeCall?.(client, command, signal)
       dispatched = true
       const result = await abortable(() => client!.callTool({ name: command.name, arguments: command.arguments, options: { signal } }), signal)
       return redact(result, connection.secrets)

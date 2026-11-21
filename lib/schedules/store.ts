@@ -29,7 +29,7 @@ export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => 
 export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
 /** How each run is set up beyond the request: the Environment, model and effort, machine size and the thread's organize. */
 export type DispatchRun = Pick<Definition, 'environmentId' | 'model' | 'machineSize' | 'runs'>
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true; thread?: string; run?: DispatchRun }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true; thread?: string; run?: DispatchRun; /** Host-derived, never a schedule form field. */ codeReview?: true }
 /** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
 export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent | SlackAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
 /** One finished run to post: the automation, how it ended, and the task it made or added to. */
@@ -134,7 +134,8 @@ export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventI
 export class ScheduleStore {
   constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: (ownerId: string, botId: string | null) => boolean | Promise<boolean>, private clock: () => Date = () => new Date(), private automation: AutomationSeams = {}) {}
   private async listChanged(tx: PoolClient, workspaceId: string | null) { if (workspaceId) await this.automation.changed?.(tx, workspaceId) }
-  private async transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
+  private async transaction<T>(work: (tx: PoolClient) => Promise<T>, existing?: PoolClient): Promise<T> {
+    if (existing) return work(existing)
     observePoolCommits(this.pool)
     const tx = await this.pool.connect()
     try { await tx.query('BEGIN'); await tx.query("SET LOCAL lock_timeout='5s'"); const value = await work(tx); await tx.query('COMMIT'); return value }
@@ -203,7 +204,7 @@ export class ScheduleStore {
     if (!issue) throw new ScheduleError('scheduleTaskAccessDenied',403)
     return issue
   }
-  async command(actor: Actor, raw: unknown) {
+  async command(actor: Actor, raw: unknown, existing?: PoolClient) {
     const parsed = commandSchema.safeParse(raw)
     if (!parsed.success) throw new ScheduleError('invalidScheduleCommand',400)
     const cmd = parsed.data
@@ -431,7 +432,7 @@ export class ScheduleStore {
         webhook_key_hash=CASE WHEN run_as_user_id IS DISTINCT FROM $7 THEN NULL ELSE webhook_key_hash END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock(),cmd.action==='delete',runAs])).rows[0]
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
-    }))
+    }, existing))
   }
   /** Close only a collecting window under the same schedule lock used by ingress. The normal worker owns dispatch. */
   private async closeWebhookBatch(tx: PoolClient, row: Schedule, batchId: string, action: 'flush_batch' | 'cancel_batch', access: WorkspaceAccess) {

@@ -9046,6 +9046,38 @@
     "subagentMaxConcurrent": {
       "label": "并发子 Agent 数量",
       "keywords": "子 Agent|并发|限制"
+    },
+    "prTitlePrefix": {
+      "label": "PR 标题前缀",
+      "keywords": "标题|前缀"
+    },
+    "prBranchPrefix": {
+      "label": "分支前缀",
+      "keywords": "分支|前缀"
+    },
+    "prAutoMerge": {
+      "label": "自动合并已验证的 PR",
+      "keywords": "自动|合并"
+    },
+    "prDraft": {
+      "label": "以草稿创建 PR",
+      "keywords": "草稿"
+    },
+    "codeReviewModel": {
+      "label": "代码审阅模型",
+      "keywords": "审阅|模型"
+    },
+    "codeReviewSeverity": {
+      "label": "代码审阅严重度",
+      "keywords": "审阅|严重度|阈值"
+    },
+    "codeReviewIgnoredPaths": {
+      "label": "代码审阅忽略路径",
+      "keywords": "审阅|忽略|路径"
+    },
+    "codeReviewOutput": {
+      "label": "代码审阅输出",
+      "keywords": "审阅|评论|汇总"
     }
   }
 }

@@ -23,7 +23,9 @@ import { advancesTo, personChangedStatusSince } from '@/lib/task-status-advance'
 import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
-import { publicationBranch, publicationGate } from '@/lib/run-publication-policy'
+import { publicationBranch, publicationDraft, publicationGate } from '@/lib/run-publication-policy'
+import { publicationDefaults } from '@/lib/code-review/settings-storage'
+import { automaticMergeReadiness } from '@/lib/code-review/auto-merge'
 import { openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
 import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue, withRunWorkspace } from './run-completion'
@@ -89,7 +91,8 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
       .where(and(eq(runPublications.issueId, issueId), eq(runPublications.remoteKey, key), sql`${runPublications.branch} is not null`))
       .orderBy(asc(runPublications.createdAt)).limit(1)
     const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier }], tx)).get(issueId) ?? null
-    const branch = previous?.branch ?? publicationBranch(identifier)
+    const defaults = await publicationDefaults({ userId: run.userId, workspaceId: stored.workspaceId }, tx)
+    const branch = previous?.branch ?? publicationBranch(identifier, defaults.branchPrefix)
     if (admission && branch !== admission.targetBranch) throw new PublicationError('publication_mismatch')
     if (branch) {
       // Personal identifiers are only unique per owner. Reserve the shared
@@ -99,7 +102,8 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
         .where(and(eq(runPublications.remoteKey, key), eq(runPublications.branch, branch), ne(runPublications.issueId, issueId))).limit(1)
       if (collision) throw new PublicationError('pull_request_conflict')
     }
-    const [saved] = await tx.insert(runPublications).values({ runId: run.id, userId: run.userId, issueId, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl, remoteKey: key, identifier, branch, baseBranch: run.baseBranch, pushApproved }).returning()
+    const [saved] = await tx.insert(runPublications).values({ runId: run.id, userId: run.userId, issueId, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl, remoteKey: key, identifier, branch, baseBranch: run.baseBranch, pushApproved,
+      titlePrefix: defaults.titlePrefix, autoMerge: defaults.autoMerge, defaultDraft: defaults.draft }).returning()
     return saved
   }))
   const policy = defaultRunPolicy()
@@ -323,7 +327,8 @@ async function settlePublication(claim: Publication, result: { pullRequest?: Pub
       // durable outcome; no task, history or notification survives revocation.
       result = { ...result, errorCode: 'issue_unavailable' }
     }
-    await tx.update(runPublications).set({ status: result.pullRequest ? 'published' : 'blocked', pullRequest: result.pullRequest ?? null, errorCode: result.errorCode ?? null, leaseToken: null, leaseExpiresAt: null, updatedAt: new Date() }).where(eq(runPublications.runId, claim.runId))
+    await tx.update(runPublications).set({ status: result.pullRequest ? 'published' : 'blocked', pullRequest: result.pullRequest ?? null, errorCode: result.errorCode ?? null, leaseToken: null, leaseExpiresAt: null, updatedAt: new Date(),
+      ...(result.pullRequest?.autoMergeEnabled ? { autoMergeRequestedAt: new Date() } : {}) }).where(eq(runPublications.runId, claim.runId))
     return true
   })
   const settled = await withRunWorkspace(claim.userId, stored?.workspaceId ?? null, () => settle(true))
@@ -376,7 +381,8 @@ export type OwnerPullRequestOpener = (input: Omit<Parameters<typeof openRunPullR
  */
 export function createOwnerPullRequestOpener(deps: { credential?: (userId: string, remoteKey: string) => Promise<{ token: string; githubAccountId?: string; installationId?: string }>; fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): OwnerPullRequestOpener {
   return async ({ userId, ...input }) => {
-    const credential = await (deps.credential ?? ownerGitHubCredential)(userId, input.remoteKey)
+    const requireUserToken = input.autoMerge
+    const credential = await (deps.credential ?? ownerGitHubCredential)(userId, input.remoteKey, requireUserToken)
     const { recordRepositoryInstallation } = await import('@/lib/github/repository-installation')
     return openRunPullRequest({ ...input, installationId: credential.installationId, ...credential, ...(deps.fetcher ? { fetcher: deps.fetcher } : {}),
       onVerified: async binding => {
@@ -388,10 +394,10 @@ export function createOwnerPullRequestOpener(deps: { credential?: (userId: strin
 export const openOwnerPullRequest = createOwnerPullRequestOpener()
 
 /** The run owner's own GitHub token, as a publication outcome when there is none. */
-async function ownerGitHubCredential(userId: string, remoteKey: string): Promise<{ token: string; githubAccountId?: string; installationId?: string }> {
-  const { GitHubAccessError } = await import('@/lib/github/user-access')
+async function ownerGitHubCredential(userId: string, remoteKey: string, requireUserToken = false): Promise<{ token: string; githubAccountId?: string; installationId?: string }> {
+  const { GitHubAccessError, githubTokenForUser } = await import('@/lib/github/user-access')
   const { githubMachineCredential } = await import('@/lib/github/machine-credential')
-  try { return await githubMachineCredential(userId, { remoteKey }) }
+  try { return requireUserToken ? await githubTokenForUser(userId) : await githubMachineCredential(userId, { remoteKey }) }
   catch (error) {
     if (!(error instanceof GitHubAccessError)) throw error
     if (error.code === 'githubNotConnected') throw new PublicationError('github_identity_required')
@@ -400,12 +406,47 @@ async function ownerGitHubCredential(userId: string, remoteKey: string): Promise
   }
 }
 
+/** The same durable publication workflow waits for the existing independent
+ * check, then reclaims its original publication. No second queue or timer. */
+async function automaticPublicationPending(runId: string): Promise<boolean> {
+  const [hint] = await db.select({ userId: runPublications.userId, issueId: runPublications.issueId, workspaceId: agentRuns.workspaceId,
+    autoMerge: runPublications.autoMerge, requested: runPublications.autoMergeRequestedAt }).from(runPublications)
+    .innerJoin(agentRuns, eq(agentRuns.id, runPublications.runId)).where(eq(runPublications.runId, runId))
+  if (!hint?.autoMerge || hint.requested || !hint.workspaceId) return false
+  try {
+    return await withPublicationWorkspace(hint.userId, hint.workspaceId, async () => {
+      const client = await pool.connect()
+      try { return await withDatabaseClient(client, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+        const [task] = await tx.select().from(issues).where(eq(issues.id, hint.issueId)).for('update')
+        const [run] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, hint.userId))).for('update')
+        const [publication] = await tx.select().from(runPublications).where(eq(runPublications.runId, runId)).for('update')
+        if (!task || !run || !publication || publication.status !== 'published' || publication.autoMergeRequestedAt
+          || run.issueId !== task.id || run.workspaceId !== hint.workspaceId || publication.pullRequest?.state !== 'open'
+          || !await mayCompleteIssue(task, hint.userId, run.workspaceId)) return false
+        const report = reportOf(run)
+        if (!report?.publish?.commit || publicationGate({ stopReason: run.stopReason, kind: run.kind, report, assignment: publication }).state !== 'pending') return false
+        const state = await automaticMergeReadiness(client, { userId: hint.userId, workspaceId: run.workspaceId, issueId: task.id, runId,
+          commit: report.publish.commit, preferred: publication.autoMerge, draft: publication.defaultDraft, verification: report.verify.status })
+        if (state === 'ineligible') return false
+        if (state === 'ready') await tx.update(runPublications).set({ status: 'pending', attempts: 0, errorCode: null, updatedAt: new Date() }).where(eq(runPublications.runId, runId))
+        return true
+      }))) } finally { client.release() }
+    })
+  } catch (error) {
+    if (!(error instanceof PublicationError) || error.code !== 'issue_unavailable') throw error
+    return false
+  }
+}
+
 /** A Workflow step calls this; the DB lease also protects duplicate workflows. */
 export async function publishRunResult(runId: string, openPullRequest: OwnerPullRequestOpener = openOwnerPullRequest): Promise<{ done: boolean }> {
   const claim = await claimPublication(runId)
   if (!claim) {
     const [row] = await db.select({ status: runPublications.status, userId: runPublications.userId }).from(runPublications).where(eq(runPublications.runId, runId))
-    if (row?.status === 'published') await resumePublicationEvidenceHandoff(row.userId, runId)
+    if (row?.status === 'published') {
+      await resumePublicationEvidenceHandoff(row.userId, runId)
+      if (await automaticPublicationPending(runId)) return { done: false }
+    }
     return { done: !row || WORKFLOW_DONE.includes(row.status) }
   }
   try {
@@ -413,26 +454,32 @@ export async function publishRunResult(runId: string, openPullRequest: OwnerPull
     // readiness instead of forcing a draft solely because execution had no
     // preconfigured command; the person's merge still requires both checks.
     const factoryBound = (await pool.query(`SELECT 1 FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND a.stage='execute' AND t."userId"=$2 AND t."issueId"=$3`,[runId,claim.userId,claim.issueId])).rowCount === 1
-    const snapshot = await withPublicationAuthority(claim, async ({ publication, report, allowCreate }) => ({
+    const snapshot = await withPublicationAuthority(claim, async ({ publication, run, report, allowCreate }, client) => ({
       remoteKey: publication.remoteKey, issueId: publication.issueId, identifier: publication.identifier!,
       title: factoryBound ? factoryPullRequestText(publication.issueId).title : publication.issueTitle!,
       summary: factoryBound ? factoryPullRequestText(publication.issueId).summary : report.summary,
-      branch: publication.branch!, commit: report.publish!.commit!, baseBranch: publication.baseBranch, draft: report.verify.status === 'not_run' && !factoryBound, allowCreate,
+      branch: publication.branch!, commit: report.publish!.commit!, baseBranch: publication.baseBranch,
+      titlePrefix: publication.titlePrefix, draft: publicationDraft(publication.defaultDraft, report.verify.status, factoryBound),
+      verificationStatus: report.verify.status, allowCreate,
+      autoMerge: await automaticMergeReadiness(client, { userId: run.userId, workspaceId: run.workspaceId, issueId: publication.issueId, runId,
+        commit: report.publish!.commit!, preferred: publication.autoMerge, draft: publicationDraft(publication.defaultDraft, report.verify.status, factoryBound), verification: report.verify.status }) === 'ready',
     }))
     const visualEvidence = factoryBound ? await prepareFactoryPublicationEvidence(pool, {
       userId: claim.userId, issueId: claim.issueId, runId, sha: snapshot.commit,
     }, resolveAppOrigin(process.env)) : undefined
     const pullRequest = await openPullRequest({ ...snapshot, userId: claim.userId, ...(visualEvidence ? { visualEvidence } : {}),
-      withWrite: write => withPublicationAuthority(claim, async (_authority, client) => {
+      withWrite: write => withPublicationAuthority(claim, async ({ publication, run, report }, client) => {
         // Same SQL transaction/connection as issue/run authority: concurrent
         // publications cannot exhaust the pool while waiting for a second one.
         if (visualEvidence) await lockFactoryPublicationEvidence(client, visualEvidence)
+        if (snapshot.autoMerge && await automaticMergeReadiness(client, { userId: run.userId, workspaceId: run.workspaceId, issueId: publication.issueId, runId,
+          commit: snapshot.commit, preferred: publication.autoMerge, draft: publication.defaultDraft, verification: report.verify.status }) !== 'ready') throw new PublicationError('issue_unavailable')
         return write()
       }) })
     if (visualEvidence && pullRequest.evidenceDigest !== visualEvidence.digest) throw new PublicationError('factory_public_evidence_required')
     const done = await settlePublication(claim, { pullRequest })
     if (done) await resumePublicationEvidenceHandoff(claim.userId, runId)
-    return { done }
+    return { done: done && !await automaticPublicationPending(runId) }
   } catch (error) {
     if (!(error instanceof PublicationError)) throw error
     if (error.retryable && claim.attempts < MAX_ATTEMPTS) {

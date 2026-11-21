@@ -5,17 +5,18 @@ import { createGitHubMcpRuntime, GITHUB_MCP_URL } from './mcp'
 import { runMcpCommand } from '@/lib/plugins/mcp'
 import { GitHubAccessError } from './user-access-error'
 import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
+import { reviewGitHubCallAllowed } from '@/lib/code-review/github-policy'
 
 const OWN = 'ghu_' + 'A'.repeat(36)
 const OTHER = 'ghu_' + 'B'.repeat(36)
 
-function fixture(behaviour: { echo?: boolean; failCall?: boolean } = {}) {
+function fixture(behaviour: { echo?: boolean; failCall?: boolean; tools?: { name: string; inputSchema: Record<string, unknown>; annotations?: { readOnlyHint?: boolean } }[] } = {}) {
   const seen: { url?: string; headers?: Record<string, string>; origin?: string; calls: unknown[] } = { calls: [] }
   const connect = (async (options: Parameters<typeof createMCPClient>[0]) => {
     const transport = options.transport as { url: string; headers: Record<string, string> }
     seen.url = transport.url; seen.headers = transport.headers
     return {
-      listTools: async ({ params }: { params?: { cursor?: string } }) => ({ tools: [{ name: 'issue_read', title: 'Read an issue', description: `token ${OWN}`, inputSchema: {}, annotations: { readOnlyHint: true } }], nextCursor: params?.cursor ? undefined : 'next' }),
+      listTools: async ({ params }: { params?: { cursor?: string } }) => ({ tools: behaviour.tools ?? [{ name: 'issue_read', title: 'Read an issue', description: `token ${OWN}`, inputSchema: {}, annotations: { readOnlyHint: true } }], nextCursor: params?.cursor ? undefined : 'next' }),
       callTool: async (call: { name: string; arguments: unknown }) => {
         seen.calls.push(call)
         if (behaviour.failCall) throw new Error(`lost ${OWN}`)
@@ -78,6 +79,41 @@ test('scheduled read-only turns get neither GitHub MCP tool', () => {
   const registry = { github_tools: {}, github_call: {}, web_search: {}, get_issue: {} } as never
   assert.deepEqual(Object.keys(scheduledReadTools(registry)).sort(), ['get_issue', 'web_search'])
   assert.deepEqual(Object.keys(scheduledReadTools(registry, ['github_call', 'github_tools', 'web_search'])), ['web_search'])
+})
+
+test('managed review output is checked before the native MCP call, using the actual tool annotation and bound PR', async () => {
+  const { seen, dependencies } = fixture({ tools: [
+    { name: 'pull_request_read', inputSchema: {}, annotations: { readOnlyHint: true } },
+    { name: 'pull_request_review_write', inputSchema: {}, annotations: { readOnlyHint: false } },
+    { name: 'add_comment_to_pending_review', inputSchema: {}, annotations: { readOnlyHint: false } },
+    { name: 'merge_pull_request', inputSchema: {}, annotations: { readOnlyHint: false } },
+    { name: 'tool_without_annotation', inputSchema: {} },
+  ] })
+  const authority = { repository: 'v2/github.com/acme/web', pullNumber: 7, output: 'summary' as 'summary' | 'comments' }
+  const runtime = createGitHubMcpRuntime(tokens([]), dependencies, async (command, readOnly) => reviewGitHubCallAllowed(authority, command, readOnly))
+  const args = { owner: 'acme', repo: 'web', pullNumber: 7 }
+  const allowed = async (name: string, extra = {}) => assert.ok(!('error' in await runtime('owner', { name, arguments: { ...args, ...extra } })))
+  const denied = async (name: string, extra = {}) => {
+    const before = seen.calls.length
+    assert.deepEqual(await runtime('owner', { name, arguments: { ...args, ...extra } }), { error: 'githubActionDenied' })
+    assert.equal(seen.calls.length, before, 'a denial is not a dispatched or uncertain external mutation')
+  }
+  await allowed('pull_request_read')
+  await denied('pull_request_review_write', { method: 'create', event: 'COMMENT' })
+  await denied('tool_without_annotation')
+  await denied('unknown_tool')
+  authority.output = 'comments'
+  await allowed('pull_request_review_write', { method: 'create' })
+  await allowed('add_comment_to_pending_review', { path: 'src/index.ts', line: 8, body: 'Synthetic finding' })
+  await allowed('pull_request_review_write', { method: 'submit_pending', event: 'COMMENT' })
+  for (const extra of [
+    { method: 'create', event: 'APPROVE' }, { method: 'submit_pending', event: 'REQUEST_CHANGES' },
+    { method: 'submit_pending' }, { method: 'delete_pending' }, { method: 'create', event: 'COMMENT', repo: 'other' },
+    { method: 'create', event: 'COMMENT', pullNumber: 8 }, { method: 'create', event: 'COMMENT', pullNumber: '7' },
+  ]) await denied('pull_request_review_write', extra)
+  await denied('merge_pull_request')
+  await denied('add_comment_to_pending_review', { owner: 'someone-else' })
+  assert.equal(seen.calls.length, 4)
 })
 
 // If the hosted server refuses the GitHub App user token, only these two tools

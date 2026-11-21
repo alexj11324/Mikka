@@ -10,7 +10,7 @@ export async function isolatedPostgresURL(connectionString) {
     || !(['/mikka_improvement', '/factory193', '/mikka_monitor_195'].includes(target.pathname) || isE2eTarget(connectionString))
     || target.search || target.hash) throw new Error('Fixture requires a disposable test database')
   const admin = new Pool({ connectionString: target.toString(), max: 1 })
-  const database = `mikka_fixture_${randomUUID().replaceAll('-', '')}`
+  const database = `mikka_fixture_${randomUUID().replaceAll('-', '')}_e2e`
   try {
     await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   } finally { await admin.end() }

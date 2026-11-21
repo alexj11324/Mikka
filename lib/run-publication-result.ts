@@ -35,6 +35,8 @@ export class PublicationError extends Error {
 }
 
 export interface PublishedPullRequest {
+  /** GitHub acknowledged its native queue; this is not a merged receipt. */
+  autoMergeEnabled?: boolean
   /** Present for deliveries recorded after #541. */
   title?: string
   url: string

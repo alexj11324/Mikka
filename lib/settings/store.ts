@@ -9,6 +9,7 @@ import { workspaceListChanged } from '@/lib/live/lists'
 import { mirrorLegacySetting } from './legacy-mirrors'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues } from './schema'
+import { mirrorCodeReviewSetting } from '@/lib/code-review/settings-storage'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
@@ -66,6 +67,7 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
       await tx.insert(workspaceSettingValues).values({ workspaceId: context.workspaceId, key, ...changed })
         .onConflictDoUpdate({ target: [workspaceSettingValues.workspaceId, workspaceSettingValues.key], set: changed })
     }
+    if (field.mirror) await mirrorCodeReviewSetting(tx, scope, context, field.mirror, value)
     await mirrorLegacySetting(key)?.(tx, scope, context, value)
   }
 }

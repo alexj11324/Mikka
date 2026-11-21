@@ -1,4 +1,6 @@
 import { factoryReviewCriteriaComplete, factoryReviewVerdict } from './validation';
+import { codeReviewConfiguration } from '../code-review/settings-storage';
+import { codeReviewInstructions } from '../code-review/configuration';
 import { runChanged } from '../live/panels';
 import { factoryRunBotMatches } from './run-scope'
 import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-target'
@@ -394,9 +396,12 @@ export async function configureFactoryCheck(
     ...(priorReview ? { priorReviewArtifactObservation: { digest: priorReview.digest } } : {}),
   };
   const currentRequest = await currentFactoryRequest(tx, task);
+  const reviewConfig = task.stage === 'review' && task.workspaceId
+    ? await (await import('../db')).withDatabaseClient(tx, () => codeReviewConfiguration(task.workspaceId!)) : null;
   const prompt = [
     ...(currentRequest ? [currentRequest] : []),
     `Factory stage: ${task.stage}. Independent read-only check of candidate ${row.id}, fixed worktree ${row.executionSha}.`,
+    ...(reviewConfig ? [codeReviewInstructions(reviewConfig)] : []),
     'Keep each original acceptance criterion distinct in your report, with its actual evidence or specific missing observation. Do not replace, merge away or omit the original criteria, and do not add requirements the request did not make.',
     ...(task.stage === 'review' && factoryFlowVersion(task) === 1 ? [
       'For an original criterion explicitly spanning review and verify, assess the review portion here and clearly record that the future verify portion remains pending. Do not claim a future check ran. The subsequent verify must assess the completed review observations and perform its own new independent checks.',

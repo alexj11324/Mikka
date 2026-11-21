@@ -1,11 +1,12 @@
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
+import { taskBranchSchema } from '@mikka/protocol/orchestrator'
 import { z } from 'zod'
 
 /** Immutable evidence of one accepted task's repository and branch binding. */
 const receipt = z.object({
   userId: z.string().min(1), issueId: z.uuid(), deviceId: z.uuid(), agentId: z.uuid(), remoteKey: z.string().min(1),
   remoteUrl: z.string().min(1), permission: z.literal('push_to_origin'),
-  targetBranch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/),
+  targetBranch: taskBranchSchema,
   workspaceId: z.uuid().optional(),
   workspaceLinked: z.boolean().optional(),
   requestEventId: z.uuid().optional(),

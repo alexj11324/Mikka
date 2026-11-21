@@ -24,6 +24,10 @@ const CURSOR_PREFIX = 'mikka-github-tools:'
 type Page = { remote: string | null; offset: number }
 type ListedTool = Record<string, unknown> & { name: string; description?: string; displayName?: string; annotations?: unknown }
 export type GitHubMcpCommand = Extract<McpCommand, { name: string }> | { cursor?: string; tool?: string }
+export type GitHubMcpGuard = (command: Extract<GitHubMcpCommand, { name: string }>, readOnly: boolean) => Promise<boolean>
+export class GitHubMcpPolicyError extends Error {
+  constructor(readonly code: 'githubActionDenied' | 'githubPolicyUnavailable') { super(code) }
+}
 class GitHubCursorError extends Error {}
 
 const cursorScope = (userId: string) => createHash('sha256').update(`${GITHUB_MCP_URL}\0${userId}`).digest('hex')
@@ -80,7 +84,7 @@ function cataloguePage(userId: string, result: Record<string, unknown>, page: Pa
 }
 
 /** `token` is asked only for `userId`, the caller; it throws GitHubAccessError when there is no usable credential. */
-export function createGitHubMcpRuntime(token: (userId: string) => Promise<{ token: string }>, dependencies: McpDependencies = {}) {
+export function createGitHubMcpRuntime(token: (userId: string) => Promise<{ token: string }>, dependencies: McpDependencies = {}, guard?: GitHubMcpGuard) {
   return async (userId: string, command: GitHubMcpCommand) => {
     const page = 'name' in command ? null : decodeCursor(userId, command.cursor)
     if (!('name' in command) && !page) return { error: 'githubToolCursorInvalid' }
@@ -89,7 +93,26 @@ export function createGitHubMcpRuntime(token: (userId: string) => Promise<{ toke
     const result = await runMcpCommand(async () => {
       const { token: value } = await token(userId)
       return { url: GITHUB_MCP_URL, transport: 'http', headers: { Authorization: `Bearer ${value}` }, secrets: [value] }
-    }, 'name' in command ? command : page?.remote ? { cursor: page.remote } : {}, dependencies, { code: error => error instanceof GitHubAccessError ? error.code : undefined })
+    }, 'name' in command ? command : page?.remote ? { cursor: page.remote } : {}, dependencies, {
+      code: error => error instanceof GitHubAccessError || error instanceof GitHubMcpPolicyError ? error.code : undefined,
+      ...(guard ? { beforeCall: async (client, call, signal) => {
+        // Discover the actual official tool annotation before a managed review
+        // call. Unknown tools and cyclic/oversized catalogues fail closed.
+        let cursor: string | undefined
+        const seen = new Set<string>()
+        for (let page = 0; page < 20; page++) {
+          const listed = await client.listTools({ params: { cursor }, options: { signal } })
+          const found = listed.tools.find(tool => tool.name === call.name)
+          if (found) {
+            if (!await guard(call, found.annotations?.readOnlyHint === true)) throw new GitHubMcpPolicyError('githubActionDenied')
+            return
+          }
+          if (!listed.nextCursor || seen.has(listed.nextCursor)) break
+          cursor = listed.nextCursor; seen.add(cursor)
+        }
+        throw new GitHubMcpPolicyError('githubActionDenied')
+      } } : {}),
+    })
     // Any other credential-shaped text GitHub returns is masked too.
     const masked = maskDeep(result, credentialMasker)
     if (!page) return masked

@@ -4,7 +4,7 @@ import { before, mock, test } from 'node:test'
 // The registry path: github_call asks a durable step for the workspace app policy
 // before it reaches GitHub. The step is stubbed so this stays source-only.
 type Policy = 'allow' | 'deny' | 'unavailable'
-const state = { policy: 'allow' as Policy, mcpCalls: 0, gateCalls: [] as string[] }
+const state = { policy: 'allow' as Policy, mcpCalls: 0, gateCalls: [] as string[], context: undefined as unknown }
 
 mock.module(new URL('./steps.ts', import.meta.url).href, {
   namedExports: {
@@ -12,8 +12,9 @@ mock.module(new URL('./steps.ts', import.meta.url).href, {
       state.gateCalls.push(`${userId}:${botId}`)
       return state.policy
     },
-    githubMcp: async () => {
+    githubMcp: async (_userId: string, _command: unknown, _scope: unknown, context: unknown) => {
       state.mcpCalls++
+      state.context = context
       return { tools: [{ name: 'list_issues' }] }
     },
   },
@@ -45,4 +46,14 @@ test('an allowed policy reaches the GitHub MCP step', async () => {
   state.policy = 'allow'; state.mcpCalls = 0
   assert.deepEqual(await call(), { tools: [{ name: 'list_issues' }] })
   assert.equal(state.mcpCalls, 1)
+})
+
+test('the durable GitHub call keeps the host task request context for managed review authority', async () => {
+  state.policy = 'allow'; state.mcpCalls = 0
+  const taskEventId = '00000000-0000-4000-8000-000000000002'
+  await registry.createCoordinatorRegistry('owner', bot, undefined, { taskEventId, sourceEventId: 'unrelated-source' }).github_call!.execute!(
+    { name: 'list_issues', arguments: {} }, { toolCallId: 'call-2', messages: [], context: {} } as never,
+  )
+  assert.equal(state.mcpCalls, 1)
+  assert.deepEqual(state.context, { botId: bot, sourceEventId: taskEventId })
 })
