@@ -1,0 +1,777 @@
+{
+  "schemaVersion": 1,
+  "finding": "SDLC-010",
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "pullRequest": "https://github.com/aspectly-labs/Mikka/pull/3007",
+  "recordedAt": "2026-11-21T01:22:48.638641+00:00",
+  "purpose": "Source-bound implementation and verification evidence for the existing runtime publication consumers; this is a dated evidence record, not another operating procedure.",
+  "deliveryStatus": "local verification complete; final independent review, exact candidate protected CI, normal merge and exact merged-version verification remain required",
+  "scope": {
+    "repository": "aspectly-labs/Mikka",
+    "branch": "feat/sdlc-2984-publication-contract",
+    "dependencyBase": "249e3911f590eb7ead883bb35989ac5524af0fba",
+    "localCodeCommit": "fbdc28a2954202d3937b4e488ea662f461a3e3da",
+    "remoteEquivalentCodeCommit": "2f83bb818f28aedafc899417d4be6ba3df9b54a3",
+    "testedCodeTree": "391cc3d9f98786667ffe4c8c2fc0d826a7c6d7e6",
+    "codeAndTestPaths": [
+      "scripts/acceptance/coding-review-ci.mjs",
+      "scripts/acceptance/coding-review-ci.test.mjs",
+      "scripts/acceptance/coding-workspace-ci.mjs",
+      "scripts/acceptance/coding-workspace-ci.test.mjs",
+      "scripts/acceptance/task-secrets-ci.mjs",
+      "scripts/acceptance/task-secrets-ci.test.mjs",
+      "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "scripts/e2b/runtime-report.mjs"
+    ],
+    "normalIntegration": {
+      "localCommit": "9813c239b3809c75812e2dc3cf1b256b2eb60ac5",
+      "remoteEquivalentCommit": "f83d386544175e34206023969a764e80dc132a8e",
+      "tree": "2ac2c87d146125d51e035508a16cd38f6e8a9ebc",
+      "remoteParents": [
+        "f4b2b9082cf838ea04c1133d25bd84f5f212e060",
+        "249e3911f590eb7ead883bb35989ac5524af0fba"
+      ],
+      "preserved": "Original #3000/#3002 code, the existing Task immutable API routing fix, and main ed905baee7482c43b29e8b15480ebbae160278c1 changes"
+    },
+    "excluded": {
+      "mikka-hosted-ui": "No UI product source, interface or private build content changes are needed for this public runtime consumer contract.",
+      "mikka-cloud": "Release policy, credential delivery, staging, production cutover, database migration and release ownership remain external.",
+      "productDrivers": {
+        "scripts/acceptance/thread-lifecycle.mjs": {
+          "blob": "8f4708cd42596ba23805d35093b656d3fa68ba61",
+          "equalToDependencyBase": true
+        },
+        "scripts/acceptance/coding-workspace.mjs": {
+          "blob": "e3ac491aa0d2780d84e696dcb70e43a742a0540b",
+          "equalToDependencyBase": true
+        },
+        "scripts/acceptance/task-secrets.mjs": {
+          "blob": "08a91f899a1134dcb74471ee0bae334583432049",
+          "equalToDependencyBase": true
+        },
+        "scripts/acceptance/factory-visual-evidence.mjs": {
+          "blob": "eb5a5cd267583ea41742ba873c444f7fd55b42a8",
+          "equalToDependencyBase": true
+        }
+      },
+      "factoryVisual": "Preserve the original finite #1789 source and #1783 window; this change does not reactivate its historical acceptance.",
+      "mikka-handoff": "A different repository; no identity or product-scope expansion."
+    }
+  },
+  "rootCause": "The shared selector and report admission still required retired subscriptions/publish jobs and publication subscription evidence after #2789 moved publication to templates. Manual coding admission also conflated the executing workflow commit with the actual report source, although #2699 already permits a later workflow to publish an older served source.",
+  "acceptedDecisions": [
+    {
+      "pullRequest": 2699,
+      "url": "https://github.com/aspectly-labs/Mikka/pull/2699",
+      "mergeSha": "92800022faf3182315f01e06da2883b0f97c9a63",
+      "mergedAt": "2026-11-16T16:55:58Z",
+      "authority": "Separate workflow execution head from the served worker source, retaining the existing promoted receipt and ancestry guards."
+    },
+    {
+      "pullRequest": 2789,
+      "url": "https://github.com/aspectly-labs/Mikka/pull/2789",
+      "mergeSha": "25302463243fe27d86a74d4610ac2e6ad3750b3f",
+      "mergedAt": "2026-11-17T16:45:26Z",
+      "reviewedChangedFiles": 111,
+      "authority": "Replace publication-time real subscription dispatch with build-time runtime validation and conservation; publication is the templates job. The same PR retains the three product drivers and changes them to owner-scoped subscriptions."
+    }
+  ],
+  "ownership": {
+    "sdlcOwner": "#2984: shared source admission, artifact reuse and offline regression contracts",
+    "productOwners": [
+      "#1593 thread lifecycle",
+      "#1721 Files",
+      "#1712 Task Secret"
+    ],
+    "continuousConsumerEvidence": "The original thread-lifecycle issue is closed but its automatic regression workflow remains active; Files and Task Secret preserve their original product scopes. None has the Factory visual finite version window.",
+    "externalOwnerPr": {
+      "number": 2821,
+      "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+      "stateAtRead": "open_draft",
+      "sameRootFixed": false,
+      "boundary": "Its Web/Cloudflare attestation changes are separate. No code was copied from or written to that owner branch."
+    },
+    "requiredIntegration": [
+      {
+        "pr": 3000,
+        "head": "8b5de3dacd3771737b0e25974c195deb057817e8",
+        "stateAtRead": "open_ready_not_merged"
+      },
+      {
+        "pr": 3002,
+        "head": "249e3911f590eb7ead883bb35989ac5524af0fba",
+        "stateAtRead": "open_ready_not_merged"
+      }
+    ],
+    "docsOwner": "#2992 updates the unified AGENTS, README, CONTRIBUTING and operation guidance; this PR only records source-bound evidence."
+  },
+  "necessityJudgments": [
+    {
+      "item": "Modern templates publication admission",
+      "decision": "repair",
+      "reason": "One actual completed nine-job historical publication is rejected by the original selector."
+    },
+    {
+      "item": "Retired publication subscription receipt",
+      "decision": "remove only for verified modern job contract",
+      "reason": "#2789 formally removes that publication precondition and the real report has no such field."
+    },
+    {
+      "item": "Legacy subscriptions/publish job and report contract",
+      "decision": "retain",
+      "reason": "Historical legacy sources do not gain modern eligibility without the modern job shape."
+    },
+    {
+      "item": "Product subscription, native tool, source, terminal and cleanup proof",
+      "decision": "retain unchanged",
+      "reason": "These are independent product guarantees and remain in the original drivers."
+    },
+    {
+      "item": "Artifact transport and ZIP implementation",
+      "decision": "reuse one existing reader",
+      "reason": "Move the existing bounded reader into runtime-report, re-export from its old Task module, and reuse listing/detail orchestration without a mutual consumer import."
+    },
+    {
+      "item": "Automatic actual report source equals exact main",
+      "decision": "retain",
+      "reason": "A successful old publication does not authorize a current automatic consumer."
+    },
+    {
+      "item": "Manual workflow/application/worker source separation",
+      "decision": "repair using existing ancestry helper",
+      "reason": "The actual historical report source differs from its workflow head under the accepted #2699 contract."
+    }
+  ],
+  "preservedGuards": [
+    "Finite official repository ID/name/owner profile; fixed workflow identity, path, event, run ID, attempt and native run status.",
+    "Existing pre-checkout repository/source and pre-credential rechecks; workflows and product drivers are not modified by this PR.",
+    "Modern nested validate/build, recheck, await-web, web-ready, templates and cleanup success; remember-failure skipped; unique successful publish then report-upload steps; mixed legacy shape rejected.",
+    "Artifact exact name and one match, complete bounded listing, listing/detail consistency, run/head/repository/attempt binding, size, digest and non-expiry.",
+    "Immutable GitHub API archive route, bounded approved HTTPS redirect, no GitHub token at storage, bounded stream, exact archive digest/size and one safe ZIP release.json member.",
+    "Original public/ready three-template identities, source and worker hashes; original error prefixes, codes, causes and safe failure ABI.",
+    "Automatic current-main/report source equality and final run/main recheck; manual explicit worker source plus both original ancestry edges and final run/artifact/application rechecks.",
+    "Files attestation keeps the verified report worker hash equal to its computed expected worker hash."
+  ],
+  "before": {
+    "nativeSelector": {
+      "path": "research/runtime-consumer-transfer/publication-selector-observation.json",
+      "sha256": "c23973613135cec2996388ab4f169db9d61c044c2a4fd801d151ddb6478aa612",
+      "receipt": {
+        "source": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "helperBlob": "cc2109dfcef25f372c9dc7254ca5d5c4057a6f80",
+        "node": "v24.22.3",
+        "capturedAt": "2026-11-21T00:15:07.382Z",
+        "result": [
+          {
+            "runId": 44839753192,
+            "runAttempt": 1,
+            "sourceCommit": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+            "result": {
+              "selected": true,
+              "reason": "lifecycle_changes",
+              "runtime": "unchanged_worker",
+              "jobs": {
+                "test": 136644911514,
+                "check": 136646242757,
+                "release": 136646711790
+              }
+            }
+          },
+          {
+            "runId": 44140435060,
+            "runAttempt": 1,
+            "sourceCommit": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+            "error": "thread_lifecycle_ci:jobs"
+          }
+        ],
+        "boundary": "Exact original pure selectRelease over unchanged native attempt job metadata; no network, models, VM, credentials or publication."
+      }
+    },
+    "nativeReport": {
+      "path": "research/runtime-consumer-transfer/publication-report-observation.json",
+      "sha256": "86026bc2f353c62ecb68b258918edb7e7616f685cb90c312f08b4784407450b1",
+      "receipt": {
+        "capturedAt": "2026-11-21T00:26:43.183Z",
+        "source": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "functionUnchangedFromMain": true,
+        "releasePinsSourceSha256": "30a80e4cd3487f712e1203dd0e8433e35fb54dd1ab0a39acddbe9c79d49c570d",
+        "node": "v24.22.3",
+        "runId": 44140435060,
+        "attempt": 1,
+        "artifactId": 14354323589,
+        "archiveBytes": 46376,
+        "archiveSha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+        "reportBytes": 329438,
+        "reportSha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+        "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+        "publishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+        "workerSha": "3c001413e47063cc68108c84938c697f4cf18357",
+        "originalReportIdentityAccepted": true,
+        "allTemplatesPublicReady": true,
+        "subscriptionAcceptancePresent": false,
+        "releasePinsAtPublishedSource": "task_secret_ci:report",
+        "reportIdentityAtWorkflowHead": "runtime_report_source_mismatch",
+        "boundary": "Original bounded ZIP reader and unchanged production report functions over an existing digest-verified historical archive. No HTTP, credentials, publication, model, VM or database operation. Does not authorize current automatic acceptance of this older served source."
+      }
+    },
+    "dependencyIntegrationBaseline": {
+      "localCommit": "c7ddb161393936c61f3faedda75fd50710e47473",
+      "remoteEquivalentCommit": "0a1c369b48a49895e2e493c5eb25145c705626a7",
+      "counts": {
+        "tests": 179,
+        "passed": 179,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "evidence": {
+        "path": "research/runtime-publication-contract/baseline-integrated/receipt.json",
+        "sha256": "928f9f9e01274c0d8b6e5d721102d74ec4507814c11457508e65cb2434c87934",
+        "receipt": {
+          "startedAt": "2026-11-21T00:40:47.303752+00:00",
+          "endedAt": "2026-11-21T00:40:53.515546+00:00",
+          "wallSeconds": 6.211800260000018,
+          "command": [
+            "node",
+            "--import",
+            "tsx",
+            "--test",
+            "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+            "scripts/acceptance/coding-workspace-ci.test.mjs",
+            "scripts/acceptance/task-secrets-ci.test.mjs",
+            "scripts/acceptance/task-secrets.test.mjs",
+            "scripts/acceptance/coding-review-ci.test.mjs",
+            "scripts/acceptance/factory-visual-evidence.test.mjs",
+            "scripts/e2b/runtime-inputs.test.mjs"
+          ],
+          "exit": 0,
+          "node": "v24.22.3",
+          "testedIndexTree": "7cfb020bb90ad32af7d2fa2466623f197eb0a9a0",
+          "sourceState": "normal 3002+3000 integration; metadata fixture uses the surviving immutable API constant; no publication-contract repair yet",
+          "summary": [
+            "ℹ tests 179",
+            "ℹ pass 179",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ duration_ms 6079.636845"
+          ],
+          "logs": {
+            "stdout.log": "2f681be3bcde5467dc80865187cc6f54b9beb8926ec5933eb56c98564ed3fae9",
+            "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      }
+    },
+    "regressionRed": {
+      "localCommit": "c39fc57ce828c3c0c6c93986f14e54925dbe1776",
+      "remoteEquivalentCommit": "b6ea2ca78cd000cb46d218936eec5871a0a96f71",
+      "tree": "660fa5500f2308caed6bc8c2ec6390d7fd7680ae",
+      "counts": {
+        "tests": 64,
+        "passed": 61,
+        "failed": 3,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "failures": [
+        "modern native job shape: thread_lifecycle_ci:jobs",
+        "modern report without retired publication receipt: task_secret_ci:report",
+        "manual later workflow with pinned old source: thread_lifecycle_ci:upstream"
+      ],
+      "evidence": {
+        "path": "research/runtime-publication-contract/node-red/receipt.json",
+        "sha256": "13c4a2e855a54cd05dacd82c0fd9f3d5783bd38462d864a531b08279a04ea570",
+        "receipt": {
+          "startedAt": "2026-11-21T00:48:14.729852+00:00",
+          "endedAt": "2026-11-21T00:48:19.725746+00:00",
+          "wallSeconds": 4.995911968000655,
+          "command": [
+            "node",
+            "--import",
+            "tsx",
+            "--test",
+            "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+            "scripts/acceptance/task-secrets-ci.test.mjs",
+            "scripts/acceptance/coding-review-ci.test.mjs"
+          ],
+          "exit": 1,
+          "node": "v24.22.3",
+          "implementationBase": "c7ddb161393936c61f3faedda75fd50710e47473",
+          "sourceState": "original integrated production functions; three publication-contract regression tests added before repair",
+          "sourceBlobs": {
+            "scripts/acceptance/thread-lifecycle-ci.test.mjs": "e1df9fdd41a0ce2941bd9f9bc0f942c33079ca7b",
+            "scripts/acceptance/task-secrets-ci.test.mjs": "2a21e3bc1b9789a5fecbdcb1f34aa3563561bc29",
+            "scripts/acceptance/coding-review-ci.test.mjs": "9fdc58b75214fdc31c2d34ccb70c2eaf2773d1ba",
+            "scripts/acceptance/thread-lifecycle-ci.mjs": "b2fdd76bfbbe9bfc4a83ba0cad99d41188720f1d",
+            "scripts/acceptance/task-secrets-ci.mjs": "23fddb03a685601707b4f6b3c6c2ba2ae70895ad",
+            "scripts/acceptance/coding-review-ci.mjs": "fd00f4fd9a9c1eb87a18f7972779aac9b8dcda62"
+          },
+          "summary": [
+            "✖ a later main workflow can publish the explicitly pinned older served worker source (1.447864ms)",
+            "✖ the retired publication subscription gate is absent only in the verified build-time contract (1.725481ms)",
+            "✖ the current official publication shape requires its complete templates release proof (0.346781ms)",
+            "ℹ tests 64",
+            "ℹ pass 61",
+            "ℹ fail 3",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ duration_ms 4610.641794",
+            "✖ failing tests:",
+            "✖ a later main workflow can publish the explicitly pinned older served worker source (1.447864ms)",
+            "✖ the retired publication subscription gate is absent only in the verified build-time contract (1.725481ms)",
+            "✖ the current official publication shape requires its complete templates release proof (0.346781ms)"
+          ],
+          "logs": {
+            "stdout.log": "3282cdfa0d9d0649bb1ce0bc8a4a9efb78c3bcc0fc67a886704dde2d41ec6c67",
+            "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      }
+    }
+  },
+  "after": {
+    "originalAffectedNodeSuites": {
+      "counts": {
+        "tests": 198,
+        "passed": 198,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "evidence": {
+        "path": "research/runtime-publication-contract/green-final/receipt.json",
+        "sha256": "cd5aeb268662c43a722bdcd1f72001d592469cd01b8086ad1f6e6015f0989334",
+        "receipt": {
+          "startedAt": "2026-11-21T01:05:37.378389+00:00",
+          "endedAt": "2026-11-21T01:05:44.323614+00:00",
+          "wallSeconds": 6.945229293000011,
+          "command": [
+            "node",
+            "--import",
+            "tsx",
+            "--test",
+            "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+            "scripts/acceptance/coding-workspace-ci.test.mjs",
+            "scripts/acceptance/task-secrets-ci.test.mjs",
+            "scripts/acceptance/task-secrets.test.mjs",
+            "scripts/acceptance/coding-review-ci.test.mjs",
+            "scripts/acceptance/factory-visual-evidence.test.mjs",
+            "scripts/e2b/runtime-inputs.test.mjs",
+            "scripts/e2b/runtime-report.test.mjs"
+          ],
+          "exit": 0,
+          "node": "v24.22.3",
+          "testedTree": "391cc3d9f98786667ffe4c8c2fc0d826a7c6d7e6",
+          "treeUnchanged": true,
+          "normalDependencyMerge": "9813c239b3809c75812e2dc3cf1b256b2eb60ac5",
+          "sourceBlobs": {
+            "scripts/acceptance/coding-review-ci.mjs": "574e56341f7171f48c64fb92c1afdff082f4dc2c",
+            "scripts/acceptance/coding-review-ci.test.mjs": "7b8733649db17752dc2bcb53c5596b14499de74b",
+            "scripts/acceptance/coding-workspace-ci.mjs": "d7069b32f1395dc07c83c33af384deed63886ea4",
+            "scripts/acceptance/coding-workspace-ci.test.mjs": "f8e6a69823da708726830b4f92b1f625970b3392",
+            "scripts/acceptance/factory-visual-evidence.mjs": "eb5a5cd267583ea41742ba873c444f7fd55b42a8",
+            "scripts/acceptance/factory-visual-evidence.test.mjs": "2316f3d1095b619a12d9cd11a1984e6e19df39ed",
+            "scripts/acceptance/task-secrets-ci.mjs": "86ff9712621e3dc52b3e224fff01e702ac5870ec",
+            "scripts/acceptance/task-secrets-ci.test.mjs": "39f275a7344d78bdf87a0779449993bbe6741885",
+            "scripts/acceptance/task-secrets.mjs": "08a91f899a1134dcb74471ee0bae334583432049",
+            "scripts/acceptance/task-secrets.test.mjs": "cb18054a302add8b7a12f7af68df712315da7e5d",
+            "scripts/acceptance/thread-lifecycle-ci.mjs": "6ce63f8087b307100c4432413f64dc98a23ff0b2",
+            "scripts/acceptance/thread-lifecycle-ci.test.mjs": "fc074808512c034120f1fa7b929d3a9da3b015f1",
+            "scripts/e2b/runtime-inputs.mjs": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+            "scripts/e2b/runtime-inputs.test.mjs": "2cd378b4161da15993ff0fa0408c1ea906f434eb",
+            "scripts/e2b/runtime-report.mjs": "50308430822db5acb976f3c7bfb6f9ae43c53ea2",
+            "scripts/e2b/runtime-report.test.mjs": "843374518c75274bef402473228ada05c4d420b3"
+          },
+          "summary": [
+            "ℹ tests 198",
+            "ℹ pass 198",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ duration_ms 6818.521305"
+          ],
+          "logs": {
+            "stdout.log": "59604e89a9f7ab3ec3caa0d344747babd19b490e741af47a054cd4c7980990e4",
+            "stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      }
+    },
+    "independentOriginalNodeSuites": {
+      "reviewer": "ci_baseline",
+      "counts": {
+        "tests": 82,
+        "passed": 82,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "evidence": {
+        "path": "research/independent-review-3007/focused.json",
+        "sha256": "f48f45615589cff533fc662cee4b6a08e9dd279175bf8c8413e0450d3c33cf60",
+        "receipt": {
+          "source": "fbdc28a2954202d3937b4e488ea662f461a3e3da",
+          "tree": "391cc3d9f98786667ffe4c8c2fc0d826a7c6d7e6",
+          "command": [
+            "node",
+            "--import",
+            "tsx",
+            "--test",
+            "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+            "scripts/acceptance/coding-workspace-ci.test.mjs",
+            "scripts/acceptance/task-secrets-ci.test.mjs",
+            "scripts/acceptance/coding-review-ci.test.mjs"
+          ],
+          "node": "v24.22.3",
+          "startedAt": "2026-11-21T01:14:28.052752+00:00",
+          "finishedAt": "2026-11-21T01:14:32.409499+00:00",
+          "wallSeconds": 4.356724597000721,
+          "exit": 0,
+          "stdoutSha256": "c55b6c29857a355475bbb42b7afd4926c0ad861255d4154f4d056c74c52aa693",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "trackedStatus": "",
+          "tests": 82,
+          "passed": 82,
+          "failed": 0,
+          "skipped": 0,
+          "cancelled": 0
+        }
+      }
+    },
+    "independentReaderEquivalence": {
+      "path": "research/independent-review-3007/reader-equivalence.json",
+      "sha256": "7efdadcf80af60fe77a59f69079b17e98d24de8bef99fb8f5c863efa8352c550",
+      "receipt": {
+        "base": "249e3911f590eb7ead883bb35989ac5524af0fba",
+        "source": "fbdc28a2954202d3937b4e488ea662f461a3e3da",
+        "checks": [
+          {
+            "function": "assertArtifactIdentity",
+            "equivalentAfterLocalCallIdentifierRenames": true
+          },
+          {
+            "function": "artifactRedirect",
+            "equivalentAfterLocalCallIdentifierRenames": true
+          },
+          {
+            "function": "boundedBytes",
+            "equivalentAfterLocalCallIdentifierRenames": true
+          },
+          {
+            "function": "archiveReport",
+            "equivalentAfterLocalCallIdentifierRenames": true
+          },
+          {
+            "function": "downloadReleaseReport",
+            "equivalentAfterLocalCallIdentifierRenames": true
+          }
+        ],
+        "limitsUnchanged": true,
+        "errors": "Original task_secret_ci prefix, codes and causes preserved by exported RuntimeArtifactError; old Task path re-exports unchanged reader entry points."
+      }
+    },
+    "targetedOriginalOxlint": {
+      "path": "research/runtime-publication-contract/lint/receipt.json",
+      "sha256": "044881a7d0b9a517ae7097675a9c4396c42663ef024bd3ad01e67bebe9174e88",
+      "receipt": {
+        "source": "fbdc28a2954202d3937b4e488ea662f461a3e3da",
+        "startedAt": "2026-11-21T01:12:43.074619+00:00",
+        "endedAt": "2026-11-21T01:12:43.191300+00:00",
+        "wallSeconds": 0.11665880100008508,
+        "command": [
+          "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/node_modules/.bin/oxlint",
+          "--deny-warnings",
+          "scripts/acceptance/coding-review-ci.mjs",
+          "scripts/acceptance/coding-review-ci.test.mjs",
+          "scripts/acceptance/coding-workspace-ci.mjs",
+          "scripts/acceptance/coding-workspace-ci.test.mjs",
+          "scripts/acceptance/task-secrets-ci.mjs",
+          "scripts/acceptance/task-secrets-ci.test.mjs",
+          "scripts/acceptance/thread-lifecycle-ci.mjs",
+          "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+          "scripts/e2b/runtime-report.mjs"
+        ],
+        "version": "1.89.0",
+        "exit": 0,
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "nativeArchiveReplay": {
+      "path": "research/runtime-publication-contract/native-archive-replay.json",
+      "sha256": "ee106fdf6ec7dd92e0fc6a78bf2a194871ec5343e6c807730e920da10c92d168",
+      "receipt": {
+        "source": "fbdc28a2954202d3937b4e488ea662f461a3e3da",
+        "remoteEquivalentSource": "2f83bb818f28aedafc899417d4be6ba3df9b54a3",
+        "tree": "391cc3d9f98786667ffe4c8c2fc0d826a7c6d7e6",
+        "startedAt": "2026-11-21T01:20:26.102Z",
+        "finishedAt": "2026-11-21T01:20:26.439Z",
+        "wallSeconds": 0.336280721,
+        "node": "v24.22.3",
+        "status": "passed",
+        "nativeInputsSha256": "4b2a6b737fab46b398a98e5e802dbfcfb7812d6b7061857a47213b63e904ea97",
+        "runId": 44140435060,
+        "runAttempt": 1,
+        "workflowId": 405833668,
+        "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+        "publishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+        "workerSha": "3c001413e47063cc68108c84938c697f4cf18357",
+        "capturedCurrentMain": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "nativeJobs": 9,
+        "publicationJobId": 134248391647,
+        "artifact": {
+          "id": 14354323589,
+          "repositoryId": 1427517699,
+          "sizeBytes": 46376,
+          "sha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429"
+        },
+        "report": {
+          "sizeBytes": 329438,
+          "sha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+          "publicReadyTemplates": 3,
+          "subscriptionPublicationReceiptPresent": false
+        },
+        "results": {
+          "actualNativeModernSelection": "build_time",
+          "actualArchiveSharedReader": "passed",
+          "modernPublishedSourcePins": "passed",
+          "legacyWithoutSubscriptionReceipt": "refused_report",
+          "automaticHistoricalSourceAgainstCapturedMain": "refused_mainChanged_before_archive",
+          "automaticWorkflowHeadMainSupportFixture": "refused_report_source_mismatch",
+          "manualThreeSourceBinding": "passed",
+          "originalFacadeExportsSameFunctionObjects": true,
+          "originalArtifactErrorAbi": "preserved"
+        },
+        "localGitAncestry": [
+          {
+            "before": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+            "after": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+            "mergeBase": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+            "ahead": 58,
+            "behind": 0
+          },
+          {
+            "before": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+            "after": "ed905baee7482c43b29e8b15480ebbae160278c1",
+            "mergeBase": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+            "ahead": 505,
+            "behind": 0
+          }
+        ],
+        "closedRequestCounts": {
+          "directReader": {
+            "github": 3,
+            "archiveApi": 1,
+            "storage": 1,
+            "artifactListing": 1,
+            "artifactDetail": 1,
+            "nativeRun": 0,
+            "main": 0,
+            "comparison": 0
+          },
+          "actualMain": {
+            "github": 3,
+            "archiveApi": 0,
+            "storage": 0,
+            "artifactListing": 0,
+            "artifactDetail": 0,
+            "nativeRun": 1,
+            "main": 1,
+            "comparison": 0
+          },
+          "isolatedReportSource": {
+            "github": 7,
+            "archiveApi": 1,
+            "storage": 1,
+            "artifactListing": 1,
+            "artifactDetail": 1,
+            "nativeRun": 1,
+            "main": 1,
+            "comparison": 0
+          },
+          "manual": {
+            "github": 10,
+            "archiveApi": 1,
+            "storage": 1,
+            "artifactListing": 1,
+            "artifactDetail": 2,
+            "nativeRun": 2,
+            "main": 0,
+            "comparison": 2
+          }
+        },
+        "servingSupportFixtureReads": 2,
+        "unexpectedNetworkCalls": 0,
+        "boundary": [
+          "Original production functions executed in Node against unmodified captured native run, all nine jobs, artifact listing metadata and actual existing ZIP bytes.",
+          "No live HTTP request was made by this replay. Global fetch throws. Only a closed injected adapter returns fixed responses; the GitHub Authorization sentinel is synthetic and absent from storage requests.",
+          "Workflow active state is an explicit support fixture. Artifact detail/latest-run responses reuse captured metadata. Storage redirect is a support fixture; the real archive was previously read through the GitHub connector.",
+          "Compare response envelopes are fixtures backed by the recorded local Git merge-base and revision counts. Application serving attestations are explicit support fixtures, checked twice; no live deployed Web identity is claimed.",
+          "The isolated automatic source-mismatch case deliberately substitutes workflow head for main to reach the report guard. The separate captured-current-main case uses the actual native main ref and rejects before archive reads.",
+          "No product driver, model, provider VM, database, release, dispatch, credential store or real workload credential was used. This proves source admission behavior, not live product acceptance or protected CI."
+        ]
+      }
+    },
+    "nativeReplayProcess": {
+      "path": "research/runtime-publication-contract/native-replay-run/receipt.json",
+      "sha256": "24f99850b412f4572111614ff45824318be722c07f7bbc69fcc58e235d7d623c",
+      "receipt": {
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/replay-native-archive.mjs"
+        ],
+        "startedAt": "2026-11-21T01:20:25.984589+00:00",
+        "finishedAt": "2026-11-21T01:20:26.453809+00:00",
+        "wallSeconds": 0.4692246560007334,
+        "exit": 0,
+        "stdoutSha256": "414d9453df331bf4f2ca323ea182e9079aa2c59c81da58553a592c4b35f822ed",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "scriptSha256": "cf80973e330440fc3efe1f82f74713e5bba1ad30a214918e30b8bccc7f73f958"
+      }
+    }
+  },
+  "historicalNativeSample": {
+    "denominator": {
+      "publicationRuns": 1,
+      "attempts": 1,
+      "jobs": 9,
+      "releaseArtifacts": 1
+    },
+    "capturedAt": "2026-11-21T01:07:27.709Z",
+    "nativeInputsSha256": "4b2a6b737fab46b398a98e5e802dbfcfb7812d6b7061857a47213b63e904ea97",
+    "runApi": "https://api.github.com/repos/aspectly-labs/Mikka/actions/runs/44140435060/attempts/1",
+    "jobsApi": "https://api.github.com/repos/aspectly-labs/Mikka/actions/runs/44140435060/attempts/1/jobs?per_page=100",
+    "artifactListingApi": "https://api.github.com/repos/aspectly-labs/Mikka/actions/runs/44140435060/artifacts",
+    "runId": 44140435060,
+    "attempt": 1,
+    "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+    "runStartedAt": "2026-11-17T17:45:19Z",
+    "runUpdatedAt": "2026-11-17T17:57:34Z",
+    "actualPublishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+    "artifact": {
+      "id": 14354323589,
+      "repositoryId": 1427517699,
+      "sizeBytes": 46376,
+      "sha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429"
+    },
+    "artifactExpiresAt": "2026-11-24T17:56:58Z",
+    "report": {
+      "sizeBytes": 329438,
+      "sha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+      "publicReadyTemplates": 3,
+      "subscriptionPublicationReceiptPresent": false
+    },
+    "jobs": [
+      {
+        "id": 134241448756,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:45:23Z",
+        "completed_at": "2026-11-17T17:45:45Z"
+      },
+      {
+        "id": 134241712724,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:45:47Z",
+        "completed_at": "2026-11-17T17:46:12Z"
+      },
+      {
+        "id": 134242008068,
+        "name": "web-ready",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:46:13Z",
+        "completed_at": "2026-11-17T17:46:22Z"
+      },
+      {
+        "id": 134242126423,
+        "name": "release / recheck",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:46:25Z",
+        "completed_at": "2026-11-17T17:46:49Z"
+      },
+      {
+        "id": 134242411045,
+        "name": "release / validate / build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:46:52Z",
+        "completed_at": "2026-11-17T17:55:48Z"
+      },
+      {
+        "id": 134248140482,
+        "name": "release / await-web",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:55:51Z",
+        "completed_at": "2026-11-17T17:56:12Z"
+      },
+      {
+        "id": 134248391647,
+        "name": "release / templates",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:56:15Z",
+        "completed_at": "2026-11-17T17:57:05Z"
+      },
+      {
+        "id": 134248933538,
+        "name": "release / cleanup",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:57:07Z",
+        "completed_at": "2026-11-17T17:57:33Z"
+      },
+      {
+        "id": 134249228442,
+        "name": "release / remember-failure",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-11-17T17:57:33Z",
+        "completed_at": "2026-11-17T17:57:33Z"
+      }
+    ],
+    "publicationSteps": [
+      {
+        "number": 11,
+        "name": "Make only fully accepted candidates public",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:56:57Z",
+        "completed_at": "2026-11-17T17:56:57Z"
+      },
+      {
+        "number": 12,
+        "name": "Preserve the complete public release report",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-17T17:56:57Z",
+        "completed_at": "2026-11-17T17:56:59Z"
+      }
+    ]
+  },
+  "measurementInterpretation": {
+    "proved": "The same historical publication that the original selector/report reject is admitted under the verified modern contract at its actual published source; exact-main automatic source rejection remains effective.",
+    "notAThroughputBenchmark": "The 64-test RED, 198-test final regression and 82-test independent check have different denominators. Their recorded wall times are execution receipts, not evidence of CI or delivery speedup.",
+    "unmeasured": [
+      "Production acceptance duration after this repair",
+      "Paid runtime rebuild count or cost savings",
+      "Ready-to-merge and merge-to-release latency for this PR"
+    ],
+    "notClaimed": "No live product E2E, model call, VM execution, current deployed Web attestation, protected-CI success or post-merge result is inferred from the closed replay."
+  },
+  "remaining": {
+    "independentReview": "Final exact remote evidence head review required before Ready. Preliminary frozen-code review found no blocker; its independent test receipt is recorded above.",
+    "protectedCi": "Pending on the final reviewed candidate. Draft aggregate failure is deliberate and never counts as success.",
+    "merge": "Pending normal merge after dependencies, current protection and release-window checks.",
+    "postMerge": "Pending verification against the exact resulting main commit, with original owner deployments and product acceptances retained."
+  }
+}

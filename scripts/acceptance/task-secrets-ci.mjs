@@ -6,12 +6,12 @@ import { pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
 import { expectedRelease, assertReleaseIdentity, selectRelease, REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW } from './thread-lifecycle-ci.mjs'
 import { assertCurrentMain, PRODUCTION_VERSION_URL } from '../release/web-deploy.mjs'
-import { assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
-import { actionsMikkaRepository, officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
+import { downloadReleaseReport, MAX_REPORT_BYTES, readReleaseArtifact,
+  RuntimeArtifactError, assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
+export { archiveReport, artifactRedirect, assertArtifactIdentity, downloadReleaseReport, MAX_ARCHIVE_BYTES, MAX_REPORT_BYTES } from '../e2b/runtime-report.mjs'
+import { actionsMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export { REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW }
-export const MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
-export const MAX_REPORT_BYTES = 32 * 1024 * 1024
 const ROOT = resolve(import.meta.dirname, '../..')
 const API = `https://api.github.com/repositories/${publicRepositoryId}`
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/
@@ -20,11 +20,9 @@ const number = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value)
 const hash = value => createHash('sha256').update(value).digest('hex')
 const CODES = new Set(['context', 'factory_scope', 'checkout', 'jobs', 'artifact_missing', 'artifact_identity', 'artifact_size', 'artifact_digest',
   'artifact_redirect', 'artifact_archive', 'report', 'report_target', 'not_selected', 'attestation', 'public_build', 'github', 'command'])
-class SecretCIError extends Error {
-  constructor(code, cause) { super(`task_secret_ci:${code}`, cause === undefined ? undefined : { cause }); this.code = code }
-}
+class SecretCIError extends RuntimeArtifactError {}
 const check = (ok, code) => { if (!ok) throw new SecretCIError(code) }
-export const safeCIFailure = error => error instanceof SecretCIError && CODES.has(error.code) ? error.code : 'guard_failed'
+export const safeCIFailure = error => error instanceof RuntimeArtifactError && CODES.has(error.code) ? error.code : 'guard_failed'
 
 function context(env) {
   check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env) && env.GITHUB_REF === 'refs/heads/main'
@@ -55,7 +53,7 @@ export function selectTaskRelease(expected, data, files) {
   const relevant = taskSecretsChanged(files), published = release.runtime === 'validated_and_published'
   return { selected: relevant && published, status: relevant && !published ? 'blocked' : relevant ? 'selected' : 'skipped',
     reason: !relevant ? 'unrelated_source' : published ? 'secret_source_and_published_runtime' : 'runtime_not_validated_and_published',
-    runtime: release.runtime, jobs: release.jobs }
+    runtime: release.runtime, publication: release.publication, jobs: release.jobs }
 }
 
 async function readGithub(path, { token, fetchImpl = fetch }) {
@@ -67,31 +65,6 @@ async function readGithub(path, { token, fetchImpl = fetch }) {
     check(response.ok, 'github')
     return await response.json()
   } catch (cause) { throw new SecretCIError('github', cause) }
-}
-
-export function assertArtifactIdentity(expected, run, artifact, now = Date.now()) {
-  // The caller binds these fields after its official-run API check. Artifact
-  // metadata cannot choose a repository or supply the authenticated download URL.
-  const repository = expected?.repositoryFullName
-  check(positive(expected?.repositoryId)
-    && officialMikkaRepository(repository, String(expected.repositoryId)), 'artifact_identity')
-  const api = `https://api.github.com/repos/${repository}`
-  const name = `e2b-release-evidence-${expected.runId}-${expected.runAttempt}`
-  const created = Date.parse(artifact?.created_at), expires = Date.parse(artifact?.expires_at), started = Date.parse(run?.run_started_at)
-  check(positive(artifact?.id) && artifact.name === name && artifact.expired === false
-    && Number.isFinite(created) && Number.isFinite(expires) && Number.isFinite(started)
-    && created >= started && created <= now + 60_000 && expires > now
-    && run.repository?.id === expected.repositoryId && run.head_repository?.id === expected.repositoryId
-    && run.repository?.full_name === repository && run.head_repository?.full_name === repository
-    && artifact.workflow_run?.id === expected.runId && artifact.workflow_run.repository_id === expected.repositoryId
-    && artifact.workflow_run.head_repository_id === expected.repositoryId && artifact.workflow_run.head_branch === 'main'
-    && artifact.workflow_run.head_sha === expected.sourceCommit
-    && artifact.url === `${api}/actions/artifacts/${artifact.id}`
-    && artifact.archive_download_url === `${api}/actions/artifacts/${artifact.id}/zip`, 'artifact_identity')
-  check(positive(artifact.size_in_bytes) && artifact.size_in_bytes <= MAX_ARCHIVE_BYTES, 'artifact_size')
-  check(typeof artifact.digest === 'string' && /^sha256:[a-f0-9]{64}$/.test(artifact.digest), 'artifact_digest')
-  return { id: artifact.id, repositoryId: expected.repositoryId, name, sha256: artifact.digest.slice(7), sizeBytes: artifact.size_in_bytes,
-    createdAt: artifact.created_at, expiresAt: artifact.expires_at }
 }
 
 /** Same metadata/attempt fencing as thread-lifecycle-ci.verifyRelease, with a
@@ -108,81 +81,17 @@ export async function verifyTaskRelease({ env, event, files, fetchImpl = fetch, 
   const proof = { kind: 'task-secret-release-selection', sourceCommit: expected.sourceCommit,
     upstream: { runId: expected.runId, runAttempt: expected.runAttempt, workflowId: expected.workflowId },
     driver: { runId: Number(env.GITHUB_RUN_ID), runAttempt: Number(env.GITHUB_RUN_ATTEMPT) }, ...selection }
-  if (selection.selected) {
-    const listing = await readGithub(`/actions/runs/${expected.runId}/artifacts?per_page=100`, options)
-    check(Array.isArray(listing?.artifacts) && listing.total_count === listing.artifacts.length && listing.total_count <= 100, 'artifact_identity')
-    const matches = listing.artifacts.filter(artifact => artifact.name === `e2b-release-evidence-${expected.runId}-${expected.runAttempt}`)
-    check(matches.length === 1, 'artifact_missing')
-    const listed = assertArtifactIdentity(expected, run, matches[0], now())
-    const artifact = assertArtifactIdentity(expected, run, await readGithub(`/actions/artifacts/${listed.id}`, options), now())
-    check(JSON.stringify(artifact) === JSON.stringify(listed), 'artifact_identity')
-    proof.artifact = artifact
-  }
+  if (selection.selected) proof.artifact = await readReleaseArtifact(expected, run, {
+    read: path => readGithub(path, options), now,
+  })
   assertReleaseIdentity(expected, workflow, await readGithub(`/actions/runs/${expected.runId}`, options))
   await assertCurrentMain({ expectedBuild: expected.sourceCommit, ...options })
   return proof
 }
 
-export function artifactRedirect(value) {
-  let url
-  try { url = new URL(value) } catch (cause) { throw new SecretCIError('artifact_redirect', cause) }
-  // Only the short-lived redirect returned by the authenticated GitHub API is
-  // accepted. No webhook, artifact field, report or user input supplies a URL.
-  check(url.protocol === 'https:' && !url.username && !url.password && !url.port && !url.hash
-    && (/^productionresultssa[0-9]+\.blob\.core\.windows\.net$/.test(url.hostname)
-      || /^[a-z0-9-]+\.actions\.githubusercontent\.com$/.test(url.hostname)), 'artifact_redirect')
-  return url.href
-}
-
-async function boundedBytes(response, limit) {
-  const length = response.headers.get('content-length')
-  check(!length || /^\d+$/.test(length) && Number(length) <= limit, 'artifact_size')
-  check(response.ok && response.body, 'github')
-  const reader = response.body.getReader(), parts = []
-  let size = 0
-  try {
-    for (;;) {
-      const part = await reader.read()
-      if (part.done) break
-      size += part.value.length
-      if (size > limit) { await reader.cancel(); throw new SecretCIError('artifact_size') }
-      parts.push(part.value)
-    }
-  } finally { reader.releaseLock() }
-  return Buffer.concat(parts)
-}
-
-/** Read only one bounded release.json member; never extract a ZIP path. */
-export function archiveReport(bytes) {
-  check(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= MAX_ARCHIVE_BYTES, 'artifact_size')
-  const source = `import io, stat, sys, zipfile\nwith zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())) as archive:\n    entries = archive.infolist()\n    assert len(entries) == 1\n    entry = entries[0]\n    assert entry.filename == 'release.json' and not entry.is_dir()\n    assert not (entry.flag_bits & 1) and not stat.S_ISLNK(entry.external_attr >> 16)\n    assert 0 < entry.file_size <= ${MAX_REPORT_BYTES}\n    assert entry.compress_type in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)\n    data = archive.read(entry)\n    assert len(data) == entry.file_size\n    sys.stdout.buffer.write(data)\n`
-  try { return execFileSync('python3', ['-c', source], { input: bytes, maxBuffer: MAX_REPORT_BYTES + 1024,
-    timeout: 20_000, stdio: ['pipe', 'pipe', 'pipe'] }) }
-  catch (cause) { throw new SecretCIError('artifact_archive', cause) }
-}
-
-export async function downloadReleaseReport(proof, { token, fetchImpl = fetch }) {
-  check(proof?.selected === true && positive(proof.artifact?.id) && proof.artifact.repositoryId === Number(publicRepositoryId)
-    && DIGEST.test(proof.artifact.sha256 ?? ''), 'attestation')
-  let response
-  try {
-    const redirect = await fetchImpl(`https://api.github.com/repositories/${proof.artifact.repositoryId}/actions/artifacts/${proof.artifact.id}/zip`, {
-      headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'x-github-api-version': '2022-11-28' },
-      redirect: 'manual', signal: AbortSignal.timeout(20_000) })
-    check(redirect.status === 302, 'artifact_redirect')
-    const url = artifactRedirect(redirect.headers.get('location'))
-    await redirect.body?.cancel()
-    // The GitHub token is never forwarded to artifact storage.
-    response = await fetchImpl(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
-  } catch (cause) { throw new SecretCIError('artifact_redirect', cause) }
-  const archive = await boundedBytes(response, MAX_ARCHIVE_BYTES)
-  check(archive.length === proof.artifact.sizeBytes, 'artifact_size')
-  check(hash(archive) === proof.artifact.sha256, 'artifact_digest')
-  return archiveReport(archive)
-}
-
-export function releasePins(bytes, expected, workerSha) {
-  check(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= MAX_REPORT_BYTES && SHA.test(workerSha ?? ''), 'report')
+export function releasePins(bytes, expected, workerSha, publication = 'subscriptions') {
+  check(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= MAX_REPORT_BYTES && SHA.test(workerSha ?? '')
+    && ['subscriptions', 'build_time'].includes(publication), 'report')
   let report
   try {
     report = JSON.parse(bytes)
@@ -190,7 +99,9 @@ export function releasePins(bytes, expected, workerSha) {
       runId: String(expected.runId), runAttempt: String(expected.runAttempt) })
   } catch (cause) { throw new SecretCIError('report', cause) }
   check(TEMPLATE_KINDS.every(kind => report.templates[kind].public === true && report.templates[kind].buildStatus === 'ready'), 'report')
-  for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
+  // Only the source-verified modern job contract retires this publication
+  // precondition. Product-driver subscription and native-tool proofs stay intact.
+  if (publication === 'subscriptions') for (const [kind, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
     const row = report.subscriptionAcceptance?.[kind]
     check(row?.status === 'passed' && row.sourceCommit === expected.sourceCommit && row.workerSha === workerSha
       && row.templateId === report.templates[kind].templateId && row.harness === harness && row.model === model
@@ -292,13 +203,15 @@ export async function attestAcceptance(env, { fetchImpl = fetch } = {}) {
   check(selected.selected, 'not_selected')
   const saved = JSON.parse(readBounded(join(directory(env), 'prepared.json'), 32 * 1024))
   check(saved.sourceCommit === selected.sourceCommit && JSON.stringify(saved.upstream) === JSON.stringify(selected.upstream)
+    && (saved.publication ?? 'subscriptions') === selected.publication
     && JSON.stringify(saved.artifact) === JSON.stringify(selected.artifact), 'attestation')
-  const pins = releasePins(readBounded(join(directory(env), 'release.json'), MAX_REPORT_BYTES), expected, source.workerSha())
+  const pins = releasePins(readBounded(join(directory(env), 'release.json'), MAX_REPORT_BYTES), expected, source.workerSha(), selected.publication)
   check(pins.reportSha256 === saved.reportSha256, 'attestation')
   const proof = { ...selected, ...pins, kind: 'task-secret-ci-attestation', publicBuild: await publicBuild(sourceCommit, fetchImpl) }
   // Final source/attempt fence follows the public alias read, before workload credentials.
   const final = await verifyTaskRelease({ env, event: event(env), files: source.files, fetchImpl })
-  check(final.selected && JSON.stringify(final.artifact) === JSON.stringify(selected.artifact), 'attestation')
+  check(final.selected && final.publication === selected.publication
+    && JSON.stringify(final.artifact) === JSON.stringify(selected.artifact), 'attestation')
   assertDriverAttestation(env, proof); writeProof(env, proof); return proof
 }
 
@@ -315,7 +228,7 @@ async function main(command, env) {
   if (command === 'eligible') { output(env, 'selected', selected.selected); writeProof(env, selected); console.log(JSON.stringify(selected)); return }
   check(selected.selected, 'not_selected')
   const bytes = await downloadReleaseReport(selected, { token: env.GITHUB_TOKEN })
-  const pins = releasePins(bytes, expectedRelease(env, event(env)), source.workerSha())
+  const pins = releasePins(bytes, expectedRelease(env, event(env)), source.workerSha(), selected.publication)
   write(env, 'release.json', bytes)
   write(env, 'prepared.json', JSON.stringify({ ...selected, ...pins }) + '\n')
   check(typeof env.GITHUB_ENV === 'string' && env.GITHUB_ENV.length > 0, 'context')

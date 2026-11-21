@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -48,6 +49,19 @@ function jobs(validated = true) {
   return { total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, name,
     run_id: run.id, run_attempt: run.run_attempt, head_sha: SHA, status: 'completed',
     conclusion: validated || index < 2 ? 'success' : 'skipped' })) }
+}
+function buildTimeJobs() {
+  // Official run 44140435060/1: #2789 retained the build, publication and
+  // cleanup jobs, and retired the separate subscription/deploy jobs.
+  const names = ['test', 'check', 'web-ready', 'release / recheck', 'release / validate / build',
+    'release / await-web', 'release / templates', 'release / cleanup', 'release / remember-failure']
+  return { total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, name,
+    run_id: run.id, run_attempt: run.run_attempt, head_sha: SHA, status: 'completed',
+    conclusion: name === 'release / remember-failure' ? 'skipped' : 'success',
+    ...(name === 'release / templates' ? { steps: [
+      { number: 11, name: 'Make only fully accepted candidates public', status: 'completed', conclusion: 'success' },
+      { number: 12, name: 'Preserve the complete public release report', status: 'completed', conclusion: 'success' },
+    ] } : {}) })) }
 }
 const relevant = ['scripts/acceptance/thread-lifecycle.mjs']
 const workflowText = readFileSync(new URL('../../.github/workflows/thread-lifecycle-acceptance.yml', import.meta.url), 'utf8')
@@ -199,6 +213,25 @@ test('cost selection requires related source changes or a real validated and pub
     'scripts/acceptance/thread-lifecycle.mjs/other']) assert.equal(lifecycleChanged([path]), false, path)
 })
 
+test('the current official publication shape requires its complete templates release proof', () => {
+  const selected = selectRelease(expected(), buildTimeJobs(), [])
+  assert.equal(selected.runtime, 'validated_and_published')
+  assert.equal(selected.publication, 'build_time')
+  assert.equal(selected.jobs.templates, 7)
+  for (const mutate of [
+    data => { data.jobs.find(row => row.name === 'release / templates').conclusion = 'skipped' },
+    data => { data.jobs.find(row => row.name === 'release / templates').steps[0].conclusion = 'skipped' },
+    data => { data.jobs.find(row => row.name === 'release / templates').steps[1].conclusion = 'failure' },
+    data => { data.jobs.find(row => row.name === 'release / cleanup').conclusion = 'failure' },
+    data => { data.jobs.push({ ...data.jobs[6], id: 99 }); data.total_count++ },
+    data => { data.jobs.push({ ...data.jobs[6], name: 'release / subscriptions', id: 99 }); data.total_count++ },
+    data => { data.jobs[6].head_sha = OTHER },
+  ]) {
+    const data = buildTimeJobs(); mutate(data)
+    assert.throws(() => selectRelease(expected(), data, []), /thread_lifecycle_ci:jobs/)
+  }
+})
+
 test('skipped, incomplete, stale-attempt or unsuccessful release jobs cannot authorize active work', () => {
   const refusals = [
     data => { data.total_count++ },
@@ -220,27 +253,56 @@ test('skipped, incomplete, stale-attempt or unsuccessful release jobs cannot aut
   }
 })
 
-function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event, validated = true, repository = run.repository } = {}) {
+function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event, validated = true, repository = run.repository,
+  buildTime = false, publishedSource = SHA } = {}) {
   let runs = 0, refs = 0
   const calls = []
+  const now = Date.now(), storage = 'https://productionresultssa1.blob.core.windows.net/synthetic-release/archive'
+  let archive, artifact
+  if (buildTime) {
+    const report = { sourceCommit: publishedSource, workerSha: OTHER,
+      templates: Object.fromEntries(['desktop', 'claude', 'codex'].map(kind => [kind, {
+        name: `mikka-${publishedSource.slice(0, 12)}-123-2-${kind}`, baseTemplate: kind, templateId: `released-${kind}`,
+        buildId: `build-${kind}`, preinstalled: true, public: true, buildStatus: 'ready',
+      }])) }
+    archive = execFileSync('python3', ['-c', 'import io,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED) as z: z.writestr("release.json",sys.stdin.buffer.read())\nsys.stdout.buffer.write(b.getvalue())\n'],
+      { input: JSON.stringify(report), maxBuffer: 16384, stdio: ['pipe', 'pipe', 'pipe'] })
+    const api = `https://api.github.com/repos/${repository.full_name}`
+    artifact = { id: 321, name: 'e2b-release-evidence-123-2', expired: false, size_in_bytes: archive.length,
+      digest: 'sha256:' + createHash('sha256').update(archive).digest('hex'), created_at: new Date(now - 1000).toISOString(),
+      expires_at: new Date(now + 3600000).toISOString(), url: `${api}/actions/artifacts/321`, archive_download_url: `${api}/actions/artifacts/321/zip`,
+      workflow_run: { id: 123, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: SHA } }
+  }
   const fetchImpl = async (input, options) => {
-    assert.equal(options.redirect, 'error')
+    if (input === storage) {
+      assert.equal(options.headers?.authorization, undefined)
+      assert.equal(options.redirect, 'error')
+      calls.push('storage'); return new Response(archive)
+    }
     const url = new URL(input)
     assert.equal(url.origin, 'https://api.github.com')
+    assert.equal(options.headers.authorization, 'Bearer private-credential-sentinel')
     assert.equal(url.pathname.startsWith('/repositories/1427517699/'), true)
     const route = url.pathname.slice('/repositories/1427517699'.length) + url.search
     calls.push(route)
+    if (buildTime && route === '/actions/artifacts/321/zip') {
+      assert.equal(options.redirect, 'manual')
+      return new Response(null, { status: 302, headers: { location: storage } })
+    }
+    assert.equal(options.redirect, 'error')
     if (route === '/actions/workflows/e2b-official-runtime.yml') return Response.json(workflow)
     if (route === '/actions/runs/123') return Response.json({ ...run, event: releaseEvent, repository, head_repository: repository,
-      run_attempt: rerun && ++runs > 1 ? 3 : 2 })
+      run_started_at: new Date(now - 60000).toISOString(), run_attempt: rerun && ++runs > 1 ? 3 : 2 })
     if (route === '/git/ref/heads/main') return Response.json({ object: { type: 'commit', sha: mainMoved && ++refs > 1 ? OTHER : SHA } })
-    if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(jobs(validated))
-    assert.fail('Unexpected endpoint; upstream artifacts are never read')
+    if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(buildTime ? buildTimeJobs() : jobs(validated))
+    if (buildTime && route === '/actions/runs/123/artifacts?per_page=100') return Response.json({ total_count: 1, artifacts: [artifact] })
+    if (buildTime && route === '/actions/artifacts/321') return Response.json(artifact)
+    assert.fail('Unexpected fixture endpoint')
   }
   return { fetchImpl, calls }
 }
 
-test('the credential guard rechecks main and the attempt after exact-attempt jobs, with no artifact reads', async () => {
+test('the legacy credential guard rechecks main and the attempt after exact-attempt jobs, with no artifact reads', async () => {
   const f = apiFixture(), proof = await verifyRelease({ env: env(), event: event(), files: relevant, ...f })
   assert.equal(proof.sourceCommit, SHA)
   assert.equal(proof.selected, true)
@@ -250,6 +312,25 @@ test('the credential guard rechecks main and the attempt after exact-attempt job
   assert.ok(!f.calls.some(path => path.includes('artifact')))
   for (const change of [{ rerun: true }, { mainMoved: true }])
     await assert.rejects(verifyRelease({ env: env(), event: event(), files: relevant, ...apiFixture(change) }))
+})
+
+test('automatic build-time publication binds the actual report source to current main before credentials', async () => {
+  const fixture = apiFixture({ buildTime: true }), proof = await verifyRelease({ env: env(), event: event(), files: [], ...fixture })
+  assert.equal(proof.runtime, 'validated_and_published')
+  assert.equal(proof.publication, 'build_time')
+  assert.equal(proof.workerSourceCommit, SHA)
+  assert.equal(proof.artifact.id, 321)
+  assert.match(proof.reportSha256, /^[a-f0-9]{64}$/)
+  assert.equal(fixture.calls.filter(path => path === 'storage').length, 1)
+  const attested = { ...proof, web: { sourceCommit: SHA, publicBuild: SHA, webRunId: 456, webAttempt: 1 } }
+  assert.doesNotThrow(() => assertAttestation(expected(), attested))
+  for (const mutate of [value => { value.workerSourceCommit = OTHER }, value => { value.artifact.repositoryId++ },
+    value => { value.reportSha256 = 'invalid' }, value => { delete value.artifact }]) {
+    const changed = structuredClone(attested); mutate(changed)
+    assert.throws(() => assertAttestation(expected(), changed), /thread_lifecycle_ci:report/)
+  }
+  for (const change of [{ publishedSource: OTHER }, { rerun: true }, { mainMoved: true }])
+    await assert.rejects(verifyRelease({ env: env(), event: event(), files: [], ...apiFixture({ buildTime: true, ...change }) }))
 })
 
 test('the shared guard verifies an automatic release and still rejects reruns and moving main', async () => {

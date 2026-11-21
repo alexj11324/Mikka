@@ -48,6 +48,23 @@ function report(sourceCommit = SHA, workerSha = WORKER) {
     credentialRoute: 'subscription', replyVerified: true, replyVerifiedAfterTool: true,
   }])) }
 }
+
+test('the retired publication subscription gate is absent only in the verified build-time contract', () => {
+  const current = report(); delete current.subscriptionAcceptance
+  const bytes = Buffer.from(JSON.stringify(current))
+  const pins = releasePins(bytes, expected, WORKER, 'build_time')
+  assert.equal(pins.workerSourceCommit, SHA)
+  assert.equal(pins.workerSha, WORKER)
+  assert.equal(pins.templates.codex, 'candidate-codex')
+  assert.throws(() => releasePins(bytes, expected, WORKER), /task_secret_ci:report/)
+  assert.throws(() => releasePins(bytes, expected, WORKER, 'unknown'), /task_secret_ci:report/)
+  for (const mutate of [value => { value.sourceCommit = OTHER }, value => { value.workerSha = OTHER },
+    value => { value.templates.desktop.public = false }, value => { value.templates.claude.buildStatus = 'building' },
+    value => { value.templates.codex.name = 'unbound-template' }]) {
+    const invalid = structuredClone(current); mutate(invalid)
+    assert.throws(() => releasePins(Buffer.from(JSON.stringify(invalid)), expected, WORKER, 'build_time'), /task_secret_ci:report/)
+  }
+})
 function zip(entries) {
   const source = 'import io,json,sys,zipfile\nbuffer=io.BytesIO()\nwith zipfile.ZipFile(buffer,"w",zipfile.ZIP_DEFLATED) as archive:\n    for row in json.load(sys.stdin): archive.writestr(row["name"],row["value"])\nsys.stdout.buffer.write(buffer.getvalue())\n'
   return execFileSync('python3', ['-c', source], { input: JSON.stringify(entries), maxBuffer: MAX_ARCHIVE_BYTES + 1024,

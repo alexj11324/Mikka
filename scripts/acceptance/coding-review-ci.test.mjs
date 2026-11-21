@@ -12,15 +12,21 @@ const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: repo, GITHUB_REP
   WORKSPACE_REVIEW_RELEASE_RUN_ID: '123', WORKSPACE_REVIEW_RELEASE_RUN_ATTEMPT: '2', ACCEPTANCE_MODE: 'workspace-review',
   TASK_SECRETS_MODEL_CASE: 'all', PRODUCTION_CANARY: 'false', FACTORY_ACCEPTANCE_REQUESTED: 'false', TASK_SECRETS_WINDOW: '' })
 
-function fixture() {
+function fixture({ buildTime = false } = {}) {
   const now = Date.now(), workflow = { id: 456, name: 'E2B additive runtime release', path: '.github/workflows/e2b-official-runtime.yml', state: 'active' }
   const run = { id: 123, run_attempt: 2, workflow_id: 456, name: workflow.name, path: workflow.path, head_sha: source, head_branch: 'main',
     event: 'push', status: 'completed', conclusion: 'success', run_started_at: new Date(now - 60000).toISOString(),
     repository: { id: 1427517699, full_name: repo, owner: { id: 183887963 } },
     head_repository: { id: 1427517699, full_name: repo, owner: { id: 183887963 } } }
-  const names = ['test', 'check', 'validate / build', 'await-web', 'subscriptions', 'publish / deploy', 'cleanup']
+  const names = buildTime ? ['test', 'check', 'web-ready', 'release / recheck', 'release / validate / build',
+    'release / await-web', 'release / templates', 'release / cleanup', 'release / remember-failure']
+    : ['test', 'check', 'validate / build', 'await-web', 'subscriptions', 'publish / deploy', 'cleanup']
   const jobs = { total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, name, run_id: 123, run_attempt: 2,
-    head_sha: source, status: 'completed', conclusion: 'success' })) }
+    head_sha: source, status: 'completed', conclusion: name === 'release / remember-failure' ? 'skipped' : 'success',
+    ...(name === 'release / templates' ? { steps: [
+      { number: 11, name: 'Make only fully accepted candidates public', status: 'completed', conclusion: 'success' },
+      { number: 12, name: 'Preserve the complete public release report', status: 'completed', conclusion: 'success' },
+    ] } : {}) })) }
   const artifact = { id: 321, name: 'e2b-release-evidence-123-2', expired: false, size_in_bytes: 1000, digest: 'sha256:' + 'd'.repeat(64),
     created_at: new Date(now - 10000).toISOString(), expires_at: new Date(now + 3600000).toISOString(),
     url: `${api}/actions/artifacts/321`, archive_download_url: `${api}/actions/artifacts/321/zip`,
@@ -32,8 +38,12 @@ function fixture() {
       status: 'passed', sourceCommit: source, workerSha: worker, templateId: `released-${kind}`, harness, model,
       credentialRoute: 'subscription', replyVerified: true, replyVerifiedAfterTool: true,
     }])) }
+  if (buildTime) delete report.subscriptionAcceptance
   const calls = []; let attestations = 0, reads = 0
-  const data = { workflow, run, jobs, artifact, report, mutateFinalRun: false }
+  const path = `/compare/${source}...${app}`
+  const data = { workflow, run, jobs, artifact, report, mutateFinalRun: false,
+    comparisons: { [`${readApi}${path}?per_page=1`]: { url: api + path, base_commit: { sha: source },
+      merge_base_commit: { sha: source }, status: 'ahead', ahead_by: 1, behind_by: 0 } } }
   return { data, calls, attestations: () => attestations, dependencies: { now: () => now,
     attest: async received => { assert.equal(received.APPLICATION_SHA, app); attestations++; return { sourceCommit: app, publicBuild: app } },
     fetchImpl: async (url, options) => {
@@ -44,6 +54,7 @@ function fixture() {
       if (url.endsWith('/attempts/2/jobs?per_page=100')) return Response.json(data.jobs)
       if (url.endsWith('/artifacts?per_page=100')) return Response.json({ total_count: 1, artifacts: [data.artifact] })
       if (url.endsWith('/actions/artifacts/321')) return Response.json(data.artifact)
+      if (Object.hasOwn(data.comparisons, url)) return Response.json(data.comparisons[url])
       assert.fail('unexpected upstream read')
     },
     download: async (proof, options) => {
@@ -80,6 +91,63 @@ test('manual application and exact published worker release are independently bo
   assert.equal(proof.upstream.runAttempt, 2); assert.equal(proof.runtime, 'validated_and_published')
   assert.equal(f.attestations(), 2); assert.equal(JSON.stringify(proof).includes(token), false)
   assert.equal(f.calls.filter(url => url === `${readApi}/actions/runs/123`).length, 2)
+})
+
+test('a later main workflow can publish the explicitly pinned older served worker source', async () => {
+  for (const buildTime of [false, true]) {
+    const f = laterWorkflow(buildTime), workflowSource = 'd'.repeat(40)
+    const proof = await attestCodingWorkspace(env(), f.dependencies)
+    assert.equal(proof.upstream.sourceCommit, workflowSource)
+    assert.equal(proof.workerSourceCommit, source)
+    assert.equal(proof.sourceCommit, app)
+    assert.equal(f.attestations(), 2)
+  }
+})
+
+function laterWorkflow(buildTime = true) {
+  const f = fixture({ buildTime }), workflowSource = 'd'.repeat(40)
+  f.data.run.head_sha = workflowSource; f.data.run.event = 'workflow_dispatch'
+  for (const job of f.data.jobs.jobs) job.head_sha = workflowSource
+  f.data.artifact.workflow_run.head_sha = workflowSource
+  for (const [before, after] of [[source, workflowSource], [workflowSource, app]]) {
+    const path = `/compare/${before}...${after}`
+    f.data.comparisons[`${readApi}${path}?per_page=1`] = { url: api + path, base_commit: { sha: before },
+      merge_base_commit: { sha: before }, status: 'ahead', ahead_by: 1, behind_by: 0 }
+  }
+  return f
+}
+
+test('manual source separation rejects unproved ancestry before artifact or workload access', async () => {
+  for (const before of [source, 'd'.repeat(40)]) for (const mutate of [
+    value => { value.url = value.url.replace(repo, 'foreign/Mikka') },
+    value => { value.base_commit.sha = 'e'.repeat(40) },
+    value => { value.merge_base_commit.sha = 'e'.repeat(40) },
+    value => { value.status = 'diverged'; value.behind_by = 1 },
+    value => { value.status = 'behind'; value.ahead_by = 0; value.behind_by = 1 },
+  ]) {
+    const f = laterWorkflow(), comparison = Object.values(f.data.comparisons).find(value => value.base_commit.sha === before
+      && value.url.endsWith(before === source ? 'd'.repeat(40) : app))
+    assert.ok(comparison)
+    mutate(comparison)
+    await assert.rejects(attestCodingWorkspace(env(), f.dependencies), /workspace_review_guard_refused|webDeploy:invalidCommitComparison/)
+    assert.equal(f.calls.some(url => url.includes('/artifacts')), false)
+    assert.equal(f.attestations(), 1)
+  }
+})
+
+test('modern manual publication keeps the explicitly selected report source, artifact head and runtime pins', async () => {
+  for (const mutate of [
+    value => { value.run.event = 'push' },
+    value => { value.artifact.workflow_run.head_sha = source },
+    value => { value.report.sourceCommit = 'd'.repeat(40) },
+    value => { value.report.workerSha = 'e'.repeat(40) },
+    value => { value.report.templates.codex.public = false },
+    value => { value.jobs.jobs.find(row => row.name === 'release / templates').steps[1].conclusion = 'skipped' },
+    value => { value.mutateFinalRun = true },
+  ]) {
+    const f = laterWorkflow(); mutate(f.data)
+    await assert.rejects(attestCodingWorkspace(env(), f.dependencies))
+  }
 })
 
 test('a stale attempt, failed publish, wrong subscription/template or changed upstream is refused', async () => {

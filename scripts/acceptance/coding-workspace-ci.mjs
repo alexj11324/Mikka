@@ -74,7 +74,7 @@ export function workspaceReleaseSelection(proof, files) {
 export function assertWorkspaceAttestation(expected, proof) {
   check(proof?.kind === 'coding-workspace-ci-attestation' && proof.selected === true
     && proof.runtime === 'validated_and_published' && proof.sourceCommit === expected.sourceCommit
-    && proof.workerSourceCommit === expected.sourceCommit && SHA.test(proof.workerSha ?? '')
+    && proof.workerSourceCommit === expected.sourceCommit && SHA.test(proof.workerSha ?? '') && proof.workerSha === expected.workerSha
     && proof.upstream?.runId === expected.runId && proof.upstream?.runAttempt === expected.runAttempt
     && proof.upstream?.workflowId === expected.workflowId
     && proof.web?.sourceCommit === expected.sourceCommit && proof.web.publicBuild === expected.sourceCommit
@@ -90,9 +90,10 @@ export async function attestWorkspaceAcceptance(env, { fetchImpl = fetch } = {})
   const web = await waitForWebDeployment({ expectedBuild: expected.sourceCommit, token: env.GITHUB_TOKEN, fetchImpl })
   const after = await verifyRelease({ env, event, files: source.files, fetchImpl })
   check(workspaceReleaseSelection(after, source.files).selected, 'not_selected')
+  const workerSha = source.workerSha()
   const proof = { ...after, ...workspaceReleaseSelection(after, source.files), kind: 'coding-workspace-ci-attestation',
-    workerSha: source.workerSha(), workerSourceCommit: expected.sourceCommit, web }
-  assertWorkspaceAttestation(expected, proof)
+    workerSha: after.publication === 'build_time' ? after.workerSha : workerSha, workerSourceCommit: expected.sourceCommit, web }
+  assertWorkspaceAttestation({ ...expected, workerSha }, proof)
   write(env, 'attestation.json', proof)
   return proof
 }
