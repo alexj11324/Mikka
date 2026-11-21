@@ -2,6 +2,7 @@ import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { PluginError } from './contracts'
 import type { StoreCategory } from './catalog'
 import { connectKind, credentialForms, type ConnectKind, type CredentialForm } from './connect-kind'
+import { wire } from './composio-wire'
 
 // One store app's page (decision 2026-10-31, as Codex's app page): Composio's
 // own description, tool list and facts, shown whether or not the person has
@@ -106,7 +107,7 @@ type RawClient = { getClient: () => { toolkits: { retrieve: (slug: string, query
 /** The real Composio client, with a timeout per call. */
 export function composioAppDetailSource(client: RawClient): AppDetailSource {
   return {
-    retrieve: slug => client.getClient().toolkits.retrieve(slug, undefined, { signal: AbortSignal.timeout(10_000) }) as Promise<RawToolkit>,
-    listTools: query => client.getClient().tools.list(query as never, { signal: AbortSignal.timeout(10_000) }) as Promise<RawToolPage>,
+    retrieve: async slug => wire(await client.getClient().toolkits.retrieve(slug, undefined, { signal: AbortSignal.timeout(10_000) })) as RawToolkit,
+    listTools: async query => wire(await client.getClient().tools.list(query as never, { signal: AbortSignal.timeout(10_000) })) as RawToolPage,
   }
 }

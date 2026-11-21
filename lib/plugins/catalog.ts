@@ -1,6 +1,7 @@
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { PluginError } from './contracts'
 import { connectKind, type ConnectKind } from './connect-kind'
+import { wire } from './composio-wire'
 
 // The 插件 store: every Composio toolkit (decisions 2026-10-31 and
 // 2026-11-02), whether it connects in one click (Composio-managed auth), with
@@ -36,7 +37,7 @@ type RawToolkit = {
   no_auth?: boolean | null
   composio_managed_auth_schemes?: string[] | null
   auth_schemes?: string[] | null
-  meta?: { description?: string | null; logo?: string | null; created_at?: string | null; categories?: { id?: string | null; name?: string | null }[] | null } | null
+  meta?: { description?: string | null; logo?: string | null; created_at?: string | null; categories?: { id?: string | null; slug?: string | null; name?: string | null }[] | null } | null
 }
 type RawPage = { items: RawToolkit[]; next_cursor?: string | null }
 /** The one call the store needs: `composio.getClient().toolkits.list`. */
@@ -60,7 +61,7 @@ function listed(item: RawToolkit) {
 
 export function toStoreApp(item: RawToolkit): StoreApp {
   const categories = (item.meta?.categories ?? []).flatMap(category => {
-    const id = clean(category?.id, 80), name = clean(category?.name, 80)
+    const id = clean(category?.id ?? category?.slug, 80), name = clean(category?.name, 80)
     return id && name ? [{ id, name }] : []
   })
   const created = item.meta?.created_at && !Number.isNaN(Date.parse(item.meta.created_at)) ? new Date(item.meta.created_at).toISOString() : null
@@ -129,7 +130,7 @@ export function resetStoreCatalogCache() { cached = null }
 
 /** The real Composio client's lister, with a timeout per page. */
 export function composioToolkitLister(client: { getClient: () => { toolkits: { list: (query: never, options?: { signal?: AbortSignal }) => Promise<unknown> } } }): ToolkitLister {
-  return query => client.getClient().toolkits.list(query as never, { signal: AbortSignal.timeout(10_000) }) as Promise<RawPage>
+  return async query => wire(await client.getClient().toolkits.list(query as never, { signal: AbortSignal.timeout(10_000) })) as RawPage
 }
 
 /** A new connection must be a store app that connects that way. */
