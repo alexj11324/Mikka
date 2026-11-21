@@ -1,7 +1,23 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
 import assert from 'node:assert/strict'
+import { after } from 'node:test'
 import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core'
+
+// Match an actual local server without inheriting CI's Cloud-only gateway omission.
+// This existing loader captures response scheduling below; no live delivery is claimed.
+const gatewayEnvironment = { MIKKA_EDITION: 'community', BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+  BETTER_AUTH_SECRET: 'synthetic-claim-commit-fixture', DEVICE_GATEWAY_URL: undefined,
+  DEVICE_GATEWAY_PUSH_SECRET: undefined, VERCEL: undefined }
+const previousGatewayEnvironment = Object.fromEntries(Object.keys(gatewayEnvironment).map(key => [key, process.env[key]]))
+for (const [key, value] of Object.entries(gatewayEnvironment)) {
+  if (value === undefined) delete process.env[key]; else process.env[key] = value
+}
+after(() => {
+  for (const [key, value] of Object.entries(previousGatewayEnvironment)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+})
 
 const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 function expandMembershipAliases(sql) {

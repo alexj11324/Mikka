@@ -31,3 +31,28 @@ export async function ownLiveRuntime(t: Pick<TestContext, 'after'>) {
   t.after(close)
   return { flush, close }
 }
+
+/** Unit writers still execute the real commit observer and live registration.
+ * Stop only at the response scheduler: these fake databases cannot deliver live
+ * reads. The captured callbacks prove registration, never notification delivery. */
+export async function captureFixtureLiveEffects(t: Pick<TestContext, 'after'>) {
+  const environment = { MIKKA_EDITION: 'community', BETTER_AUTH_URL: 'http://127.0.0.1:3000',
+    BETTER_AUTH_SECRET: 'synthetic-unit-commit-fixture', DEVICE_GATEWAY_URL: undefined,
+    DEVICE_GATEWAY_PUSH_SECRET: undefined, VERCEL: undefined }
+  const previous = Object.fromEntries(Object.keys(environment).map(key => [key, process.env[key]]))
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value
+    }
+  })
+  for (const [key, value] of Object.entries(environment)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+  const runtime = await import('../../lib/server-runtime/server')
+  const scheduled: Parameters<typeof runtime.after>[0][] = []
+  const scheduler = mock.module(new URL('../../lib/server-runtime/server.ts', import.meta.url).href, {
+    cache: true, namedExports: { ...runtime, after: (work: Parameters<typeof runtime.after>[0]) => { scheduled.push(work) } },
+  })
+  t.after(() => scheduler.restore())
+  return scheduled
+}

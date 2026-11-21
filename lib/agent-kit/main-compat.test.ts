@@ -11,7 +11,7 @@ import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
-import * as serverRuntime from '../server-runtime/server'
+import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
 import { observeCommitEffects } from '../db/commit-effects'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
@@ -35,16 +35,8 @@ const publicationAssignment={pushBranch:'mikka/mik-42',policy:publicationPolicy}
 const prepared=mock.fn(async(..._args:Parameters<typeof import('../run-publications').prepareRunPublication>)=>structuredClone(publicationAssignment))
 const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a run')})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-// Keep the real commit observer and background registration, but stop at the
-// response scheduler: title/model work and live delivery belong to their suites.
-const scheduledAfter: Parameters<typeof serverRuntime.after>[0][]=[]
-stub('../server-runtime/server.ts',{...serverRuntime,after:(work:Parameters<typeof serverRuntime.after>[0])=>{scheduledAfter.push(work)}})
-// A normal local server enables the built-in gateway. CI's ambient Cloud
-// edition must not silently remove that branch from this compatibility fixture.
-const gatewayEnvironment={MIKKA_EDITION:'community',BETTER_AUTH_URL:'http://127.0.0.1:3000',BETTER_AUTH_SECRET:'synthetic-agent-kit-gateway-fixture',DEVICE_GATEWAY_URL:undefined,DEVICE_GATEWAY_PUSH_SECRET:undefined,VERCEL:undefined}
-const previousGatewayEnvironment=Object.fromEntries(Object.keys(gatewayEnvironment).map(key=>[key,process.env[key]]))
-before(()=>{for(const [key,value] of Object.entries(gatewayEnvironment)){if(value===undefined)delete process.env[key];else process.env[key]=value}})
-after(()=>{for(const [key,value] of Object.entries(previousGatewayEnvironment)){if(value===undefined)delete process.env[key];else process.env[key]=value}})
+let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+before(async()=>{scheduledAfter=await captureFixtureLiveEffects({after})})
 beforeEach(()=>{scheduledAfter.length=0})
 const compactSql = (sql: string) => sql.replace(/\s+/g, ' ').trim()
 const fixtureRows = <T>(rows: T[]) => ({ rows, rowCount: rows.length })

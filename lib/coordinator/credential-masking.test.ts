@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
+import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
 import { coordinatorMessages, coordinatorSessions } from '../db/schema'
 
 // The safety floor (decision 2026-11-02-1600): a GitHub token never persists in
@@ -39,7 +40,11 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () =
 stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {}, coordinatorSessionScope: async () => null })
 
 let store: typeof import('@/tests/support/legacy-coordinator-store')
-before(async () => { store = await import('@/tests/support/legacy-coordinator-store') })
+let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+before(async () => {
+  scheduledAfter = await captureFixtureLiveEffects({ after })
+  store = await import('@/tests/support/legacy-coordinator-store')
+})
 
 test('assistant text, tool results and the stored warning are saved with GitHub tokens masked', async () => {
   inserted.length = 0; updates.length = 0

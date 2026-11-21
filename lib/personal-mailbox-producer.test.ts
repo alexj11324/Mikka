@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
 import { agentRuns, agents, bots, devices } from './db/schema'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { makeSnapshot } from './agent-kit/definition'
@@ -15,7 +16,9 @@ const owner = 'synthetic-owner', botId = '28700000-0000-4000-8000-000000000011'
 const workspaceId = '28700000-0000-4000-8000-000000000012'
 const agentId = '28700000-0000-4000-8000-000000000013', repoId = '28700000-0000-4000-8000-000000000014', issueId = '28700000-0000-4000-8000-000000000015'
 const connectionId = '28700000-0000-4000-8000-000000000019'
+let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
 before(async () => {
+  scheduledAfter = await captureFixtureLiveEffects({ after })
   const workspaceModule = await import('./workspace-db')
   mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: { ...workspaceModule, workspacePool: { query: async () => ({ rows: [{ userId: owner }] }) } } })
 })

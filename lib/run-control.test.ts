@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { after, before } from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
-import { sendOwnedRunMessage, stopOwnedRun, type RunControlDatabase } from './run-control'
+import type { RunControlDatabase } from './run-control'
+import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
+
+let { sendOwnedRunMessage, stopOwnedRun } = {} as typeof import('./run-control')
+let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+before(async () => {
+  scheduledAfter = await captureFixtureLiveEffects({ after })
+  ;({ sendOwnedRunMessage, stopOwnedRun } = await import('./run-control'))
+})
 
 const runId = '11111111-1111-4111-8111-111111111111'
 const dialect = new PgDialect()
