@@ -19,7 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        # PR updates run one Node version to halve queued jobs; merge_group/push keep 22+24.
+        node: ${{ github.event_name == 'pull_request' && fromJSON('["24"]') || fromJSON('["22","24"]') }}
     services:
       postgres:
         image: postgres:17

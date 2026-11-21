@@ -92,7 +92,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        # PR updates run one Node version to halve queued jobs; merge_group/push keep 22+24.
+        node: ${{ github.event_name == 'pull_request' && fromJSON('["24"]') || fromJSON('["22","24"]') }}
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
@@ -130,7 +131,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        # PR updates run one Node version to halve queued jobs; merge_group/push keep 22+24.
+        node: ${{ github.event_name == 'pull_request' && fromJSON('["24"]') || fromJSON('["22","24"]') }}
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
@@ -370,7 +372,8 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.db_matrix).shard }}
-        node: ['22', '24']
+        # PR updates run one Node version to halve queued jobs; merge_group/push keep 22+24.
+        node: ${{ github.event_name == 'pull_request' && fromJSON('["24"]') || fromJSON('["22","24"]') }}
     services:
       postgres:
         image: postgres:17
