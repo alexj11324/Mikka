@@ -5,11 +5,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { QUARTER_HOUR } from '../../cloudflare/suggestions-cron/src/schedule.mjs'
 import { applicationWitness, readJson } from '../device-gateway/deploy.mjs'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 import { affectsWorker } from '../device-gateway/select-release.mjs'
 
 export const WORKER = 'mikka-suggestions-cron'
 export const MIKKA_URL = 'https://app.aspectlylabs.com/mikka'
-const REPOSITORY = 'alexj11324/Mikka'
 const CONFIG = 'cloudflare/suggestions-cron/wrangler.jsonc'
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const SHA = /^[a-f0-9]{40}$/
@@ -65,7 +65,7 @@ export function gitRepository(cwd = ROOT) {
   }
   return {
     async refreshMain() {
-      await git(['fetch', '--quiet', '--no-tags', 'https://github.com/' + REPOSITORY + '.git', 'refs/heads/main'])
+      await git(['fetch', '--quiet', '--no-tags', 'https://github.com/' + (actionsMikkaRepository(process.env) || 'alexj11324/Mikka') + '.git', 'refs/heads/main'])
       return git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'])
     },
     async contains(ancestor, descendant) {
@@ -161,7 +161,7 @@ async function wranglerDeploy(sourceCommit, { accountId, cloudflareToken }) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REPOSITORY !== REPOSITORY
+    if (process.env.GITHUB_ACTIONS !== 'true' || !actionsMikkaRepository(process.env)
       || process.env.GITHUB_REF !== 'refs/heads/main' || !['push', 'workflow_dispatch'].includes(process.env.GITHUB_EVENT_NAME)) fail('reviewed_main_workflow_required')
     const report = await deployCron({ sourceCommit: process.env.GITHUB_SHA, accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
       cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN })

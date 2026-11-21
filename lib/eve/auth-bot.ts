@@ -3,7 +3,7 @@ import {createRequestScope,runRequestScope} from '../../apps/api/src/context'
 
 /** Resolve default Coordinator exactly as the app does, using this request's
  * active Workspace. A supplied invalid selector never becomes a default. */
-export async function resolveEveRequestBot(request:Request,session:ApiSession) {
+export async function resolveEveRequestBot(request:Request,session:ApiSession,expectedWorkspaceId?:string) {
   const {z}=await import('zod')
   const supplied=new URL(request.url).searchParams.get('botId')??request.headers.get('x-mikka-bot-id')
   const parsed=supplied===null?null:z.uuid().safeParse(supplied)
@@ -16,9 +16,9 @@ export async function resolveEveRequestBot(request:Request,session:ApiSession) {
     try {
       const { chatBotId } = await import('../coordinator/coordinator-bot')
       const workspace = (await loadWorkspaceContext(undefined, session.user)).workspace.id
-      const botId = await chatBotId(session.user.id, parsed?.data?.toLowerCase(), workspace)
       const { apiWorkspaceAllowed } = await import('../api-auth')
-      if (!apiWorkspaceAllowed(session, workspace)) return null
+      if ((expectedWorkspaceId !== undefined && expectedWorkspaceId !== workspace) || !apiWorkspaceAllowed(session, workspace)) return null
+      const botId = await chatBotId(session.user.id, parsed?.data?.toLowerCase(), workspace)
       const { assertEveScope } = await import('./scope')
       await assertEveScope({ ownerId: session.user.id, botId, workspaceId: workspace, surface: 'web' })
       return {botId,workspaceId:workspace}

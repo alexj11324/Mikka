@@ -1,4 +1,6 @@
 // Actual cloud-worker repository task through fake E2B HTTP + fake LiteLLM.
+import { submitEveMessage } from '../acceptance/eve-session.mjs'
+// New remote repository task on official E2B instances + real DeepSeek + local API.
 // Run only after local acceptance, with the isolated server's database env:
 // NODE_USE_ENV_PROXY=1 node --import ./tests/support/server-only.mjs --import tsx \
 //   scripts/e2b/cloud-local-acceptance.mjs <environment.json>
@@ -119,7 +121,7 @@ async function main() {
   })
   execFileSync(process.execPath, [resolve('scripts/assert-test-model.mjs'), metric.model], { stdio: 'ignore' })
   const marker = `cloud-acceptance-${id}`
-  await api('/api/coordinator/messages', { text: `请只创建一个个人任务，标题“${marker}”，描述“在当前仓库写入文件 cloud-acceptance.txt，内容为 ${marker}。完成后用 submit 工具提交报告，不推送、不创建PR。”。不要派发，不启动线程，不调用电脑。`, submissionId: randomUUID() })
+  await submitEveMessage(accounts.owner, null, `请只创建一个个人任务，标题“${marker}”，描述“在当前仓库写入文件 cloud-acceptance.txt，内容为 ${marker}。完成后用 submit 工具提交报告，不推送、不创建PR。”。不要派发，不启动线程，不调用电脑。`, randomUUID(), { expectedOwnerId: actor.userId, expectedWorkspaceId: actor.workspaceId })
   const issue = await wait(async () => (await pool.query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [actor.userId, marker])).rows[0])
 
   stage = 'restricted-https-relay'

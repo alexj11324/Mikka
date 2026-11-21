@@ -23,8 +23,13 @@ concurrency:
   group: mobile-update-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
+
 jobs:
   update:
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
     name: EAS Update
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -44,11 +49,16 @@ jobs:
         run: node --test scripts/mobile-ota-credentials.test.mjs
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
+      - name: Validate the selected private UI owner before credential access
+        run: |
+          node --input-type=module - <<'JS'
+          import { privateMikkaRepository } from './scripts/cloudflare-source.mjs'
+          privateMikkaRepository('mikka-hosted-ui')
+          JS
       - name: Read the existing production Expo credential through OIDC
         if: >-
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' &&
-          github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
-          github.repository_owner_id == '183887963'
+          (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -77,7 +87,7 @@ jobs:
         if: env.EXPO_TOKEN != '' && env.HOSTED_UI_READ_KEY != ''
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: alexj11324/mikka-hosted-ui
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: main
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui

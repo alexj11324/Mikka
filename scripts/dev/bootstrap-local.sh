@@ -2,7 +2,7 @@
 # One-step local setup for a cloud Linux session (docs/local-bootstrap.md):
 # PostgreSQL 17 on 127.0.0.1:5432 with mikka_e2e migrated (PGDG, no Docker), Node as in .node-version,
 # pnpm install --frozen-lockfile, bubblewrap/socat/ripgrep, and Playwright on
-# the container's own Chromium. Idempotent: a second run only checks.
+# the container's own Chromium. Reuses installed tools; migration setup is idempotent.
 # Prints one line of exports for the session; it holds no secret.
 set -euo pipefail
 
@@ -122,12 +122,10 @@ fi
 db_url() { echo "postgresql://e2e:$1@127.0.0.1:$PG_PORT/mikka_e2e"; }
 DB_URL="$(db_url "$(cat "$PW_FILE")")"
 PRINT_URL="$(db_url "\$(cat $PW_FILE)")"
-MIGRATIONS="$( (ls "$ROOT/drizzle"/*.sql; cat "$ROOT/scripts/setup-e2e-db.mjs" "$ROOT/pnpm-lock.yaml") | sha256sum | cut -c1-16)"
-if [ "$("${PSQL[@]}" -d mikka_e2e -c "SELECT obj_description('public'::regnamespace)" 2>/dev/null)" != "mikka-bootstrap $MIGRATIONS" ]; then
-  log "migrating mikka_e2e"
-  (cd "$ROOT" && E2E_DATABASE_URL="$DB_URL" MIKKA_DATABASE_URL="$DB_URL" DATABASE_URL="$DB_URL" pnpm -s test:e2e:setup >/dev/null)
-  "${PSQL[@]}" -d mikka_e2e -c "COMMENT ON SCHEMA public IS 'mikka-bootstrap $MIGRATIONS'"
-fi
+# The existing per-file migration ledger skips applied SQL. Always enter setup
+# so executor, backfill and schema changes cannot hide behind a separate cache.
+log "migrating mikka_e2e"
+(cd "$ROOT" && E2E_DATABASE_URL="$DB_URL" MIKKA_DATABASE_URL="$DB_URL" DATABASE_URL="$DB_URL" pnpm -s test:e2e:setup >/dev/null)
 
 # 7. Better Auth for a local development or compiled API server: a random secret made on this machine,
 # kept in a 0600 file and never printed (the export line reads the file), and the local origin.
