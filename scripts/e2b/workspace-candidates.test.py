@@ -20,7 +20,8 @@ spec = importlib.util.spec_from_file_location('candidates', Path(__file__).with_
 candidates = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(candidates)
 REAL_CONSERVATION_PROBE = candidates.builder.probe_conservation
-ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_SHA': 'b' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
+ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_REPOSITORY_ID': '1427517699',
+       'GITHUB_REPOSITORY_OWNER_ID': '183887963', 'GITHUB_SHA': 'b' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
 SCOPE = {'sourceCommit': 'a' * 40, 'workerSha': 'c' * 40, 'workflowCommit': ENV['GITHUB_SHA'], 'runId': '123', 'runAttempt': '2'}
 PRIVATE = 'synthetic-private-sdk-response-and-key'
 

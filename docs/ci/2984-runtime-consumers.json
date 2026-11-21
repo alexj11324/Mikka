@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "issue": 2984,
+  "pullRequest": 2995,
+  "capturedUtc": "2026-11-20T22:15:40.109985+00:00",
+  "scope": "Existing official runtime producer event contract; no deployment, new trigger or provider/model acceptance is executed by this change verification.",
+  "base": "040362591abbcb95d825311e5577bd27caa92b10",
+  "redCheckpoint": "5a67c3860d26503234e362b745bc10cace204fd5",
+  "redTree": "eb452119d5a1d6ce7456a618eb66feafc3b3dc21",
+  "testedProductionAndTestBlobs": {
+    ".github/workflows/coding-workspace-acceptance.yml": "ed2634bb7c5f08a3da4b5a74d0892dbe5416799c",
+    ".github/workflows/thread-lifecycle-acceptance.yml": "614ac6b7d261f01a79b5bf88aa89faea2051839c",
+    ".github/workflows/task-secret-acceptance.yml": "bc5fb61e0b28c29e640bab9abfc52c7fc73a054c",
+    "scripts/acceptance/thread-lifecycle-ci.mjs": "cc2109dfcef25f372c9dc7254ca5d5c4057a6f80",
+    "scripts/acceptance/coding-workspace-ci.test.mjs": "2097bdb7521bb4c53c9b29658371db481f58a0ad",
+    "scripts/acceptance/thread-lifecycle-ci.test.mjs": "587cab725daa7c234a9d1e300cbdeefab1d8e7c7",
+    "scripts/acceptance/task-secrets-ci.test.mjs": "4cc8b3b54a43f96ad40660d7d80565bb01a096c5"
+  },
+  "node": "v24.22.3",
+  "observedProducer": {
+    "denominator": 1,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/44825145743/attempts/1",
+    "id": 44825145743,
+    "name": "E2B additive runtime release",
+    "event": "workflow_run",
+    "head_sha": "603d1d95f0266827549f858624a872920344034a",
+    "head_branch": "main",
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "workflow_id": 405833668,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-20T21:59:49Z",
+    "updated_at": "2026-11-20T22:03:09Z",
+    "jobs": [
+      {
+        "id": 136595756267,
+        "name": "test",
+        "run_id": 44825145743,
+        "run_attempt": 1,
+        "head_sha": "603d1d95f0266827549f858624a872920344034a",
+        "conclusion": "success",
+        "started_at": "2026-11-20T22:00:01Z",
+        "completed_at": "2026-11-20T22:00:21Z"
+      },
+      {
+        "id": 136596011924,
+        "name": "check",
+        "run_id": 44825145743,
+        "run_attempt": 1,
+        "head_sha": "603d1d95f0266827549f858624a872920344034a",
+        "conclusion": "success",
+        "started_at": "2026-11-20T22:02:40Z",
+        "completed_at": "2026-11-20T22:03:08Z"
+      },
+      {
+        "id": 136597373547,
+        "name": "web-ready",
+        "run_id": 44825145743,
+        "run_attempt": 1,
+        "head_sha": "603d1d95f0266827549f858624a872920344034a",
+        "conclusion": "skipped",
+        "started_at": "2026-11-20T22:03:08Z",
+        "completed_at": "2026-11-20T22:03:08Z"
+      },
+      {
+        "id": 136597374066,
+        "name": "release",
+        "run_id": 44825145743,
+        "run_attempt": 1,
+        "head_sha": "603d1d95f0266827549f858624a872920344034a",
+        "conclusion": "skipped",
+        "started_at": "2026-11-20T22:03:08Z",
+        "completed_at": "2026-11-20T22:03:08Z"
+      }
+    ],
+    "proves": "The real official producer uses event=workflow_run. Its skipped publication and a later main advancement are not evidence of a completed publication or a downstream event-only failure."
+  },
+  "ownership": {
+    "separateOwnerPullRequest": 2821,
+    "separateOwnerHead": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+    "deduplication": "The current owner diff changes Web attestation fields and evidence retention, not these event checks. Those changes are not copied here.",
+    "windowSpecificConsumer": "factory-visual-evidence-acceptance.yml remains unchanged."
+  },
+  "before": {
+    "base": "040362591abbcb95d825311e5577bd27caa92b10",
+    "command": [
+      "node",
+      "--import",
+      "tsx",
+      "--test",
+      "scripts/acceptance/coding-workspace-ci.test.mjs",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "scripts/acceptance/task-secrets-ci.test.mjs"
+    ],
+    "exitCode": 1,
+    "wallSeconds": 4.517219,
+    "recordedUtc": "2026-11-20T22:09:27.479982+00:00",
+    "diffSha256": "70f055aa4d730460db1becef30625fea770f57540e373b7b157b9ef8d646f645",
+    "logSha256": "0c8acd93a6deb1dabfb1f0d45c93fa4738b1e687bfd8ee40d4f4df58a4c348c6",
+    "summary": {
+      "tests": 68,
+      "pass": 64,
+      "fail": 4,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "newEventCases": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4
+    },
+    "sourceBinding": "Measured base plus recorded diff; published red tree has identical files."
+  },
+  "afterLocal": {
+    "parent": "5a67c3860d26503234e362b745bc10cace204fd5",
+    "startedUtc": "2026-11-20T22:12:39.511089+00:00",
+    "samples": [
+      {
+        "phase": "green",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--test",
+          "scripts/acceptance/coding-workspace-ci.test.mjs",
+          "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+          "scripts/acceptance/task-secrets-ci.test.mjs"
+        ],
+        "exitCode": 0,
+        "wallSeconds": 4.270352,
+        "logSha256": "4d5da0fae7ef5217f2684db7b1e21f0dbecd7a4068877c374e741b45f42352ae"
+      },
+      {
+        "phase": "lint",
+        "command": [
+          "node_modules/.bin/oxlint",
+          "--deny-warnings",
+          "scripts/acceptance/coding-workspace-ci.test.mjs",
+          "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+          "scripts/acceptance/task-secrets-ci.test.mjs",
+          "scripts/acceptance/thread-lifecycle-ci.mjs"
+        ],
+        "exitCode": 0,
+        "wallSeconds": 0.08471,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exitCode": 0,
+        "wallSeconds": 0.009678,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "finishedUtc": "2026-11-20T22:12:43.876480+00:00",
+    "diffSha256": "d825b1c237b9a9fc512473f538392b2a9b4b090ce735993224661028656ea95b",
+    "summary": {
+      "tests": 68,
+      "pass": 68,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "newEventCases": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0
+    },
+    "fullEnrolledSuites": [
+      {
+        "suite": "test:acceptance",
+        "command": [
+          "corepack",
+          "pnpm",
+          "-s",
+          "test:acceptance"
+        ],
+        "exitCode": 0,
+        "wallSeconds": 6.763415,
+        "recordedUtc": "2026-11-20T22:13:52.562724+00:00",
+        "sourceParent": "5a67c3860d26503234e362b745bc10cace204fd5",
+        "diffSha256": "d825b1c237b9a9fc512473f538392b2a9b4b090ce735993224661028656ea95b",
+        "logSha256": "af242ba899531bee5784c70a5c93ffb1aa9a9b2ec4088ff07b3284c488c884b8",
+        "summary": {
+          "tests": 200,
+          "pass": 200,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:workflow-wakes",
+        "command": [
+          "corepack",
+          "pnpm",
+          "-s",
+          "test:workflow-wakes"
+        ],
+        "exitCode": 0,
+        "wallSeconds": 4.891811,
+        "recordedUtc": "2026-11-20T22:13:50.685320+00:00",
+        "sourceParent": "5a67c3860d26503234e362b745bc10cace204fd5",
+        "diffSha256": "d825b1c237b9a9fc512473f538392b2a9b4b090ce735993224661028656ea95b",
+        "logSha256": "17e41460da297652566e973ae8b20087c605bc77766a7af00f7c83331a869c89",
+        "summary": {
+          "tests": 164,
+          "pass": 164,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      }
+    ],
+    "sourceBinding": "Measured red checkpoint plus fix diff; production/test blobs are listed above. Evidence and documentation updates do not substitute for protected current-head CI."
+  },
+  "preservedChecks": [
+    "fixed official workflow ID/name/path/state",
+    "receiver/source repository and main branch",
+    "pointer/API event equality",
+    "exact source/current main and latest run attempt",
+    "original exact-attempt job selection",
+    "skipped publication is not a validated published runtime",
+    "artifact identity/digest/receipt checks",
+    "source/attempt checks repeated before scoped credentials",
+    "receiver retry bounds",
+    "existing timeout, permissions and consumer selection"
+  ],
+  "limitations": [
+    "All new positive gate evidence is offline source-bound replay. No live successful publication is claimed.",
+    "Actual current-head protected CI, independent review, normal merge and exact postmerge verification are required.",
+    "No workflow wall-time saving or historical failure frequency is estimated from this one metadata sample."
+  ]
+}

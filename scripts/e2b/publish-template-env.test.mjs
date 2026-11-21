@@ -429,10 +429,10 @@ test('GitHub-only build timeline waits for source upload before the single runti
       if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: COMMIT } })
       if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) return Response.json({ workflow_runs: [{
         id: 70, run_attempt: 1, head_sha: COMMIT, head_branch: 'main', path: '.github/workflows/web-deploy.yml',
-        repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' }, event: 'push',
+        repository: { id: 1427517699, full_name: 'alexj11324/Mikka' }, head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka' }, event: 'push',
         status: elapsed < 200 ? 'in_progress' : 'completed', conclusion: elapsed < 200 ? null : 'success',
       }] })
-      assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/1/jobs')
+      assert.equal(url.pathname, '/repositories/1427517699/actions/runs/70/attempts/1/jobs')
       return Response.json({ total_count: 1, jobs: [{ name: 'deploy', head_sha: COMMIT, status: 'completed', conclusion: 'success',
         steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
           'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),

@@ -35,10 +35,10 @@ const BLOCKED_MODEL_CODES = new Set(['run_subscription_expired', 'run_quota_exce
 const actions = new Set(['workspace.switchWorkspace', 'memory.getMemory', 'memory.addFact', 'memory.setFactScope',
   'memory.removeFact', 'memory.undoRemoveFact', 'memory.reviewFact', 'bots.pollBots', 'bots.createBot',
   'execution-settings.getBotModelMenu', 'execution-settings.chooseBotModel',
-  'coordinator.sendCoordinatorMessage', 'coordinator.pollCoordinatorChat', 'coordinator.stopCoordinatorTurn'])
+  'coordinator.pollCoordinatorChat', 'coordinator.stopCoordinatorTurn'])
 const businessWrites = new Set(['workspace.switchWorkspace', 'memory.addFact', 'memory.setFactScope',
   'memory.removeFact', 'memory.undoRemoveFact', 'memory.reviewFact', 'bots.createBot',
-  'execution-settings.chooseBotModel', 'coordinator.sendCoordinatorMessage'])
+  'execution-settings.chooseBotModel'])
 class MemoryProbeError extends Error {
   constructor(code, httpStatus = null, body = null, options) {
     super(CODES.has(code) ? code : 'request_failed', options)
@@ -263,8 +263,15 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
       check(url.origin === CORE_ORIGIN && url.pathname.startsWith('/mikka/api/') && !headers.has('authorization'), 'target_refused')
       check(['/api/auth/sign-in/email', '/api/auth/get-session', '/api/auth/sign-out', '/api/workspace', '/api/rpc', '/api/integrations/github', '/api/inbox'].includes(path)
         || [...ownedBots.keys(), ...candidateBotIds].some(id => path === '/api/bots/' + id)
+        || path === '/api/agents/eve/v1/session' && ownedBots.has(url.searchParams.get('botId'))
         || path === '/api/coordinator/stream' && ownedBots.has(url.searchParams.get('botId')), 'target_refused')
       let businessWrite = path === '/api/auth/sign-in/email'
+      if (path === '/api/agents/eve/v1/session') {
+        const body = JSON.parse(init.body)
+        check(init.method === 'POST' && UUID.test(headers.get('x-mikka-submission-id') ?? '')
+          && body.clientContext?.expectedWorkspaceId === selectedWorkspaceId && body.clientContext?.expectedOwnerId === ownerId, 'fixture_binding_failed')
+        businessWrite = true
+      }
       if (path === '/api/integrations/github') check((init.method ?? 'GET') === 'GET', 'target_refused')
       if (path === '/api/inbox') {
         if ((init.method ?? 'GET') === 'GET') check(allowedWorkspaces.has(url.searchParams.get('workspaceId')), 'fixture_binding_failed')
@@ -282,7 +289,6 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
           check(factId && args[0] === factId || ownedPendingFacts.has(args[0]), 'fixture_binding_failed')
         if (['execution-settings.getBotModelMenu', 'execution-settings.chooseBotModel', 'coordinator.pollCoordinatorChat', 'coordinator.stopCoordinatorTurn'].includes(body.action))
           check(ownedBots.has(args[0]), 'fixture_binding_failed')
-        if (body.action === 'coordinator.sendCoordinatorMessage') check(ownedBots.has(args[2]) && args[9] === selectedWorkspaceId, 'fixture_binding_failed')
         if (body.action === 'memory.addFact') check(args[0]?.requestId === requestId && args[0]?.subject === subject, 'fixture_binding_failed')
       }
       if (path === '/api/auth/get-session') url.searchParams.set('disableCookieCache', 'true')
@@ -419,7 +425,12 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
           check(exactModel(chosen.current), 'model_unavailable')
           const beforeUse = ownedFact(await readMemory()).usedCount
           const prompt = `这是只读记忆验收。请从已提供的个人事实中找到 M1821 ${marker} 后面的值，只回复该值。不要调用工具，不要创建任务、派发工作、访问外部服务或修改任何数据。找不到就回复 MISSING。`
-          check((await rpc('coordinator.sendCoordinatorMessage', [prompt, null, botId, nonce(), undefined, null, [], undefined, undefined, selectedWorkspaceId]))?.queued === true)
+          const submitted = await request('model_submit', '/api/agents/eve/v1/session?botId=' + botId, {
+            ...post({ message: prompt, clientContext: { expectedOwnerId: ownerId, expectedWorkspaceId: selectedWorkspaceId } }),
+            headers: { 'content-type': 'application/json', 'x-mikka-submission-id': nonce() },
+          }, 202)
+          check(submitted?.ok === true && /^wrun_[A-Za-z0-9_-]+$/.test(submitted.sessionId ?? '')
+            && typeof submitted.deliveryId === 'string' && submitted.deliveryId.length > 0)
           promptSent = true
           phase = 'model_stream'
           const stream = await client.request('/api/coordinator/stream?botId=' + botId + '&wait=1', {}, 90_000)

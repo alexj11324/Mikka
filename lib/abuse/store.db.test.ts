@@ -52,6 +52,32 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   // Settlement writes the cache breakdown, so this ledger's schema needs the
   // migration that adds those columns as well.
   await pool.query(readFileSync('drizzle/20261111060000_hosted_usage_token_breakdown.sql', 'utf8'))
+  await t.test('ledger attribution upgrades existing receipts and can be applied twice', async () => {
+    const migration = readFileSync('drizzle/20261121043334_add_hosted_usage_message_attribution.sql', 'utf8')
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const [legacyId, runId, threadId] = [randomUUID(), randomUUID(), randomUUID()]
+      await client.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"usageRunId","usageThreadId","inputTokens","costMicroUsd")
+        VALUES ($1,$2,'fixture/model','settled',$3,$4,11,23)`, [legacyId, old, runId, threadId])
+      await client.query(migration)
+      await client.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"usageRunId","usageMessageId","billingSource")
+        SELECT source,$1,'fixture/model','settled',$2,'harness-message-1',source
+        FROM unnest(ARRAY['credits','subscription','api_key']) source`, [old, runId])
+      await client.query(migration)
+      assert.deepEqual((await client.query(`SELECT "usageRunId","usageThreadId","usageMessageId","billingSource",
+        "inputTokens"::int AS tokens,"costMicroUsd"::int AS cost FROM hosted_usage WHERE id=$1`, [legacyId])).rows,
+      [{ usageRunId: runId, usageThreadId: threadId, usageMessageId: null, billingSource: null, tokens: 11, cost: 23 }])
+      assert.deepEqual((await client.query(`SELECT DISTINCT "usageMessageId", "billingSource" FROM hosted_usage
+        WHERE "usageRunId"=$1 AND "billingSource" IS NOT NULL ORDER BY "billingSource"`, [runId])).rows,
+      ['api_key', 'credits', 'subscription'].map(billingSource => ({ usageMessageId: 'harness-message-1', billingSource })))
+      await assert.rejects(client.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"billingSource")
+        VALUES ('invalid-source',$1,'fixture/model','settled','invalid')`, [old]), { code: '23514' })
+    } finally {
+      await client.query('ROLLBACK')
+      client.release()
+    }
+  })
   const store = new HostedUsageStore(pool)
   /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
   const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
@@ -69,6 +95,25 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [id])
     return id
   }
+  await t.test('owner-only Decisions reservations attribute member spend and enforce the member budget', async () => {
+    const { hostedBillingScope } = await import('./context')
+    const { readResourceBudgets, resourceBudgetAdmission } = await import('../billing/resource-budgets')
+    const workspaceId = await verified(), ownerId = `owner-${randomUUID()}`, call = randomUUID()
+    const attribution = { workspaceId, billingAccountWorkspaceId: workspaceId, ownerId, attributionComplete: true }
+    await pool.query(`insert into billing_resource_budgets (id,"workspaceId",scope,"scopeId",period,"limitPoints","warningPercent","updatedBy") values($1,$2,'member',$3,'month',10,50,$3)`, [randomUUID(), workspaceId, ownerId])
+    await hostedBillingScope.run(attribution, () => store.reserve(workspaceId, 'mikka-decision', call))
+    assert.equal((await pool.query('select "actorId" from hosted_usage where id=$1', [call])).rows[0].actorId, ownerId)
+    await store.settle(call, 100_000)
+    const [budget] = await readResourceBudgets(pool, [workspaceId])
+    assert.equal(budget.spentPoints, 10)
+    assert.equal(await resourceBudgetAdmission(pool, workspaceId, attribution, 1), false)
+    await hostedBillingScope.run(attribution, () => assert.rejects(store.reserve(workspaceId, 'Decisions', randomUUID()), /usage_budget_exhausted/))
+    const other = { ...attribution, actorId: `other-${randomUUID()}` }
+    const otherCall = randomUUID()
+    await hostedBillingScope.run(other, () => store.reserve(workspaceId, 'Decisions', otherCall))
+    assert.equal((await pool.query('select "actorId" from hosted_usage where id=$1', [otherCall])).rows[0].actorId, other.actorId)
+    await store.settle(otherCall, 0)
+  })
   await t.test('plan points are usable, settle once across an expiry boundary, and leave purchased balances intact', async () => {
     const id = await verified(), grant = randomUUID(), call = randomUUID()
     await pool.query('update hosted_allowances set remaining=0 where "workspaceId"=$1', [id])
@@ -293,6 +338,21 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       await store.settle(after, null)
     },
   )
+  await t.test('readiness ignores abandoned holds that a new reservation reaps', async () => {
+    const id = await verified(), abandoned = randomUUID(), reconcilable = randomUUID()
+    await pool.query('UPDATE hosted_allowances SET remaining=150000 WHERE "workspaceId"=$1', [id])
+    await store.reserve(id, 'fixture', abandoned)
+    await store.settle(abandoned, null)
+    assert.equal((await store.status(id)).state, 'points_exhausted')
+    await pool.query(`UPDATE hosted_usage SET "createdAt"=now()-interval '11 minutes' WHERE id=$1`, [abandoned])
+    assert.equal((await store.status(id)).state, 'ready')
+    assert.equal((await pool.query('SELECT state FROM hosted_usage WHERE id=$1', [abandoned])).rows[0].state, 'unknown')
+    await store.reserve(id, 'fixture', reconcilable)
+    assert.equal((await pool.query('SELECT state FROM hosted_usage WHERE id=$1', [abandoned])).rows[0].state, 'failed')
+    await store.settle(reconcilable, null, 0, 0, 'fixture-generation')
+    await pool.query(`UPDATE hosted_usage SET "createdAt"=now()-interval '11 minutes' WHERE id=$1`, [reconcilable])
+    assert.equal((await store.status(id)).state, 'points_exhausted')
+  })
   await t.test(
     'actual rolling spend pauses subsequent calls; purchased calls bypass pause; clears after window',
     async capTest => {

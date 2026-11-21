@@ -162,6 +162,15 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
       }
       return response({ profile: value })
     }
+    if (path === '/api/agents/eve/v1/session') {
+      assert.equal(method, 'POST'); assert.equal(url.searchParams.get('botId'), botId)
+      const profileId = new Headers(init.headers).get('x-mikka-submission-id')
+      assert.deepEqual(body.clientContext, { botId, profileId, taskDestination: { kind: 'cloud' },
+        expectedOwnerId: ownerId, expectedWorkspaceId: workspaceId })
+      supplySubmission(profileId, body.message)
+      if (failure === 'lost_submission_response') throw new Error('PRIVATE_NETWORK_ERROR')
+      return response({ ok: true, sessionId: 'wrun_observability_fixture', deliveryId: 'delivery_fixture' }, 202)
+    }
     if (path === '/api/rpc') {
       const args = decode(body.args)
       if (body.action === 'workspace.switchWorkspace') {
@@ -184,13 +193,6 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
         fallback = args[0]
         if (failure === 'prepare_fallback_lost' && !fallback) throw new Error('PRIVATE_NETWORK_ERROR')
         return response({ ok: true, result: encode({ apiKeyAfterQuota: fallback }) })
-      }
-      if (body.action === 'coordinator.sendCoordinatorMessage') {
-        const profileId = args[8]
-        assert.equal(args[2], botId); assert.equal(args[3], profileId); assert.deepEqual(args[4], { kind: 'cloud' })
-        supplySubmission(profileId, args[0])
-        if (failure === 'lost_submission_response') throw new Error('PRIVATE_NETWORK_ERROR')
-        return response({ ok: true, result: encode({ queued: true }) })
       }
       assert.equal(body.action, 'issues.getIssue')
       const found = submissions.find(value => value.issueId === args[0]); assert.ok(found)
@@ -414,7 +416,9 @@ test('two executed cases retain exact native receipts, restore model/profile sta
     assert.match(value.requestTrace.traceId, /^[0-9a-f]{32}$/)
     assert.equal(value.requestTrace.backendObserved, false)
   }
-  for (const call of data.calls.filter(value => value.body?.action === 'coordinator.sendCoordinatorMessage')) {
+  const submissions = data.calls.filter(value => value.path === '/mikka/api/agents/eve/v1/session')
+  assert.equal(submissions.length, 2)
+  for (const call of submissions) {
     assert.match(call.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
     assert.equal(call.headers['x-posthog-session-id'], undefined)
   }
@@ -650,7 +654,7 @@ test('browser mode publishes readiness then observes the real-shaped UI click th
     assert.deepEqual(report.cases[0].submission, { source: 'browser', observed: true, position: 11, locale })
     assert.equal(report.cases[0].requestTrace, undefined)
     assert.equal(report.browserReplayVerified, false); assert.equal(report.posthogIngestionVerified, false)
-    assert.equal(data.calls.filter(value => value.body?.action === 'coordinator.sendCoordinatorMessage').length, 0)
+    assert.equal(data.calls.filter(value => value.path === '/mikka/api/agents/eve/v1/session').length, 0)
     assert.ok(data.calls.every(value => !value.headers.traceparent && !value.headers['x-posthog-session-id']))
     assert.equal(report.preparation.restoration, 'complete'); assert.equal(report.cases[0].cleanup.state, 'complete')
     safe(ready); safe(report)
@@ -665,7 +669,7 @@ test('browser waiting times out or blocks changed UI text without sending or rep
     assert.equal(report.cases[0].code, foreign ? 'foreign_activity' : 'task_timeout', JSON.stringify(report))
     assert.equal(report.cases[0].cleanup.state, 'complete')
     assert.equal(data.submissions.length, 0); assert.equal(data.state.closed, 1)
-    assert.equal(data.calls.filter(value => value.body?.action === 'coordinator.sendCoordinatorMessage').length, 0)
+    assert.equal(data.calls.filter(value => value.path === '/mikka/api/agents/eve/v1/session').length, 0)
     safe(report)
   }
 })

@@ -5,6 +5,11 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { validateHistoricalReleaseManifest, validateReleaseManifest } from './service-builds.mjs'
+import { actionsMikkaRepository, officialMikkaRepository, operationsRepositoryId, publicRepositoryId } from '../cloudflare-source.mjs'
+
+const trustedActors = { owner: { id: '183887963', login: 'alexj11324' }, mergeQueue: { id: '118344674', login: 'github-merge-queue[bot]' } }
+const trustedActor = (actor, automatic) => String(actor?.id) === trustedActors.owner.id
+  || (automatic && String(actor?.id) === trustedActors.mergeQueue.id && actor?.login === trustedActors.mergeQueue.login)
 
 export const repository = 'alexj11324/Mikka'
 const producer = '.github/workflows/cloudflare-api-image.yml'
@@ -13,19 +18,19 @@ const qualification = '.github/workflows/cloud-services-ci.yml'
 const number = /^[1-9][0-9]{0,15}$/
 const sha = /^[a-f0-9]{40}$/
 const archiveDigest = /^sha256:[a-f0-9]{64}$/
-const apiRoot = 'https://api.github.com/repos/'
+const apiRoot = 'https://api.github.com/repositories/'
 
-export function checkedRun(run, path, { event, successful = true } = {}) {
+export function checkedRun(run, path, { event, successful = true, automaticDeployment = false } = {}) {
   for (const key of ['repository', 'head_repository']) {
-    assert.equal(run[key]?.id, 1427517699)
-    assert.equal(run[key].full_name, repository)
+    assert.ok(officialMikkaRepository(run[key]?.full_name, String(run[key]?.id)))
     assert.equal(run[key].fork, false)
     assert.equal(run[key].private, false)
   }
   assert.equal(run.path, path)
   assert.equal(run.head_branch, 'main')
-  assert.equal(String(run.actor?.id), '183887963')
-  assert.equal(String(run.triggering_actor?.id), '183887963')
+  const automatic = (path === producer && run.event === 'push') || (automaticDeployment && path === deployment && run.event === 'workflow_run')
+  assert.ok(trustedActor(run.actor, automatic))
+  assert.ok(trustedActor(run.triggering_actor, automatic))
   assert.match(run.head_sha ?? '', sha)
   assert.match(String(run.id), number)
   assert.match(String(run.run_attempt), number)
@@ -39,8 +44,7 @@ export function checkedRun(run, path, { event, successful = true } = {}) {
  * lease. Every main push produces a manifest; the latest build's completion
  * starts its own run. Superseded runs are recorded, never counted as releases. */
 export function selectAutomaticCandidate(event, actualRun, mainSha) {
-  assert.equal(event?.repository?.id, 1427517699)
-  assert.equal(event.repository.full_name, repository)
+  assert.ok(officialMikkaRepository(event?.repository?.full_name, String(event?.repository?.id)))
   assert.equal(event.action, 'completed')
   checkedRun(actualRun, producer, { event: 'push' })
   for (const field of ['id', 'run_attempt', 'head_sha', 'event', 'head_branch', 'status', 'conclusion'])
@@ -76,12 +80,18 @@ export function artifactFor(run, artifacts, prefix) {
   return artifact
 }
 
-export async function github(path, { token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN, method = 'GET', body, bytes = false } = {}) {
-  assert.ok(token, 'pipeline_github_identity_required')
+export async function github(path, { token, method = 'GET', body, bytes = false } = {}) {
   assert.ok(typeof path === 'string' && !path.startsWith('/') && !path.includes('://'))
+  const prefix = path.startsWith(repository + '/') ? repository + '/' : 'alexj11324/mikka-cloud/'
+  assert.ok(path.startsWith(prefix), 'pipeline_repository_scope')
+  const repositoryId = prefix === repository + '/' ? publicRepositoryId : operationsRepositoryId
+  token ??= repositoryId === publicRepositoryId
+    ? process.env.MIKKA_PUBLIC_ACTIONS_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN
+    : process.env.GH_TOKEN
+  assert.ok(token, 'pipeline_github_identity_required')
   let response
   try {
-    response = await fetch(apiRoot + path, { method, headers: {
+    response = await fetch(apiRoot + repositoryId + '/' + path.slice(prefix.length), { method, headers: {
       authorization: `Bearer ${token}`, accept: 'application/vnd.github+json',
       'x-github-api-version': '2022-11-28', ...(body ? { 'content-type': 'application/json' } : {}),
     }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(60_000) })
@@ -175,7 +185,7 @@ export async function priorDeployment(api, currentRun, selectedRun, target = 'st
     for (let attempt = latest.run_attempt - Number(isCurrent); attempt >= 1; attempt--) {
       const run = attempt === latest.run_attempt ? latest
         : await api(`${repository}/actions/runs/${latest.id}/attempts/${attempt}`)
-      checkedRun(run, deployment, { successful: false })
+      checkedRun(run, deployment, { successful: false, automaticDeployment: true })
       assert.equal(run.run_attempt, attempt)
       assert.ok(['workflow_run', 'workflow_dispatch'].includes(run.event))
       const jobs = await pages(api, `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs')
@@ -224,9 +234,9 @@ async function qualificationOrigin(api) {
 /** Selection is read-only. The private publisher rechecks source ancestry,
  * original jobs, upload logs, archive bytes and member digests before writers. */
 export async function selectPipeline({ env = process.env, api = github } = {}) {
-  assert.equal(env.GITHUB_REPOSITORY, repository)
+  assert.ok(actionsMikkaRepository(env), 'pipeline_repository_scope')
   assert.equal(env.GITHUB_REF, 'refs/heads/main')
-  assert.equal(env.GITHUB_ACTOR_ID, '183887963')
+  assert.ok(trustedActor({ id: env.GITHUB_ACTOR_ID, login: env.GITHUB_ACTOR }, env.GITHUB_EVENT_NAME === 'workflow_run'))
   const report = resolve(env.RUNNER_TEMP, 'deploy-pipeline')
   await mkdir(report, { recursive: true, mode: 0o700 })
   let selected, previous, rollback
@@ -282,10 +292,10 @@ export async function selectPipeline({ env = process.env, api = github } = {}) {
 /** Production consumes the completed staging artifact from this same run,
  * with its own serving baseline. It never silently uses the staging baseline. */
 export async function selectPromotion({ env = process.env, api = github } = {}) {
-  assert.equal(env.GITHUB_REPOSITORY, repository)
+  assert.ok(actionsMikkaRepository(env), 'pipeline_repository_scope')
   assert.equal(env.GITHUB_REF, 'refs/heads/main')
   assert.equal(env.GITHUB_EVENT_NAME, 'workflow_run')
-  assert.equal(env.GITHUB_ACTOR_ID, '183887963')
+  assert.equal(env.GITHUB_ACTOR_ID, trustedActors.owner.id)
   for (const key of ['GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'INPUT_STAGE_ARTIFACT']) assert.match(env[key] ?? '', number)
   assert.match(env.INPUT_OPERATIONS_SOURCE ?? '', sha)
   const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, 'utf8'))

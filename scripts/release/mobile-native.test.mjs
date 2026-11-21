@@ -10,7 +10,7 @@ const DRIVER = 'd'.repeat(40)
 const BUILD = 'a9b373b6-da29-43f0-9176-25a60eae1985'
 const PROJECT = '902ffab1-ed16-482e-8b83-2b7535079810'
 const RUNTIME = '0ec11b32ade9dcb4bcf87a751626ec5ba9acaa2d'
-const baseEnv = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
+const baseEnv = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: DRIVER, GITHUB_RUN_ID: '123' }
 const app = { extra: { eas: { projectId: PROJECT } }, ios: { bundleIdentifier: 'com.aspectlylabs.mikka' },
   runtimeVersion: { policy: 'fingerprint' } }

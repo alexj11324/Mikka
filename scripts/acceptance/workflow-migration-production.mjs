@@ -192,16 +192,19 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   const marker = 'm1415-' + randomUUID().replaceAll('-', '').slice(0, 12)
   const at = new Date(Math.ceil(now() / 1000) * 1000 + 180_000).toISOString()
   const definition = reminderDefinition(marker, at)
-  let closeSession = false, owner, chat, baseline = 0, etag, schedule, occurrence, timerId, managed, deploymentId
-  const request = async (path, body, cleanup = false) => {
-    check(isTeamWorkspaceReadPath(path) || path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
+  let closeSession = false, owner, workspaceId, chat, baseline = 0, etag, schedule, occurrence, timerId, managed, deploymentId
+  const request = async (path, body, cleanup = false, extraHeaders = {}) => {
+    const eveSend = !!chat?.botId && path === '/mikka/api/agents/eve/v1/session?botId=' + encodeURIComponent(chat.botId)
+    check(eveSend || isTeamWorkspaceReadPath(path) || path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
       '/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out', '/mikka/api/rpc'].includes(path), 'http_failed')
-    check(body === undefined || path === CHAT || path.endsWith('/sign-in/email') || path.endsWith('/sign-out')
+    check(body === undefined || eveSend && body.clientContext?.expectedOwnerId === owner
+      && body.clientContext?.expectedWorkspaceId === workspaceId
+      && /^[a-f0-9-]{36}$/i.test(extraHeaders['x-mikka-submission-id'] ?? '') || path.endsWith('/sign-in/email') || path.endsWith('/sign-out')
       || path === '/mikka/api/rpc' && (isTeamWorkspaceSwitchRequest(body)
         || body.version === DESKTOP_RPC_VERSION && body.action === 'coordinator.coordinatorHistory'
         && Array.isArray(body.args) && body.args.length === 3 && body.args[0] === chat?.botId
         && Number.isSafeInteger(body.args[1]) && body.args[1] >= baseline && body.args[2] === 1), 'http_failed')
-    const url = new URL(path, ORIGIN), headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store' })
+    const url = new URL(path, ORIGIN), headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store', ...extraHeaders })
     const cookie = cookies.header(url); if (cookie) headers.set('cookie', cookie)
     if (body !== undefined) headers.set('content-type', 'application/json')
     if (path === '/mikka/api/rpc') headers.set('x-mikka-rpc', '1')
@@ -264,8 +267,12 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   const submit = async (text, cleanup = false) => {
     if (!cleanup) await pin()
     if (cleanup) report.cleanupSubmissionCount++; else report.submissionCount++
-    const value = await json(CHAT, { text, submissionId: randomUUID() }, cleanup)
-    check(value.status === 202 && value.value.queued === true && value.value.enabled === true, 'submission_failed')
+    const response = await request('/mikka/api/agents/eve/v1/session?botId=' + encodeURIComponent(chat.botId),
+      { message: text, clientContext: { expectedOwnerId: owner, expectedWorkspaceId: workspaceId } }, cleanup,
+      { 'x-mikka-submission-id': randomUUID() })
+    const value = await response.json().catch(() => null)
+    check(response.status === 202 && value?.ok === true && /^wrun_[A-Za-z0-9_-]+$/.test(value.sessionId ?? '')
+      && typeof value.deliveryId === 'string' && value.deliveryId.length > 0, 'submission_failed')
   }
   try {
     const read = path => vercelRead(path, { token, fetchImpl })
@@ -288,7 +295,7 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
     closeSession = true
     await json('/mikka/api/auth/sign-in/email', { email, password })
     await session(); report.normalSessionObserved = true
-    Object.assign(report, await selectTeamWorkspace({ ownerId: owner,
+    Object.assign(report, await selectTeamWorkspace({ ownerId: owner, onSelected: selected => { workspaceId = selected.workspaceId },
       json: async (path, body) => (await json(path, body)).value }))
     await poll()
     check(chat.enabled === true, 'coordinator_disabled'); check(chat.working === false, 'coordinator_busy')
