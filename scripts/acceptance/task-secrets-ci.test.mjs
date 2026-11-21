@@ -247,6 +247,46 @@ function reader(fixture, mutate = () => {}) {
   } }
 }
 
+test('canonical Task release metadata uses immutable routes and keeps artifact identity checks', async () => {
+  // The native old-name run URL returned HTTP301 to this immutable repository
+  // route on 2026-11-21. A redirect:error reader cannot use the retired route.
+  const fixture = responseFixture(), environment = env()
+  environment.GITHUB_REPOSITORY = 'aspectly-labs/Mikka'
+  environment.GITHUB_REPOSITORY_OWNER_ID = '359279274'
+  fixture.run.event = 'workflow_run'
+  for (const key of ['repository', 'head_repository'])
+    fixture.run[key] = { id: 1427517699, full_name: environment.GITHUB_REPOSITORY, owner: { id: 359279274 } }
+  fixture.artifact.url = 'https://api.github.com/repos/aspectly-labs/Mikka/actions/artifacts/321'
+  fixture.artifact.archive_download_url = fixture.artifact.url + '/zip'
+  const calls = [], data = {
+    [`${IMMUTABLE_API}/actions/workflows/e2b-official-runtime.yml`]: fixture.workflow,
+    [`${IMMUTABLE_API}/actions/runs/123`]: fixture.run,
+    [`${IMMUTABLE_API}/git/ref/heads/main`]: fixture.main,
+    [`${IMMUTABLE_API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
+    [`${IMMUTABLE_API}/actions/runs/123/artifacts?per_page=100`]: fixture.listing,
+    [`${IMMUTABLE_API}/actions/artifacts/321`]: fixture.artifact,
+  }
+  const fetchImpl = async (url, options) => {
+    calls.push(url)
+    assert.equal(options.redirect, 'error')
+    assert.equal(options.headers.authorization, `Bearer ${TOKEN}`)
+    if (url.startsWith(API + '/')) return new Response(null,
+      { status: 301, headers: { location: IMMUTABLE_API + url.slice(API.length) } })
+    assert.ok(Object.hasOwn(data, url), 'only the fixed immutable repository is read')
+    return Response.json(data[url])
+  }
+  const request = { env: environment, event: { workflow_run: structuredClone(fixture.run) }, files: relevant, fetchImpl }
+  const result = await verifyTaskRelease(request)
+  assert.equal(result.selected, true)
+  assert.equal(result.artifact.repositoryId, 1427517699)
+  assert.equal(result.artifact.id, 321)
+  assert.ok(calls.every(url => url.startsWith(IMMUTABLE_API + '/')))
+  assert.equal(calls.filter(url => url.endsWith('/actions/runs/123')).length, 2)
+  assert.equal(calls.filter(url => url.endsWith('/git/ref/heads/main')).length, 2)
+  fixture.artifact.url = fixture.artifact.url.replace('aspectly-labs', 'foreign')
+  await assert.rejects(verifyTaskRelease(request), /artifact_identity/)
+})
+
 test('live release verification rejects missing/duplicate artifacts and a rerun or moving main during the check', async () => {
   const good = reader(responseFixture())
   assert.equal((await verifyTaskRelease({ env: env(), event: event(), files: relevant, fetchImpl: good.fetchImpl })).selected, true)
