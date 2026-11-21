@@ -5,6 +5,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "exports": {
+    "./keyboard-shortcuts": "./src/keyboard-shortcuts.ts",
     "./settings": "./src/settings.ts",
     "./coding-terminal": "./src/coding-terminal.ts",
     "./coding-workspace": "./src/coding-workspace.ts",

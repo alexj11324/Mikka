@@ -9051,6 +9051,42 @@
     "subagentMaxConcurrent": {
       "label": "并发子 Agent 数量",
       "keywords": "子 Agent|并发|限制"
+    },
+    "keyboardShortcutSearchOpen": {
+      "label": "打开搜索",
+      "keywords": "快捷键|搜索|查找"
+    },
+    "keyboardShortcutSettingsOpen": {
+      "label": "打开设置",
+      "keywords": "快捷键|设置|偏好"
+    },
+    "keyboardShortcutTaskCreate": {
+      "label": "新建任务",
+      "keywords": "快捷键|新建|任务|问题"
+    },
+    "keyboardShortcutSidebarToggle": {
+      "label": "切换侧栏",
+      "keywords": "快捷键|侧栏|导航"
+    },
+    "keyboardShortcutReviewOpen": {
+      "label": "打开审阅",
+      "keywords": "快捷键|审阅|任务"
+    },
+    "keyboardShortcutBoardAssistantToggle": {
+      "label": "切换看板助手",
+      "keywords": "快捷键|看板|助手|面板"
+    },
+    "keyboardShortcutDetailsToggle": {
+      "label": "切换详情",
+      "keywords": "快捷键|详情|面板"
+    },
+    "keyboardShortcutDevicesAdd": {
+      "label": "添加设备",
+      "keywords": "快捷键|设备|电脑|连接"
+    },
+    "keyboardShortcutThemeToggle": {
+      "label": "切换外观",
+      "keywords": "快捷键|主题|外观|深色|浅色"
     }
   }
 }

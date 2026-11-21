@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ResolvedSetting, SettingSchemaEntry, SettingScope, SettingValue } from '@mikka/protocol/settings'
+import { KEYBOARD_SHORTCUT_ACTIONS, keyboardShortcutSettingKey, normalizeKeyboardShortcut, type KeyboardShortcutSettingKey } from '@mikka/protocol/keyboard-shortcuts'
 import { archiveIdleDays } from '@/lib/conversation-directory-input'
 import { DEFAULT_TITLE_TRIGGERS, THREAD_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX } from '@/lib/thread-title'
 import { settingMetadata } from './metadata'
@@ -15,8 +16,20 @@ const inherited = {
   writeAccess: { personal: 'owner', workspace: 'admin' } as const,
 }
 
+const keyboardBinding = z.string().max(80).transform((raw, context) => {
+  const value = normalizeKeyboardShortcut(raw)
+  if (value === null) { context.addIssue({ code: 'custom', message: 'Invalid keyboard shortcut or reserved navigation key' }); return z.NEVER }
+  return value
+})
+const shortcutFields = Object.fromEntries(KEYBOARD_SHORTCUT_ACTIONS.map(({ action, context, defaultBinding, metadataKey }): [KeyboardShortcutSettingKey, SettingDefinition] => [keyboardShortcutSettingKey(action), {
+  key: keyboardShortcutSettingKey(action), scope: ['personal'], group: 'keyboard_shortcuts', page: 'shortcuts',
+  ...settingMetadata(metadataKey), type: 'string', guard: keyboardBinding, defaultValue: defaultBinding,
+  personalOverride: true, writeAccess: { personal: 'owner' }, personalContext: 'account', action, context,
+}])) as Record<KeyboardShortcutSettingKey, SettingDefinition>
+
 /** Adding a scalar field here gives it validation, typed persistence, reset and schema search. */
 export const SETTINGS_REGISTRY = {
+  ...shortcutFields,
   archiveIdleAfterDays: {
     ...inherited, key: 'archiveIdleAfterDays', group: 'threads', page: 'threads',
     ...settingMetadata('archiveIdleAfterDays'),

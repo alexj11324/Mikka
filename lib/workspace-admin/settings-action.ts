@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { ACTION_ERROR_CODES, type ActionErrorCode, type ActionResult } from '@/lib/action-result'
 import { WorkspaceError } from '@/lib/workspace-access'
+import type { KeyboardShortcutConflictResponse } from '@mikka/protocol/keyboard-shortcuts'
+import { KeyboardShortcutConflictError } from '@/lib/settings/shortcut-conflict'
 
 /** Backend settings codes remain separate from the existing UI message catalogue. */
 export const SETTINGS_ACTION_ERROR_CODES = [
@@ -11,7 +13,7 @@ export const SETTINGS_ACTION_ERROR_CODES = [
   'apiKeyInvalid', 'apiKeyUnverifiable', 'apiKeyBaseUrlInvalid', 'apiKeyNotFound',
 ] as const
 export type SettingsActionErrorCode = ActionErrorCode | typeof SETTINGS_ACTION_ERROR_CODES[number]
-export type SettingsActionResult<T> = ActionResult<T, SettingsActionErrorCode>
+export type SettingsActionResult<T> = ActionResult<T, SettingsActionErrorCode> | KeyboardShortcutConflictResponse
 const codes = new Set<string>([...ACTION_ERROR_CODES, ...SETTINGS_ACTION_ERROR_CODES])
 const knownCode = (code: string): code is SettingsActionErrorCode => codes.has(code)
 
@@ -19,6 +21,7 @@ const knownCode = (code: string): code is SettingsActionErrorCode => codes.has(c
 export async function settingsWorkspaceAction<T>(fn: () => Promise<T>): Promise<SettingsActionResult<T>> {
   try { return await fn() as T & { error?: undefined } }
   catch (error) {
+    if (error instanceof KeyboardShortcutConflictError) return { error: error.code, conflicts: error.conflicts }
     if (error instanceof ActionFailureError) return { error: error.code, params: error.params }
     if (error instanceof WorkspaceError) return { error: knownCode(error.code) ? error.code : 'generic' }
     if (error instanceof z.ZodError) return { error: 'validationGeneric' }

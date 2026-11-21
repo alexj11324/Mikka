@@ -150,3 +150,115 @@ dbTest('migration upgrade preserves zero and scoped title overrides; replay pres
   assert.equal(view.values.archiveIdleAfterDays.source, 'default')
   await assert.rejects(pool.query('INSERT INTO workspace_setting_values ("workspaceId",key,"integerValue","booleanValue") VALUES ($1,\'invalid\',1,true)', [workspaceId]), { code: '23514' })
 })
+
+dbTest('keyboard shortcuts are owner-only account settings with typed entity and setting mirrors', async () => {
+  const key = 'keyboardShortcuts.search.open'
+  as(owner)
+  const saved = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [key]: 'shift+mod+f2' })))
+  assert.equal(saved.status, 200)
+  assert.deepEqual((await saved.json()).values[key], { value: 'Mod+Shift+F2', source: 'personal' })
+  assert.deepEqual((await pool.query('SELECT binding FROM keyboard_shortcuts WHERE "userId"=$1 AND "actionId"=\'search.open\'', [owner])).rows, [{ binding: 'Mod+Shift+F2' }])
+  assert.deepEqual((await pool.query('SELECT "workspaceId","textValue","integerValue","booleanValue","textArrayValue" FROM personal_setting_values WHERE "userId"=$1 AND key=$2', [owner, key])).rows,
+    [{ workspaceId: null, textValue: 'Mod+Shift+F2', integerValue: null, booleanValue: null, textArrayValue: null }])
+  await pool.query('UPDATE keyboard_shortcuts SET binding=NULL WHERE "userId"=$1 AND "actionId"=$2', [owner, 'search.open'])
+  try {
+    assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${workspaceId}`))).json()).values[key], { value: 'Mod+Shift+F2', source: 'personal' })
+    const collision = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ 'keyboardShortcuts.settings.open': 'Mod+Shift+F2' })))
+    assert.equal(collision.status, 409)
+  } finally {
+    await pool.query('UPDATE keyboard_shortcuts SET binding=$3 WHERE "userId"=$1 AND "actionId"=$2', [owner, 'search.open', 'Mod+Shift+F2'])
+  }
+  assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${homes.get(owner)}`))).json()).values[key], { value: 'Mod+Shift+F2', source: 'personal' })
+  as(member)
+  assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${workspaceId}&userId=${owner}`))).json()).values[key], { value: 'Mod+KeyK', source: 'default' })
+  for (const body of [{ values: { [key]: 'Mod+F3' }, userId: owner }, patch({ [key]: { binding: 'Mod+F3', userId: owner } }), patch({ 'keyboardShortcuts.unknown': 'Mod+F3' })]) {
+    assert.equal((await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', body))).status, 400)
+  }
+  assert.equal((await workspace.PATCH(request(`workspace/${workspaceId}`, 'PATCH', patch({ [key]: 'Mod+F3' })), context())).status, 400)
+  assert.equal((await workspaceReset.POST(request(`workspace/${workspaceId}/reset`, 'POST', { group: 'keyboard_shortcuts' }), context())).status, 400)
+  assert.equal((await pool.query('SELECT binding FROM keyboard_shortcuts WHERE "userId"=$1 AND "actionId"=\'search.open\'', [owner])).rows[0].binding, 'Mod+Shift+F2')
+  as(outsider)
+  for (const response of [
+    await personal.GET(request(`personal?workspaceId=${workspaceId}`)),
+    await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [key]: 'Mod+F3' }))),
+    await personalReset.POST(request(`personal/reset?workspaceId=${workspaceId}`, 'POST', { group: 'keyboard_shortcuts' })),
+  ]) assert.equal(response.status, 403)
+  as(owner)
+  assert.equal((await workspace.PATCH(request(`workspace/${workspaceId}`, 'PATCH', patch({ [key]: 'Mod+F3' })), context())).status, 400)
+  assert.equal((await personalReset.POST(request(`personal/reset?workspaceId=${workspaceId}`, 'POST', { group: 'keyboard_shortcuts' }))).status, 200)
+})
+
+dbTest('keyboard writes check effective defaults atomically, allow swaps and disable, and reset the whole group', async () => {
+  as(owner)
+  const search = 'keyboardShortcuts.search.open', create = 'keyboardShortcuts.task.create'
+  let response = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [create]: 'Ctrl+K' })))
+  assert.equal(response.status, 409)
+  assert.deepEqual(await response.json(), { error: 'keyboardShortcutConflict', conflicts: [{ actions: ['search.open', 'task.create'], bindings: ['Mod+KeyK', 'Ctrl+KeyK'], platforms: ['other'] }] })
+  response = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [search]: 'C', [create]: 'Mod+K', archiveIdleAfterDays: 14 })))
+  assert.equal(response.status, 200)
+  assert.deepEqual((await response.json()).values[create], { value: 'Mod+KeyK', source: 'personal' })
+  response = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [search]: null, archiveIdleAfterDays: 3 })))
+  assert.equal(response.status, 409)
+  let view = await (await personal.GET(request(`personal?workspaceId=${workspaceId}`))).json()
+  assert.deepEqual(view.values[search], { value: 'KeyC', source: 'personal' })
+  assert.deepEqual(view.values.archiveIdleAfterDays, { value: 14, source: 'personal' })
+  assert.equal((await pool.query('SELECT binding FROM keyboard_shortcuts WHERE "userId"=$1 AND "actionId"=\'search.open\'', [owner])).rows[0].binding, 'KeyC')
+  response = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [search]: '' })))
+  assert.deepEqual((await response.json()).values[search], { value: '', source: 'personal' })
+  response = await personalReset.POST(request(`personal/reset?workspaceId=${workspaceId}`, 'POST', { group: 'keyboard_shortcuts' }))
+  assert.equal(response.status, 200); view = await response.json()
+  assert.deepEqual(view.values[search], { value: 'Mod+KeyK', source: 'default' })
+  assert.deepEqual(view.values[create], { value: 'KeyC', source: 'default' })
+  assert.deepEqual(view.values.archiveIdleAfterDays, { value: 14, source: 'personal' })
+  assert.equal((await pool.query('SELECT 1 FROM keyboard_shortcuts WHERE "userId"=$1 AND binding IS NOT NULL', [owner])).rowCount, 0)
+  assert.equal((await pool.query('SELECT 1 FROM personal_setting_values WHERE "userId"=$1 AND key LIKE \'keyboardShortcuts.%\' AND "textValue" IS NOT NULL', [owner])).rowCount, 0)
+})
+
+dbTest('concurrent keyboard writes serialize the full effective set and another owner can reuse the same key', async () => {
+  as(owner)
+  const responses = await Promise.all(['search.open', 'settings.open'].map(action => personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ [`keyboardShortcuts.${action}`]: 'Mod+F9' })))))
+  assert.deepEqual(responses.map(response => response.status).sort(), [200, 409])
+  const rejected = await responses.find(response => response.status === 409)!.json()
+  assert.equal(rejected.error, 'keyboardShortcutConflict')
+  assert.deepEqual(rejected.conflicts[0].actions, ['search.open', 'settings.open'])
+  assert.equal((await pool.query('SELECT 1 FROM keyboard_shortcuts WHERE "userId"=$1 AND binding=\'Mod+F9\'', [owner])).rowCount, 1)
+  assert.equal((await pool.query('SELECT 1 FROM personal_setting_values WHERE "userId"=$1 AND "textValue"=\'Mod+F9\'', [owner])).rowCount, 1)
+  as(member)
+  const other = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ 'keyboardShortcuts.search.open': 'Mod+F9' })))
+  assert.equal(other.status, 200)
+  assert.deepEqual((await other.json()).values['keyboardShortcuts.search.open'], { value: 'Mod+F9', source: 'personal' })
+  as(owner)
+  assert.equal((await personalReset.POST(request(`personal/reset?workspaceId=${workspaceId}`, 'POST', { group: 'keyboard_shortcuts' }))).status, 200)
+})
+
+dbTest('keyboard schema is machine-readable and migration replay retains disabled and reset rows', async () => {
+  as(owner)
+  const rows = (await (await schema.GET(request('schema'))).json()).settings
+  const row = rows.find((entry: { action?: string }) => entry.action === 'review.open')
+  assert.equal(row.key, 'keyboardShortcuts.review.open'); assert.equal(row.page, 'shortcuts')
+  assert.equal(row.defaultValue, 'Mod+Shift+KeyB'); assert.ok(row.keywords.includes('审阅'))
+  assert.deepEqual(row.context, { scope: 'workspace', editable: true, modal: false, target: 'task' })
+  const saved = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ 'keyboardShortcuts.review.open': '', 'keyboardShortcuts.devices.add': 'Mod+F8' })))
+  assert.equal(saved.status, 200)
+  const migration = await readFile(new URL('../../drizzle/20261120194334_keyboard_shortcuts.sql', import.meta.url), 'utf8')
+  await pool.query(migration); await pool.query(migration)
+  const view = await (await personal.GET(request(`personal?workspaceId=${workspaceId}`))).json()
+  assert.deepEqual(view.values['keyboardShortcuts.review.open'], { value: '', source: 'personal' })
+  assert.deepEqual(view.values['keyboardShortcuts.devices.add'], { value: 'Mod+F8', source: 'personal' })
+  assert.deepEqual(view.values['keyboardShortcuts.search.open'], { value: 'Mod+KeyK', source: 'default' })
+})
+
+dbTest('account shortcut invalidation reaches only the owner in active workspaces without settings payloads', async () => {
+  const { ownerKeyboardShortcutTargets } = await import('../live/lists')
+  const home = homes.get(owner)!
+  const sort = <T extends { scope: { workspaceId: string } }>(rows: T[]) => rows.sort((a, b) => a.scope.workspaceId.localeCompare(b.scope.workspaceId))
+  assert.deepEqual(sort(await ownerKeyboardShortcutTargets(pool, workspacePool, owner)), sort([workspaceId, home].map(id => ({
+    scope: { ownerId: owner, workspaceId: id }, events: [{ kind: 'workspace_settings', id }],
+  }))))
+  await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [home, owner])
+  try {
+    assert.deepEqual(await ownerKeyboardShortcutTargets(pool, workspacePool, owner), [{ scope: { ownerId: owner, workspaceId }, events: [{ kind: 'workspace_settings', id: workspaceId }] }])
+  } finally {
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [home, owner])
+  }
+})
