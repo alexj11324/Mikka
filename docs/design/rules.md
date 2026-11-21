@@ -222,9 +222,13 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   under the title come the code and how long ago, then the properties in one
   column (an icon and label, then the value, ▾ where it opens choices) in
   Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
-  The bar carries one primary action — the task's own conversation, which is
-  where its work is (R-62, R-89); everything else in it is a tool or goes into
-  ⋯ (R-91). [2026-11-18-2030](decisions/2026-11-18-2030-task-page-surface.md)
+  The full page's bar carries one action — 开始工作, which opens the dispatch
+  window where the task's work begins (decision 2026-11-19-2110, recorded in
+  `components/slots/task-detail-contract.ts`); where the bar has no room it
+  stays the ⋯ menu's first item (R-91). What the task is already doing is on
+  its own property line (R-62). Everything else in the bar is a tool or goes
+  into ⋯ (R-91).
+  [2026-11-18-2030](decisions/2026-11-18-2030-task-page-surface.md)
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
