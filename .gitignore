@@ -92,3 +92,4 @@ yarn-error.log*
 /.mikka-cloud/
 /.mikka-web/
 /.cloudflare-marketing/
+/data/

@@ -14,7 +14,7 @@ async function fixture(t) {
   await mkdir(join(root, '.output/eve/packages/subscription-worker/bin'), { recursive: true })
   await writeFile(join(root, '.output/eve/packages/subscription-worker/bin/mikka-subscription-worker'), 'subscription-worker-fixture')
   await writeFile(join(root, '.output/eve/mikka-eve-build.json'), JSON.stringify({
-    version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
+    version: 1, eve: '1.3.0', revision: sourceSha, preset: 'node-server',
     world: '@workflow/world-postgres', worldVersion: '5.2.0',
   }))
   await mkdir(join(root, 'cloudflare/eve-runtime'), { recursive: true })

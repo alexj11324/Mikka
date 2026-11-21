@@ -92,6 +92,7 @@ yarn-error.log*
 /.mikka-cloud/
 /.mikka-web/
 /.cloudflare-marketing/
+/data/
 
 # EAS replaces all nested .gitignore files. Preserve the mobile and e2b exclusions.
 /apps/mobile/.expo/

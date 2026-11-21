@@ -1,7 +1,7 @@
 # Cloudflare Eve host
 
-The Node 24 image runs the Nitro server produced by Eve `1.0.0-rc.9` from
-`apps/eve`. The agent selects `@workflow/world-postgres` `5.2.0` when
+The Node 24 image runs the Nitro server produced by Eve `1.3.0` from
+`apps/eve`. The agent selects `@workflow/world-postgres` `5.4.1` when
 `WORKFLOW_TARGET_WORLD=@workflow/world-postgres`. PostgreSQL stores sessions and Graphile
 Worker processes their queued work inside the Eve server. Task sandbox ownership
 and reclamation belong to the Sandbox Provider.

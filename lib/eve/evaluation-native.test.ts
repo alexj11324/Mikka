@@ -33,8 +33,8 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  })
  for(const folder of ['apps/eve/agent/channels','apps/eve/agent/tools','apps/eve/agent/hooks','apps/eve/agent/connections','apps/eve/agent/skills','lib/eve','lib/abuse','lib/agent-kit','lib/factory','workflows/coordinator','node_modules','bindings'])await mkdir(join(fixture,folder),{recursive:true})
  for(const name of await readdir(join(root,'node_modules')))if(name!=='.cache')await symlink(join(root,'node_modules',name),join(fixture,'node_modules',name))
- await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.0.0-rc.9'}}))
- await writeFile(join(cwd,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.0.0-rc.9'}}))
+ await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.3.0'}}))
+ await writeFile(join(cwd,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.3.0'}}))
  await writeFile(join(fixture,'tsconfig.json'),JSON.stringify({compilerOptions:{module:'ESNext',target:'ES2022',moduleResolution:'Bundler',strict:true,skipLibCheck:true}}))
  await writeFile(join(cwd,'tsconfig.json'),JSON.stringify({extends:'../../tsconfig.json'}))
  const sources=['apps/eve/agent/agent.ts','apps/eve/agent/instructions.ts','apps/eve/agent/channels/evaluation.ts','apps/eve/agent/tools/product.ts','apps/eve/agent/tools/agent.ts','apps/eve/agent/tools/no_reply.ts','apps/eve/agent/tools/ask_question.ts','apps/eve/agent/hooks/product.ts','apps/eve/agent/connections/personal.ts','apps/eve/agent/skills/assigned.ts','lib/eve/auth.ts','lib/eve/host-authorization.mjs','lib/eve/scope.ts','lib/eve/runtime.ts','lib/eve/evaluation-channel.ts','lib/eve/evaluation-context.ts','lib/eve/evaluation-runtime.ts','lib/eve/streaming-model.ts','lib/model-effort.ts','lib/model-routing.ts','lib/agent-kit/eval-fixtures.ts']

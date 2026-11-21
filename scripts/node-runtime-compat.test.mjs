@@ -17,7 +17,7 @@ test('all declared product engines accept Node 22, with 24 still the default', (
   assert.equal(read('.node-version').trim(), '24')
   assert.equal(JSON.parse(read('node_modules/eve/package.json')).engines.node, '>=22')
   const workspace = load('pnpm-workspace.yaml')
-  assert.equal(workspace.patchedDependencies['eve@1.0.0-rc.9'], 'patches/eve@1.0.0-rc.9.patch')
+  assert.equal(workspace.patchedDependencies['eve@1.3.0'], 'patches/eve@1.3.0.patch')
 })
 
 test('Node bundles target 22 rather than relying on the compiler host version', () => {
@@ -65,7 +65,7 @@ test('CI installs, builds and starts both real runtimes without a daemon-only du
 
 test('pinned Eve development cleanup works without Node 24 resource-management globals', () => {
   const workspace = load('pnpm-workspace.yaml')
-  assert.equal(workspace.packageExtensions['eve@1.0.0-rc.9'].dependencies['core-js-pure'], '3.51.0')
+  assert.equal(workspace.packageExtensions['eve@1.3.0'].dependencies['core-js-pure'], '3.51.0')
   const source = read('node_modules/eve/dist/src/internal/nitro/host/start-development-server.js')
   assert.match(source, /import AsyncDisposableStack from "core-js-pure\/actual\/async-disposable-stack\/index.js"/)
   assert.match(source, /import SuppressedError from "core-js-pure\/actual\/suppressed-error.js"/)

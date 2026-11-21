@@ -163,7 +163,7 @@ test('prebuilt packaging carries accepted API resource bytes into the official E
       deploymentId: release, preset: 'node-server', resources: [resource] }))
     await mkdir(join(work, 'apps/eve/.output/server'), { recursive: true })
     await writeFile(join(work, 'apps/eve/.output/server/index.mjs'), 'export default {}\n')
-    await writeFile(join(work, 'apps/eve/.output/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9',
+    await writeFile(join(work, 'apps/eve/.output/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.3.0',
       revision: publicSha, preset: 'node-server', world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0' }))
     await cp(new URL('../cloudflare/eve-runtime/runtime', import.meta.url), join(work, 'cloudflare/eve-runtime/runtime'), { recursive: true })
     await packageEve({ root: work, preset: 'node-server' })
@@ -334,9 +334,9 @@ test('maintenance patch is captured from the genuine driver and changes only ins
     const original = git('rev-parse', 'HEAD')
     const patch = 'diff --git a/dist/storage.js b/dist/storage.js\n--- a/dist/storage.js\n+++ b/dist/storage.js\n@@ -1,3 +1,3 @@\n before\n-old\n+patched\n after\n'
     const sha = createHash('sha256').update(patch).digest('hex')
-    await mkdir(join(work, 'patches'))
-    await writeFile(join(work, 'patches/@workflow__world-postgres@5.2.0.patch'), patch)
-    git('add', 'patches')
+    await mkdir(join(work, 'cloudflare/eve-runtime/backports'), { recursive: true })
+    await writeFile(join(work, 'cloudflare/eve-runtime/backports/@workflow__world-postgres@5.2.0.patch'), patch)
+    git('add', 'cloudflare')
     commit('reviewed startup patch on current main')
     const driver = git('rev-parse', 'HEAD')
     const runnerTemp = join(work, 'node_modules/runner-temp')

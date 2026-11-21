@@ -1,6 +1,6 @@
 # Bot runtime deployment
 
-Mikka builds the pinned `eve@1.0.0-rc.9` agent in `apps/eve` alongside the
+Mikka builds the pinned `eve@1.3.0` agent in `apps/eve` alongside the
 frontend and API. Run `pnpm build:app` to produce both services. The final
 packaging step rejects different application and agent revisions.
 

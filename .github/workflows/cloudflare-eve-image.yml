@@ -143,7 +143,9 @@ jobs:
           test -n "$MAINTENANCE_OWNER_RELEASE"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
-          git show "$GITHUB_SHA:patches/@workflow__world-postgres@5.2.0.patch" > "$patch_file"
+          # Backports target releases predating the pnpm-applied patch, so the
+          # patch asset is kept outside patches/ (which pnpm now applies itself).
+          git show "$GITHUB_SHA:cloudflare/eve-runtime/backports/@workflow__world-postgres@5.2.0.patch" > "$patch_file"
           printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
       - name: Preserve the reviewed hosted model call budget from the main driver
         if: inputs.maintenance_hosted_call_budget_sha != ''

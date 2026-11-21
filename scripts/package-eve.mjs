@@ -35,7 +35,7 @@ export async function packageEve({ root = process.cwd(), preset = process.env.NI
   const agent = JSON.parse(await readFile(join(source, 'mikka-eve-build.json'), 'utf8'))
   const appPath = join(output, 'mikka-build.json')
   const app = JSON.parse(await readFile(appPath, 'utf8'))
-  if (agent.version !== 1 || agent.eve !== '1.0.0-rc.9' || agent.revision !== app.revision || agent.preset !== preset) throw new Error('EVE_APP_BUILD_MISMATCH')
+  if (agent.version !== 1 || agent.eve !== '1.3.0' || agent.revision !== app.revision || agent.preset !== preset) throw new Error('EVE_APP_BUILD_MISMATCH')
   let resourceRoot = output
   if (preset === 'node-server') {
     await cp(source, join(output, 'eve'), { recursive: true })

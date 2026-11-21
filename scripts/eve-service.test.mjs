@@ -41,7 +41,7 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
   const directory=join(root,development?'apps/eve':'eve')
   await mkdir(join(directory, 'server'), { recursive: true })
   await writeFile(join(directory, 'server/index.mjs'), 'export default {}')
-  await writeFile(join(directory, 'mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9', revision: 'a'.repeat(40), ...(!development ? { world: '@workflow/world-postgres' } : {}) }))
+  await writeFile(join(directory, 'mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.3.0', revision: 'a'.repeat(40), ...(!development ? { world: '@workflow/world-postgres' } : {}) }))
   const data = join(root, 'data')
   const env = { MIKKA_DATA_DIR: data, WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_DATA_DIR: '/data/workflow', WORKFLOW_LOCAL_BASE_URL: 'https://main.test',
     NITRO_SSL_CERT: 'installation-certificate', NITRO_SSL_KEY: 'installation-tls-key', NITRO_UNIX_SOCKET: '/run/mikka/frontend.sock' }
@@ -52,7 +52,8 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
     child.exitCode = null; child.signalCode = null
     child.stdout = new PassThrough(); child.stderr = new PassThrough()
     child.kill = signal => { assert.equal(signal, 'SIGTERM'); stopped++; child.exitCode = 0; child.emit('exit', 0) }
-    queueMicrotask(() => child.stdout.write('➜ Listening on: http://127.0.0.1:43127/\n'))
+    // `eve dev --no-ui` prints "ready at"; the packaged Nitro server prints "Listening on".
+    queueMicrotask(() => child.stdout.write(development ? '[DEV] ready at http://127.0.0.1:43127/\n' : '➜ Listening on: http://127.0.0.1:43127/\n'))
     return child
   } })
   assert.equal(env.MIKKA_EVE_ORIGIN, 'http://127.0.0.1:43127')
@@ -98,7 +99,7 @@ test('startup preserves an existing session directory instead of replacing its d
   await mkdir(join(root, 'eve/.eve/.workflow-data'), { recursive: true })
   await writeFile(join(root, 'eve/.eve/.workflow-data/history'), 'recorded-session')
   await writeFile(join(root, 'eve/server/index.mjs'), 'export default {}')
-  await writeFile(join(root, 'eve/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9', revision: 'a'.repeat(40) }))
+  await writeFile(join(root, 'eve/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.3.0', revision: 'a'.repeat(40) }))
   await assert.rejects(startEveService({ root, env: {}, allocatePort: async () => 43127,
     spawnProcess: () => { throw new Error('MUST_NOT_SPAWN') } }), /EVE_SERVICE_STORAGE_MISMATCH/)
   assert.equal(await readFile(join(root, 'eve/.eve/.workflow-data/history'), 'utf8'), 'recorded-session')

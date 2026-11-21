@@ -15,8 +15,8 @@ test('built Eve payload refuses corrupted resources and a different source or Wo
     sha256: createHash('sha256').update(resource).digest('hex') }] }
   await mkdir(join(directory, 'eve'))
   const host = { version: 1, ...identity, uiSha: identity.sourceSha, uiSource: 'public-server' }
-  const agent = { version: 1, eve: '1.0.0-rc.9', revision: identity.sourceSha, preset: 'node-server',
-    world: '@workflow/world-postgres', worldVersion: '5.2.0' }
+  const agent = { version: 1, eve: '1.3.0', revision: identity.sourceSha, preset: 'node-server',
+    world: '@workflow/world-postgres', worldVersion: '5.4.1' }
   await writeFile(join(directory, 'eve-host.json'), JSON.stringify(host))
   await writeFile(join(directory, 'eve/mikka-eve-build.json'), JSON.stringify(agent))
   await writeFile(join(directory, 'eve/resource.txt'), resource)

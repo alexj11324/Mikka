@@ -217,7 +217,7 @@ test('the checked-in migration execution identity contains the actual runner, ch
   const context = await buildContexts()
   for (const file of [...migrationRoots, ...migrationToolchain,
     'scripts/bot-environment-backfill.mjs', 'scripts/task-workspace-evidence.mjs', 'scripts/preview-database-url.mjs',
-    'scripts/integration-migration-history.mjs', 'patches/@workflow__world-postgres@5.2.0.patch']) {
+    'scripts/integration-migration-history.mjs', 'patches/@workflow__world-postgres@5.4.1.patch']) {
     assert.ok(context.migrations.execution.files.includes(file), file)
   }
   assert.equal(context.migrations.version, 2)

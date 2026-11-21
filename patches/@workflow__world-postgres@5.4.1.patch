@@ -1,0 +1,20 @@
+diff --git a/dist/storage.js b/dist/storage.js
+index 2dcc348..3fdc94b 100644
+--- a/dist/storage.js
++++ b/dist/storage.js
+@@ -1039,8 +1039,13 @@ export function createEventsStorage(drizzle, options = {}) {
+             // Read before listing, in one statement: the count, then the highest
+             // slot. Every in-band write the count includes committed with it, so
+             // the listing that follows sees its event.
+-            const snapshot = await readEventLogSnapshot(drizzle, params.runId);
+-            const page = await events.list(params);
++            let snapshot = await readEventLogSnapshot(drizzle, params.runId);
++            let page = await events.list(params);
++            if (!snapshot && page.data.some(({ eventId }) => eventIdToSlot(eventId) !== null)) {
++                // The first event can commit with its fence between the two reads.
++                snapshot = await readEventLogSnapshot(drizzle, params.runId);
++                page = await events.list(params);
++            }
+             return snapshot ? { ...page, snapshot } : page;
+         },
+     };
