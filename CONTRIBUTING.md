@@ -112,8 +112,9 @@ cannot.
    See the [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
-   with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). `browser-gate.yml` only keeps the protected
-   check name "Browser tests (before merge)" and passes at once. The specs
+   with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). The required checks are
+   "UI policy (strict)" and "Production build and browser interactions";
+   GitGuardian remains optional and unchanged. The specs
    under `tests/e2e/` stay as retained fixtures. The general browser suite is
    retired. Targeted Desktop and Analytics jobs retain their
    explicitly selected build/browser checks. `site-search.yml` runs its
