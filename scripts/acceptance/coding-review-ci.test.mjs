@@ -33,7 +33,7 @@ function fixture() {
       credentialRoute: 'subscription', replyVerified: true, replyVerifiedAfterTool: true,
     }])) }
   const calls = []; let attestations = 0, reads = 0
-  const data = { workflow, run, jobs, artifact, report, mutateFinalRun: false }
+  const data = { workflow, run, jobs, artifact, report, mutateFinalRun: false, comparisons: {} }
   return { data, calls, attestations: () => attestations, dependencies: { now: () => now,
     attest: async received => { assert.equal(received.APPLICATION_SHA, app); attestations++; return { sourceCommit: app, publicBuild: app } },
     fetchImpl: async (url, options) => {
@@ -44,6 +44,7 @@ function fixture() {
       if (url.endsWith('/attempts/2/jobs?per_page=100')) return Response.json(data.jobs)
       if (url.endsWith('/artifacts?per_page=100')) return Response.json({ total_count: 1, artifacts: [data.artifact] })
       if (url.endsWith('/actions/artifacts/321')) return Response.json(data.artifact)
+      if (Object.hasOwn(data.comparisons, url)) return Response.json(data.comparisons[url])
       assert.fail('unexpected upstream read')
     },
     download: async (proof, options) => {
@@ -80,6 +81,23 @@ test('manual application and exact published worker release are independently bo
   assert.equal(proof.upstream.runAttempt, 2); assert.equal(proof.runtime, 'validated_and_published')
   assert.equal(f.attestations(), 2); assert.equal(JSON.stringify(proof).includes(token), false)
   assert.equal(f.calls.filter(url => url === `${readApi}/actions/runs/123`).length, 2)
+})
+
+test('a later main workflow can publish the explicitly pinned older served worker source', async () => {
+  const f = fixture(), workflowSource = 'd'.repeat(40)
+  f.data.run.head_sha = workflowSource; f.data.run.event = 'workflow_dispatch'
+  for (const job of f.data.jobs.jobs) job.head_sha = workflowSource
+  f.data.artifact.workflow_run.head_sha = workflowSource
+  for (const [before, after] of [[source, workflowSource], [workflowSource, app]]) {
+    const path = `/compare/${before}...${after}`
+    f.data.comparisons[`${readApi}${path}?per_page=1`] = { url: api + path, base_commit: { sha: before },
+      merge_base_commit: { sha: before }, status: 'ahead', ahead_by: 1, behind_by: 0 }
+  }
+  const proof = await attestCodingWorkspace(env(), f.dependencies)
+  assert.equal(proof.upstream.sourceCommit, workflowSource)
+  assert.equal(proof.workerSourceCommit, source)
+  assert.equal(proof.sourceCommit, app)
+  assert.equal(f.attestations(), 2)
 })
 
 test('a stale attempt, failed publish, wrong subscription/template or changed upstream is refused', async () => {

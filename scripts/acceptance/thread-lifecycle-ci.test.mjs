@@ -49,6 +49,19 @@ function jobs(validated = true) {
     run_id: run.id, run_attempt: run.run_attempt, head_sha: SHA, status: 'completed',
     conclusion: validated || index < 2 ? 'success' : 'skipped' })) }
 }
+function buildTimeJobs() {
+  // Official run 44140435060/1: #2789 retained the build, publication and
+  // cleanup jobs, and retired the separate subscription/deploy jobs.
+  const names = ['test', 'check', 'web-ready', 'release / recheck', 'release / validate / build',
+    'release / await-web', 'release / templates', 'release / cleanup', 'release / remember-failure']
+  return { total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, name,
+    run_id: run.id, run_attempt: run.run_attempt, head_sha: SHA, status: 'completed',
+    conclusion: name === 'release / remember-failure' ? 'skipped' : 'success',
+    ...(name === 'release / templates' ? { steps: [
+      { number: 11, name: 'Make only fully accepted candidates public', status: 'completed', conclusion: 'success' },
+      { number: 12, name: 'Preserve the complete public release report', status: 'completed', conclusion: 'success' },
+    ] } : {}) })) }
+}
 const relevant = ['scripts/acceptance/thread-lifecycle.mjs']
 const workflowText = readFileSync(new URL('../../.github/workflows/thread-lifecycle-acceptance.yml', import.meta.url), 'utf8')
 
@@ -197,6 +210,25 @@ test('cost selection requires related source changes or a real validated and pub
     '.github/workflows/thread-lifecycle-acceptance.yml']) assert.equal(lifecycleChanged([path]), true, path)
   for (const path of ['docs/acceptance/issue-1593.md', 'package.json', 'lib/unrelated.ts',
     'scripts/acceptance/thread-lifecycle.mjs/other']) assert.equal(lifecycleChanged([path]), false, path)
+})
+
+test('the current official publication shape requires its complete templates release proof', () => {
+  const selected = selectRelease(expected(), buildTimeJobs(), [])
+  assert.equal(selected.runtime, 'validated_and_published')
+  assert.equal(selected.publication, 'build_time')
+  assert.equal(selected.jobs.templates, 7)
+  for (const mutate of [
+    data => { data.jobs.find(row => row.name === 'release / templates').conclusion = 'skipped' },
+    data => { data.jobs.find(row => row.name === 'release / templates').steps[0].conclusion = 'skipped' },
+    data => { data.jobs.find(row => row.name === 'release / templates').steps[1].conclusion = 'failure' },
+    data => { data.jobs.find(row => row.name === 'release / cleanup').conclusion = 'failure' },
+    data => { data.jobs.push({ ...data.jobs[6], id: 99 }); data.total_count++ },
+    data => { data.jobs.push({ ...data.jobs[6], name: 'release / subscriptions', id: 99 }); data.total_count++ },
+    data => { data.jobs[6].head_sha = OTHER },
+  ]) {
+    const data = buildTimeJobs(); mutate(data)
+    assert.throws(() => selectRelease(expected(), data, []), /thread_lifecycle_ci:jobs/)
+  }
 })
 
 test('skipped, incomplete, stale-attempt or unsuccessful release jobs cannot authorize active work', () => {
