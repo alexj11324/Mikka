@@ -177,7 +177,7 @@ test('mobile input evidence precedes Expo access and stays immutable before a gu
   const expo = steps.find(step => step.with?.['secret-name'] === 'EXPO_TOKEN')
   const publish = steps.find(step => step.name === 'Publish to production')
   assert.equal(select.run, 'node scripts/release/mobile-ota-source.mjs select')
-  assert.equal(select.env.GH_TOKEN, '${{ steps.source-token.outputs.token }}')
+  assert.equal(select.env.GH_TOKEN, '${{ github.token }}')
   assert.equal(source.with.name, 'mobile-production-ota-source')
   assert.equal(source.with.path, '${{ runner.temp }}/mobile-ota-source/release.json')
   assert.equal(source.with['if-no-files-found'], 'error')

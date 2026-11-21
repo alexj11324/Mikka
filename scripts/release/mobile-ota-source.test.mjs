@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -53,6 +53,16 @@ test('publication provenance rejects another attempt, source, actor, fork, step 
     assert.throws(() => checkedMobilePublication(f.run, f.jobs, f.artifact, f.receipt))
   }
   assert.throws(() => sourceReceipt({ ...fixture().receipt, token: 'unwanted-field' }))
+})
+
+test('organization-hosted publication retains official repository identity checks', async () => {
+  const f = fixture()
+  f.run.repository = f.run.head_repository = { ...repository, full_name: 'aspectly-labs/Mikka' }
+  f.artifact.url = f.artifact.url.replace('alexj11324', 'aspectly-labs')
+  f.artifact.archive_download_url = f.artifact.url + '/zip'
+  assert.equal((await latestMobilePublication({ ...history([f], []), repository: 'aspectly-labs/Mikka' })).status, 'published')
+  f.run.head_repository = { ...f.run.head_repository, id: 1 }
+  await assert.rejects(latestMobilePublication({ ...history([f], []), repository: 'aspectly-labs/Mikka' }))
 })
 
 function history(rows, downloaded) {
@@ -114,6 +124,19 @@ test('actual Git trees preserve deferred mobile changes across later Web merges 
   await writeFile(join(ui, 'mobile/view.tsx'), 'official mobile')
   const firstSource = commit(product), firstOverlay = commit(ui)
   const first = mobileInputs(product, ui, firstSource, firstOverlay), baseline = { status: 'published', receipt: first }
+  const runner = join(root, 'runner')
+  await mkdir(join(runner, 'mobile-ota-source'), { recursive: true })
+  await symlink(ui, join(product, '.hosted-ui'))
+  await writeFile(join(runner, 'mobile-ota-source/release.json'), JSON.stringify({ ...first, version: 1, kind: 'mobile-ota-source', runId: '10', runAttempt: '1' }))
+  const env = { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+    GITHUB_REPOSITORY_OWNER_ID: '359279274', GITHUB_ACTOR_ID: '183887963', GITHUB_REF: 'refs/heads/main',
+    GITHUB_WORKFLOW_REF: 'aspectly-labs/Mikka/.github/workflows/mobile-update.yml@refs/heads/main', GITHUB_WORKFLOW_SHA: firstSource,
+    GITHUB_SHA: firstSource, GITHUB_WORKSPACE: product, OVERLAY_SHA: firstOverlay, GITHUB_EVENT_NAME: 'workflow_dispatch',
+    GITHUB_RUN_ID: '10', GITHUB_RUN_ATTEMPT: '1', RUNNER_TEMP: runner }
+  execFileSync(process.execPath, [new URL('./mobile-ota-source.mjs', import.meta.url).pathname, 'verify'], { env })
+  assert.throws(() => execFileSync(process.execPath, [new URL('./mobile-ota-source.mjs', import.meta.url).pathname, 'verify'], {
+    env: { ...env, GITHUB_REPOSITORY_OWNER_ID: '183887963' }, stdio: 'pipe',
+  }))
   await writeFile(join(product, 'web-only.txt'), 'new web')
   await writeFile(join(ui, 'web-only.txt'), 'new web overlay')
   const web = mobileInputs(product, ui, commit(product), commit(ui))
@@ -135,8 +158,9 @@ test('the existing bounded archive reader verifies the native digest and never f
   const archive = execFileSync('python3', ['-c', 'import io,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED) as z: z.writestr("release.json",sys.stdin.buffer.read())\nsys.stdout.buffer.write(b.getvalue())'], { input: bytes })
   const { createHash } = await import('node:crypto')
   const proof = { selected: true, artifact: { id: 210, sizeBytes: archive.length, sha256: createHash('sha256').update(archive).digest('hex') } }
-  const fetched = await downloadReleaseReport(proof, { token: 'read-only-fixture', fetchImpl: async (url, init) => {
+  const fetched = await downloadReleaseReport(proof, { token: 'read-only-fixture', repository: 'aspectly-labs/Mikka', fetchImpl: async (url, init) => {
     if (url.startsWith('https://api.github.com/')) {
+      assert.equal(url, 'https://api.github.com/repos/aspectly-labs/Mikka/actions/artifacts/210/zip')
       assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
       return new Response(null, { status: 302, headers: { location: 'https://productionresultssa12.blob.core.windows.net/receipt' } })
     }

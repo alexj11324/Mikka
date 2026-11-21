@@ -4,10 +4,10 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { downloadReleaseReport } from '../acceptance/task-secrets-ci.mjs'
+import { actionsMikkaRepository, officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export const OTA_SOURCE_ARTIFACT = 'mobile-production-ota-source'
-const repository = 'alexj11324/Mikka', workflow = '.github/workflows/mobile-update.yml'
-const api = `https://api.github.com/repos/${repository}`
+const workflow = '.github/workflows/mobile-update.yml'
 const sha = /^[a-f0-9]{40}$/, number = /^[1-9][0-9]{0,15}$/
 const keys = value => Object.keys(value).sort()
 const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], {
@@ -40,8 +40,7 @@ export function sourceReceipt(value) {
 
 function trustedRun(run) {
   for (const field of ['repository', 'head_repository']) {
-    assert.equal(run[field]?.id, 1427517699)
-    assert.equal(run[field].full_name, repository)
+    assert.ok(officialMikkaRepository(run[field]?.full_name, String(run[field]?.id)))
     assert.equal(run[field].fork, false)
     assert.equal(run[field].private, false)
   }
@@ -101,7 +100,9 @@ async function pages(json, path, key) {
 }
 
 /** Only the newest trusted source receipt is considered; an unconfirmed or expired one blocks automatic OTA. */
-export async function latestMobilePublication({ json, download, now = Date.now() }) {
+export async function latestMobilePublication({ json, download, now = Date.now(), repository = 'alexj11324/Mikka' }) {
+  assert.ok(officialMikkaRepository(repository, publicRepositoryId))
+  const api = `https://api.github.com/repos/${repository}`
   const artifacts = await pages(json, `actions/artifacts?name=${OTA_SOURCE_ARTIFACT}`, 'artifacts')
   const trusted = []
   for (const artifact of artifacts) {
@@ -148,9 +149,8 @@ export function selectMobilePublication(candidate, baseline, event) {
 
 function candidate(env) {
   assert.equal(env.GITHUB_ACTIONS, 'true')
-  assert.equal(env.GITHUB_REPOSITORY, repository)
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699')
-  assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963')
+  const repository = actionsMikkaRepository(env)
+  assert.ok(repository)
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_REF, 'refs/heads/main')
   assert.equal(env.GITHUB_WORKFLOW_REF, `${repository}/${workflow}@refs/heads/main`)
@@ -163,6 +163,7 @@ function candidate(env) {
 
 async function main(command, env) {
   const current = candidate(env), directory = resolve(env.RUNNER_TEMP, 'mobile-ota-source'), file = resolve(directory, 'release.json')
+  const repository = env.GITHUB_REPOSITORY, api = `https://api.github.com/repos/${repository}`
   if (command === 'verify') {
     assert.deepEqual(sourceReceipt(JSON.parse(await readFile(file, 'utf8'))), current)
     return
@@ -180,7 +181,7 @@ async function main(command, env) {
   assert.equal(String(run.id), current.runId)
   assert.equal(String(run.run_attempt), current.runAttempt)
   assert.equal(run.head_sha, current.sourceCommit)
-  const baseline = await latestMobilePublication({ json, download: proof => downloadReleaseReport(proof, { token: env.GH_TOKEN }) })
+  const baseline = await latestMobilePublication({ json, repository, download: proof => downloadReleaseReport(proof, { token: env.GH_TOKEN, repository }) })
   const selection = selectMobilePublication(current, baseline, env.GITHUB_EVENT_NAME)
   if (selection.selected) {
     await mkdir(directory, { recursive: true, mode: 0o700 })

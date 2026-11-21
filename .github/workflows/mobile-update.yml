@@ -223,7 +223,7 @@ jobs:
         if: steps.eligibility.outputs.allowed == 'true'
         id: mobile-source
         env:
-          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           OVERLAY_SHA: ${{ steps.eligibility.outputs.overlay_sha }}
         run: node scripts/release/mobile-ota-source.mjs select
       - name: Record when mobile inputs do not authorize an OTA
