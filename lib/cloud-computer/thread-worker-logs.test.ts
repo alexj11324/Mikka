@@ -5,7 +5,7 @@ import { once } from 'node:events'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test, { after, before, mock } from 'node:test'
+import test, { before, mock } from 'node:test'
 import { promisify } from 'node:util'
 import { threadResourcePreflight, withThreadProjectResources } from '../../tests/support/thread-project-resources-fixture'
 import { ActionFailureError } from '../action-error'
@@ -13,9 +13,8 @@ import { CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '../c
 import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
 
 let { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } = {} as typeof import('./thread-worker-logs')
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+const scheduledAfter = captureFixtureLiveEffects()
 before(async () => {
-  scheduledAfter = await captureFixtureLiveEffects({ after })
   ;({ logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } = await import('./thread-worker-logs'))
 })
 

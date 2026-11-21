@@ -16,9 +16,8 @@ const owner = 'synthetic-owner', botId = '28700000-0000-4000-8000-000000000011'
 const workspaceId = '28700000-0000-4000-8000-000000000012'
 const agentId = '28700000-0000-4000-8000-000000000013', repoId = '28700000-0000-4000-8000-000000000014', issueId = '28700000-0000-4000-8000-000000000015'
 const connectionId = '28700000-0000-4000-8000-000000000019'
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+const scheduledAfter = captureFixtureLiveEffects()
 before(async () => {
-  scheduledAfter = await captureFixtureLiveEffects({ after })
   const workspaceModule = await import('./workspace-db')
   mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: { ...workspaceModule, workspacePool: { query: async () => ({ rows: [{ userId: owner }] }) } } })
 })

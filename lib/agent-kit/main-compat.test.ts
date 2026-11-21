@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
-import {after, afterEach, before, beforeEach, mock, test} from 'node:test'
+import {afterEach, before, beforeEach, mock, test} from 'node:test'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { PoolClient } from 'pg'
@@ -35,8 +35,7 @@ const publicationAssignment={pushBranch:'mikka/mik-42',policy:publicationPolicy}
 const prepared=mock.fn(async(..._args:Parameters<typeof import('../run-publications').prepareRunPublication>)=>structuredClone(publicationAssignment))
 const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a run')})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
-before(async()=>{scheduledAfter=await captureFixtureLiveEffects({after})})
+const scheduledAfter = captureFixtureLiveEffects()
 beforeEach(()=>{scheduledAfter.length=0})
 const compactSql = (sql: string) => sql.replace(/\s+/g, ' ').trim()
 const fixtureRows = <T>(rows: T[]) => ({ rows, rowCount: rows.length })

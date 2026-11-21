@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { after, before, mock, test } from 'node:test'
+import { before, mock, test } from 'node:test'
 import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
 import { coordinatorMessages, coordinatorSessions } from '../db/schema'
 
@@ -40,9 +40,8 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () =
 stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {}, coordinatorSessionScope: async () => null })
 
 let store: typeof import('@/tests/support/legacy-coordinator-store')
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+const scheduledAfter = captureFixtureLiveEffects()
 before(async () => {
-  scheduledAfter = await captureFixtureLiveEffects({ after })
   store = await import('@/tests/support/legacy-coordinator-store')
 })
 

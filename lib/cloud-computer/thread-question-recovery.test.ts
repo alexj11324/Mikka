@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test, { after, before, mock } from 'node:test'
+import test, { before, mock } from 'node:test'
 import { threadResourcePreflight, withThreadProjectResources } from '../../tests/support/thread-project-resources-fixture'
 import { REGISTRATION_COMPLETE } from '../computer/registration-command'
 
@@ -26,9 +26,8 @@ mock.module('../secrets/runtime.ts', { namedExports: {
 import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
 
 let runtime: Promise<typeof import('./thread-machines')>
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+const scheduledAfter = captureFixtureLiveEffects()
 before(async () => {
-  scheduledAfter = await captureFixtureLiveEffects({ after })
   runtime = import('./thread-machines')
   await runtime
 })

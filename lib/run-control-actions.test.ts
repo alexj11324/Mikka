@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { after, afterEach, before, mock, test } from 'node:test'
+import { afterEach, before, mock, test } from 'node:test'
 import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
 import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
@@ -109,9 +109,8 @@ async function runChainQuery(sql: string, params: unknown[]) {
   throw new Error('Unexpected run-chain SQL shape')
 }
 let actions: typeof import('../app/actions/agents')
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+const scheduledAfter = captureFixtureLiveEffects()
 before(async () => {
-  scheduledAfter = await captureFixtureLiveEffects({ after })
   // The receipt store has its own PostgreSQL coverage. This fixture models run controls.
   mock.module('@/lib/thread-reads', { namedExports: { threadReadReceipts: async () => [] } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (input?: { query?: { disableCookieCache?: boolean } }) => {

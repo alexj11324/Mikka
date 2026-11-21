@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
-import { after, before, mock, test } from 'node:test'
+import { before, mock, test } from 'node:test'
 import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
 
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
-before(async () => { scheduledAfter = await captureFixtureLiveEffects({ after }) })
+const scheduledAfter = captureFixtureLiveEffects()
 import { type SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { agentRuns, agents, deviceRepos, devices } from './db/schema'

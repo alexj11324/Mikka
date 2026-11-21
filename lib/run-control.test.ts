@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
-import test, { after, before } from 'node:test'
+import test, { before } from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import type { RunControlDatabase } from './run-control'
 import { captureFixtureLiveEffects } from '../tests/support/live-runtime'
 
 let { sendOwnedRunMessage, stopOwnedRun } = {} as typeof import('./run-control')
-let scheduledAfter: Awaited<ReturnType<typeof captureFixtureLiveEffects>>
+const scheduledAfter = captureFixtureLiveEffects()
 before(async () => {
-  scheduledAfter = await captureFixtureLiveEffects({ after })
   ;({ sendOwnedRunMessage, stopOwnedRun } = await import('./run-control'))
 })
 
