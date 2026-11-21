@@ -40,10 +40,11 @@ import type { IssueView } from '@/app/actions/issues'
 import type { IssueWorkSnapshot } from '@/app/actions/agents'
 import { harnessLabel, threadTopologyKey, type IssueThreadsRead } from './issue-threads'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
+import { ChatComposerAttachment } from '@/components/coordinator/chat-composer'
 import { choiceFromMenu, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { ThreadScreen } from '@ui-slot/thread'
 import { useConversationPanels } from '@/components/coordinator/conversation-panels-context'
-import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
+import type { ThreadEntry, ThreadEntryPart, ThreadHost } from '@/components/slots/thread-contract'
 import { atTheirTime } from '@/lib/thread-child-entries'
 import { HarnessMark, harnessName, ProviderMark } from '@/components/labels/entity-labels'
 import { PersonAvatar } from '@/components/person-avatar'
@@ -115,6 +116,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
  */
 type ThreadTab = 'chat' | 'changes' | 'acceptance' | 'artifacts'
 type IssueThreadPanelProps = {
+  host?: ThreadHost
   issueId: string | null
   runId: string
   onBack?: () => void
@@ -143,7 +145,7 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, focusRunId, transcriptOnly = false, attempt, collect, beforeEntries, afterEntries, childEntries, openSender }: IssueThreadPanelProps) {
+function ThreadPanel({ host = 'embedded', issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, focusRunId, transcriptOnly = false, attempt, collect, beforeEntries, afterEntries, childEntries, openSender }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const tArtifact = useTranslations('ArtifactsPage')
   const messages = useMessages()
@@ -634,12 +636,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const referenceWorkspace = liveRuns.find(run => run.id === liveRunId)?.workspaceId
   const references = !composerUnavailable && referenceWorkspace && data?.thread.ownedByCurrentUser ? <ThreadReferencePicker draft={draft}
     workspaceId={referenceWorkspace} input={inputRef} onChange={setDraft} /> : null
-  const conversation = data || beforeEntries?.length || afterEntries?.length ? <div data-slot="thread-conversation" className="flex min-h-0 flex-1 flex-col"><ThreadScreen botId={null} name={title} mark={author?.mark ?? null} readOnly={readOnly && !changeRequest} scrollRef={transcript} entries={atTheirTime([...beforeEntries ?? [], ...entries, ...afterEntries ?? [], ...!data ? [{ id: `${runId}:loading`, role: 'bot' as const, event: true as const, at: Date.now(), parts: [{ kind: 'text' as const, text: '', node: waiting }] }] : []], childEntries)}
+  const conversation = data || beforeEntries?.length || afterEntries?.length ? <div data-slot="thread-conversation" className="flex min-h-0 flex-1 flex-col"><ThreadScreen host={host} botId={null} name={title} mark={author?.mark ?? null} readOnly={readOnly && !changeRequest} scrollRef={transcript} entries={atTheirTime([...beforeEntries ?? [], ...entries, ...afterEntries ?? [], ...!data ? [{ id: `${runId}:loading`, role: 'bot' as const, event: true as const, at: Date.now(), parts: [{ kind: 'text' as const, text: '', node: waiting }] }] : []], childEntries)}
     panels={bare || transcriptOnly || collect ? undefined : panels}
     historyPrepend={historyPrepend}
     older={olderPosition ? { loading: olderState === 'loading', auto: olderState === 'idle', onLoad: () => { void loadOlder() } } : undefined}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
-    composer={{ ref: inputRef, model: modelControl, label: composerUnavailable ? t(data && !isThreadRun(data.thread) ? 'checkEnded' : 'replyUnavailable') : t('composer', { agent: harnessLabel(threadComposerHarness(detail?.harness ?? '', liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
+    composer={{ ref: inputRef, leadingControls: <ChatComposerAttachment />, leftControls: modelControl, label: composerUnavailable ? t(data && !isThreadRun(data.thread) ? 'checkEnded' : 'replyUnavailable') : t('composer', { agent: harnessLabel(threadComposerHarness(detail?.harness ?? '', liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, attachmentDisabled: composerUnavailable, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: quoteLabel, onRemove: () => setReplyQuote(null) }] : []]}

@@ -1,7 +1,8 @@
-import { createContext, type ReactNode, type RefObject } from 'react'
+import { createContext, type ReactNode, type RefObject, type UIEventHandler } from 'react'
 import type { DecisionReceipt } from '@/hooks/use-decision-submission'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
+import type { ChatMessageProps } from './chat-message-contract'
 
 /**
  * A conversation as one screen (docs/ui-overlay.md, slot `thread`): a Bot's chat, built by `CoordinatorChat` from the
@@ -38,8 +39,9 @@ export type ThreadEntryPart =
   | { kind: 'task'; run: RunSource; onOpen: () => void }
   /** Artifacts it handed over: a chip opens the artifact. */
   | { kind: 'artifacts'; items: { id: string; name: string }[]; onOpen: (id: string) => void }
-  /** Something failed: the words, with what can be done about it (retry, change model, sign in again). */
-  | { kind: 'error'; text: string; actions?: ReactNode }
+  /** Something failed: the words, with what can be done about it (retry, change model, sign in again).
+   * Current failures keep their semantic marker on the existing error line; historical actions own their past marker. */
+  | { kind: 'error'; text: string; actions?: ReactNode; failure?: 'live' | 'welcome' }
 
 export type ThreadEntry =
   | {
@@ -89,13 +91,21 @@ export type ThreadQuestion = {
   facts?: { label: string; value: string }[]
 }
 
+/** The surface containing a conversation; choosing a host does not change its appearance. */
+export type ThreadHost = 'page' | 'embedded' | 'column'
+
 export type ThreadScreenProps = {
+  host: ThreadHost
   /** Who the person talks to: the Bot's id (null: the Coordinator) and its name. */
   botId: string | null
   name: string
+  /** The accessible name of the existing transcript viewport. */
+  transcriptLabel?: string
+  /** The accessible waiting state for an initial read; omitted once it resolves or fails. */
+  loadingLabel?: string
   /** Its mark, for the author line (an entry's own author wins). */
   mark: ReactNode
-  /** null while the first read is on its way. */
+  /** null until the first read supplies entries; loadingLabel distinguishes a pending read from an error. */
   entries: ThreadEntry[] | null
   /** Shown in place of an empty conversation: the welcome being written. No starter cards (R-12). */
   empty?: ReactNode
@@ -146,6 +156,67 @@ export type ThreadScreenProps = {
     /** Reports the work area's actual active page; null for New or an artifact. */
     onActiveTab?: (tabId: string | null) => void
   }
+}
+
+/** Message contents remain with their readers; the screen owns every list item and its key. */
+export type ThreadTranscriptMessage = { id: string } & (
+  | { message: ChatMessageProps; content?: never }
+  | { content: ReactNode; message?: never }
+)
+
+export type ThreadGroupRow =
+  | { kind: 'author'; id: string; mine: boolean; name: string; mark?: ReactNode; messages: ThreadTranscriptMessage[] }
+  | { kind: 'pending'; id: string; phase: 'sending' | 'accepted' | 'failed'; message: ChatMessageProps; after?: ReactNode }
+  | { kind: 'notice'; id: string; label: string; content: ReactNode }
+
+export type ThreadScrolledRow = ThreadTranscriptMessage & {
+  messageId: string
+  before?: ReactNode
+  arriving?: boolean
+  attributes?: {
+    'data-coordinator-stream-id'?: string
+    'data-streaming'?: boolean
+    'data-message-position'?: number
+    'data-testid'?: string
+  }
+}
+
+type TranscriptScroll = {
+  label: string
+  ref: RefObject<HTMLDivElement | null>
+  onScroll: UIEventHandler<HTMLDivElement>
+}
+
+/** Existing transcript presentations share one screen without changing their DOM or their readers' state. */
+export type ThreadTranscriptScreenProps = {
+  host: ThreadHost
+  /** The same composer slot node; the screen owns its placement, the reader owns its actions. */
+  composer: ReactNode
+  beforeComposer?: ReactNode
+  transcript:
+    | {
+      kind: 'group'
+      scroll: TranscriptScroll
+      rows: ThreadGroupRow[]
+      /** A loading, refusal or empty state replaces the list. */
+      placeholder?: ReactNode
+      before?: ReactNode
+      after?: ReactNode
+      end?: ReactNode
+    }
+    | {
+      kind: 'embedded'
+      scroll: TranscriptScroll
+      stateKey: string
+      startAtEnd: boolean
+      sentCount: number | null
+      compact: boolean
+      rows: ThreadScrolledRow[]
+      before?: ReactNode
+      after?: ReactNode
+      overlay?: ReactNode
+      jumpToEnd: boolean
+    }
 }
 
 /** The hosted shell waits for a task tab's existing save before removing it. */

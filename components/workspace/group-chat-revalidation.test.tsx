@@ -43,7 +43,7 @@ mock.module('@/components/nav/letter-avatar', { namedExports: { LetterAvatar: em
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty } })
 mock.module('@/components/workspace/agent-markdown', { namedExports: { AgentMarkdown: empty } })
 mock.module('@/components/workspace/message-reactions', { namedExports: { MessageReactions: empty, useMessageReactions: () => ({}) } })
-mock.module('@/components/coordinator/chat-composer', { namedExports: { ChatComposer: ({ value, label, disabled }: { value: string; label: string; disabled: boolean }) => <Textarea aria-label={label} value={value} disabled={disabled} readOnly /> } })
+mock.module('@/components/coordinator/chat-composer', { namedExports: { ChatComposerAttachment: () => null, ChatComposer: ({ value, label, disabled }: { value: string; label: string; disabled: boolean }) => <Textarea aria-label={label} value={value} disabled={disabled} readOnly /> } })
 
 let GroupChatView: typeof import('./group-chat-view')['GroupChatView']
 let SWRConfig: typeof import('swr')['SWRConfig']

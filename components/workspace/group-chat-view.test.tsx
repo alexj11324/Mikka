@@ -39,7 +39,7 @@ mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { n
 mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [{ kind: 'task', id: issueId, title: 'Authorized task' }] } })
 mock.module(new URL('./thread-header.tsx', import.meta.url).href, { namedExports: { ThreadHeader: ({ onTitleChanged }: { onTitleChanged?: () => void }) => { headerTitleChanged = onTitleChanged; return null } } })
 mock.module(new URL('../coordinator/bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: ({ botId, running }: { botId: string; running: boolean }) => <span aria-label="Fixture Bot model">{botId} {running ? 'next message' : 'current'}</span> } })
-mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: ({ ref, value, onChange, model }: ChatComposerProps) => <>{model}<Textarea ref={ref} value={value} onChange={event => onChange(event.currentTarget.value)} /></> } })
+mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposerAttachment: () => null, ChatComposer: ({ ref, value, onChange, leftControls }: ChatComposerProps) => <>{leftControls}<Textarea ref={ref} value={value} onChange={event => onChange(event.currentTarget.value)} /></> } })
 mock.module(new URL('../nav/conversation-pill.tsx', import.meta.url).href, { namedExports: { ConversationPill: () => null } })
 mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: hasMemberPage ? groupMembers : undefined, error: membersError }) } })
 mock.module(new URL('../nav/letter-avatar.tsx', import.meta.url).href, { namedExports: { LetterAvatar: () => null } })
@@ -112,6 +112,20 @@ test('group replies use the existing Markdown HTML and URL protections', async (
   assert.equal(reply.querySelector('script'), null)
   assert.equal(reply.querySelector('a[href^="javascript:"]'), null)
   assert.deepEqual([...reply.querySelectorAll('a[href]')].filter(link => link.getAttribute('href')).map(link => link.getAttribute('href')), [taskHref, threadHref, threadHref])
+})
+
+test('another person\'s grouped messages keep plain text and one author line', async () => {
+  await render([1, 2].map(position => ({ ...message('user', position, handoff), authorId: 'peer' })))
+  const rows = [...container.querySelectorAll('ol[aria-label="messages"] > li')]
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].textContent?.match(/member/g)?.length, 1)
+  const words = [...rows[0].querySelectorAll('[data-slot="user-message-text"]')]
+  assert.equal(words.length, 2)
+  for (const text of words) {
+    assert.equal(text.textContent, handoff)
+    assert.equal(text.querySelector('a'), null)
+  }
+  assert.equal(rows[0].querySelectorAll('[data-slot="bubble"][data-align="start"]').length, 2)
 })
 
 test('the chat reads its newest page and members on the group key, never on a timer (#1212)', async () => {

@@ -40,7 +40,7 @@ mock.module('@/components/workspace/agent-markdown', { namedExports: { AgentMark
 mock.module('@/components/workspace/message-reactions', { namedExports: { MessageReactions: empty, useMessageReactions: () => ({}) } })
 type ComposerProps = { value: string; onChange: (value: string) => void; onSubmit: () => void; disabled: boolean; label: string }
 let composer: ComposerProps
-mock.module('@/components/coordinator/chat-composer', { namedExports: { ChatComposer: (props: ComposerProps) => {
+mock.module('@/components/coordinator/chat-composer', { namedExports: { ChatComposerAttachment: () => null, ChatComposer: (props: ComposerProps) => {
   composer = props
   return <div><Textarea aria-label={props.label} value={props.value} disabled={props.disabled} onChange={event => props.onChange(event.target.value)} /><Button disabled={props.disabled} onClick={props.onSubmit}>send</Button></div>
 } } })

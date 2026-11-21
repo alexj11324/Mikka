@@ -1,15 +1,16 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { listAgents } from '@/app/actions/agents'
-import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { ChatComposer, ChatComposerAttachment } from '@/components/coordinator/chat-composer'
+import { ThreadScreen } from '@ui-slot/thread'
+import type { ThreadGroupRow, ThreadTranscriptMessage } from '@/components/slots/thread-contract'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
 import { namedConversationModelBot } from '@/lib/named-conversation-model'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
+import { CHAT_SURFACE } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
 import { GroupLeaveAction } from './group-leave-action'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -208,6 +209,33 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
   // Whom the person's messages go to, for the chat-message slot: the group.
   const speaker = { id: group.id, name: group.title || t('untitled') }
 
+  const rows: ThreadGroupRow[] = authorRuns(messages).map(run => {
+    const mine = run.authorType === 'user' && run.authorId === userId
+    const name = authorName(run.authorType, run.authorId)
+    const bot = run.authorType === 'bot' ? member('bot', run.authorId) : undefined
+    return {
+      kind: 'author', id: run.key, mine, name,
+      mark: bot ? <BotAvatar {...memberAvatar(bot)} size="message" still /> : <LetterAvatar name={name} size="message" />,
+      messages: run.messages.map((message): ThreadTranscriptMessage => mine
+        ? { id: message.id, message: { from: 'person', speaker,
+          body: <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage>,
+          after: <MessageReactions reactions={reactions[message.id]} align="end" /> } }
+        : { id: message.id, message: { from: 'bot', speaker, presentation: 'group-received',
+          body: run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />,
+          after: <MessageReactions reactions={reactions[message.id]} align="start" /> } }),
+    }
+  })
+  for (const item of unsent) rows.push({
+    kind: 'pending', id: item.id, phase: item.phase,
+    message: { from: 'person', speaker, body: <CollapsibleMessage><UserMessageText text={item.text} renderText={referenceText} /></CollapsibleMessage> },
+    after: item.phase === 'failed' && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{item.error}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>,
+  })
+  if (first?.agentStatus) rows.push({ kind: 'notice', id: 'answering', label: t('answering'), content: <span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span> })
+  const placeholder = blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
+    : blockingCode ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{blockingCode === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{blockingCode !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>
+      : !pages ? <div aria-busy="true" className="flex flex-col gap-3 py-4"><Skeleton className="h-9 w-2/3" /><Skeleton className="ml-auto h-9 w-1/2" /><Skeleton className="h-9 w-3/5" /></div>
+        : messages.length === 0 && !unsent.length ? <p className="py-6 text-sm text-muted-foreground">{t('empty')}</p> : null
+
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className={cn('relative flex min-h-0 w-full flex-1 flex-col', CHAT_SURFACE)}>
     {namedChat
       ? <ThreadHeader standalone issueId={null} runId={group.id} title={group.title || t('untitled')} headingRef={titleHeading}
@@ -225,52 +253,19 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
           }} />
         </div>
       : namedChat ? null : <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />}
-    <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto scroll-fade-y">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
-        {blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
-          : blockingCode ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{blockingCode === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{blockingCode !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>
-            : !pages ? <div aria-busy="true" className="flex flex-col gap-3 py-4"><Skeleton className="h-9 w-2/3" /><Skeleton className="ml-auto h-9 w-1/2" /><Skeleton className="h-9 w-3/5" /></div>
-              : messages.length === 0 && !unsent.length ? <p className="py-6 text-sm text-muted-foreground">{t('empty')}</p>
-                : <>
-                  {older && <Button variant="ghost" size="sm" className="self-center text-muted-foreground" disabled={loadingOlder} onClick={() => { void setSize(size + 1) }}>{loadingOlder && <Spinner data-icon="inline-start" role="presentation" aria-hidden="true" />}{loadingOlder ? t('loadingOlder') : t('older')}</Button>}
-                  <ol aria-label={t('messages')} className="flex flex-col gap-4">
-                    {authorRuns(messages).map(run => {
-                      const mine = run.authorType === 'user' && run.authorId === userId
-                      const name = authorName(run.authorType, run.authorId)
-                      const bot = run.authorType === 'bot' ? member('bot', run.authorId) : undefined
-                      return <li key={run.key} className={cn('flex', mine ? 'flex-col items-end gap-1' : 'items-end gap-2')}>
-                        {!mine && (bot ? <BotAvatar {...memberAvatar(bot)} size="message" still /> : <LetterAvatar name={name} size="message" />)}
-                        <div className={cn('flex min-w-0 flex-col gap-1', mine ? 'max-w-[min(26rem,80%)] items-end' : 'max-w-[min(35rem,85%)]')}>
-                          {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
-                          {/* The person's own words are drawn by the chat-message slot, as in a 1:1 chat. */}
-                          {run.messages.map(message => mine
-                            ? <ChatMessage key={message.id} from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage>} after={<MessageReactions reactions={reactions[message.id]} align="end" />} />
-                            : <Fragment key={message.id}>
-                              <Bubble variant="muted" align="start" className="max-w-full">
-                                <BubbleContent size="roomy" className="whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
-                              </Bubble>
-                              <MessageReactions reactions={reactions[message.id]} align="start" />
-                            </Fragment>)}
-                        </div>
-                      </li>
-                    })}
-                    {unsent.map(item => <li key={item.id} data-pending={item.phase} className={cn('flex flex-col items-end gap-1', item.phase === 'sending' && 'opacity-60')}>
-                      <ChatMessage from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={item.text} renderText={referenceText} /></CollapsibleMessage>} />
-                      {item.phase === 'failed' && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{item.error}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
-                    </li>)}
-                    {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}
-                  </ol>
-                  {first?.routingError && !first.agentStatus && <p className="text-center text-xs text-muted-foreground">{t('noTaker')}</p>}
-                  {first?.stopped && !first.agentStatus && <p role="status" className="text-center text-xs text-muted-foreground">{t('stopped')}</p>}
-                </>}
-        {namedChat && readRevision !== undefined && !blockingCode && !accessRejected && <VisibleReadEnd onSeen={acknowledge} />}
-      </div>
-    </div>
-    <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      {referenceWorkspace && <ThreadReferencePicker key={group.id} draft={draft} workspaceId={referenceWorkspace} input={composerInput} onChange={setDraft} />}
-      <ChatComposer ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
-        model={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
-        sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
-    </div>
+    <ThreadScreen host="page" transcript={{
+      kind: 'group', rows, placeholder,
+      scroll: { ref: scroller, label: t('messages'), onScroll: event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) } },
+      before: older && <Button variant="ghost" size="sm" className="self-center text-muted-foreground" disabled={loadingOlder} onClick={() => { void setSize(size + 1) }}>{loadingOlder && <Spinner data-icon="inline-start" role="presentation" aria-hidden="true" />}{loadingOlder ? t('loadingOlder') : t('older')}</Button>,
+      after: <>
+        {first?.routingError && !first.agentStatus && <p className="text-center text-xs text-muted-foreground">{t('noTaker')}</p>}
+        {first?.stopped && !first.agentStatus && <p role="status" className="text-center text-xs text-muted-foreground">{t('stopped')}</p>}
+      </>,
+      end: namedChat && readRevision !== undefined && !blockingCode && !accessRejected && <VisibleReadEnd onSeen={acknowledge} />,
+    }}
+      beforeComposer={referenceWorkspace && <ThreadReferencePicker key={group.id} draft={draft} workspaceId={referenceWorkspace} input={composerInput} onChange={setDraft} />}
+      composer={<ChatComposer leadingControls={<ChatComposerAttachment />} ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
+        leftControls={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
+        sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />} />
   </section>
 }

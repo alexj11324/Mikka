@@ -62,7 +62,7 @@ stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
 stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', threadTopologyKey: (id: string) => ['issue-thread-topology', id], IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
-stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
+stub('components/coordinator/chat-composer.tsx', { ChatComposerAttachment: Empty, ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
 mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => Empty })
 
 const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: { type: 'doc', content: [] }, status: 'review', priority: 'normal', revision: 1, identifier: 'FIX-1', metadata: {}, createdAt: new Date(0), updatedAt: new Date(0) }
@@ -80,7 +80,15 @@ stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Emp
 // The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
 stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <Input id="task-title" value={titleField.value} readOnly /> })
 stub('components/slots/task-conversation.tsx', { TaskConversation: ({ issueId, runId }: { issueId: string; runId: string }) => <ol data-task-conversation={issueId}><li>{runId}</li></ol> })
-stub('components/slots/thread.tsx', { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) => <ol>{entries?.map(entry => <li key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, index) => part.kind === 'text' ? <span key={index}>{part.node}</span> : null)}</li>)}</ol> })
+stub('components/slots/thread.tsx', { ThreadScreen: (props: import('../components/slots/thread-contract').ThreadScreenProps | import('../components/slots/thread-contract').ThreadTranscriptScreenProps) => {
+  if ('transcript' in props) return <>
+    {'placeholder' in props.transcript && props.transcript.placeholder != null ? props.transcript.placeholder : <ol>{props.transcript.rows.map(row => <li key={row.id}>{'messages' in row
+      ? row.messages.map(entry => <span key={entry.id}>{entry.message ? entry.message.body : entry.content}</span>)
+      : 'message' in row ? row.message?.body : row.content}</li>)}</ol>}
+    {props.composer}
+  </>
+  return <ol>{props.entries?.map(entry => <li key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, index) => part.kind === 'text' ? <span key={index}>{part.node}</span> : null)}</li>)}</ol>
+} })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>
@@ -183,6 +191,7 @@ for (const item of cases) test(`${item.name}: a failed Retry stays available, th
   </SWRConfig>))
   await until(() => !!container.querySelector(item.node), 'The initial read must produce retained content')
   const original = container.querySelector(item.node)
+  if (item.read === 'group') assert.match(original?.textContent ?? '', /Retained group message/)
   failures.set(item.read, new TypeError('fixture continuing read failure'))
   await act(async () => { if (isApp) setTransportState('offline'); else await mutate(key).catch(() => {}) })
   const notice = () => [...container.querySelectorAll('[data-sonner-toast]')].find(element => element.textContent?.includes(item.title))
@@ -198,11 +207,13 @@ for (const item of cases) test(`${item.name}: a failed Retry stays available, th
   // The installed Sonner removes an action toast after 200 ms, independent of duration.
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
   assert.equal(container.querySelector(item.node), original, 'The retained content stays mounted')
+  if (item.read === 'group') assert.match(original?.textContent ?? '', /Retained group message/)
   if (!isApp) assert.ok(cache.get(serialize(key))?.error, 'The retried read still failed')
   assert.ok(retry(), 'A failed Retry must preserve its in-place recovery action')
   failures.delete(item.read)
   await act(async () => retry()!.click())
   await until(() => reads.get(item.read) === before + 2 && !notice(), 'A later successful read must dismiss the notice')
   assert.equal(container.querySelector(item.node), original)
+  if (item.read === 'group') assert.match(original?.textContent ?? '', /Retained group message/)
   assert.equal(unexpectedNetwork, 0)
 })
