@@ -59,6 +59,7 @@ test('fresh API publication keeps the independent UI namespace bound to its rece
 })
 
 test('a selected main overlay survives later merges while an unmerged overlay is rejected without changing the checkout', async () => {
+  const fixtureEnv = { ...process.env, MIKKA_HOSTED_UI_GITHUB_OWNER: 'alexj11324' }
   const directory = await mkdtemp(join(tmpdir(),'mikka-overlay-main-'))
   const upstream = join(directory,'upstream'), checkout = join(directory,'checkout')
   const git = (cwd,...args) => execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
@@ -70,11 +71,11 @@ test('a selected main overlay survives later merges while an unmerged overlay is
     git(upstream,'add','source.txt');git(upstream,'commit','-m','Reviewed main')
     const pinned = git(upstream,'rev-parse','HEAD')
     git(directory,'clone','--depth=1',pathToFileURL(upstream).href,checkout)
-    const remote = 'git@github.com:' + privateMikkaRepository('mikka-hosted-ui') + '.git'
+    const remote = 'git@github.com:' + privateMikkaRepository('mikka-hosted-ui', fixtureEnv) + '.git'
     git(checkout,'config','url.'+pathToFileURL(upstream).href+'.insteadOf',remote)
     await writeFile(join(upstream,'source.txt'),'newer main\n')
     git(upstream,'commit','-am','Later main merge')
-    verifyOverlayMain(checkout,pinned)
+    verifyOverlayMain(checkout,pinned,fixtureEnv)
     assert.equal(git(checkout,'rev-parse','HEAD'),pinned)
     assert.equal(await readFile(join(checkout,'source.txt'),'utf8'),'reviewed overlay\n')
     git(checkout,'config','user.name','Fixture')
@@ -83,7 +84,7 @@ test('a selected main overlay survives later merges while an unmerged overlay is
     await writeFile(join(checkout,'source.txt'),'unmerged overlay\n')
     git(checkout,'commit','-am','Unmerged source')
     const unmerged = git(checkout,'rev-parse','HEAD')
-    assert.throws(()=>verifyOverlayMain(checkout,unmerged),/CF_OCI_STAGE_OVERLAY_MAIN_ANCESTRY_FAILED/)
+    assert.throws(()=>verifyOverlayMain(checkout,unmerged,fixtureEnv),/CF_OCI_STAGE_OVERLAY_MAIN_ANCESTRY_FAILED/)
     assert.equal(git(checkout,'rev-parse','HEAD'),unmerged)
   } finally { await rm(directory,{recursive:true,force:true}) }
 })
