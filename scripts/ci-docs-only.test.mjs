@@ -245,10 +245,6 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   const database = job('browser-tests-full')
   assert.match(database, /fail-fast: false/)
   assert(database.includes('shard: ${{ fromJSON(needs.changes.outputs.db_matrix).shard }}'))
-  const nodeMatrix = `node: \${{ fromJSON(github.event_name == 'pull_request' && '["24"]' || '["22","24"]') }}`
-  for (const name of ['ui-policy-full', 'ui-policy-integrations', 'browser-tests-full']) {
-    assert(job(name).includes(nodeMatrix), name)
-  }
   assert(database.includes('node-version: ${{ matrix.node }}'))
   assert(database.includes("name: Database checks (${{ matrix.shard }})${{ matrix.node == '22' && ' (Node 22)' || '' }}"))
   assert(database.includes('DB_TEST_SHARD: ${{ matrix.shard }}'))

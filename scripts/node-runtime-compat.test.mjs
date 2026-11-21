@@ -54,7 +54,7 @@ test('CI installs, builds and starts both real runtimes without a daemon-only du
   const ci = load('.github/workflows/ui-policy.yml')
   for (const key of ['ui-policy-full', 'ui-policy-integrations', 'browser-tests-full']) {
     const job = ci.jobs[key]
-    assert.deepEqual(job.strategy.matrix.node, ['22', '24'], key)
+    assert.equal(job.strategy.matrix.node, `\${{ fromJSON(github.event_name == 'pull_request' && '["24"]' || '["22","24"]') }}`, key)
     assert.equal(job.steps.find(step => step.uses === './.github/actions/pnpm-install').with['node-version'], '${{ matrix.node }}')
   }
   assert.equal(ci.jobs['browser-tests-full'].strategy.matrix.shard, '${{ fromJSON(needs.changes.outputs.db_matrix).shard }}')
