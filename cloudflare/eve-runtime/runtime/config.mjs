@@ -13,7 +13,7 @@ export function hostConfiguration(env) {
       // about 100 queries a second while idle. LISTEN/NOTIFY wakes idle
       // workers when a job is added, so this only delays scheduled jobs.
       WORKFLOW_POSTGRES_POLL_INTERVAL_MS: '5000',
-      ...runtime, NODE_ENV: 'production', MIKKA_EVE_HOST: 'cloudflare', MIKKA_HOSTED_MODEL_FALLBACK: 'cloudflare-workers-ai',
+      ...runtime, NODE_ENV: 'production', MIKKA_EVE_HOST: 'cloudflare',
       WORKFLOW_TARGET_WORLD: '@workflow/world-postgres',
       MIKKA_DEPLOYMENT_ID: env.EVE_RELEASE_ID, WORKFLOW_DEPLOYMENT_ID: env.EVE_RELEASE_ID, MIKKA_EVE_PUBLIC_ORIGIN: publicOrigin,
       MIKKA_BUILD_REVISION: env.EVE_SOURCE_SHA, MIKKA_UI_OVERLAY_SHA: env.EVE_UI_SHA,

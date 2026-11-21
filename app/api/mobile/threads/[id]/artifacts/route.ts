@@ -6,7 +6,6 @@ import { runOutsideToken } from '@/lib/tokens/scope'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceSelection } from '@/lib/workspace-selection'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `GET /api/mobile/threads/:id/artifacts`: the thread's Artifact segment on iOS (方案 / PR / 报告 / 截图和录屏), as the

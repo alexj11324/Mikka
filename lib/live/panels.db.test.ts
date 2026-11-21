@@ -21,8 +21,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('panel notifications follow actual committed writes and persisted owner/workspace scopes', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
+  const nextServer = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { pending.push(work) },
   } })
   const coordinator = await isolateCoordinatorWakes(t)
@@ -313,7 +313,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       const { createFactoryQuestions } = await import('../factory/questions/store')
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = agentIds.get('owner')!
       devicePaths.add(`/v1/devices/${deviceId}/push`)
-      await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
+      await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]',now())`, [deviceId])
       await databasePool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
       await databasePool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/fixture/repo')`, [repoId, deviceId])
       const authorize = async (owner: string, issueId: string, tx: import('pg').PoolClient) => (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issueId, owner])).rowCount === 1

@@ -17,13 +17,14 @@ import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 
 import {
   isTerminalRunState,
-  RUN_LEASE_MS,
-  type DeviceHeartbeat,
+  SESSION_LEASE_MS,
+  type DeviceGatewayTicket,
   type DeviceRegistration,
+  type DeviceReport,
+  type DeviceReportResult,
   type DeviceRepo,
   type FsPendingRequest,
   type FsResult,
-  type HeartbeatResult,
   type RunAssignment,
   type RunCompletion,
   type RunCommand,
@@ -40,13 +41,15 @@ import {
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
 import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCaptureRequest, ScreenCaptureResponse } from "@mikka/protocol/capture"
 import type { RunChunk } from "./chunks"
-import type { RunControlMode, ToolApprovalGate } from "./agents/tool-approval"
+import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
+import type { RunDrive } from './run-drive'
 import type { ServerDecide } from './server-decision'
 import type { WorkspaceReadCommand, WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import type { ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
-import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
+import { DeviceGatewayRequiredError, DeviceSessionRequiredError, RunNotPinnedHereError, ServerUnreachableError } from "./errors"
+import type { DeviceGatewaySocket } from "./device-gateway"
 
 export type {
   DeviceRepo,
@@ -55,11 +58,10 @@ export type {
   RunPatch,
   SetupRecipe,
 } from "@mikka/protocol"
+export { DEVICE_SESSION_LOCAL_GRACE_MS } from "@mikka/protocol"
 
 /** What the daemon sends when it registers (`deviceId` re-registers). */
 export type DeviceInfo = Omit<DeviceRegistration, "deviceId">
-
-export type HeartbeatStatus = DeviceHeartbeat
 
 export interface ChunkBatch {
   /** Producer sequence of the first chunk (1-based, per run). */
@@ -76,14 +78,19 @@ export interface ServerLink {
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
-  /** A gateway hint only; every live run rechecks its current authority. */
+  /** A gateway push or a reopened socket: every live run rechecks its current authority. */
   invalidateRunControls?(): void
-  /** How live runs learn of stops and revocations; see RunControlMode. */
-  setRunControlMode?(mode: RunControlMode): void
+  /**
+   * Called when any route answers 426 `daemonUpgradeRequired`, wherever the
+   * request came from, so the daemon stops before its next request.
+   */
+  onUpgradeRequired?(listener: (latest?: string) => void): void
   /** The server's Decisions API on behalf of one run (server-decision.ts). */
   decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  /** The run's shared Drive mirror over its MCP endpoint (decision 2026-11-19-2200). */
+  prepareRunDrive?(assignment: RunAssignment, signal: AbortSignal): Promise<RunDrive | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
   coordinatorCommand?(deviceId: string, turnId: string, command: NativeCoordinatorCommand, signal: AbortSignal): Promise<void>
   coordinatorToolResult?(deviceId: string, turnId: string, callId: string, signal: AbortSignal): Promise<NativeCoordinatorToolResult>
@@ -99,8 +106,11 @@ export interface ServerLink {
     info: DeviceInfo,
     knownDeviceId?: string
   ): Promise<{ deviceId: string; tracing?: DeviceRegistered["tracing"] }>
-  /** Also renews the leases of the runs listed in `status.runs`. */
-  heartbeat(deviceId: string, status: HeartbeatStatus): Promise<HeartbeatResult>
+  /**
+   * What changed on the device, sent once when it changes and once after each
+   * socket open (decision 2026-11-17-2215). It renews nothing.
+   */
+  report(deviceId: string, report: DeviceReport): Promise<DeviceReportResult>
   listRepos(deviceId: string): Promise<DeviceRepo[]>
   /** Ids of queued runs pinned to this device. */
   pendingRuns(deviceId: string): Promise<string[]>
@@ -141,10 +151,9 @@ export interface ServerLink {
   checkpointRun?(runId: string, checkpoint: RunCheckpoint): Promise<RunCheckpointReceipt | void>
   /**
    * Messages people sent this device's runs and stops they asked for
-   * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
-   * `signal` ends the wait early (daemon stopping). A server that also
-   * reports runs queued for this device passes them to `onQueuedRuns`, so
-   * the daemon claims them without waiting for its next heartbeat.
+   * (ADR 0018), runs queued for it (`onQueuedRuns`) and device commands.
+   * The daemon reads once per gateway push or socket open, with
+   * `waitSeconds` 0; it never long-polls (decision 2026-11-17-2215).
    */
   fetchCommands(
     deviceId: string,
@@ -153,13 +162,15 @@ export interface ServerLink {
   ): Promise<RunCommand[]>
   answerWorkspaceRead?(deviceId: string, requestId: string, receipt: WorkspaceReadReceipt, options: { expiresAt: string; signal?: AbortSignal }): Promise<void>
   /**
-   * A short-lived ticket for the device's push socket. Absent on a link
-   * that only long-polls, and null when this server has no gateway.
+   * A short-lived ticket for the device session socket. A server without a
+   * gateway refuses with `DeviceGatewayRequiredError`; it has no devices.
    */
-  deviceGateway?(
+  deviceGateway(
     deviceId: string,
     signal?: AbortSignal
-  ): Promise<{ url: string | null; protocol: string | null; runControl?: 'push'; computerReviews?: 'push'; coordinatorResults?: 'push' }>
+  ): Promise<DeviceGatewayTicket>
+  /** Opens the session socket for a ticket; the daemon uses the global WebSocket without it. */
+  openDeviceGateway?(url: string, protocol: string): DeviceGatewaySocket
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[], refusedSteers?: string[]): Promise<void>
   /**
@@ -185,10 +196,8 @@ export interface FetchCommandsOptions {
   skipRuns?: readonly string[]
   onQueuedRuns?: (runIds: string[]) => void
   /**
-   * The newest release this daemon knows of and the device commands it
-   * already holds. Sending them asks the server for releases and device
-   * commands on this poll, which ends as soon as either is news.
-   * Older servers ignore them and never call `onUpdates`.
+   * The newest release this daemon knows of. Sending it asks the server for
+   * releases and the oldest pending device command on this read.
    */
   updates?: { daemonLatest: string; skipDeviceCommands?: readonly string[] }
   onUpdates?: (updates: { daemonVersions?: DaemonVersions; deviceCommands: DeviceManagementCommand[] }) => void
@@ -198,7 +207,8 @@ export interface FetchCommandsOptions {
 export const MAX_CONTINUES = 3
 export const MAX_CRASH_RETRIES = 3
 export const MAX_FIX_ROUNDS = 3
-export const DEFAULT_LEASE_MS = RUN_LEASE_MS
+/** The memory server's lease bound; like the real one, it lasts as long as the session. */
+export const DEFAULT_LEASE_MS = SESSION_LEASE_MS
 
 /** Who has the issue after a run ended, and why. Never empty. */
 export interface IssueOwner {
@@ -221,16 +231,59 @@ type QueueRunInput = Omit<RunAssignment, "deviceId" | "runId"> & {
   runId?: string
 }
 
+type MemorySocketEvent = { data?: unknown; code?: number }
+
+/** The memory server's device gateway socket: opens on the next turn, answers pings, carries `work`. */
+class MemoryGatewaySocket implements DeviceGatewaySocket {
+  readyState = 0
+  private readonly listeners = new Map<string, Set<(event: MemorySocketEvent) => void>>()
+  constructor(private readonly server: MemoryServer, readonly deviceId: string) {
+    setTimeout(() => {
+      if (this.readyState !== 0) return
+      if (!server.online) { this.readyState = 3; this.emit("error", {}); return }
+      this.readyState = 1
+      server.sockets.add(this)
+      this.emit("open", {})
+    }, 0)
+  }
+  send(data: string) {
+    if (this.readyState !== 1) throw new Error("socket not open")
+    if (data === "ping") queueMicrotask(() => this.message("pong"))
+  }
+  /** A frame from the server. */
+  message(data: string) { if (this.readyState === 1) this.emit("message", { data }) }
+  close(code?: number) {
+    if (this.readyState >= 2) return
+    this.readyState = 3
+    this.server.sockets.delete(this)
+    this.emit("close", { code })
+  }
+  addEventListener(type: string, listener: (event: MemorySocketEvent) => void) {
+    const set = this.listeners.get(type) ?? new Set()
+    set.add(listener)
+    this.listeners.set(type, set)
+  }
+  removeEventListener(type: string, listener: (event: MemorySocketEvent) => void) { this.listeners.get(type)?.delete(listener) }
+  private emit(type: string, event: MemorySocketEvent) { for (const listener of [...this.listeners.get(type) ?? []]) listener(event) }
+}
+
 /**
  * In-memory stand-in for the server: tests, and `--server memory` in dev
- * until the real link is wired. `online = false` simulates a network cut.
+ * until the real link is wired. `online = false` simulates a network cut for
+ * requests; `closeSessions` drops the device gateway sockets.
  */
 export class MemoryServer {
   online = true
+  /** False: the ticket route refuses like a server without a device gateway. */
+  gateway = true
+  /** True: a claim needs an open session socket for the device, as on the real server. */
+  requireSession = false
   readonly devices = new Map<
     string,
-    { credential: string; info: DeviceInfo; lastHeartbeat?: HeartbeatStatus }
+    { credential: string; info: DeviceInfo; reports: DeviceReport[] }
   >()
+  /** Open device gateway sockets. */
+  readonly sockets = new Set<MemoryGatewaySocket>()
 
   readonly repos = new Map<string, DeviceRepo[]>()
   readonly runs = new Map<string, MemoryRun>()
@@ -336,6 +389,7 @@ export class MemoryServer {
       patches: [],
     })
     this.issueStatus.set(run.issueId, "in_progress")
+    this.pushWork(deviceId)
     return runId
   }
 
@@ -356,6 +410,24 @@ export class MemoryServer {
     const wake = this.wakeCommands
     this.wakeCommands = []
     for (const fn of wake) fn()
+    const devices = new Set([...this.stopRequests, ...[...this.inputs.values()].map(input => input.runId)]
+      .flatMap(runId => this.runs.get(runId)?.deviceId ?? []))
+    for (const deviceId of devices) this.pushWork(deviceId)
+  }
+
+  /** The gateway's `work` signal to a device's open sockets. */
+  pushWork(deviceId: string) {
+    for (const socket of [...this.sockets]) if (socket.deviceId === deviceId) socket.message("work")
+  }
+
+  /** Whether a device holds an open session socket. */
+  sessionOpen(deviceId: string) {
+    return [...this.sockets].some(socket => socket.deviceId === deviceId)
+  }
+
+  /** Drops every open session socket, with a close code (4001: update required). */
+  closeSessions(code?: number) {
+    for (const socket of [...this.sockets]) socket.close(code)
   }
 
   private pendingCommands(
@@ -405,30 +477,20 @@ export class MemoryServer {
             (!knownDeviceId || id === knownDeviceId)
         )
         const deviceId = existing?.[0] ?? this.fixedDeviceId ?? randomUUID()
-        this.devices.set(deviceId, { credential, info })
+        this.devices.set(deviceId, { credential, info, reports: this.devices.get(deviceId)?.reports ?? [] })
         return { deviceId }
       },
-      heartbeat: async (deviceId, status) => {
+      report: async (deviceId, report) => {
         this.check()
-        const device = this.devices.get(deviceId)
-        if (device) device.lastHeartbeat = status
-
-        const leases: Record<string, string> = {}
-        const revoked: string[] = []
-        for (const { runId } of status.runs) {
-          const run = this.runs.get(runId)
-          if (!run) continue
-          // The real server also takes back runs it no longer knows; this one
-          // forgets every run on restart (`--server memory`), so it does not.
-          if (run.deviceId !== deviceId || isTerminalRunState(run.state)) {
-            revoked.push(runId)
-            continue
-          }
-          run.leaseExpiresAt = Date.now() + this.leaseMs
-          leases[runId] = new Date(run.leaseExpiresAt).toISOString()
-        }
-        return { leases, ...(revoked.length ? { revoked } : {}) }
+        this.devices.get(deviceId)?.reports.push(report)
+        return {}
       },
+      deviceGateway: async (deviceId) => {
+        this.check()
+        if (!this.gateway) throw new DeviceGatewayRequiredError()
+        return { url: `memory://gateway/${encodeURIComponent(deviceId)}`, protocol: `mikka-ticket-1-${"0".repeat(64)}` }
+      },
+      openDeviceGateway: (url) => new MemoryGatewaySocket(this, decodeURIComponent(url.slice("memory://gateway/".length))),
       listRepos: async (deviceId) => {
         this.check()
         return this.repos.get(deviceId) ?? []
@@ -441,6 +503,7 @@ export class MemoryServer {
       },
       claimRun: async (deviceId, runId) => {
         this.check()
+        if (this.requireSession && !this.sessionOpen(deviceId)) throw new DeviceSessionRequiredError()
         const run = this.runs.get(runId)
         if (!run || run.deviceId !== deviceId)
           throw new RunNotPinnedHereError(runId)

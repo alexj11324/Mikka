@@ -8,7 +8,6 @@ import { coordinatorEnabled } from '@/lib/coordinator/wake'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /api/mobile/chat/retry` with `{ botId? }`: 重试 on a failed reply, the

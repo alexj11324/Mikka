@@ -20,7 +20,7 @@ describe("quota on the daemon", () => {
     cleanupTempDirs()
   })
 
-  it("keeps running when a read throws and does not put the secret on the heartbeat", async () => {
+  it("keeps running when a read throws and does not put the secret on the device report", async () => {
     const lines: string[] = []
     const log = pino(
       { level: "info" },
@@ -56,9 +56,9 @@ describe("quota on the daemon", () => {
     expect(lines.join("\n")).toContain("[REDACTED]")
 
     await daemon.syncWithServer()
-    const heartbeat = server.devices.get("device-1")?.lastHeartbeat
-    expect(JSON.stringify(heartbeat)).not.toContain(SECRET)
-    const quotas = heartbeat?.quotas ?? []
+    const sent = server.devices.get("device-1")?.reports.at(-1)
+    expect(JSON.stringify(server.devices.get("device-1")?.reports)).not.toContain(SECRET)
+    const quotas = sent?.quotas ?? []
     expect(quotas).toHaveLength(3)
     expect(
       quotas.every((quota: QuotaSnapshot) => quota.status === "unknown")

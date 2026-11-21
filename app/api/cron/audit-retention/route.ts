@@ -3,7 +3,6 @@ import { cronJob } from '@/lib/background'
 import { deliverWorkspaceAudits } from '@/lib/audit/delivery'
 import { sweepAuditRetention } from '@/lib/audit/retention'
 import { maintainEnterpriseGovernance } from '@/lib/enterprise/maintenance'
-export const runtime = 'nodejs'
 export const maxDuration = 60
 const headers = { 'cache-control': 'no-store' }
 async function handleGET(request: Request) {

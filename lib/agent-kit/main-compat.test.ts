@@ -58,6 +58,8 @@ function identityFixtureQuery(raw: string, args: unknown[]) {
 // This suite substitutes device authentication and DB IO to test only claim
 // snapshot composition. Real credential admission is covered by revocation DB tests.
 stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
+// The claiming device holds its gateway session (decision 2026-11-17-2215).
+stub('../device-session.ts',{deviceSessionHeld:async()=>true})
 let selectIndex=0
 let mismatch: string|undefined
 let currentRun: {id:string;userId:string;workspaceId:string|null;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
@@ -188,9 +190,9 @@ stub('../db/index.ts',{
 afterEach(()=>{assert.equal(applicationLease,false,'claim always releases its APP client');assert.equal(memberLease,false,'the outer Workspace lease always closes')})
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,sessionOpenedAt:new Date(),sessionClosedAt:null,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
-stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
+stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck,assertLiteLLMModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();if(revokeDuringToken)memberActive=false;return {token:'synthetic-only'}}})
 stub('../personal-mailbox-runtime.ts',{personalWorkerMailboxAdvertised:async()=>[]})
@@ -325,7 +327,8 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    assert.equal(compactSql(raw),compactSql(`SELECT repo."repoPath",repo."remoteUrl",a.harness,
         CASE WHEN source.id IS NULL THEN repo."baseBranch"
           WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
-          ELSE source."baseBranch" END AS "baseBranch"
+          ELSE source."baseBranch" END AS "baseBranch",
+        CASE WHEN source."agentDefinition"#>>'{projectExecution,environment,chosen}'='true' THEN source."agentDefinition"#>>'{projectExecution,environment,id}' END AS "chosenEnvironmentId"
       FROM device_repos repo JOIN agents a ON a.id=$2 AND a."userId"=$3
       JOIN issues i ON i.id=$4 AND i."workspaceId"=$5 AND i."ownershipState"='bound'
       LEFT JOIN agent_runs source ON source.id=$6 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"

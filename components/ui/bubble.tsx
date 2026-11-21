@@ -63,15 +63,20 @@ function Bubble({
 
 function BubbleContent({
   className,
+  size = "default",
   render,
   ...props
-}: useRender.ComponentProps<"div">) {
+}: useRender.ComponentProps<"div"> & { size?: "default" | "roomy" }) {
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(
       {
         className: cn(
           "w-fit max-w-full min-w-0 overflow-hidden rounded-xl border border-transparent px-3 py-2 text-sm leading-relaxed wrap-break-word group-data-[align=end]/bubble:self-end [button]:text-left [button,a]:transition-colors [button,a]:outline-none [button,a]:focus-visible:border-ring [button,a]:focus-visible:ring-3 [button,a]:focus-visible:ring-ring/50",
+          // A person's own message gets the roomier shape the product uses for
+          // it everywhere; keep the radius here so no caller restyles the
+          // component to get it (R-90).
+          size === "roomy" && "rounded-2xl px-4 py-3",
           className
         ),
       },

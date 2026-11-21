@@ -127,7 +127,7 @@ const listIn = <T>(key: string) => (body: unknown) => {
 }
 
 /** A group chat the person is in, with its latest message (GET /api/conversations). */
-export type GroupSummary = { creationPurpose?: 'group' | 'conversation'; unreadCount?: string; markedUnread?: boolean; /** Who created it (conversations.createdBy); its owner, who cannot leave. */ createdBy?: string; id: string; workspaceId: string; title: string; createdAt: string; lastMessage: GroupMessage | null }
+export type GroupSummary = { creationPurpose?: 'group' | 'conversation'; unreadCount?: string; markedUnread?: boolean; /** Who created it (conversations.createdBy); its owner, who cannot leave. */ createdBy?: string; /** The person's own 置顶 / 隐藏 for it (lib/chat-preferences.ts). */ pinned?: boolean; hidden?: boolean; pinOrder?: number | null; id: string; workspaceId: string; title: string; createdAt: string; lastMessage: GroupMessage | null }
 
 /** The person's group chats in one workspace, for the bot list (R-01). */
 export function fetchGroups(workspaceId: string, fetcher: typeof fetch = fetch): Promise<GroupSummary[]> {

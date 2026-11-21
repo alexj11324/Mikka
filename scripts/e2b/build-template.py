@@ -391,7 +391,9 @@ def runtime_source(environ=os.environ):
 def release_metadata(environ=os.environ):
     """Attach only public workflow identity so a cancelled job is recoverable."""
     identity = {'application': 'mikka-template-release'}
-    if (environ.get('GITHUB_REPOSITORY') == 'alexj11324/Mikka'
+    if ((environ.get('GITHUB_REPOSITORY'), environ.get('GITHUB_REPOSITORY_OWNER_ID')) in (
+            ('alexj11324/Mikka', '183887963'), ('aspectly-labs/Mikka', '359279274'))
+            and environ.get('GITHUB_REPOSITORY_ID') == '1427517699'
             and re.fullmatch(r'[a-f0-9]{40}', runtime_source(environ))
             and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ID', ''))
             and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ATTEMPT', ''))):

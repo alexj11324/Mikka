@@ -1,7 +1,7 @@
 'use client'
 
-import { ListTodo, Plus } from 'lucide-react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { ListTodo, Plus } from '@/components/icons'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import { preloadTaskDetail } from './page-loaders'
 const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
 
 /** The board's list view: one row per task, its columns the same 显示 properties as the cards. */
-export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate, onClearFilters }: {
+export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onOpenInColumn, onCreate, onClearFilters }: {
   issues: Awaited<ReturnType<typeof listIssues>>
   /** 受阻 tasks group under 受阻, as on the board, each row naming why (lib/task-blocked.ts). */
   blocks?: ReadonlyMap<string, TaskBlock>
@@ -26,6 +26,12 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
   owners?: ReadonlyMap<string, RunOwner>
   searching: boolean
   onOpen: (id: string) => void
+  /**
+   * ⌘/Ctrl+click opens the task in the right column and leaves the list standing
+   * (`openTask`, decision 2026-11-07-2045), which is how Capy opens an issue.
+   * Without it a task has only one destination, the centre page.
+   */
+  onOpenInColumn?: (id: string) => void
   onCreate: () => void
   /** Filters hide every task: the empty state offers to clear them. */
   onClearFilters?: () => void
@@ -61,7 +67,15 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
           <span className="text-muted-foreground tabular-nums">{group.length}</span>
         </header>
         <ul>
-          {group.map(issue => <li key={issue.id}>
+          {group.map(issue => <li key={issue.id} onClickCapture={event => {
+            // Capture, because the Button's own onClick is Base UI's and does not
+            // hand us the native event: checking the modifier there always read
+            // false, so ⌘+click opened the centre page like a plain click.
+            if (!onOpenInColumn || !(event.metaKey || event.ctrlKey)) return
+            event.preventDefault()
+            event.stopPropagation()
+            onOpenInColumn(issue.id)
+          }}>
             <Button type="button" variant="ghost" data-focus-id={issue.id} onPointerEnter={preloadTaskDetail} onFocus={preloadTaskDetail} onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
                 {/* Linear's row order: priority, number, status, title. */}

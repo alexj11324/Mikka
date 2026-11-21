@@ -11,7 +11,7 @@ test('desktop decisions read completion preferences only for a currently owned c
   let runReads = 0, preferenceReads = 0, decisions = 0
   const judged: string[][] = []
   const mocks = [
-    mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } }),
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => requestHeaders } }),
     mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: {
       getSession: async (input: { headers: Headers }) => { assert.equal(input.headers, requestHeaders); return session },
     } } } }),

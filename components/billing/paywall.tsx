@@ -3,7 +3,7 @@
 import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { toast } from 'sonner'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import { getHostedUsage, startPlanCheckout } from '@/app/actions/billing'
 import { Button } from '@/components/ui/button'

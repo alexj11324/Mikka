@@ -193,6 +193,8 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   const botIds = botRows.map(row => row.id)
   const runOwners = botIds.length || issueIds.length ? await tx.selectDistinct({ userId: agentRuns.userId }).from(agentRuns)
     .where(sql`${botIds.length ? inArray(agentRuns.botId, botIds) : sql`false`} OR ${issueIds.length ? inArray(agentRuns.issueId, issueIds) : sql`false`}`) : []
+  // Deleting a task can cascade its Factory task while a Decision still references it.
+  await tx.execute(sql`delete from project_decisions where "workspaceId" = ${workspaceId}`)
   // A task deletion can cascade its run before the Artifact's SET NULL action.
   // Its tenant guard must keep rejecting missing/mismatched parents, so remove
   // this tenant's Artifacts before deleting either parent (including Bot-less runs).
@@ -222,7 +224,6 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   const deletedBots = botIds.length ? (await tx.delete(bots).where(eq(bots.workspaceId, workspaceId)).returning({ id: bots.id })).length : 0
   await tx.delete(conversations).where(eq(conversations.workspaceId, workspaceId))
   for (const statement of [
-    sql`delete from project_decisions where "workspaceId" = ${workspaceId}`,
     sql`delete from subagent_events where "workspaceId" = ${workspaceId}`,
     sql`delete from cloud_machines where "workspaceId" = ${workspaceId}`,
     sql`delete from workspace_snapshots where "workspaceId" = ${workspaceId}`,
@@ -247,6 +248,13 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
  * if the workspace transaction then fails a retry finishes the job.
  */
 export async function deleteWorkspaceData(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
+  const deletion = await deleteWorkspaceRecords(actorId, workspaceId, confirmName)
+  // Runs in the deleted workspace stop now; nothing rechecks them later (decision 2026-11-17-2215).
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ workspaceId })
+  return deletion
+}
+
+async function deleteWorkspaceRecords(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
   z.uuid().parse(workspaceId)
   const typed = z.string().max(200).parse(confirmName).trim()
   let reviewIds: string[] = []

@@ -5,7 +5,6 @@ import { readCliAgentPolicy, readCliRunPolicy } from '@/lib/agent-tool-approval/
 import { setCliAgentPolicy, setCliPolicy } from '@/lib/agent-tool-approval/policy-settings'
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
-export const dynamic = 'force-dynamic'
 const schema = z.discriminatedUnion('operation', [
   z.object({ operation:z.literal('read'), runId:z.uuid() }).strict(),
   z.object({ operation:z.literal('readAgent'), agentId:z.uuid(), botId:z.uuid().nullable() }).strict(),

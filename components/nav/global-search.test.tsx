@@ -20,7 +20,7 @@ const selected: string[] = []
 let authRequired = false
 let sourceDenied = false
 let palette: SearchPaletteProps
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key, useLocale: () => 'en' } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key, useLocale: () => 'en' } })
 mock.module('@/hooks/use-live-key', { namedExports: { useLiveScope: () => ({ ownerId: 'owner', workspaceId }), useLiveKeys: () => {} } })
 mock.module('@/app/actions/task-domain', { namedExports: { getTaskPresentations: async (input: { workspaceId: string; issueIds: string[] }) => {
   assert.equal(input.workspaceId, workspaceId)

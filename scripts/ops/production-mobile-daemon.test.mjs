@@ -249,12 +249,12 @@ function fixture(options = {}) {
       return response({ url: 'wss://mikka-gateway.aspectlylabs.com/v1/devices/' + NEW_DEVICE + '/socket', protocol: ticketProtocol(),
         runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' })
     }
-    if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/heartbeat') {
+    if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/report') {
       assert.equal(newDevice.enabled, false)
-      assert.deepEqual(body.runs, [])
       assert.deepEqual(body.harnesses, [])
+      // The fake server stands in for the device session as well (the gateway socket).
       newDevice.seen = clock; newDevice.online = true
-      return response({ leases: {}, revoked: [], deviceCommands: [], daemonVersions: { min: '0.0.456' } })
+      return response({ deviceCommands: [], daemonVersions: { min: '0.0.456' } })
     }
     assert.fail('Unexpected path: ' + path)
   }

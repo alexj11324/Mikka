@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { refreshSubscriptionModels } from '@/app/actions/model-order'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { ReadResponseError } from '@/lib/swr/retry'
@@ -326,5 +326,5 @@ export function useSubscriptions(workspaceId: string) {
     void connect(failure.provider, existing, !!existing && (!failure.again?.connectionId || failure.again.resume === true) && subscriptionSignInState(existing, Date.now()) === 'resume')
   }
 
-  return { state, loadFailed, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain }
+  return { state, loadFailed, reload: refresh, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain }
 }

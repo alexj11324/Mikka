@@ -2,7 +2,7 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useMemo, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { Citations } from '@/components/agents/citations'
 import { FileDiff, type FileDiffLine } from '@/components/agents/file-diff'

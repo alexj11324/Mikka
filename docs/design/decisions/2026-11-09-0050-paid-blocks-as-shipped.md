@@ -18,9 +18,11 @@
    typography, borders and motion. No re-theming to Mikka tokens, no swapping in
    Mikka avatars, icons or components, no removing a visual element.
 2. **BoardUI's own token rules** (semantic tokens, composite type utilities,
-   Remix icons) stay for BoardUI components and for Mikka's own hand-written UI,
-   because that is how BoardUI ships. They are never applied to affectUI or beUI
-   blocks, which keep their own classes, colours, type and icons.
+   Remix icons) stay for BoardUI components, because that is how BoardUI ships.
+   They are never applied to affectUI or beUI blocks, which keep their own
+   classes, colours, type and icons. Mikka's own hand-written UI keeps BoardUI's
+   tokens and type but not its icon family: it draws affectUI's Hugeicons through
+   `components/icons/index.tsx` ([2026-11-18-1900](2026-11-18-1900-icons-hugeicons.md)).
 3. **When rules conflict, the native look wins.** Record the conflict in the PR
    instead of restyling. Exceptions only with Alex's approval, recorded in the PR.
    The one approved exception today is hiding cost.

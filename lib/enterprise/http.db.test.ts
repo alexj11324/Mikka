@@ -48,8 +48,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   observePoolCommits(pool)
   // Native HTTP uses the production API request adapters, as the mobile DB fixture does.
   const requestContext = await import('../../apps/api/src/context')
-  t.mock.module('next/headers', { namedExports: await import('../../apps/api/compat/headers') })
-  t.mock.module('next-intl/server', { namedExports: await import('../../apps/api/compat/intl') })
+  t.mock.module('@/lib/server-runtime/headers', { namedExports: await import('../../lib/server-runtime/headers') })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: await import('../../lib/intl/i18n-server') })
   async function withMobileRequest<T>(request: Request, work: () => Promise<T>) {
     const scope = requestContext.createRequestScope(request)
     try { return await requestContext.runRequestScope(scope, work) }

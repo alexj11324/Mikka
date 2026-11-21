@@ -4,7 +4,6 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { MAX_PINNED_CHATS, setChatOrder } from '@/lib/chat-preferences'
 import { botOutsideToken, groupOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 const key = z.object({ kind: z.enum(['bot', 'group']), id: z.uuid() })
 const order = z.object({ pinned: z.array(key).max(MAX_PINNED_CHATS), list: z.array(key).max(500) }).strict()

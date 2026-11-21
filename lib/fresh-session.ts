@@ -32,7 +32,14 @@ export const SESSION_OPTIONS = {
   cookieCache: { enabled: true, maxAge: SESSION_COOKIE_CACHE_SECONDS },
 }
 
-/** Makes `auth.api.getSession` skip the cookie cache inside withFreshSession. */
+/**
+ * Makes `auth.api.getSession` skip the cookie cache inside withFreshSession.
+ *
+ * A renewed session cookie needs no help here: `mikkaCookies` is registered as
+ * an after hook, and `auth.api.*` runs the plugin pipeline, so the renewal
+ * reaches the request's cookie journal on every read. Passing `returnHeaders`
+ * would change the result shape the caller receives.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- better-auth's getSession is overloaded; the wrapper only adds a query flag.
 export function readFreshSessionsInScope(api: { getSession: (context: any) => Promise<unknown> }, native?: { cookieName: () => Promise<string> }) {
   const read = api.getSession
@@ -49,6 +56,7 @@ export function readFreshSessionsInScope(api: { getSession: (context: any) => Pr
     }
     const browser = readBrowserSession(context, mustBeFresh)
     if (browser) return browser
-    return read(sessionMustBeFresh() ? { ...context, query: { ...context?.query, disableCookieCache: true } } : context)
+    const query = { ...context?.query, ...(sessionMustBeFresh() ? { disableCookieCache: true } : {}) }
+    return read({ ...context, query })
   }
 }

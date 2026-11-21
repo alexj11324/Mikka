@@ -12,14 +12,16 @@ export const PAT_MAX_LIFETIME_DAYS = 366
 export const PAT_ACTIVE_LIMIT = 50
 
 /** The only scopes a new token may hold; each one names a `/api/v1` surface. */
-export const API_SCOPES = ['tasks:read', 'tasks:write', 'runs:read', 'runs:write'] as const
+export const API_SCOPES = ['tasks:read', 'tasks:write', 'runs:read', 'runs:write',
+  'threads:read', 'threads:write', 'artifacts:read', 'drive:read', 'drive:write', 'bots:read', 'bots:write',
+  'grants:read', 'grants:write'] as const
 export type ApiScope = typeof API_SCOPES[number]
 /** Internal scope on tokens created before M4. Never selectable in the UI or API. */
 export const LEGACY_SCOPE = 'legacy:full' as const
 export const TOKEN_SCOPES = [...API_SCOPES, LEGACY_SCOPE] as const
 export type TokenScope = typeof TOKEN_SCOPES[number]
 export const DEFAULT_API_SCOPES: readonly ApiScope[] = API_SCOPES
-export const READ_ONLY_API_SCOPES: readonly ApiScope[] = ['tasks:read', 'runs:read']
+export const READ_ONLY_API_SCOPES: readonly ApiScope[] = ['tasks:read', 'runs:read', 'threads:read', 'artifacts:read', 'drive:read', 'bots:read', 'grants:read']
 
 /** `/api/v1` public API audience, distinct from the device daemon's `/v1` namespace.
  * A token is either legacy-only or public-scope-only; the migration enforces the split. */

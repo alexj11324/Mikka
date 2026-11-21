@@ -18,7 +18,7 @@ bindings. Current workflow files define the triggers and selected coverage.
   are **different** operations; neither changes long-term public build ownership.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
-  Targeted Desktop, Analytics and self-hosted jobs retain their selected browser
+  Targeted Desktop and Analytics jobs retain their selected browser
   checks. `browser-gate.yml` only keeps the protected check name
   `Browser tests (before merge)` and passes at once; delete it once that name
   is removed from the required checks in the repository settings.
@@ -26,6 +26,11 @@ bindings. Current workflow files define the triggers and selected coverage.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
   have been migrated and verified.
+
+`local-device-node22.yml` now runs an actual app/Eve build and startup smoke
+on Node 22 and 24, retaining the daemon and installer tests. The core,
+integration and PG17 database jobs above also run the selected suites on both
+majors; the original Node 24 protected-check names stay unchanged.
 
 ## Focused governance acceptance and superseded PR runs
 
@@ -52,10 +57,16 @@ adding or duplicating regression suites.
 
 There are two intentionally different classes of PR checks:
 
-- **Required checks always run**, even on drafts: `UI policy (strict)`,
-  `Production build and browser interactions`, `Browser tests (before merge)`
-  and external GitGuardian. A skipped required job can be reported as
-  successful by GitHub, so draft status must never authorize a bypass.
+- **Required check names never become false green on drafts**: in the main `CI`
+  workflow, the lightweight selector and required aggregators (`UI policy
+  (strict)`, `Production build and browser interactions`) run on Draft PRs;
+  those aggregators explicitly **fail** until the PR is Ready. Core, Integration,
+  Source, Daemon, Analytics, Governance and DB runner-heavy jobs are deferred.
+  `ready_for_review` re-runs the complete applicable protected verification
+  even if the commit SHA has not changed. `Browser tests (before merge)` and
+  external GitGuardian retain their original workflows. A skipped required
+  job can be reported successful by GitHub; these named aggregators must never
+  skip or accept the draft as complete.
 - **Non-required specialized acceptances** (`E2B additive runtime release`
   offline PR test, E2B subscription custody, Read cache API acceptance,
   SSH device backend, Site search read contract and Unattended sandbox
@@ -69,8 +80,10 @@ There are two intentionally different classes of PR checks:
   and TestFlight-oriented review. Other specialized evidence may have its
   own intentional manual or source-version trigger.
 
-This reduces runner allocation without mistaking a draft-only skipped result
-for proof that a ready PR is safe to merge.
+This reduces runner allocation during the local red→green cycle without
+mistaking a draft-only skipped result for proof that a Ready PR is safe to
+merge. Draft check failure means "not yet a merge candidate," not an ordinary
+product regression. Main pushes and merge groups continue normal full coverage.
 
 ## Main pushes: postmerge checks
 
@@ -146,6 +159,16 @@ dispatch of **E2B additive runtime release** on current main with `reason` and
 `cloudflare_receipt` also starts it; a dispatch without a receipt fails before
 any template builder starts. Every gate rechecks the receipt against the live
 gateway and current main.
+
+The Coding Workspace, Task VM and Task Secret consumers accept this official
+producer's `workflow_run` event alongside its retained push/manual events. The
+event is only a pointer: their pre-checkout and shared guards confirm the fixed
+workflow identity, repository, exact main source and latest attempt through the
+GitHub API. Existing source selection, publication evidence and pre-credential
+checks still apply. A successful run with skipped publication does not prove a
+validated and published runtime. The finite Factory visual-evidence window
+below keeps its separate selection rules. The source-bound counterexample and
+retained refusal cases are recorded in the [#2984 evidence](../../docs/ci/2984-runtime-consumers.json).
 
 To retry after an external service recovers, dispatch the same way; the Actions
 dispatch event records the reason. Manual dispatch always runs validation, even for a matching worker. Changed
@@ -273,7 +296,7 @@ for identities, rollout, source exposure boundaries and recovery.
 ## Dependency-aware selection
 
 `ci-selection.yml` supplies the same trusted decision to CI, Analytics SSR,
-Desktop and Self-hosted image. Nx Core follows explicit root-file, workspace,
+and Desktop. Nx Core follows explicit root-file, workspace,
 source-contract and DB feature-marker edges; candidate code is parsed, not
 executed during classification. Source/security policies stay enabled, and
 unmapped/unsafe/global inputs expand coverage. Core/integration commands are
@@ -284,12 +307,13 @@ and Monday 03:23 UTC run complete CI. No Nx Cloud, remote test cache, browser E2
 or release credentials are added. See [policy and commands](../../docs/ci/incremental.md)
 and [measured results](../../docs/ci/1699-results.md).
 
-Selected Desktop, Analytics and Docker PR checks now run as reusable jobs of CI;
-their conclusions are included in `UI policy (strict)`. Main image publication
-remains independent, and source-SHA release gates are unchanged.
-
-Selected reusable calls consume CI's trusted decision without running another
-selector. Independent dispatches and Image pushes still classify their changes.
+Selected reusable jobs consume CI's trusted decision without running another
+selector. The Analytics conclusion contributes to `UI policy (strict)`.
+The actual Analytics build, SSR checks and browser run own the `analytics-ssr`
+check name; no second runner summarizes that job. An absent or invalid trusted
+selection fails before setup, and the parent gate rejects selected runs that
+fail, cancel or skip. See the [measured queue samples](../../docs/ci/2984-analytics-baseline.json).
+Independent dispatches still classify their changes.
 Desktop checks and Electron acceptance run on Linux. Mac packaged acceptance,
 local-driver permission probes and installer acceptance are removed from CI;
 the standalone acceptance drivers remain available for explicit local runs.

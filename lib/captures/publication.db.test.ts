@@ -1,6 +1,5 @@
 // Full application migrations on a disposable PostgreSQL database. GitHub is
 // the external boundary; share ownership, receipts and report writes are real.
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'

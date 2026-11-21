@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { pollIssue } from '@/app/actions/issues'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
-import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from 'lucide-react'
+import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from '@/components/icons'
 import { getIssuePropertyOptions, updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { LABEL_COLORS, labelKey, pullRequestKey, reconcileMetadataDraft, type IssueLabel, type IssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
 import { taskProjectOptions } from '@/lib/task-project-options'
@@ -190,7 +190,7 @@ export function AccessChangeDialog({ change, pending, onConfirm, onCancel }: { c
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel>
-        <AlertDialogAction disabled={pending} onClick={() => { void onConfirm() }}>{pending ? tCommon('saving') : tProperty('accessChangeConfirm')}</AlertDialogAction>
+        <AlertDialogAction variant="default" disabled={pending} onClick={() => { void onConfirm() }}>{pending ? tCommon('saving') : tProperty('accessChangeConfirm')}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>

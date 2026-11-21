@@ -1,36 +1,27 @@
 'use client'
 
-// A task has one status, its status field, drawn with the same icon on every surface (decision 2026-11-13-1405):
+// A task has one status, its status field, drawn with the same mark on every surface (decision 2026-11-13-1405):
 // TaskStatusIcon, and a task's chip carries that one icon only. What an Agent is doing belongs to the conversation:
-// TaskRunMark is its small mark (working, waiting for the person, error), drawn on the conversation's own surfaces and
+// TaskRunMark is its small mark (working, waiting for the person, error; RUN_MARKS), drawn on the conversation's own surfaces and
 // never beside a status icon. TaskStatusMark is a conversation card's one glyph: the mark while active, else the status.
+// Both marks come from the one registry (`lib/state-mark.ts`), so no shape or colour is chosen here.
 import { useCallback } from 'react'
-import { useTranslations } from 'next-intl'
-import { Hand, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react'
-import { cn } from 'cn'
-import { ISSUE_STATUSES } from '@/components/workspace/issue-properties'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { runIndicatorOf, type RunIndicator, type TaskState } from '@/lib/task-state'
-import { statusIconTints, type StatusTone } from '@/lib/status-appearance'
+import { Mark } from '@/components/workspace/state-mark'
+import { runMarkOf, statusMarkOf, type MarkSize } from '@/lib/state-mark'
 
-const STATUS_ICONS = new Map<string, LucideIcon>(ISSUE_STATUSES.map(status => [status.value, status.icon]))
-// R-34's colours, as ISSUE_STATUSES' indicatorClassName names them: 进行中 amber, 评审中 blue, 已完成 green, the rest grey.
-const STATUS_TONES: Record<string, StatusTone> = { doing: 'warning', review: 'info', done: 'success' }
-export type TaskIconSize = 'sm' | 'md' | 'lg'
+/** The mark ladder, under the name this module's call sites already use. */
+export type TaskIconSize = MarkSize
 
 /**
- * A task's status icon: the status field's, in its colour. An unknown status draws the first one's shape, grey.
- * `plain` draws the shape alone, in the colour of where it sits: for a paid block's own status slot, which keeps its
- * colour tokens (decision 2026-11-13-1405, the status-icon exception).
+ * A task's status icon: the status field's mark (R-34's colour and shape). An unknown status draws 待整理's. `plain`
+ * draws the shape alone, in the colour of where it sits: for a paid block's own status slot, which keeps its colour
+ * tokens (decision 2026-11-13-1405, the status-icon exception).
  */
 export function TaskStatusIcon({ status, size = 'sm', plain = false }: { status: string; size?: TaskIconSize; plain?: boolean }) {
-  const Icon = STATUS_ICONS.get(status) ?? ISSUE_STATUSES[0].icon
-  return <Icon aria-hidden="true" data-task-status={status} className={cn('shrink-0', size === 'lg' ? 'size-[18px]' : size === 'md' ? 'size-4' : 'size-3.5', !plain && statusIconTints[STATUS_TONES[status] ?? 'neutral'])} />
-}
-
-const RUN_MARKS: Record<RunIndicator, { icon: LucideIcon; tone: StatusTone }> = {
-  working: { icon: LoaderCircle, tone: 'warning' },
-  waiting: { icon: Hand, tone: 'info' },
-  error: { icon: TriangleAlert, tone: 'destructive' },
+  const mark = statusMarkOf(status)
+  return <Mark shape={mark.shape} tone={plain ? undefined : mark.tone} size={size} data-task-status={status} />
 }
 
 /** The words of a run mark, for its tooltip and for assistive technology. They are not status names. */
@@ -43,9 +34,9 @@ export function useRunIndicatorLabel() {
 export function TaskRunMark({ state, indicator = state ? runIndicatorOf(state) : null, plain = false }: { state?: TaskState | 'idle' | null; indicator?: RunIndicator | null; /** The shape alone, in the colour of where it sits (a paid block's slot). */ plain?: boolean }) {
   const label = useRunIndicatorLabel()
   if (!indicator) return null
-  const mark = RUN_MARKS[indicator]
+  const mark = runMarkOf(indicator)
   return <span role="img" aria-label={label(indicator)} title={label(indicator)} data-run-indicator={indicator} className="inline-flex shrink-0">
-    <mark.icon aria-hidden="true" className={cn('size-3', !plain && statusIconTints[mark.tone], indicator === 'working' && 'motion-safe:animate-spin [animation-duration:1.6s]')} />
+    <Mark shape={mark.shape} tone={plain ? undefined : mark.tone} spin={indicator === 'working'} />
   </span>
 }
 

@@ -37,25 +37,29 @@ export async function prepareLinuxRepositoryDialog(profile) {
   return { repo, config }
 }
 
-export function verifyLinuxRepositoryDialog(page, fixture) {
+async function driveLinuxDirectoryDialog(choose, step, open) {
   const driver = fileURLToPath(new URL('./linux-directory-dialog.py', import.meta.url))
-  return verifyRepositoryChoices(fixture.repo, 'Source', async (path, step) => {
-    const timeout = new AbortController()
-    // The driver emits only fixed control labels and pixel coordinates.
-    const input = execute('/usr/bin/python3', [driver, path ? 'choose' : 'cancel'], { timeout: 25_000 })
-      .then(({ stdout }) => console.log('Native repository ' + step + ': ' + stdout.trim()))
-    try {
-      const [result] = await Promise.race([
-        Promise.all([page.evaluate(() => window.mikka.device.pickRepo()), input]),
-        delay(28_000, undefined, { signal: timeout.signal }).then(() => { throw new Error('NATIVE_DIRECTORY_DIALOG_TIMEOUT_' + step) }),
-      ])
-      console.log('Native repository ' + step + ' result: ' + result.status)
-      return result
-    } finally { timeout.abort() }
-  })
+  const timeout = new AbortController()
+  const input = execute('/usr/bin/python3', [driver, choose ? 'choose' : 'cancel'], { timeout: 25_000 })
+    .then(({ stdout }) => console.log('Native repository ' + step + ': ' + stdout.trim()))
+  try {
+    const [result] = await Promise.race([
+      Promise.all([open(), input]),
+      delay(28_000, undefined, { signal: timeout.signal }).then(() => { throw new Error('NATIVE_DIRECTORY_DIALOG_TIMEOUT_' + step) }),
+    ])
+    return result
+  } finally { timeout.abort() }
 }
 
-async function verifyRepositoryChoices(repo, childName, selectFolder) {
+export function verifyLinuxRepositoryDialog(page, fixture, verifyProject) {
+  return verifyRepositoryChoices(fixture.repo, 'Source', async (path, step) => {
+    const result = await driveLinuxDirectoryDialog(Boolean(path), step, () => page.evaluate(() => window.mikka.device.pickRepo()))
+    console.log('Native repository ' + step + ' result: ' + result.status)
+    return result
+  }, verifyProject && (root => verifyProject(root, open => driveLinuxDirectoryDialog(true, 'project', open))))
+}
+
+async function verifyRepositoryChoices(repo, childName, selectFolder, verifyProject) {
   try {
     const child = join(repo, childName)
     await mkdir(child)
@@ -66,6 +70,7 @@ async function verifyRepositoryChoices(repo, childName, selectFolder) {
     execFileSync('git', ['-C', repo, 'remote', 'rename', 'origin', 'upstream'])
     assert.deepEqual(await selectFolder(child, 'upstream'), expected)
     assert.deepEqual(await selectFolder(null, 'cancel'), { status: 'cancelled' })
+    if (verifyProject) await verifyProject(expected.repo.path)
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

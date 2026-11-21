@@ -5,7 +5,6 @@ import { mobilePushTokens } from '@/lib/db/schema'
 import { pushSession, removePushBinding, withPushSession } from '@/lib/mobile-push-session'
 import { forbiddenOrigin, json, unauthorized, writeAllowed } from '@/lib/mobile-api'
 
-export const dynamic = 'force-dynamic'
 
 const EXPO_TOKEN = z.string().regex(/^(?:Exponent|Expo)PushToken\[[A-Za-z0-9_-]{10,200}\]$/)
 /** List only this person's bindings that are still eligible for native delivery. */

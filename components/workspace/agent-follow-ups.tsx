@@ -1,7 +1,7 @@
 'use client'
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { AgentComponentRenderers } from '@/lib/agent-ui-catalog'

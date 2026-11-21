@@ -1,29 +1,32 @@
 # Self-hosting Mikka
 
+Self-hosting is community-maintained. Mikka ended dedicated compatibility testing and automatic self-hosted image releases on November 20, 2026.
+
 Deploy the community server, then connect the official app to that server. It runs on your own database and does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
 
 The image provides the server: API, realtime, daemon gateway, scheduling, migrations and BYOK. **Mikka has one official UI**, whose Web, Desktop and iOS clients connect to this server ([active One UI decision](design/decisions/2026-11-08-2133-one-ui.md)). The old built-in community workspace was retired; `MIKKA_COMMUNITY_UI=1` no longer re-enables it. The public image still serves server status, sign-in and account handoff pages, not a second workbench. Official UI screenshots are not copied into the public server image.
 
 ## Start the server
 
-Use a Linux host with Docker Engine and Docker Compose 2.24 or newer. The first published image targets `linux/amd64`. Start with 2 CPU cores and 4 GB RAM for the application and PostgreSQL; running coding agents on this same host needs additional resources. The application listens on port 3000 and is served at `/mikka`. This version supports a configurable origin; the `/mikka` path is fixed in the compiled web application.
+Use a Linux host with Docker Engine and Docker Compose 2.24 or newer. The first published image targets `linux/amd64`. Start with 2 CPU cores and 4 GB RAM for the application, PostgreSQL and LiteLLM; running coding agents on this same host needs additional resources. The application listens on port 3000 and is served at `/mikka`. This version supports a configurable origin; the `/mikka` path is fixed in the compiled web application.
 
-Download `docker-compose.yml` from the release you plan to run. In the same directory, create a `.env` file:
+Download `docker-compose.yml` and `deploy/litellm/Dockerfile` plus `deploy/litellm/config.yaml` and `deploy/litellm/start.sh` from the release you plan to run, preserving those paths. Configure the model aliases and upstream credentials in LiteLLM before starting the application; see [model configuration](self-hosting-byok.md#必需的-litellm-模型出口). In the same directory, create a `.env` file:
 
 ```dotenv
 POSTGRES_PASSWORD=replace-with-a-random-hex-password
+MIKKA_LITELLM_MASTER_KEY=replace-with-a-random-hex-key
 BETTER_AUTH_URL=http://localhost:3000
 # Pin a published commit SHA or release tag for repeatable upgrades.
 MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
 ```
 
-Generate the database password with `openssl rand -hex 32`. Do not use a sample password. Keep `.env` private (`chmod 600 .env`); it is not part of the image or source control.
+Generate separate database and LiteLLM keys with `openssl rand -hex 32`. Do not use a sample password. Keep `.env` private (`chmod 600 .env`); it is not part of the image or source control.
 
 ```sh
 docker compose up -d --wait
 ```
 
-Open `http://localhost:3000/mikka` for server information. Compose starts only the app and PostgreSQL. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
+Open `http://localhost:3000/mikka` for server information. Compose starts the app, PostgreSQL and the mandatory LiteLLM service. LiteLLM has no exposed host port; the app uses `http://litellm:4000` and the configured master key. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
 
 The app port binds to `127.0.0.1` by default. For remote access, put a TLS reverse proxy on the host and set `BETTER_AUTH_URL=https://mikka.example.com`. The value is an **origin**, without `/mikka`, credentials, a query, or a fragment. Forward `Host` unchanged, support WebSocket upgrades, and forward the original HTTPS scheme. The server rejects conflicting forwarded hosts or schemes. HTTP is accepted only for a configured loopback origin; use HTTPS for a network deployment.
 
@@ -48,8 +51,8 @@ not hosted Mikka compute, model credits, or access to any Mikka account.
 
 Use the independent [`docker-compose.neon.yml`](../docker-compose.neon.yml)
 from the **same Mikka release** as the application image. Unlike the default
-Compose file, it launches **only the Mikka app** and does not create a local
-PostgreSQL service. This is a fresh-installation procedure; changing an existing
+Compose file, it launches **the Mikka app and LiteLLM** and does not create a local
+PostgreSQL service. Keep the same `deploy/litellm` files beside it. This is a fresh-installation procedure; changing an existing
 installation's database URL does not migrate its data.
 
 1. [Create a Neon project](https://console.neon.tech/) and choose a region close
@@ -65,6 +68,7 @@ installation's database URL does not migrate its data.
 
    ```dotenv
    BETTER_AUTH_URL=http://localhost:3000
+   MIKKA_LITELLM_MASTER_KEY=REPLACE_WITH_A_RANDOM_HEX_KEY
    MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
    MIKKA_DATABASE_URL=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID-pooler.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
    MIKKA_DATABASE_URL_UNPOOLED=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
@@ -77,7 +81,7 @@ installation's database URL does not migrate its data.
    either connection URL to source control, support messages or screenshots;
    run `chmod 600 .env`. Be aware that `docker compose config` expands
    variables and may print the credentials.
-4. Start the app (not the bundled `postgres` service):
+4. Configure the LiteLLM aliases and upstream secrets, then start the app and LiteLLM:
 
    ```sh
    docker compose -f docker-compose.neon.yml up -d --wait
@@ -235,7 +239,8 @@ fails startup with `SELF_HOSTED_ORIGIN_INVALID` before database migration.
 
 Realtime updates use the server's built-in gateway. Allow WebSocket upgrades
 for `/mikka/v1/live/<channel>/socket` and the device gateway paths through your
-reverse proxy. Authenticated `/api/live/ticket` responses contain the actual
+reverse proxy. A device works only while it holds its gateway socket: a server
+without a device gateway has no devices, and there is no polling fallback. Authenticated `/api/live/ticket` responses contain the actual
 socket address; keep the base path when validating or opening it. See
 [self-hosted realtime and scheduling](self-hosting-realtime.md) for replica and
 external-Worker configuration.
@@ -299,9 +304,9 @@ and account so a notification cannot route into a different saved account.
 
 In **Settings → Models and subscriptions**, add your own provider API key, or connect your own Claude or ChatGPT subscription after configuring the subscription backend below. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.
 
-To supply the server's default OpenAI-compatible model, set `MIKKA_DEFAULT_MODEL_BASE_URL`, `MIKKA_DEFAULT_MODEL_API_KEY`, and `MIKKA_DEFAULT_MODEL_ID`. Use the provider's API base, including its version path where required. Provider charges go to your account. Without a configured default model, choose one of your own available models.
+Configure `MIKKA_LITELLM_URL` and `MIKKA_LITELLM_MASTER_KEY` for all managed model calls. The bundled Compose files set the internal URL and require a master key. Set default/title/Decision/Planning aliases and upstream credentials in LiteLLM; personal API keys also go through it. There is no direct-provider fallback. See [model configuration and migration](self-hosting-byok.md#必需的-litellm-模型出口).
 
-Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation.
+Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation. A daemon too old to hold a device session is refused on every device route (`426 daemonUpgradeRequired`); update it and sign in again ([decision 2026-11-17-2215](design/decisions/2026-11-17-2215-device-session-no-heartbeat.md)).
 
 For an E2B cloud computer, save your own E2B key in your account. This does not buy Mikka-hosted compute and does not charge Mikka credits.
 
@@ -396,7 +401,7 @@ node scripts/self-hosted-smoke.mjs
 
 The build uses the pinned pnpm lockfile, Vite frontend, Nitro Node server, and Node 24. It does not run migrations at image build time and does not require production credentials. `.dockerignore` excludes local environment files and private hosted UI. The runtime image contains the traced server dependencies and public assets, runs as an unprivileged user, and starts from its standalone output directory.
 
-The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 17 database, checks migrations/startup health, verifies public configuration and static assets, and restarts the same persisted installation. A successful main build publishes `ghcr.io/alexj11324/mikka:<commit-sha>` and updates `latest`; release tags publish matching tags. Pin the SHA or release tag in `.env` before an upgrade, back up the two volumes, then run `docker compose pull` and `docker compose up -d --wait`. For a stable versioned release, use the [host-only upgrade controller and compatibility policy](self-hosted-updates.md); main/`latest` image publication never restarts existing self-hosted servers automatically.
+Choose a published image and its matching Compose file. Pin the image digest or published release tag in `.env`. Back up the two volumes before you run `docker compose pull` and `docker compose up -d --wait`. For existing stable releases, see the [host-side upgrade guide](self-hosted-updates.md).
 
 `/mikka/api/version` reports the compiled revision. `docker compose ps` reports health. Startup logs include migration names and bounded error codes, never generated installation keys.
 

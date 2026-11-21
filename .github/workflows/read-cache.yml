@@ -68,7 +68,6 @@ jobs:
       E2E_BASE_URL: http://localhost:3137
       MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
-      NEXT_TELEMETRY_DISABLED: '1'
       NODE_OPTIONS: --max-old-space-size=6144
       SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
       MIKKA_SIGNUP_IP_HOURLY: '1000'
@@ -81,7 +80,7 @@ jobs:
         with:
           ffmpeg-github-token: ${{ github.token }}
       - name: Verify the bounded read-only driver
-        run: node --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs
+        run: node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs
       - name: Generate ephemeral test-only authentication secret
         run: |
           node --input-type=commonjs - <<'NODE'

@@ -36,6 +36,8 @@ export interface HostedRuntimeSnapshot {
   harness: string
   model: string | null
   modelSelection?: HostedModelSelection
+  /** The Bot's saved reasoning effort for this turn (bot_model_choices.effort); absent is the model's default. */
+  effort?: import('./model-routing').ModelRoutingEffort
 }
 /** The bot scope a frozen selection belongs to. */
 export const selectionScope = (selection: HostedModelSelection): HostedModelScope => ({

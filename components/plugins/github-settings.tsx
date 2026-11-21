@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
-import { ArrowUpRight, ChevronRight, TriangleAlert } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowUpRight, ChevronRight, TriangleAlert } from '@/components/icons'
 import { toast } from 'sonner'
 import { AppTile, ToolGroup } from '@/components/plugins/connected-apps'
 import { SettingsSection } from '@/components/settings/primitives'
@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InlineLoadError } from '@/components/load-error'
@@ -312,6 +313,7 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
     </SettingsSection></PageSection>}
 
     {connected && githubState && <PageSection id="github-repositories-heading" title={t('githubRepositoryAccess')}><SettingsSection>
+      {/* control-size-exempt: the row's main target is a stretched link button, and the trailing link is a row action, not a toolbar peer. */}
       <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors has-[[data-repositories]:hover]:bg-muted/50">
         {githubState.installed
           // The whole row opens the list (its hover covers the row); the GitHub link sits above it.
@@ -333,7 +335,7 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
         : <p role="status" className="text-xs text-muted-foreground">{t(toolsState === 'loading' ? 'githubToolsLoading' : toolsState === 'reconnect' ? 'githubToolsReconnect' : 'githubToolsNotConnected')}</p>}
     </PageSection>
 
-    {userId && githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} userId={userId} />}
+    {userId && githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} userId={userId} installed={githubState.installed} onReturnFromInstall={checkOnReturn} />}
 
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !githubLinking) setConfirming(false) }}>
       <AlertDialogContent size="sm">
@@ -351,7 +353,7 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
 }
 
 /** 已授权的仓库: search, open GitHub or configure the owner's verification command. */
-export function RepositoriesDialog({ open, onOpenChange, repositories, userId }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string }) {
+export function RepositoriesDialog({ open, onOpenChange, repositories, userId, installed, onReturnFromInstall }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string; installed: boolean; onReturnFromInstall: () => void }) {
   const t = useTranslations('Settings.integrations')
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<GitHubRepository | null>(null)
@@ -364,7 +366,20 @@ export function RepositoriesDialog({ open, onOpenChange, repositories, userId }:
       <DialogHeader><DialogTitle className="pr-6 break-words">{editing?.fullName ?? t('githubRepositoriesDialog')}</DialogTitle></DialogHeader>
       {editing ? <RepositoryVerificationForm key={editing.fullName} repository={editing.fullName} userId={userId} onBack={() => setEditing(null)} /> : <>
       <SearchInput aria-label={t('githubRepositorySearch')} placeholder={t('githubRepositorySearch')} value={query} onChange={event => setQuery(event.target.value)} />
-      <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* An empty list and a search with no hits are different states; without
+          this the dialog shows only a search box and blank space. Each carries
+          the one action that resolves it (R-41, R-96): clear the search, or open
+          the App installation the page's own row opens. */}
+      {shown.length === 0
+        ? <Empty>
+            <EmptyHeader><EmptyTitle>{repositories.length ? t('githubNoMatch') : t('githubNoRepository')}</EmptyTitle></EmptyHeader>
+            {repositories.length
+              ? <Button type="button" variant="outline" onClick={() => setQuery('')}>{t('githubClearSearch')}</Button>
+              : <Button variant="ghost" size="sm" nativeButton={false} role="link" render={<a href={INSTALL_URL} target="_blank" rel="noopener noreferrer" onClick={onReturnFromInstall} />}>
+                  {installed ? t('githubManage') : t('githubAuthorize')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
+                </Button>}
+          </Empty>
+        : <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
         {shown.map(repository => <li key={repository.id} className="flex items-center gap-2">
           <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-muted/50">
             <span className="min-w-0 truncate">{repository.fullName}</span>
@@ -372,7 +387,7 @@ export function RepositoriesDialog({ open, onOpenChange, repositories, userId }:
           </a>
           <Button type="button" variant="ghost" size="sm" aria-label={t('githubVerificationFor', { repository: repository.fullName })} onClick={() => setEditing(repository)}>{t('githubVerification')}</Button>
         </li>)}
-      </ul>
+      </ul>}
       </>}
     </DialogContent>
   </Dialog>

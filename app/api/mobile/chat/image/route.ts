@@ -6,7 +6,6 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
-export const dynamic = 'force-dynamic'
 
 const query = z.object({ message: z.uuid(), index: z.coerce.number().int().min(0).max(1) })
 const DATA_URL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/

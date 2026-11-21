@@ -4,7 +4,7 @@ import { queueFactoryRun } from '@/lib/agent-runs'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ensureRecordedBotHarnessRuntime } from '@/lib/computer/bot-runtime-records'
 import { chooseCloudRunModel, chooseLocalRunModel, threadRunModel, type RunModel } from '@/lib/computer/run-model'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceSessionOpenSql } from '@/lib/device-presence'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -122,14 +122,13 @@ export function automaticFactoryDispatch(pool: Pool) {
     if (recovery && !check && source.deviceKind !== 'cloud') {
       if (recovery.requestEpoch !== task.sourceEventId || recovery.previousRunId !== source.id || !source.remoteUrl)
         throw new FactoryError('factoryRecoveryExecutorUnavailable')
-      // An idle gateway daemon stops HTTP heartbeats, so lastSeenAt alone would miss it: ask presence.
-      const { rows: candidates } = await tx.query(`SELECT a.id,d.id AS "deviceId",d."lastSeenAt",a.harness FROM agents a JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=a."userId"
+      // Only devices whose session is open (lib/device-session.ts).
+      const { rows: candidates } = await tx.query(`SELECT a.id,d.id AS "deviceId",a.harness FROM agents a JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=a."userId"
         WHERE a."userId"=$1 AND d.enabled=true AND d.kind='local' AND d.id<>$2 AND a.harness=$3
-          AND d."protocolVersion">=$4
-        ORDER BY (d."deviceType"='server') DESC,d."lastSeenAt" DESC NULLS LAST,a.id LIMIT 20`,
+          AND d."protocolVersion">=$4 AND ${deviceSessionOpenSql('d')}
+        ORDER BY (d."deviceType"='server') DESC,d."sessionOpenedAt" DESC NULLS LAST,a.id LIMIT 5`,
       [task.userId, source.deviceId, source.harness, DAEMON_PROTOCOL_VERSION])
-      const online = await deviceOnlineStates(candidates.map(c => ({ id: c.deviceId, lastSeenAt: c.lastSeenAt })))
-      const targets = candidates.filter(c => online.get(c.deviceId)).slice(0, 5)
+      const targets = candidates
       let selected = false
       const profile = source.agentDefinition?.agentProfile
       const exactEntry = profile && profileFixedModel(profile) ? profile.targetEntry

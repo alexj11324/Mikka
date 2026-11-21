@@ -4,7 +4,6 @@ import { localComputerDecision } from '@mikka/protocol/computer'
 import { decideLocalComputerReview, pendingLocalComputerReviews } from '@/lib/computer/local-reviews'
 import { runOutsideToken, runsOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 async function owner(request: Request) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') return null

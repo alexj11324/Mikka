@@ -135,7 +135,7 @@ for (const harness of ['codex', 'claude_code'] as const) {
     })
     const binary = resolve(import.meta.dirname, 'fakes', harness === 'codex' ? 'fake-codex-subscription.mjs' : 'fake-claude-subscription.mjs')
     const daemon = await new Daemon({ dataDir, flavor: 'dev', link, credential: 'synthetic', hostedSubscriptions: true,
-      harnessBinaries: { [harness]: binary }, quotaSource: null, heartbeatMs: 50, log: createLogger({ level: 'silent' }) }).start()
+      harnessBinaries: { [harness]: binary }, quotaSource: null, log: createLogger({ level: 'silent' }) }).start()
     const input = { issueId: randomUUID(), repoId, baseBranch: 'main', harness, prompt: 'ORIGINAL_QUESTION', model: 'fixture-model', effort: 'high' as const,
       preserveQuestionWorktree: true, subscriptionBinding: { bindingId: randomUUID(), ownerId: 'owner', workspaceId: randomUUID(),
         consumerId: randomUUID(), route: harness === 'codex' ? 'codex_cli' as const : 'claude_code_cli' as const } }

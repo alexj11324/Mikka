@@ -302,7 +302,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const target = deviceId ?? unusedDeviceId
     check(url.origin === ORIGIN && !url.search && !url.hash
       && ((method === 'POST' && url.pathname === BASE + '/v1/devices/register')
-        || (method === 'POST' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/heartbeat')
+        || (method === 'POST' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/report')
         || ((core || releaseWitness) && method === 'GET' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/gateway')
         || (method === 'GET' && url.pathname === BASE + '/v1/devices/' + target + '/repos'))
       && headers.get('authorization') === 'Bearer ' + credential && !headers.has('cookie')
@@ -481,14 +481,14 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       await deviceSocket.ping()
       report.checks.deviceGateway = true
     }
+    // The device report replaces the heartbeat (decision 2026-11-17-2215): it renews
+    // nothing and records no presence, which follows the gateway socket.
     phase = 'heartbeat'
-    const beat = await client.heartbeat(deviceId, { harnesses: [], runs: [], worktreeDiskBytes: 0,
-      computerUse: { installed: false, version: null }, deviceType: 'server' })
-    check(beat && typeof beat.leases === 'object' && Object.keys(beat.leases).length === 0
-      && (beat.revoked ?? []).length === 0 && (beat.deviceCommands ?? []).length === 0
+    const beat = await client.report(deviceId, { harnesses: [], computerUse: { installed: false, version: null }, deviceType: 'server' })
+    check(beat && !('leases' in beat) && (beat.deviceCommands ?? []).length === 0
       && !beat.cloudCredential, 'heartbeat_failed')
     const present = (await devices()).find(row => row.id === deviceId)
-    check(present?.name === marker && present.online === true && present.enabled === false, 'heartbeat_failed')
+    check(present?.name === marker && present.enabled === false, 'heartbeat_failed')
     report.checks.heartbeat = true
     primaryPassed = true
   } catch (cause) { error(cause) }

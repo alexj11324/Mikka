@@ -5,10 +5,11 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { issueRestoreDeadline } from '@/lib/issue-metadata'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { JSONContent } from '@tiptap/react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/components/icons'
 import type { IssueDetailNavigation } from './issue-detail-header'
+import { TaskPageLoading } from './workspace-loading'
 import type { IssueActionRequest } from './issue-detail-actions'
 import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
@@ -41,8 +42,9 @@ import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 import { TaskDetailFrame } from '@ui-slot/task-detail'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { presentedFactoryEvents, readTaskEvidenceTarget, taskEvidenceThread } from '@/lib/task-factory-events'
+import { TaskArtifactsButton } from './thread-artifacts'
 
 type Issue = IssueView
 type IssueRead = IssueView & { readVersion?: string; taskWork?: IssueWorkSnapshot & { history: ActivityRead } }
@@ -120,7 +122,7 @@ function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () =>
     <p role="status" className="text-sm text-muted-foreground">{description}</p>
     {error && <FieldError>{error}</FieldError>}
     <div className="flex gap-2">
-      {canRestore && <Button disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
+      {canRestore && <Button size="sm" disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
       <Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button>
       <Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button>
     </div>
@@ -134,7 +136,7 @@ function subscribeWide(onChange: () => void) {
   return () => query.removeEventListener('change', onChange)
 }
 
-export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
+export function TaskDetail({ id, deferWork = false, ...props }: DetailProps & { id: string; deferWork?: boolean }) {
   const t = useTranslations('Workspace.detail')
   const { cache } = useSWRConfig()
   const [loadedId, setLoadedId] = useState<string | null>(null)
@@ -142,7 +144,9 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   const { data, error, mutate } = useSWR<IssueRead>(key, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(key))?.data as IssueRead | undefined
-    return loadIssue(id, props.user.id, previous?.id === id ? previous : undefined, true)
+    // The embedded task can display its document while TaskForm reads Work separately.
+    const current = previous?.id === id ? previous : undefined
+    return loadIssue(id, props.user.id, current, !deferWork || Boolean(current?.taskWork))
   }, { revalidateOnFocus: false, revalidateOnMount: false, onSuccess: () => setLoadedId(id) })
   useEffect(() => {
     let active = true
@@ -169,7 +173,7 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])
   if (error && !backgroundFailed) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
-  if (!data) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
+  if (!data) return <TaskPageLoading />
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.
   return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId !== id ? 'cached' : data.canSteer === false ? 'reader' : 'editor'} initial={data} refreshDetail={mutate} preview={loadedId !== id} {...props} /></SectionBoundary>
@@ -238,11 +242,12 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const [title, setTitle] = useState(initial.title)
   const [content, setContent] = useState<JSONContent>(initial.content)
   const [status, setStatus] = useState(initial.status)
+  const [stateId, setStateId] = useState<string | null>(initial.stateId ?? null)
   const [priority, setPriority] = useState(initial.priority)
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState(false)
   const flight = useRef<Promise<boolean> | null>(null)
-  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, priority: initial.priority, generation: 0 })
+  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, stateId: (initial.stateId ?? null) as string | null, priority: initial.priority, generation: 0 })
   const savedRef = useRef(initial)
   const acknowledged = useRef(0)
   const conflictingRead = useRef<Issue | null>(null)
@@ -310,7 +315,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     // Only fields unchanged since the last server snapshot adopt its newer
     // value. Updating the draft too keeps a later text save from reopening Done.
     if (current.title === previous.title && !composing.current) { next.title = fresh.title; setTitle(fresh.title) }
-    if (current.status === previous.status) { next.status = fresh.status; setStatus(fresh.status) }
+    if (current.status === previous.status && current.stateId === (previous.stateId ?? null)) { next.status = fresh.status; setStatus(fresh.status); next.stateId = fresh.stateId ?? null; setStateId(fresh.stateId ?? null) }
     if (current.priority === previous.priority) { next.priority = fresh.priority; setPriority(fresh.priority) }
     if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = fresh.content; setContent(fresh.content) }
     draft.current = next
@@ -327,12 +332,13 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [hasUnsavedChanges])
-  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'priority'>>) {
+  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'stateId' | 'priority'>>) {
     if (locked) return
     draft.current = { ...draft.current, ...patch, generation: draft.current.generation + 1 }
     if (patch.title !== undefined) setTitle(patch.title)
     if (patch.content !== undefined) setContent(patch.content)
     if (patch.status !== undefined) setStatus(patch.status)
+    if (patch.stateId !== undefined) setStateId(patch.stateId)
     if (patch.priority !== undefined) setPriority(patch.priority)
     setDirty(true)
     setError('')
@@ -363,7 +369,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
           if (snapshot.generation !== acknowledged.current) {
             let result: Awaited<ReturnType<typeof saveIssue>> | undefined
             try {
-              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
+              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, stateId: snapshot.stateId && snapshot.stateId !== previous.stateId ? snapshot.stateId : undefined, priority: snapshot.priority })
             } catch (error) {
               if (error && typeof error === 'object') {
                 if ('code' in error && error.code === 'desktop_session_changed') throw error
@@ -389,6 +395,8 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
             if (confirmed.revision >= savedRef.current.revision) {
               savedRef.current = confirmed
               setSaved(confirmed)
+              // A status saved without a state took its category's default: the draft follows the server's choice.
+              if (draft.current.stateId === snapshot.stateId && draft.current.status === confirmed.status) { draft.current = { ...draft.current, stateId: confirmed.stateId ?? null }; setStateId(confirmed.stateId ?? null) }
             }
             conflictingRead.current = null
             acknowledged.current = snapshot.generation
@@ -428,8 +436,8 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
     const previousStatus = savedRef.current.status
-    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
-    draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
+    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setStateId(issue.stateId ?? null); setPriority(issue.priority)
+    draft.current = { ...draft.current, status: issue.status, stateId: issue.stateId ?? null, priority: issue.priority }
     void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
@@ -462,10 +470,11 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
 
   const saveLabel = readOnly || locked ? '' : error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')
   const acceptance = preview ? null : <FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} onOpenThread={showThread} />
+  const artifacts = preview ? null : <TaskArtifactsButton issueId={saved.id} threads={agentActivity.threads} work={agentActivity.work} failed={agentActivity.failed?.retry ?? null} />
   // The frame composes sub-tasks and activity around the shared document editor.
   const editorWith = (afterDescription: ReactNode, renderActivity: (discussions: IssueDiscussions) => ReactNode) => <>
-    {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    {documentTools && <div data-task-description-body><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert data-task-description-body><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div data-task-description-body className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
   </>
   const dialogs = <>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id, user.id)) }} /></DialogContent></Dialog>
@@ -475,15 +484,16 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const titleChange = (value: string) => changed({ title: value })
   const titleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }
   return <FramedTask Frame={TaskDetailFrame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
-    task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
+    task={saved} title={title} status={status} stateId={stateId} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
     discussionSave={sync ? { afterAcknowledged: sync.afterAcknowledged, retry: () => { void save() } } : undefined}
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
-    editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance}
+    descriptionEditable={!readOnly && !locked && syncState.ready}
+    editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance} artifacts={artifacts}
     teamSnapshot={!preview && initial.taskWork?.teamId !== undefined ? { teamId: initial.taskWork.teamId, refresh: refreshDetail } : undefined}
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
-    onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
+    onStatus={(value, picked) => { changed(picked === undefined ? { status: value, stateId: null } : { status: value, stateId: picked }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
     onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 

@@ -1,9 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { getApiSession } from '@/lib/api-auth'
 import { dismissSuggestion } from '@/lib/suggestions/store'
 
-export const runtime = 'nodejs'
 
 /** Takes one suggestion off the person's list. */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

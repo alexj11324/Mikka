@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import type { ArtifactDetail } from '@/lib/artifacts/types'
 import { withBasePath } from '@/lib/base-path'
 import { ArtifactKindIcon } from './artifact-card'

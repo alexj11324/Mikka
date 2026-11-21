@@ -21,17 +21,19 @@ import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('provider failure continues the same task through its own Agent\'s authorized preferred models, never the other Agent\'s', { skip: !dbUrl }, async t => {
-  const names = ['WORKSPACE_SECRETS_KEY', 'BETTER_AUTH_SECRET', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
+  const names = ['WORKSPACE_SECRETS_KEY', 'BETTER_AUTH_SECRET', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED', 'MIKKA_LITELLM_URL', 'MIKKA_LITELLM_MASTER_KEY'] as const
   const saved = new Map(names.map(name => [name, process.env[name]]))
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   // Policy snapshots sign with this secret; CI provides one, local runs get a test-only value.
   process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
+  process.env.MIKKA_LITELLM_URL = 'https://models.example.test/v1'
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-provider-fallback'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
-  const next = await import('next/server')
+  const next = await import('@/lib/server-runtime/server')
   let captureAfter: (() => Promise<void>)[] | undefined
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
     after: (work: () => Promise<void>) => { captureAfter?.push(work) },
   } })
   const coordinator = await isolateCoordinatorWakes(t)
@@ -101,8 +103,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     const remote = `https://github.com/mikka-ci/provider-fallback-${randomUUID()}.git`
     await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses)
-      VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`, [deviceId, id, DAEMON_PROTOCOL_VERSION, harnesses(['claude_code', 'codex'])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Laptop','local',true,$3,now(),$4,now())`, [deviceId, id, DAEMON_PROTOCOL_VERSION, harnesses(['claude_code', 'codex'])])
     const agents: Record<Harness, string> = { claude_code: randomUUID(), codex: randomUUID() }
     for (const [harness, agentId] of Object.entries(agents))
       await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)', [agentId, id, deviceId, harness, `${harness}-${agentId.slice(0, 8)}`])
@@ -162,8 +164,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     stopReason: 'provider_failure', report: { ...emptyRunReport('The model provider could not serve the request.'), providerFailure: failure },
   })
   const claim = async (p: Person, runId: string, options: { snapshot?: boolean } = {}) => {
-    const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
-      method: 'POST', headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
+    const response = await claimRoute.POST(new Request(`https://mikka.test/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
+      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
         [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [PROJECT_ENVIRONMENT_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1',
         ...(options.snapshot ? { [POLICY_SNAPSHOT_HEADER]: POLICY_SNAPSHOT_VERSION } : {}) },
     }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
@@ -431,7 +433,7 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     assert.equal(assignment.requireWorktreeContinuation, true)
     assert.equal(assignment.resumeSessionId, `session-${runId}`, 'the same Agent resumes its own session')
     assert.equal(assignment.followUp, providerContinuationNote())
-    assert.ok(assignment.modelCredential, 'the continuation carries B\'s key')
+    assert.ok(assignment.modelCredential, 'the continuation carries a gateway token for B')
     assert.equal(assignment.subscriptionBinding, undefined)
   })
 
@@ -564,8 +566,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     const { p, second } = await twoModels('provider-pinned')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [p.deviceId, harnesses(['claude_code'])])
     const deviceId = randomUUID(), agentId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses)
-      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4)`, [deviceId, p.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4,now())`, [deviceId, p.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Other Codex\')', [agentId, p.id, deviceId])
     const runId = await running(p, 'claude_code', { pinned: true })
     await end(p, runId, balance)
@@ -660,8 +662,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     const { p: second } = await twoModels('provider-checkpoint-remote')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [second.deviceId, harnesses(['claude_code'])])
     const deviceId = randomUUID(), agentId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses)
-      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4)`, [deviceId, second.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4,now())`, [deviceId, second.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Checkpoint Codex')`, [agentId, second.id, deviceId])
     const otherRun = await running(second)
     await persistRunCompletion(second.id, otherRun, { stopReason: 'provider_failure', report: {

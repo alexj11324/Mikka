@@ -25,7 +25,10 @@ if (posthogConfig.token) {
   autocapture: false,
   capture_pageview: false,
   capture_pageleave: false,
-  capture_exceptions: false,
+  // A render crash, a throwing click handler and an unhandled rejection reach
+  // this product only through `$exception` (lib/analytics-policy.ts scrubs it).
+  // Console errors stay off: they carry whatever a log call was given.
+  capture_exceptions: { capture_unhandled_errors: true, capture_unhandled_rejections: true, capture_console_errors: false },
   capture_performance: false,
   capture_heatmaps: false,
   capture_dead_clicks: false,

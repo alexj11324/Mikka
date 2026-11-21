@@ -19,7 +19,7 @@ const translator = (namespace: string) => Object.assign((key: string, values?: R
   assert.equal(typeof value, 'string', `missing ${namespace}.${key}`)
   return (value as string).replace(/\{(\w+)\}/g, (match, name: string) => values?.[name] === undefined ? match : String(values[name]))
 }, { has: (key: string) => typeof lookup(`${namespace}.${key}`) === 'string' })
-mock.module('next-intl', { namedExports: { useTranslations: translator } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translator } })
 
 let state: { data?: EnvironmentsView; error?: Error }
 let history: ProjectSetupHistory
@@ -77,7 +77,7 @@ before(async () => {
 })
 beforeEach(() => {
   const data: EnvironmentsView = { canManage: true, projects: [], environments: [{
-    id: environmentId, name: 'Private environment fixture', revision: 7, archived: false,
+    id: environmentId, name: 'Private environment fixture', revision: 7, archived: false, defaultMachineSize: null,
     configuration: { runtime: 'local', harness: 'any', variables: {}, secretIds: [], repositoryKeys: [],
       setup: { command: 'node --version', copyFiles: ['fixture.local'], approved: false } },
   }] }

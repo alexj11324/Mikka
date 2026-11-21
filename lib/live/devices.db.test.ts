@@ -18,8 +18,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('the device list key reaches only the owner home, after real device writers commit', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { pending.push(work) } } })
   const channelScopes = new Map<string, LiveScope>(), unexpected: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
@@ -69,27 +69,30 @@ test('the device list key reaches only the owner home, after real device writers
     await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'peer','peer','peer','member','active')`, [home]), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const device = randomUUID(), token = `orv_${randomBytes(32).toString('base64url')}`
     const codex = { harness: 'codex', installed: true, version: '1.0.0' }, claude = { harness: 'claude_code', installed: true, version: '2.1.0' }
-    await database.query(`INSERT INTO devices(id,name,"ownerId",harnesses,"lastSeenAt") VALUES ($1,'mine','owner',$2,now())`, [device, JSON.stringify([codex])])
+    await database.query(`INSERT INTO devices(id,name,"ownerId",harnesses,"lastSeenAt","sessionOpenedAt") VALUES ($1,'mine','owner',$2,now(),now())`, [device, JSON.stringify([codex])])
     await database.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES ($1,'owner',$2)`, [randomUUID(), createHash('sha256').update(token).digest('hex')])
     const ownerHome = [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'device_list', id: home }] }]
 
-    await t.test('a heartbeat pushes only when the device comes back online or its harnesses change', async () => {
-      const { POST } = await import('../../app/v1/devices/[deviceId]/heartbeat/route')
-      const beat = async (harnesses: unknown[]) => {
-        const response = await scope.run(() => POST(new Request(`http://127.0.0.1/v1/devices/${device}/heartbeat`, {
-          method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ runs: [], worktreeDiskBytes: 0, harnesses }),
+    await t.test('a session that opens or closes, or a harness change, pushes the device list; an unchanged report does not', async () => {
+      const [{ POST }, { applyDeviceSessionReport }] = await Promise.all([import('../../app/v1/devices/[deviceId]/report/route'), import('../device-session')])
+      const report = async (harnesses: unknown[]) => {
+        const response = await scope.run(() => POST(new Request(`http://127.0.0.1/v1/devices/${device}/report`, {
+          method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ harnesses }),
         }), { params: Promise.resolve({ deviceId: device }) }))
         assert.equal(response.status, 200)
       }
-      await beat([codex])
-      assert.deepEqual(await deliveries(), [], 'an ordinary beat from an online device is not a list change')
-      await database.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes' WHERE id=$1`, [device])
-      await beat([codex])
-      assert.deepEqual(await deliveries(), ownerHome, 'offline to online is one push to the owner home')
-      await beat([codex])
-      assert.deepEqual(await deliveries(), [])
-      await beat([codex, claude])
+      const session = (state: 'connected' | 'disconnected', socketId: string) => scope.run(() => applyDeviceSessionReport(device, { state, at: new Date().toISOString(), socketId }))
+      const deviceLists = async () => (await deliveries()).filter(delivery => delivery.events.some(event => event.kind === 'device_list'))
+      await report([codex])
+      assert.deepEqual(await deliveries(), [], 'an unchanged report is not a list change')
+      assert.deepEqual((await session('disconnected', 'socket-unknown0')).applied, false)
+      assert.deepEqual(await deliveries(), [], 'a report for another socket changes nothing')
+      await session('connected', 'socket-livedev01')
+      assert.deepEqual(await deviceLists(), ownerHome, 'a session that opens is one device-list push to the owner home')
+      await session('disconnected', 'socket-livedev01')
+      assert.deepEqual(await deviceLists(), ownerHome, 'a session that closes is one too')
+      await report([codex, claude])
       assert.deepEqual(await deliveries(), ownerHome, 'a new harness shows in the list')
     })
 
@@ -136,7 +139,7 @@ test('the device list key reaches only the owner home, after real device writers
         await database.query('DROP TRIGGER reject_device_removal ON devices')
         await database.query('DROP FUNCTION reject_device_removal()')
       }
-      await database.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes' WHERE id=$1`, [device])
+      await database.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes',"sessionClosedAt"=clock_timestamp() WHERE id=$1`, [device])
       await scope.run(() => removeOwnedDevice('owner', device))
       await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
       assert.deepEqual(await deliveries(), [], 'a home lost between COMMIT and delivery receives nothing')

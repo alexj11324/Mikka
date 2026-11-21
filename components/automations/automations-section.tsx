@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { goToHref } from '@/components/workspace/workspace-navigation'
 import { AutomationEditor } from './automation-editor'
 import { AutomationsPage } from './automations-page'

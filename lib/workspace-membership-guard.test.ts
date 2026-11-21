@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter, getEventListeners } from 'node:events'
 import test from 'node:test'
-import { createRequire } from 'node:module'
 import { channel } from 'node:diagnostics_channel'
 import { withMailboxDiagnostics } from './mailbox-diagnostics'
 import { Client } from 'pg'
@@ -178,11 +177,11 @@ test('cancel or WS connection failure before COMMIT destroys only held clients a
     assert.equal(h.state.appDestroyed, 1); assert.equal(h.state.wsDestroyed, 1)
   }
 })
-test('actual Next response-close signal reaches request and guarded APP discard before WS release without a server', async () => {
-  const require = createRequire(import.meta.url)
-  const { signalFromNodeResponse } = require('next/dist/server/web/spec-extension/adapters/next-request.js')
+test('a response-close abort reaches the request and the guarded APP discard before WS release without a server', async () => {
+  const abort = new AbortController()
   const response = Object.assign(new EventEmitter(), { writableFinished: false, destroyed: false })
-  const request = new Request('http://127.0.0.1:30587/mikka/v1/mailbox', { signal: signalFromNodeResponse(response) })
+  response.once('close', () => abort.abort())
+  const request = new Request('http://127.0.0.1:30587/mikka/v1/mailbox', { signal: abort.signal })
   const h = model(), atData = barrier(); h.control.data = atData.wait
   request.signal.addEventListener('abort', () => h.abort.abort(), { once: true })
   const observations: { stage: string; requestId?: string }[] = [], events = channel('mikka.personal-mailbox.lifecycle')

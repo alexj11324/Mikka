@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { affectsWorker } from './select-release.mjs'
+import { affectsWorker, selectRelease } from './select-release.mjs'
 import { readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 import { ALIAS, PROJECT, TEAM, WORKER, deployGateway, gitRepository, readJson, validateConfig } from './deploy.mjs'
 
@@ -16,7 +16,7 @@ const configText = readFileSync(new URL('../../cloudflare/device-gateway/wrangle
 
 function fixture() {
   const state = { main: SOURCE, live: SOURCE, same: true, writes: 0, waits: 0, calls: [], status: 'READY', namespace: NAMESPACE,
-    migration: 'v1', secret: true, project: PROJECT, aliasProject: PROJECT, activeVersion: VERSION, cfStatus: 200 }
+    migration: 'v1', secret: true, reportURL: 'https://app.example.test/mikka/v1/internal/device-sessions', project: PROJECT, aliasProject: PROJECT, activeVersion: VERSION, cfStatus: 200 }
   const repository = {
     async assertCheckout() {},
     async refreshMain() { return state.main },
@@ -41,6 +41,7 @@ function fixture() {
       if (url.pathname.endsWith('/settings')) data = { bindings: [
         { type: 'durable_object_namespace', name: 'DEVICE_SESSION', class_name: 'DeviceSession', namespace_id: state.namespace },
         ...(state.secret ? [{ type: 'secret_text', name: 'GATEWAY_PUSH_SECRET' }] : []),
+        ...(state.reportURL ? [{ type: 'plain_text', name: 'DEVICE_SESSION_REPORT_URL', text: state.reportURL }] : []),
       ] }
       else if (url.pathname.endsWith(`/services/${WORKER}`)) data = { default_environment: { script: { migration_tag: state.migration } } }
       else if (url.pathname.endsWith('/deployments')) data = { deployments: [{ versions: [{ version_id: state.activeVersion, percentage: 100 }] }] }
@@ -106,6 +107,15 @@ test('missing Worker/bindings, unapplied migrations and foreign projects fail be
     const { state, options } = fixture()
     Object.assign(state, patch)
     await assert.rejects(() => deployGateway(options), /provider_read_http_404|gateway_bindings_mismatch|gateway_existing_migration_required|production_project_mismatch|production_identity_mismatch/)
+    assert.equal(state.writes, 0)
+  }
+})
+
+test('a Worker without the device session report URL is refused before any deploy', async () => {
+  for (const reportURL of ['', 'http://app.example.test/mikka/v1/internal/device-sessions', 'https://app.example.test/mikka/v1/devices', 'not a url']) {
+    const { state, options } = fixture()
+    state.reportURL = reportURL
+    await assert.rejects(() => deployGateway(options), /gateway_session_report_url_required/)
     assert.equal(state.writes, 0)
   }
 })
@@ -243,4 +253,26 @@ test('protected promotion is checked twice with version identity, with no Vercel
     assert.equal(reads, 2)
     assert.ok(state.calls.every(path => path.startsWith('/client/v4/')))
   }
+})
+
+
+test('edge selection admits both official owner profiles and rejects mixed identities before provider reads', async () => {
+  const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SOURCE,
+    GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963' }
+  let reads = 0
+  const read = async url => {
+    reads++
+    return new URL(url).hostname === ALIAS
+      ? Response.json({ build: SOURCE }, { headers: { 'cf-ray': 'fixture', 'x-mikka-gateway-version-sha256': '2'.repeat(64) } })
+      : Response.json({ Status: 3, Question: [{ name: '_mikka-release.aspectlylabs.com.', type: 16 }] })
+  }
+  for (const profile of [{}, { GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }]) {
+    for (const workload of ['device', 'cron']) assert.equal(await selectRelease(workload, { ...env, ...profile }, read), false)
+  }
+  const before = reads
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '1' }, { GITHUB_REPOSITORY: 'foreign/Mikka' },
+    { GITHUB_REPOSITORY_OWNER_ID: '359279274' }, { GITHUB_REPOSITORY: 'aspectly-labs/Mikka' }]) {
+    await assert.rejects(selectRelease('device', { ...env, ...patch }, read), /reviewed_main_workflow_required/)
+  }
+  assert.equal(reads, before)
 })

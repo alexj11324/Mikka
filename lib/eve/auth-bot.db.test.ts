@@ -8,8 +8,8 @@ const valid=disposableDatabase()&&process.env.E2E_DATABASE_URL===process.env.MIK
 if(process.env.REQUIRE_DB==='1'&&!valid)throw new Error('Eve default scope tests require matching isolated loopback _e2e databases')
 test('native default Bot uses the authenticated active Workspace and rejects supplied invalid selectors',{skip:!valid},async t=>{
   const aliases=[
-    mock.module('next/headers',{namedExports:await import('../../apps/api/compat/headers')}),
-    mock.module('next-intl/server',{namedExports:await import('../../apps/api/compat/intl')}),
+    mock.module('@/lib/server-runtime/headers',{namedExports:await import('../../lib/server-runtime/headers')}),
+    mock.module('@/lib/intl/i18n-server',{namedExports:await import('../../lib/intl/i18n-server')}),
   ]
   const {pool}=await import('../db')
   const {resolveEveRequestBot}=await import('./auth-bot')

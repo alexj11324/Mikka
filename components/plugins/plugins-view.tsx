@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useViewState } from '@/lib/hooks/view-state'
 import useSWR, { useSWRConfig } from 'swr'
 import useSWRInfinite from 'swr/infinite'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { goToHref } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 import { isToolkitSlug } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
-import type { StoreApp } from '@/lib/plugins/catalog'
+import { findCredentialAlternative, type StoreApp } from '@/lib/plugins/catalog'
 import type { ConnectKind } from '@/lib/plugins/connect-kind'
 import { matchesStoreQuery, storeItemState, type StoreItemState } from '@/lib/plugins/store-state'
 import { getLinearIntegrationState } from '@/app/actions/linear-sync'
@@ -34,7 +34,10 @@ async function fetchSkills([path, query, page]: readonly [string, string, number
   if (page) params.set('page', String(page))
   const search = params.toString()
   const response = await fetch(withBasePath(search ? path + '?' + search : path))
-  if (!response.ok) throw new Error('skills search failed')
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { error?: string } | null
+    throw new Error(failure?.error ?? 'skills_search_failed')
+  }
   return await response.json() as SkillsPage
 }
 
@@ -97,7 +100,7 @@ function readLocation() {
   return { app: isToolkitSlug(app) ? app : null, category: category && category.length <= 80 ? category : null }
 }
 
-export type StoreEntry = { id: string; name: string; description: string; iconUrl: string | null; connect?: ConnectKind }
+export type StoreEntry = { id: string; name: string; description: string; iconUrl: string | null; connect?: ConnectKind; credentialAlternative?: { id: string; name: string } | null }
 export type StoreSectionData = { id: string; name: string; items: StoreEntry[]; preview: number }
 
 export type PluginsTab = 'apps' | 'skills'
@@ -197,7 +200,7 @@ export function usePluginStore({ apps, ownRead, category, query, go }: { apps: C
   // Ours have no Composio blurb: one line says what each brings (UI audit work-10).
   const own: StoreEntry[] = OWN_APPS.map(id => ({ id, ...info(id), description: t(`ownDescription.${id}`) }))
   if (!byId.has('slack')) own.push({ id: 'slack', ...info('slack'), description: t('ownDescription.slack') })
-  const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl, connect: item.connect }] : [] })
+  const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl, connect: item.connect, credentialAlternative: findCredentialAlternative(item, store) }] : [] })
   const stateOf = (id: string): StoreItemState | null => id === 'slack' && !byId.has(id) ? 'add' : isOwnApp(id)
     ? ownRead.data?.failed.includes(id) && ownRead.data.states[id] === undefined ? 'unavailable' : storeItemState({ kind: 'own', state: ownRead.data?.states[id] })
     : storeItemState({ kind: 'composio', connect: byId.get(id)?.connect, accounts: apps.accountsFor(id).length, canLink: byId.get(id)?.connect === 'credentials' ? apps.canEnterKey : apps.canLink, loading: apps.loading })

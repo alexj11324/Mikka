@@ -36,7 +36,7 @@ test(
         namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98 }) },
       });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,"sessionOpenedAt" timestamptz,"sessionClosedAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
       CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
@@ -84,6 +84,8 @@ test(
       await pool.query(
         await readFile(new URL("../drizzle/20261115204738_model_gateway_tokens.sql", import.meta.url), "utf8"),
       );
+      // The Bot's reasoning effort beside its model choice (freezeBotModel reads it).
+      await pool.query(await readFile(new URL("../drizzle/20261120044916_bot_settings.sql", import.meta.url), "utf8"));
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
@@ -103,7 +105,7 @@ test(
         binding = randomUUID(),
         connection = randomUUID();
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt",harnesses) VALUES ($1,'alice','local',true,true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),'[]')`,
+        `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,'alice','local',true,true,now(),now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),now(),'[]')`,
         [own, foreign],
       );
       await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [
@@ -278,7 +280,7 @@ test(
         mock.module(new URL(path, import.meta.url).href, {
           namedExports: exports,
         });
-      mock.module("next/headers", {
+      mock.module("@/lib/server-runtime/headers", {
         namedExports: { headers: async () => new Headers() },
       });
       stub("./auth.ts", {

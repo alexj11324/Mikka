@@ -1,7 +1,7 @@
 # Hosted-model abuse controls (#523, #525, #526, #527)
 
 This guide describes hosted billing in the cloud edition. Community model
-calls use their own provider configuration and bypass hosted credit accounting,
+calls use their own LiteLLM deployment and bypass hosted credit accounting,
 as [self-hosted services](../self-hosting-byok.md) describes.
 
 The corrections in the issue comments are authoritative: cloud computers are
@@ -106,34 +106,19 @@ and transaction preservation without Stripe calls.
 
 ## Scope and accounting
 
-The default model (`COORDINATOR_MODEL`, `deepseek/deepseek-v4.1-flash`) is
-served first by ZeroCat's OpenAI-compatible API (`https://zero.cat/v1`, model
-`deepseek-v4.1-flash`, `lib/abuse/zerocat.ts`). `ZEROCAT_BASE_URL` and
-`ZEROCAT_API_KEY` come from Infisical `prod:/vercel`, synced to Vercel
-Production. Its fallback is the same id on Vercel AI Gateway, used when ZeroCat
-is unconfigured (or set to another base URL), when its admission rule refuses
-it, or when the call fails before the first token: a network error, a timeout
-(20 s to the first streamed token, 60 s for a whole call), 429, 402 (quota),
-5xx, a redirect (the transport refuses them), any other HTTP refusal, or a stream
-error. After such a failure an instance skips ZeroCat for 60 s (`paused`), so
-later calls do not each wait on a failing route. Once a token has reached the
-caller the call stays on ZeroCat, and a stopped call never moves. A caller may
-hand in only the trusted Gateway transport for this model, and only as its
-fallback. Gateway routing options (`providerOptions.gateway`) are dropped from
-ZeroCat requests. Each call writes one `model.route` span
-([tracing](../operations/tracing.md)) with the route, the fallback reason and
-which credential Gateway served with.
+All Mikka-managed model calls use backend LiteLLM. The default is the
+`mikka-default` alias; title, Decision and Planning calls use their own aliases.
+Actual models and Vercel, Neon or provider upstream credentials are configured
+behind LiteLLM, as [the egress decision](../design/decisions/2026-11-20-0530-litellm-only-model-egress.md)
+describes. Application configuration is `MIKKA_LITELLM_URL` plus
+`MIKKA_LITELLM_MASTER_KEY`. There is no application-level direct-provider
+fallback, ZeroCat cooldown or Workers AI switch.
 
-Gateway bills the fallback with Vercel's own (system) credentials. The team's
-Gateway may still hold a DeepSeek BYOK key on an account with no balance; this
-change leaves that dashboard configuration alone. Gateway retries a failed BYOK
-attempt on system credentials within the same request, so such a call is still
-answered and billed by Vercel; `mikka.model.gateway_credential` records which
-credential served each fallback, so a call billed to BYOK would show as `byok`.
-
-Admission: ZeroCat is a `zerocat` route (`ModelAdmissionStore.zeroCat`), the
-fallback the existing `vercel-gateway` route; a workspace rule decides each
-separately, and the call is refused only when neither is admitted.
+Admission uses the `litellm` transport and the configured LiteLLM endpoint;
+workspace model rules still run before provider I/O. Authorized API-key calls
+retain their selected provider/model and send routing metadata to LiteLLM.
+They cannot silently switch to the operator's upstream key when the user's
+key fails.
 
 All new hosted text calls are admitted before provider I/O. Default Workflow
 turns (Coordinator/bot and Slack), frozen hosted snapshots, live evaluations,
@@ -143,8 +128,8 @@ attention decisions carry the server-owned workspace billing context.
 Subscription-model snapshots retain their existing model seam and never debit
 hosted credit. Own-device work and BYO E2B do not require a card or debit points.
 Unscoped internal decision transport is exempt for the host's own judgments;
-it signs in with the app's one gateway credential (`lib/ai-gateway-auth.ts`)
-under the team's AI Gateway budget; there is no Decisions-only key.
+it uses the app's LiteLLM credential and `mikka-decision` alias, with the
+same native Decisions protocol and cost receipt as scoped calls.
 The standalone `routeGroupMessage`/`callDecisionRequest` helpers have no active
 unscoped user-facing consumer in this revision.
 
@@ -201,17 +186,13 @@ The text model caps output at 4,096 tokens and provider time at 60 seconds;
 compaction keeps its existing 30-second timeout. Inputs over 16 MB are refused;
 these transport bounds do not reserve money. Subscription calls keep their
 existing capabilities.
-Actual Gateway `providerMetadata.gateway.cost` is rounded upwards to integer
-microdollars. ZeroCat returns token counts and no cost, so a default-model call served by
-ZeroCat settles from its usage at `ZEROCAT_PRICE_USD_PER_MILLION` (input 0.12, cached
-input 0.012, output 1.00, reasoning included), the rates Gateway billed for this
-model, rounded up; missing token counts leave the cost unknown, as below. A
-fallback call settles from Gateway's receipt like any Gateway call; the failed
-ZeroCat attempt is not charged. Missing cost or an interrupted provider call retains its
-receipt record and keeps its hold until reconciled, rather than treating unknown
-usage as free. Operators can reconcile the same call ID with
-`HostedUsageStore.settle(id, actualMicroUsd, ...)` after checking the Gateway
-receipt. No automatic retry discards an uncertain charge.
+LiteLLM's `x-litellm-response-cost` is converted to integer microdollars;
+`x-litellm-call-id` links the usage row to the proxy's spend receipt. Streaming
+calls retain the generation ID; a final cost receipt is required for settlement.
+Missing cost or an interrupted provider call retains its receipt and hold as
+unknown, rather than treating unknown usage as free. Operators can reconcile
+the same call ID with `HostedUsageStore.settle(id, actualMicroUsd, ...)` after
+checking the LiteLLM receipt. No automatic retry discards an uncertain charge.
 Already existing rows with prepaid amounts retain their old accounting until
 settled, so changing the admission path cannot charge or refund them twice.
 

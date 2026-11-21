@@ -19,7 +19,7 @@ const secret = 'statement-count-webhook-secret'
 const originalEdition = process.env.MIKKA_EDITION
 after(() => { if (originalEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = originalEdition })
 const callbacks: Array<() => unknown> = []
-mock.module('next/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
   decide: async () => null, invokeDecision: async () => null, callDecisionRequest: async () => { throw new Error('no model in this test') },
 } })

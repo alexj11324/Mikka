@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr'
 import { Window } from 'happy-dom'
 
 let available = false, connected = false, reads = 0, links = 0
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module('@/lib/auth-client', { namedExports: { authClient: {
   listAccounts: async () => { reads++; return available ? { data: connected ? [{ providerId: 'google' }] : [], error: null } : { data: null, error: { message: 'Unavailable' } } },
   linkSocial: async () => { links++; return { data: {}, error: null } },

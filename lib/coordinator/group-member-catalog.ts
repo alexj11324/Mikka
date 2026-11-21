@@ -2,14 +2,14 @@ import type { PoolClient } from 'pg'
 import type { RoutingMember } from './group-routing'
 import { AGENT_TOOL_IDS } from '@/lib/agent-kit/registry'
 
-type PublicBot = { id:string; name:string; publicRole:string; ownerId:string; repository:string|null; tools:unknown; skills:unknown }
+type PublicBot = { id:string; name:string; publicRole:string; ownerId:string; repository:string|null; environmentId:string|null; tools:unknown; skills:unknown }
 const executionTools = new Set(['dispatch_run','dispatch_factory_run','dispatch_factory_task','dispatch_bot_computer','intake_factory_request'])
 
 /** This projection is the privacy boundary: never SELECT the full definition,
  * instructions, skill bodies, account IDs or provider configuration. */
-export async function groupBotCatalog(client: Pick<PoolClient,'query'>, actorId:string, workspaceId:string, ids:string[], availability:(bot:Pick<PublicBot,'id'|'ownerId'|'repository'>)=>Promise<{available:boolean;reason?:string}>, ownerActive:(ownerId:string)=>Promise<boolean>): Promise<RoutingMember[]> {
+export async function groupBotCatalog(client: Pick<PoolClient,'query'>, actorId:string, workspaceId:string, ids:string[], availability:(bot:Pick<PublicBot,'id'|'ownerId'|'repository'|'environmentId'>)=>Promise<{available:boolean;reason?:string}>, ownerActive:(ownerId:string)=>Promise<boolean>): Promise<RoutingMember[]> {
   if (!ids.length) return []
-  const { rows } = await client.query<PublicBot>(`SELECT b.id,b.name,b."publicRole",b."ownerId",b.repository,
+  const { rows } = await client.query<PublicBot>(`SELECT b.id,b.name,b."publicRole",b."ownerId",b.repository,b."environmentId",
     v.definition->'tools' AS tools,
     (SELECT jsonb_agg(jsonb_build_object('name',s->>'name','description',s->>'description')) FROM jsonb_array_elements(COALESCE(v.definition->'skills','[]'::jsonb)) s) AS skills
     FROM bots b LEFT JOIN agent_kit_heads h ON h.owner_id=b."ownerId" AND h.bot_id=b.id AND h.workspace_id=b."workspaceId"
@@ -24,7 +24,7 @@ export async function groupBotCatalog(client: Pick<PoolClient,'query'>, actorId:
     // An unconfigured bot uses the registered built-in task capability. An
     // explicit definition that removed dispatch remains unable to dispatch.
     const configured= row.tools == null || tools.some(tool=>executionTools.has(tool))
-    const execution=configured ? await availability({id:row.id,ownerId:row.ownerId,repository:row.repository}) : undefined
+    const execution=configured ? await availability({id:row.id,ownerId:row.ownerId,repository:row.repository,environmentId:row.environmentId}) : undefined
     const canExecute=configured && execution?.available === true
     // Direct chat does not expose a tool executor. Configured tools are not
     // falsely advertised as usable in this group merely because they exist.

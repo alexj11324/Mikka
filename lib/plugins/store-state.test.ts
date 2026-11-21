@@ -13,6 +13,8 @@ test('a connected Composio app shows …, an unconnected one +', () => {
   // Nothing to connect, or nothing Mikka can connect: no control, whatever else is known.
   assert.equal(storeItemState({ kind: 'composio', connect: 'none', accounts: 0, canLink: false, loading: true }), 'ready')
   assert.equal(storeItemState({ kind: 'composio', connect: 'unsupported', accounts: 0, canLink: true, loading: false }), 'unavailable')
+  assert.equal(storeItemState({ kind: 'composio', connect: 'oauthSetupRequired', accounts: 0, canLink: true, loading: false }), 'unavailable')
+  assert.equal(storeItemState({ kind: 'composio', connect: 'oauthSetupRequired', accounts: 1, canLink: false, loading: false }), 'connected')
   assert.equal(storeItemState({ kind: 'composio', connect: 'credentials', accounts: 0, canLink: true, loading: false }), 'add')
 })
 

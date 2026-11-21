@@ -1,5 +1,5 @@
 name: Cloudflare LiteLLM runtime
-# The model gateway's protocol converter (decision 2026-11-15-2000), built and
+# The private model egress, built and
 # published like the task runtime: bound to an accepted API build, tested,
 # then pushed to the account registry for the private publisher to pin.
 on:
@@ -25,15 +25,19 @@ on:
     paths: &litellm_paths
       - 'deploy/litellm/**'
       - 'cloudflare/litellm/**'
+      - 'lib/model-gateway/**'
+      - 'tests/model-gateway-litellm.test.ts'
       - '.github/workflows/cloudflare-litellm-image.yml'
-  push:
-    branches: [main]
-    paths: *litellm_paths
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
 jobs:
   image:
-    if: github.event_name != 'workflow_dispatch'
+    # All PRs retain their existing credential-free qualification. The
+    # protected Registry producer is allowed to run only on real main pushes.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -44,16 +48,21 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --prefix cloudflare/litellm
+      - run: node --test cloudflare/litellm/worker.test.mjs
       - name: Build the LiteLLM image and check its health and master-key guard offline
         run: |
           docker build --platform linux/amd64 -t mikka-litellm deploy/litellm
           bash deploy/litellm/offline-check.sh mikka-litellm
+      - name: Prove both CLI protocols through the built proxy
+        run: |
+          corepack pnpm install --frozen-lockfile --ignore-scripts
+          bash deploy/litellm/conversion-check.sh mikka-litellm
   publish:
     permissions:
       contents: read
       actions: read
       id-token: write
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 20

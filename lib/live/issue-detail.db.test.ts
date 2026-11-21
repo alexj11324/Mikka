@@ -21,9 +21,9 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('issue members and relations keys reach only the task audience, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
-  mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const nextServer = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   // The same writers refresh lists and documents; lists.db.test.ts and panels.db.test.ts cover those keys.
   for (const file of ['./lists.ts']) {
     const actual = await import(file)

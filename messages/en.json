@@ -148,6 +148,14 @@
       "working": "Agent working",
       "waiting": "Needs you",
       "error": "Agent error"
+    },
+    "stateMenu": {
+      "search": "Change status…",
+      "searchAria": "Search {label}",
+      "open": "Open",
+      "closed": "Closed",
+      "noMatch": "No matching status",
+      "readFailed": "Could not load statuses"
     }
   },
   "Nav": {
@@ -219,6 +227,10 @@
     "artifacts": "Artifacts",
     "cardPreview": "[Card]",
     "botMenu": {
+      "share": "Share",
+      "moveTo": "Move to",
+      "unfollow": "Unfollow",
+      "following": "Following",
       "archive": "Archive",
       "unarchive": "Unarchive",
       "delete": "Delete",
@@ -230,7 +242,63 @@
       "deletePermanent": "Its chat history is deleted permanently.",
       "deleteKeeps": "The tasks and threads it dispatched stay.",
       "archiveInstead": "Archive instead",
-      "failed": "Didn't finish. Try again."
+      "failed": "Didn't finish. Try again.",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied",
+      "profile": "Bot profile",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "hide": "Hide",
+      "unhide": "Unhide",
+      "hidden": "Hidden",
+      "pinLimit": "Pins are full. Unpin one first.",
+      "rename": "Rename",
+      "renameTitle": "Rename thread",
+      "threadArchived": "Archived “{name}”",
+      "noMessages": "No messages yet",
+      "waitingOnYou": "{count} threads waiting on you",
+      "density": "Density",
+      "compact": "Compact",
+      "detailed": "Detailed",
+      "sortBy": "Sort by",
+      "sortPinned": "Pinned first",
+      "sortRecent": "Latest activity",
+      "sortName": "Name",
+      "groupBy": "Group by",
+      "groupNone": "None",
+      "groupUnread": "Unread",
+      "groupWaiting": "Threads waiting on you",
+      "groupWorking": "Working",
+      "groupOther": "Other",
+      "filters": "Filters",
+      "clearFilters": "Clear filters",
+      "sectionOptions": "List options",
+      "searchThreads": "Search threads",
+      "searchThreadsPlaceholder": "Search Bots or threads",
+      "closeSearch": "Close search",
+      "markAllRead": "Mark all as read",
+      "allRead": "Everything is marked read",
+      "viewAllThreads": "View all threads",
+      "noMatches": "No matches",
+      "botOptions": "Bot options",
+      "threadActions": "Thread actions",
+      "showThreads": "Show threads",
+      "hideThreads": "Hide threads",
+      "archiveThread": "Archive thread",
+      "unreadSuffix": "{name}, unread",
+      "collapseSection": "Collapse {name}",
+      "expandSection": "Expand {name}"
+    },
+    "age": {
+      "now": "now",
+      "s": "{n}s",
+      "m": "{n}m",
+      "h": "{n}h",
+      "d": "{n}d",
+      "w": "{n}w",
+      "y": "{n}y"
     }
   },
   "Plugins": {
@@ -252,6 +320,8 @@
     "loadFailed": "Could not load the skills.sh directory right now.",
     "retry": "Retry",
     "browseSkills": "Open skills.sh",
+    "identityUnavailable": "This deployment doesn't have the identity needed to search skills.sh. You can still browse skills.sh directly.",
+    "identityRejected": "skills.sh rejected the deployment identity. Check the Vercel OIDC setup, or browse skills.sh directly.",
     "noResults": "No matching skills found.",
     "clearSearch": "Clear search",
     "installCount": "{count} installs",
@@ -263,7 +333,11 @@
     "state": {
       "connected": "Connected",
       "notConnected": "Not connected",
-      "paused": "Paused"
+      "paused": "Paused",
+      "needsReconnect": "Needs reconnecting",
+      "unknown": "Linked, state unknown",
+      "syncPaused": "Sync paused",
+      "statusUnknown": "Connection state unknown"
     },
     "popular": "Popular",
     "latest": "New",
@@ -278,7 +352,11 @@
     "connectKind": {
       "managed": "One-click",
       "credentials": "API key",
-      "none": "No setup"
+      "none": "No setup",
+      "oauthSetupRequired": "This provider needs a Composio-managed OAuth app that's not available to Mikka yet",
+      "oauthSetupRequiredWithAlternative": "Composio-managed OAuth isn't available to Mikka · API-key option: {name}",
+      "alternativeLink": "Use API-key version: {name}",
+      "unsupported": "Mikka doesn't support this provider's authentication method yet."
     },
     "key": {
       "title": "Connect {name}",
@@ -298,7 +376,14 @@
       "replaced": "Changed {name} key",
       "securedBy": "Secured by"
     },
-    "connectionStatusFailed": "Couldn't read connection status for {names}"
+    "connectionStatusFailed": "Couldn't read connection status for {names}",
+    "storeDirectory": "App directory",
+    "storeNotConfigured": "App store is not set up",
+    "noAppsYet": "No apps yet",
+    "noSkillsYet": "No skills yet",
+    "noAppsForQuery": "No apps match “{query}”",
+    "noSkillsForQuery": "No skills match “{query}”",
+    "typeMore": "Type one more character"
   },
   "Auth": {
     "sso": {
@@ -1315,6 +1400,10 @@
     "issueNotFound": "This task does not exist or you do not have access.",
     "issueRevisionInvalid": "This task version is out of date. Please reopen it.",
     "issueStale": "Another member updated this task. The latest state has been restored; please try again.",
+    "issueStateNotFound": "This status no longer exists. Reload the list.",
+    "issueStateNameTaken": "A status with this name already exists.",
+    "issueStateDefaultLocked": "Make another status the default before deleting this one.",
+    "issueStateMoveTargetInvalid": "Choose another status to move its tasks to.",
     "issueSaveFailed": "The save did not go through. Keep this page open and try again.",
     "issueMoveInvalid": "The task move information is invalid.",
     "issuePriorityInvalid": "The task priority is invalid.",
@@ -1386,6 +1475,9 @@
     "validationProjectChangesRequired": "Choose at least one property to change.",
     "projectCheckFields": "Please check the project properties.",
     "projectPropertyInvalid": "The project property format is invalid.",
+    "pullPinLimit": "Pins are full. Unpin a pull request first.",
+    "savedViewLimit": "Saved views are full. Delete one first.",
+    "savedViewNotFound": "This view was already deleted.",
     "projectNotFound": "This project does not exist or you do not have access.",
     "projectVisibilityChanged": "The default visibility for this project changed. Review the current setting and try again.",
     "projectStale": "This project was updated. Refresh and try again to avoid overwriting someone else's changes.",
@@ -1452,6 +1544,12 @@
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
     "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "botEnvironmentUnavailable": "This environment is unavailable. Choose another one.",
+    "botAliasInvalid": "An alias is 1–32 lowercase letters, digits, - or _.",
+    "botAliasTaken": "Another bot in this workspace uses this alias.",
+    "botTargetUnavailable": "This machine, Agent or profile is unavailable.",
+    "botShareUnavailable": "A personal workspace has no one to share with.",
+    "botSubscriberNoAccess": "This member cannot see this bot.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",
@@ -1504,7 +1602,11 @@
     "apiKeyInvalid": "The key is invalid or has been revoked.",
     "apiKeyUnverifiable": "Couldn't verify the key right now. Try again later.",
     "apiKeyBaseUrlInvalid": "The base URL must be a public https address.",
-    "apiKeyNotFound": "This API key no longer exists."
+    "apiKeyNotFound": "This API key no longer exists.",
+    "scheduleEnvironmentUnavailable": "The selected environment is no longer available.",
+    "scheduleThreadUnavailable": "The thread it runs in is no longer available.",
+    "scheduleRunAsUnavailable": "The person it runs as is no longer a member of this workspace.",
+    "scheduleRunAsConsentRequired": "Only the person it runs as can do this, or an owner or admin."
   },
   "Overview": {
     "sections": {
@@ -1557,6 +1659,8 @@
       "filterComments": "Comments",
       "filterAgents": "Agents & bots",
       "showEarlier": "Show {count} earlier",
+      "noActivity": "No activity yet",
+      "noMatchingActivity": "No activity matches these filters",
       "copy": "Copy",
       "copied": "Copied",
       "copyFailed": "Could not copy",
@@ -1848,6 +1952,19 @@
     "backToAccessible": "Back to an accessible workspace"
   },
   "Projects": {
+    "deviceCheckouts": {
+      "title": "My local folders",
+      "empty": "No folder selected.",
+      "desktopEmpty": "Select a folder in Mikka Desktop.",
+      "choose": "Choose a Git folder",
+      "link": "Connect this computer",
+      "linkFailed": "Could not connect this computer to the workspace.",
+      "notRepo": "Select a folder inside a Git repository.",
+      "readFailed": "Could not load your folders.",
+      "writeFailed": "Could not save the folder change. Try again.",
+      "device": "Device",
+      "clearFor": "Remove folder on {device}"
+    },
     "dependencies": {
       "title": "Dependency repositories",
       "empty": "No repositories to show.",
@@ -2081,6 +2198,8 @@
   },
   "Settings": {
     "teamOnlyNotice": "Members, Teams, Team permissions and Audit log are in shared workspaces",
+    "billingUnavailableNotice": "Billing is in Mikka Cloud",
+    "cloudUnavailableNotice": "Mikka Cloud is for a self-hosted server's admin",
     "unavailableTitle": "{title} is temporarily unavailable",
     "title": "Settings",
     "searchLabel": "Search settings",
@@ -2167,6 +2286,9 @@
       },
       "environments": {
         "title": "Run environments"
+      },
+      "issue-states": {
+        "title": "Issue states"
       }
     },
     "appearance": {
@@ -2223,7 +2345,11 @@
         "tool": "Tools",
         "person": "People",
         "preference": "Preferences"
-      }
+      },
+      "pendingTitle": "Waiting for you",
+      "pendingHint": "What Mikka just learned. It is used for answers and reminders only after you confirm it.",
+      "approve": "Keep",
+      "reject": "Discard"
     },
     "workspaceForm": {
       "name": "Name",
@@ -2493,7 +2619,10 @@
       "githubAppOwner": "Owner",
       "githubAppPersonal": "Personal account",
       "githubAppOrganization": "Organization",
-      "githubAppOrganizationName": "Organization name"
+      "githubAppOrganizationName": "Organization name",
+      "githubNoMatch": "No repository matches this search",
+      "githubClearSearch": "Clear search",
+      "githubNoRepository": "No repositories yet. Authorize the GitHub App to see them here"
     },
     "slackInstallation": {
       "title": "Slack bot",
@@ -2709,7 +2838,8 @@
       "neverUsed": "Never used",
       "expires": "Expires {date}",
       "noExpiry": "Never expires",
-      "expired": "Expired"
+      "expired": "Expired",
+      "copyFailed": "Could not copy. Select the token and copy it by hand"
     },
     "secrets": {
       "heading": "Secrets",
@@ -2848,6 +2978,7 @@
         "presets": "Periods"
       },
       "loading": "Loading audit log",
+      "loadFailed": "Couldn't load the audit log",
       "filter": "Filter",
       "filters": {
         "all": "All",
@@ -2882,7 +3013,8 @@
         },
         "bot": {
           "permissions_changed": "changed permissions for {target}",
-          "taken_over": "took over {target}"
+          "taken_over": "took over {target}",
+          "transferred": "handed {target} to another member"
         },
         "integration": {
           "permission_changed": "set {integration} to {to}"
@@ -3180,6 +3312,19 @@
         "customTools": "Custom tools",
         "fallbacks": "Fallbacks",
         "thinking": "Thinking"
+      },
+      "baseUrl": "Base URL",
+      "modelsDialog": {
+        "title": "Models available for \"{name}\"",
+        "description": "Automatically detects models this key can call when connecting, replacing, or testing it. Checked models appear in the model picker with a key badge.",
+        "allProvider": "All {provider} models",
+        "recognized": "Recognized",
+        "unrecognized": "Not in Mikka catalog · add by id",
+        "addById": "Add model by id for this key",
+        "addByIdBlocked": "Adding arbitrary model IDs directly to a preset key is not yet supported; unlisted models can be added via a custom provider.",
+        "manageButton": "Models",
+        "manageLabel": "Choose models for {name}",
+        "empty": "No models returned by this provider"
       }
     },
     "modelOrder": {
@@ -3560,7 +3705,10 @@
       },
       "restore": "Restore",
       "copyFiles": "Files to copy into the worktree, one per line",
-      "approveSetup": "Run this setup when a new worktree starts"
+      "approveSetup": "Run this setup when a new worktree starts",
+      "machineSize": "Default machine size",
+      "machineSizeDefault": "Mikka default",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB"
     },
     "threadTitles": {
       "title": "Thread titles",
@@ -3579,6 +3727,40 @@
       "workspaceDefault": "Workspace default",
       "triggersError": "Could not update the title triggers",
       "loadError": "Could not load thread title settings"
+    },
+    "issueStates": {
+      "open": "Open",
+      "closed": "Closed",
+      "new": "New state",
+      "newIn": "New {type} state",
+      "default": "Default",
+      "tasks": "{count, plural, one {# task} other {# tasks}}",
+      "rename": "Rename",
+      "look": "Icon and color",
+      "makeDefault": "Make default",
+      "delete": "Delete",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "actions": "Actions for {name}",
+      "name": "Name",
+      "category": "Category",
+      "icon": "Icon",
+      "color": "Color",
+      "create": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "resetName": "Use default name",
+      "deleteTitle": "Delete {name}",
+      "moveTo": "Move its tasks to",
+      "moveAndDelete": "Move and delete",
+      "colors": {
+        "gray": "Gray",
+        "yellow": "Yellow",
+        "green": "Green",
+        "blue": "Blue",
+        "purple": "Purple",
+        "red": "Red"
+      }
     }
   },
   "TelegramBot": {
@@ -3969,7 +4151,7 @@
       "arguments": "Details",
       "approveRun": "Run"
     },
-    "loadError": "Could not load the conversation. Retrying.",
+    "loadError": "Could not load the conversation.",
     "failedTitle": "Reply failed",
     "replyToolUnavailable": "This reply could not be completed. Please try again.",
     "apiBalance": "Insufficient API balance",
@@ -4087,12 +4269,6 @@
       }
     },
     "empty": "Tell {name} what you need",
-    "starters": {
-      "fixBug": "Fix a bug in my repo",
-      "reviewPullRequests": "Review my open pull requests",
-      "summarizeToday": "Summarize what needs me today",
-      "dailyBriefing": "Set up a daily briefing"
-    },
     "events": {
       "aThread": "A thread",
       "aTask": "A task",
@@ -4121,6 +4297,12 @@
       "runWaitingDevice": "starts when its computer is back online",
       "runDeviceBack": "starts now: its computer is back online",
       "issueMoved": "moved to {status}",
+      "issueAssigned": "was assigned here by {name}",
+      "issueAssignedYou": "was assigned here",
+      "issueCommented": "{name} commented",
+      "issueCommentedSomeone": "has a new comment",
+      "issueMentioned": "{name} mentioned this Bot",
+      "issueMentionedSomeone": "mentioned this Bot",
       "issueSnapshot": "is {status}",
       "issueChanged": "changed status",
       "runReport": "reported progress",
@@ -4261,6 +4443,8 @@
         "finished": "{tool} finished",
         "failed": "Failed",
         "args": "Arguments",
+        "command": "Command",
+        "exitCode": "Exit code {code}",
         "result": "Result",
         "waiting": "Waiting for result…",
         "empty": "No arguments or result",
@@ -4287,13 +4471,10 @@
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
-    "invalidConversationID": "Invalid conversation ID.",
     "unableToLoadChatHistoryPleaseTry": "Unable to load chat history. Please try again.",
     "activeAgentsNoParameters": "This endpoint takes no parameters.",
     "conversationNotFound": "Conversation not found.",
-    "aResponseIsStillGeneratingPleaseTry": "A response is still generating. Please try again shortly.",
     "thisMessageWasAlreadySubmittedPleaseAsk": "This message was already submitted. Please ask a new question.",
-    "onlyTheLastResponseCanBeRetried": "Only the last response can be retried.",
     "invalidMessageIDPleaseAskANew": "Invalid message ID. Please ask a new question.",
     "theResponseEndedEarlySavedContentIs": "The response ended early. Saved content is preserved; please retry.",
     "theConnectionWasInterruptedRefreshToSee": "The connection was interrupted. Refresh to see saved content.",
@@ -4327,19 +4508,11 @@
     "formContent": "Form content: ",
     "theQuestionIsEmptyOrTooLong": "The question is empty or too long. Adjust it in the original component and retry.",
     "theQuestionDidNotFinishRetryIn": "The question did not finish. Retry in the original component.",
-    "unableToRefreshConversationsPleaseReloadThe": "Unable to refresh conversations. Please reload the page.",
     "newConversation": "New conversation",
     "today": "Today",
     "last7Days": "Last 7 days",
     "earlier": "Earlier",
     "toggleSidebar": "Toggle sidebar",
-    "switchConversation": "Switch conversation: ",
-    "searchConversations": "Search conversations",
-    "switchConversation2": "Switch conversation",
-    "conversationHistory": "Conversation history",
-    "searchConversations2": "Search conversations…",
-    "noMatchingConversations": "No matching conversations",
-    "noConversationsYet": "No conversations yet",
     "responding": "Responding",
     "componentDemo": "Component demo",
     "newTask": "New task",
@@ -4566,7 +4739,8 @@
     "needsModelCloudModelsUnknown": "Cloud template models have not been verified",
     "needsModelCloudModelNotReported": "The cloud template did not report this model",
     "needsModelCloudUnavailable": "Cloud execution is temporarily unavailable",
-    "needsModelChecking": "Subscription allowance could not be checked. Try again."
+    "needsModelChecking": "Subscription allowance could not be checked. Try again.",
+    "invalidConversationID": "Invalid thread id."
   },
   "ThreadRunPlace": {
     "cloudName": "Cloud computer {id}",
@@ -4622,7 +4796,12 @@
     "loading": "Loading conversations…",
     "empty": "No matching conversations.",
     "untitled": "Untitled conversation",
-    "more": "Load more"
+    "more": "Load more",
+    "emptyTitle": "No threads yet.",
+    "clearFilters": "Clear filters",
+    "automationFilter": "Automation is {name}",
+    "automationUnknown": "this automation",
+    "clearAutomation": "Remove automation filter"
   },
   "ThreadReferences": {
     "sourceUnavailable": "Source file and folder references are unavailable for this thread.",
@@ -4689,6 +4868,7 @@
     "stepsCommands": "{count, plural, one {Ran # command} other {Ran # commands}}",
     "stepsTools": "{count, plural, one {Called # tool} other {Called # tools}}",
     "composer": "Tell {agent} what to do next…",
+    "replyUnavailable": "Replies are unavailable for this run.",
     "checkEnded": "This independent check has ended. Handle the result in Acceptance.",
     "sendFailed": "Send outcome unconfirmed. Draft kept",
     "stop": "Stop",
@@ -5017,6 +5197,26 @@
       "model": "Model",
       "repository": "Repository",
       "noRepository": "No repository",
+      "environment": "Environment",
+      "machine": "Machine",
+      "machineDefault": "Your default",
+      "machineCloud": "Mikka Cloud",
+      "machineCloudflare": "Cloudflare coding machine",
+      "otherDevices": "Other devices",
+      "effort": "Effort",
+      "effortDefault": "Default",
+      "efforts": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "xhigh": "Extra high",
+        "max": "Max"
+      },
+      "access": "Access",
+      "accessPrivate": "Private",
+      "accessShared": "Workspace",
+      "subscribers": "Subscribers",
+      "noEnvironment": "No environment",
       "loading": "Loading…"
     },
     "createConversation": {
@@ -5026,8 +5226,15 @@
       "noBots": "No bots available",
       "newBot": "New bot",
       "create": "Start conversation",
+      "nameRequired": "Give the conversation a name",
+      "botsRequired": "Choose at least one Bot",
+      "lead": "Replies",
       "failed": "Couldn’t create the conversation",
       "unconfirmed": "Creation not confirmed",
+      "model": "Model",
+      "modelAuto": "Follow the Bot",
+      "device": "Device",
+      "deviceAuto": "Automatic",
       "reviewGroups": "View conversations"
     },
     "newGroup": {
@@ -5037,8 +5244,15 @@
       "noBots": "No bots available",
       "newBot": "New bot",
       "create": "Create",
+      "nameRequired": "Give the group a name",
+      "botsRequired": "Choose at least one Bot",
+      "lead": "Replies",
       "failed": "Group creation failed",
       "unconfirmed": "Group creation not confirmed",
+      "model": "Model",
+      "modelAuto": "Follow the Bot",
+      "device": "Device",
+      "deviceAuto": "Automatic",
       "reviewGroups": "View group chats"
     },
     "searchPlaceholder": "Search bots, chats, groups, tasks and projects",
@@ -5093,6 +5307,16 @@
       "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
+      "profile": {
+        "label": "Profile",
+        "alias": "Alias",
+        "aliasHint": "Slack: @Mikka bot=<alias>",
+        "aliasPlaceholder": "release",
+        "tasksRunOn": "Tasks run on",
+        "defaultAgent": "Default agent",
+        "unset": "Your default",
+        "loadError": "Could not load the profile."
+      },
       "publicRole": {
         "label": "Public role",
         "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
@@ -5256,7 +5480,8 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
-      "defaultProject": "My default project",
+      "project": "Project",
+      "status": "Status",
       "projectPreferenceUnavailable": "Could not load or save your project.",
       "intent": "Action",
       "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
@@ -5267,7 +5492,7 @@
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
       "titleLabel": "Title",
-      "titlePlaceholder": "Title (optional, the Bot writes one if empty)",
+      "titlePlaceholder": "Title",
       "placeholder": "What should it do?",
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextAgent": "run it with {agent}",
@@ -5299,7 +5524,42 @@
       "expand": "Bigger window",
       "collapse": "Smaller window",
       "createMore": "Create more",
-      "created": "Task created"
+      "created": "Task created",
+      "createdTask": "Created {identifier}",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "noAssignee": "No assignee",
+      "people": "People",
+      "bots": "Bots",
+      "dueDate": "Due date",
+      "due": {
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "endOfWeek": "End of this week",
+        "inOneWeek": "In one week"
+      },
+      "labels": "Labels",
+      "access": "Access",
+      "accessWorkspace": "Everyone in this workspace",
+      "accessMembers": "Only specific people",
+      "dictate": "Dictate",
+      "stopDictation": "Stop recording",
+      "transcribing": "Transcribing…",
+      "dictationFailed": {
+        "microphone": "Microphone unavailable",
+        "audioKeyRequired": "Dictation needs an OpenAI API key",
+        "tooLarge": "Recording too long",
+        "failed": "Could not transcribe"
+      },
+      "removeFile": "Remove {name}",
+      "fileRejected": "{name} cannot be attached",
+      "fileFailed": "Could not upload {name}",
+      "startWork": "Start work",
+      "startWorkPrompt": "Start work on task {task} \"{title}\" (issue {id}): {context}.",
+      "startWorkPromptWithNote": "Start work on task {task} \"{title}\" (issue {id}): {context}. {note}",
+      "startWorkSent": "Sent to {bot}",
+      "noDueDate": "No due date",
+      "createLabelNamed": "Create “{name}”"
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -5381,7 +5641,10 @@
           "flagged": "Flagged"
         },
         "markBlocked": "Mark as blocked",
-        "unblock": "Move out of Blocked"
+        "unblock": "Move out of Blocked",
+        "unread": "Unread",
+        "markUnread": "Mark as unread",
+        "markRead": "Mark as read"
       },
       "title": "Board",
       "synced": "Synced with Linear",
@@ -5390,7 +5653,29 @@
       "coordinatorPlaceholder": "Tell the Coordinator what to arrange…",
       "collapse": "Hide conversation",
       "expand": "Show conversation",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "views": {
+        "forYou": "For you",
+        "assigned": "Assigned to me",
+        "created": "Created by me",
+        "mentioned": "Mentioned",
+        "all": "All"
+      },
+      "grouping": "Grouping",
+      "groupBy": {
+        "status": "Status",
+        "priority": "Priority"
+      },
+      "direction": "Direction",
+      "directionValue": {
+        "desc": "Descending",
+        "asc": "Ascending"
+      },
+      "subtasks": "Sub-tasks",
+      "subtasksValue": {
+        "show": "Show",
+        "hide": "Hide"
+      }
     },
     "search": {
       "searching": "Searching…",
@@ -5409,6 +5694,14 @@
       "sourceSeparator": ", ",
       "sectionsHint": "to jump between sections",
       "openHint": "to open"
+    },
+    "profileMark": {
+      "state": {
+        "working": "Working",
+        "idle": "Idle",
+        "needs-you": "Needs you",
+        "failed": "Failed"
+      }
     }
   },
   "SuggestionsPage": {
@@ -5531,7 +5824,7 @@
   "LegacyChat": {
     "title": "Chat history",
     "readOnly": "This chat is read-only. Continue your work in the Bot chat.",
-    "empty": "No saved messages.",
+    "empty": "This thread has no messages.",
     "loadError": "Unable to load saved chat history.",
     "retry": "Retry",
     "incomplete": "This saved reply did not finish."
@@ -5791,8 +6084,7 @@
     },
     "steps": "Steps {count}",
     "questionCommandSource": "From the execution before the question",
-    "sourceExecution": "View execution",
-    "mergeConfirm": "Merge"
+    "sourceExecution": "View execution"
   },
   "ArtifactReview": {
     "checksRatio": "{passed}/{total} passed",
@@ -5842,7 +6134,9 @@
     "mergeFailed": "Merge failed: {reason}",
     "letAgentFix": "Let the Agent fix it",
     "checksFailed": "Checks failed: {names}",
-    "rerunChecks": "Rerun checks"
+    "rerunChecks": "Rerun checks",
+    "cancel": "Cancel",
+    "mergeConfirm": "Merge"
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",
@@ -6235,25 +6529,77 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
-    "cloud_machine_unfunded": {"default":"Not enough Mikka credits to keep the cloud machine running"},
-    "review_auth_required": {"default":"Sign in to review this task."},
-    "review_not_found": {"default":"This task review is unavailable."},
-    "not_owner_terminal": {"default":"Only the task owner can use this terminal."},
-    "review_machine_gone": {"default":"The task environment is no longer available."},
-    "review_binding_changed": {"default":"The task environment has changed. Open the review again."},
-    "review_checkout_unavailable": {"default":"This task has no available working directory."},
-    "review_preview_unavailable": {"default":"Preview is unavailable","configuration":"This environment does not support a secure preview","runtime":"The preview server is unavailable","protocol":"The preview response is invalid","scope_changed":"The task environment or authorization has changed","limit":"The preview has reached its usage limit"},
-    "terminal_unsupported": {"default":"This environment does not support the task terminal.","local_device":"Remote terminal access is not available on this local device.","runtime_version":"Update the task runtime to use its terminal."},
-    "terminal_already_controlled": {"default":"The Agent is still using this environment. End its work before opening the terminal."},
-    "terminal_binding_changed": {"default":"The terminal environment or authorization has changed."},
-    "terminal_ended": {"default":"This terminal session has ended."},
-    "terminal_input_too_large": {"default":"Terminal input exceeds 16 KiB."},
-    "terminal_invalid_request": {"default":"The terminal request is invalid."},
-    "terminal_request_conflict": {"default":"This input request ID was already used for different input."},
-    "terminal_input_uncertain": {"default":"Input delivery is uncertain. Check the terminal before sending it again."},
-    "terminal_limit": {"default":"The terminal has reached its usage limit."},
-    "terminal_unavailable": {"default":"The terminal is unavailable.","configuration":"Secure terminal access is not configured.","runtime":"The terminal runtime is unavailable.","protocol":"The terminal response is invalid.","installation":"The terminal runtime could not be prepared.","lease":"The terminal authorization has expired or changed."},
-    "terminal_control_unavailable": {"default":"Exclusive control of the task environment is unavailable.","fence_unavailable":"The task environment control lock is unavailable.","fence_lost":"The task environment control lock was lost."},
+    "cloud_machine_unfunded": {
+      "default": "Not enough Mikka credits to keep the cloud machine running"
+    },
+    "review_auth_required": {
+      "default": "Sign in to review this task."
+    },
+    "review_not_found": {
+      "default": "This task review is unavailable."
+    },
+    "not_owner_terminal": {
+      "default": "Only the task owner can use this terminal."
+    },
+    "review_machine_gone": {
+      "default": "The task environment is no longer available."
+    },
+    "review_binding_changed": {
+      "default": "The task environment has changed. Open the review again."
+    },
+    "review_checkout_unavailable": {
+      "default": "This task has no available working directory."
+    },
+    "review_preview_unavailable": {
+      "default": "Preview is unavailable",
+      "configuration": "This environment does not support a secure preview",
+      "runtime": "The preview server is unavailable",
+      "protocol": "The preview response is invalid",
+      "scope_changed": "The task environment or authorization has changed",
+      "limit": "The preview has reached its usage limit"
+    },
+    "terminal_unsupported": {
+      "default": "This environment does not support the task terminal.",
+      "local_device": "Remote terminal access is not available on this local device.",
+      "runtime_version": "Update the task runtime to use its terminal."
+    },
+    "terminal_already_controlled": {
+      "default": "The Agent is still using this environment. End its work before opening the terminal."
+    },
+    "terminal_binding_changed": {
+      "default": "The terminal environment or authorization has changed."
+    },
+    "terminal_ended": {
+      "default": "This terminal session has ended."
+    },
+    "terminal_input_too_large": {
+      "default": "Terminal input exceeds 16 KiB."
+    },
+    "terminal_invalid_request": {
+      "default": "The terminal request is invalid."
+    },
+    "terminal_request_conflict": {
+      "default": "This input request ID was already used for different input."
+    },
+    "terminal_input_uncertain": {
+      "default": "Input delivery is uncertain. Check the terminal before sending it again."
+    },
+    "terminal_limit": {
+      "default": "The terminal has reached its usage limit."
+    },
+    "terminal_unavailable": {
+      "default": "The terminal is unavailable.",
+      "configuration": "Secure terminal access is not configured.",
+      "runtime": "The terminal runtime is unavailable.",
+      "protocol": "The terminal response is invalid.",
+      "installation": "The terminal runtime could not be prepared.",
+      "lease": "The terminal authorization has expired or changed."
+    },
+    "terminal_control_unavailable": {
+      "default": "Exclusive control of the task environment is unavailable.",
+      "fence_unavailable": "The task environment control lock is unavailable.",
+      "fence_lost": "The task environment control lock was lost."
+    },
     "review_scope_denied": {
       "default": "You do not have access to review this task.",
       "sponsored_placement": "The hosted workspace is no longer available for reviewing this task."
@@ -6354,7 +6700,15 @@
     "run_provider_error": {
       "default": "The model provider could not complete this request. Try again."
     },
-    "run_credentials_unavailable": {"default":"The task's credentials are unavailable.","device_unavailable":"This computer cannot receive the task's credentials right now.","credential_missing":"This task's subscription is not connected for its owner. Connect it in Settings and try again.","credential_expired":"The owner's subscription sign-in has expired. Sign in to it again and try again.","quota_exhausted":"The owner's subscription has used up its quota.","native_credentials":"The subscription credential is unavailable.","github_credentials":"The GitHub credential is unavailable."},
+    "run_credentials_unavailable": {
+      "default": "The task's credentials are unavailable.",
+      "device_unavailable": "This computer cannot receive the task's credentials right now.",
+      "credential_missing": "This task's subscription is not connected for its owner. Connect it in Settings and try again.",
+      "credential_expired": "The owner's subscription sign-in has expired. Sign in to it again and try again.",
+      "quota_exhausted": "The owner's subscription has used up its quota.",
+      "native_credentials": "The subscription credential is unavailable.",
+      "github_credentials": "The GitHub credential is unavailable."
+    },
     "run_failed": {
       "default": "The task could not be completed. Check the error details or try again."
     },
@@ -6630,6 +6984,37 @@
       "request": "GitHub App setup did not finish. Try again.",
       "response": "GitHub did not return complete App credentials. Start again.",
       "template": "This version cannot create a GitHub App yet. Update the server and try again."
+    },
+    "interop_not_found": {
+      "default": "Not found, or you do not have access."
+    },
+    "interop_invalid_request": {
+      "default": "The request is invalid."
+    },
+    "interop_scope_required": {
+      "default": "This token lacks the required scope."
+    },
+    "interop_send_unavailable": {
+      "default": "The message could not be delivered.",
+      "run_not_active": "The run is no longer active.",
+      "thread_replaced": "A newer thread replaced this one.",
+      "thread_cannot_continue": "This thread cannot continue.",
+      "delivery_unavailable": "This delivery mode is unavailable for the thread.",
+      "delivery_uncertain": "The earlier send with this key has no recorded outcome; it is not sent again.",
+      "bot_unavailable": "The Bot is unavailable.",
+      "continuation_requires_grant": "Continuing this ended thread needs its owner's explicit grant."
+    },
+    "interop_diff_unavailable": {
+      "default": "The diff is unavailable.",
+      "no_checkpoint": "The thread has no saved changes.",
+      "masked": "The diff contains a secret and is withheld."
+    },
+    "interop_drive_conflict": {
+      "default": "The Drive folder changed. Read it again and retry."
+    },
+    "interop_drive_unavailable": {
+      "default": "Drive is unavailable.",
+      "file_too_large": "The file is too large."
     }
   },
   "FactoryFlow": {
@@ -7039,9 +7424,7 @@
         "any": "Any",
         "none": "Choose at least one source, or Organization workspaces can't run models.",
         "names": {
-          "vercel-gateway": "Mikka hosted models (Gateway)",
-          "zerocat": "Mikka hosted models (ZeroCat)",
-          "cloudflare-workers-ai": "Mikka hosted models (Cloudflare Workers AI)",
+          "litellm": "Mikka models (LiteLLM)",
           "openai-subscription": "OpenAI subscription",
           "anthropic-subscription": "Anthropic subscription",
           "api-key": "Your own API key"
@@ -7430,6 +7813,20 @@
     "waitingOnYou": "Waiting on you",
     "inProgress": "Running"
   },
+  "HostedAutomations": {
+    "aroundNow": "Around now",
+    "now": "Now",
+    "runningNow": "Running now",
+    "next": "Next",
+    "nothingNext": "No runs in the next 8 hours",
+    "more": "Show all",
+    "less": "Show less",
+    "activity": "Runs",
+    "perTen": "runs / 10 min",
+    "perTenOne": "run / 10 min",
+    "nextRun": "next",
+    "lastRun": "last run"
+  },
   "HostedThread": {
     "placeholder": "What should it do?",
     "open": "Open",
@@ -7659,6 +8056,17 @@
     "runsCount": "{count, plural, one {# run} other {{formatted} runs}}"
   },
   "HostedShell": {
+    "workspacePicker": "Open in workspace",
+    "relatedThreads": "Related threads",
+    "expandWorkArea": "Expand work area",
+    "sidebarNavigation": "Sidebar navigation",
+    "openTabs": "Open tabs",
+    "tabActions": "Tab actions",
+    "closeTab": "Close tab",
+    "closeNamedTab": "Close {name}",
+    "closeOtherTabs": "Close other tabs",
+    "closeFollowingTabs": "Close following tabs",
+    "collapseWorkArea": "Collapse work area",
     "newTab": "New tab",
     "searchOrUrl": "Search or enter URL",
     "tools": "Tools",
@@ -7811,7 +8219,9 @@
     "working": "Working",
     "groupChats": "Group chats",
     "groupGlyph": "G",
-    "hiddenChats": "Hidden chats",
+    "hiddenChats": "Hidden threads",
+    "noHiddenChats": "No hidden threads",
+    "showAllItems": "Show all {count}",
     "restartToUpdate": "Restart to update",
     "chatList": "Chats",
     "document": "Document",
@@ -7907,7 +8317,89 @@
       "minutes": "{count}m ago",
       "hours": "{count}h ago",
       "days": "{count}d ago"
-    }
+    },
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "sendFailedRetry": "Could not send. Please try again.",
+    "uploadFailed": "Upload failed",
+    "uploading": "Uploading",
+    "addFileLimit": "At most {count} files",
+    "textFilesOnly": "Text files only",
+    "fileTooLong": "File too long",
+    "cannotAddFile": "Cannot add this file",
+    "removePhoto": "Remove photo",
+    "removeFile": "Remove {name}",
+    "retryUpload": "Retry uploading {name}",
+    "clearQuote": "Clear quote",
+    "stop": "Stop",
+    "stopUnconfirmed": "Stop not confirmed",
+    "loading": "Loading",
+    "selectText": "Select text",
+    "unread": "Unread",
+    "waitingReply": "Waiting for your reply",
+    "audioKeyRequired": "Add a working [OI] API key first.",
+    "customAnswer": "Add another answer…",
+    "cannotPasteImage": "Cannot paste the image",
+    "photo": "Photo",
+    "event": {
+      "runSucceeded": "Succeeded",
+      "runFailed": "Failed",
+      "runStopped": "Stopped",
+      "runCancelled": "Cancelled",
+      "scheduleRan": "Ran",
+      "scheduleFailed": "Run failed",
+      "scheduleSkipped": "Skipped",
+      "actionDone": "Done",
+      "actionFailed": "Failed",
+      "actionDeclined": "Declined",
+      "runRetried": "Continued on another machine",
+      "runSwitched": "Subscription limit reached; continued with an API key",
+      "runPaused": "Subscription limit reached; paused",
+      "runWaitingDevice": "Waiting for the device",
+      "runDeviceBack": "Device is online; starting",
+      "runReport": "Reported progress",
+      "runQuestion": "Waiting for your answer",
+      "runBlocked": "Blocked",
+      "newEvent": "New activity",
+      "someThread": "A thread",
+      "someTask": "A task",
+      "quotedTitle": "“{title}”",
+      "scheduledTitle": "Scheduled task “{title}”",
+      "someSchedule": "A scheduled task",
+      "runEnded": "finished",
+      "taskNowStatus": "{task} is now {status}",
+      "taskStatusChanged": "{task} changed status",
+      "taskIsStatus": "{task} is {status}",
+      "scheduleResult": "has a result",
+      "scheduleDue": "{schedule} is due",
+      "artifactDelivered": "Delivered “{title}”",
+      "someArtifact": "Delivered an Artifact",
+      "actionNewState": "The action changed state"
+    },
+    "failure": {
+      "subUnavailable": "That subscription is unavailable",
+      "subReconnect": "Reconnect the subscription",
+      "subQuotaUsed": "Subscription limit reached",
+      "subRetry": "Subscription temporarily unavailable",
+      "subSelectionChanged": "That subscription choice expired",
+      "subRateLimited": "Subscription requests are rate-limited",
+      "subAccessDenied": "The provider refused subscription access",
+      "modelRejected": "The model refused the request",
+      "quotaChecking": "Subscription limit being checked",
+      "runtimeUnavailable": "This environment does not support that subscription",
+      "modelNotReported": "The cloud computer did not report this model",
+      "hostedQuotaUsed": "Mikka limit reached",
+      "hostedPaused": "Mikka limit temporarily unavailable",
+      "temporarilyUnavailable": "Temporarily unavailable",
+      "wakeWaiting": "Reply waiting to retry",
+      "wakeUnconfirmed": "Reply start not confirmed",
+      "wakeExhausted": "Reply retries stopped",
+      "apiBalance": "API balance too low",
+      "replyIncomplete": "Reply did not finish. Please try again.",
+      "replyFailed": "Reply failed"
+    },
+    "item": "{count} item",
+    "items": "{count} items"
   },
   "PersonalFiles": {
     "archiveFolderTitle": "Archive {name}?",
@@ -7957,7 +8449,10 @@
     "succeeded": "Automation \"{title}\" ran: {task}",
     "succeededNoTask": "Automation \"{title}\" ran",
     "failed": "Automation \"{title}\" did not run: {reason}",
-    "failedUnknown": "Something went wrong; see the run history in Mikka"
+    "failedUnknown": "Something went wrong; see the run history in Mikka",
+    "footer": "{automation} · Mikka",
+    "statusSucceeded": "Succeeded",
+    "statusFailed": "Failed"
   },
   "Automations": {
     "cancelRun": "Cancel run",
@@ -8079,9 +8574,6 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
-      "eachRun": "Each run",
-      "eachRunNew": "Makes a new task",
-      "eachRunSame": "Adds to the same task",
       "notify": "Post runs to Slack",
       "notifyOff": "Don't post",
       "notifyChoose": "Choose a channel",
@@ -8124,6 +8616,7 @@
       "schedule": "On a schedule",
       "manual": "Run manually",
       "runNow": "Run now",
+      "runUnconfirmed": "Mikka couldn’t confirm this run. Choose Run now to retry.",
       "scheduleKind": {
         "once": "Once",
         "interval": "Every",
@@ -8198,7 +8691,8 @@
         "interval": "The interval must be between 1 minute and 1 year",
         "cron": "A cron expression has 5 fields",
         "team": "Choose a Linear team",
-        "channel": "Choose a Slack channel"
+        "channel": "Choose a Slack channel",
+        "thread": "Choose a thread to save"
       },
       "webhook": {
         "title": "Webhook",
@@ -8250,7 +8744,54 @@
         "notInstalled": "Connect Slack to this workspace in Settings first",
         "noChannels": "Mikka's Slack app cannot see any channels yet. Add it to a channel first",
         "channelsError": "Could not load Slack channels"
-      }
+      },
+      "viewOnly": "Only its creator can change it. Take it over to edit.",
+      "devicesError": "Devices could not load",
+      "description": "Description",
+      "descriptionPlaceholder": "What it’s for (optional)",
+      "runsIn": "Runs in",
+      "runsInNew": "A new thread each run",
+      "runsInSame": "One standing thread",
+      "runsInExisting": "An existing thread",
+      "threadSearch": "Search threads",
+      "threadNone": "No matching threads",
+      "threadChosen": "Chosen thread",
+      "threadChange": "Change",
+      "environment": "Environment",
+      "environmentDefault": "Default environment",
+      "model": "Model",
+      "modelDefault": "Agent default",
+      "effort": "Effort",
+      "effortDefault": "Model default",
+      "efforts": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "xhigh": "Extra high",
+        "max": "Max"
+      },
+      "machineSize": "Machine size",
+      "machineSizeDefault": "Environment default",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB",
+      "pin": "Pin each run’s thread",
+      "more": "More",
+      "duplicateTo": "Duplicate to",
+      "duplicated": "Duplicated",
+      "duplicatedPaused": "Duplicated and paused. Cleared: {fields}",
+      "cleared": {
+        "bot": "Bot",
+        "machine": "Machine",
+        "profile": "Agent profile",
+        "environment": "Environment",
+        "thread": "Thread",
+        "linear": "Linear events",
+        "slack": "Slack",
+        "github": "GitHub events"
+      },
+      "runsAs": "Runs as",
+      "runsAsCreator": "Creator ({name})",
+      "postAsRunner": "Post as the person it runs as",
+      "quiet": "Quiet posts"
     },
     "run": {
       "from": "Started by {event} · {what}",
@@ -8284,6 +8825,59 @@
       "message": "New message in a channel",
       "mention": "Mikka is mentioned",
       "reaction_added": "Reaction added"
+    },
+    "tabs": {
+      "mine": "My automations",
+      "all": "All automations",
+      "scheduled": "Scheduled"
+    },
+    "filterMenu": "Filter",
+    "displayMenu": "Display",
+    "chip": {
+      "creatorIsMe": "Creator is me",
+      "scheduled": "Trigger is schedule",
+      "status": "Status is {status}"
+    },
+    "removeFilter": "Remove filter",
+    "filterCreator": "Created by me",
+    "filterScheduled": "Runs on a schedule",
+    "filterStatus": "Status",
+    "grouping": "Group by",
+    "groupStatus": "State",
+    "groupFolder": "Folder",
+    "showTemplates": "Show templates",
+    "groups": {
+      "active": "Active",
+      "paused": "Paused",
+      "ended": "Ended",
+      "deleted": "Deleted"
+    },
+    "clearFilters": "Clear filters",
+    "templatesTitle": "Templates",
+    "viewRuns": "View runs",
+    "trigger": {
+      "schedule": "Schedule",
+      "manual": "Manual",
+      "github": "GitHub",
+      "linear": "Linear",
+      "slack": "Slack",
+      "webhook": "Webhook"
+    },
+    "create": {
+      "title": "Create automation",
+      "scratchDescription": "Set the triggers, instructions and limits yourself",
+      "templateDescription": "Pick a ready automation and fit it to your work",
+      "askBot": "Create with Mikka",
+      "askBotDescription": "Say what you want and a Bot builds it in a thread",
+      "back": "Back"
+    },
+    "templateDescriptions": {
+      "standup": "Summarize yesterday’s merged PRs and closed issues every weekday morning",
+      "prReview": "Give every new pull request a first review",
+      "ciFix": "When a check fails on a PR, find the cause and fix it",
+      "linearTriage": "Prioritize and route new Linear issues",
+      "slackQuestion": "Answer questions in Slack from the code and docs",
+      "weeklyDeps": "Open dependency update PRs once a week"
     }
   },
   "SetupChecklist": {
@@ -8304,5 +8898,146 @@
       "app": "Connect",
       "invite": "Invite"
     }
+  },
+  "PullDirectory": {
+    "overview": "Overview",
+    "changes": "Changes",
+    "none": "None",
+    "notReported": "Not reported",
+    "tasks": "Tasks",
+    "diffSize": "Diff",
+    "openReview": "Open review",
+    "noLinkedTask": "No linked task.",
+    "moreActions": "More",
+    "readingViews": "Views",
+    "countAll": "{count} total",
+    "countShown": "{shown} of {count}",
+    "filter": "Filter",
+    "filters": "Filters, {count} on",
+    "done": "Done",
+    "anyState": "Any state",
+    "anyAuthor": "Anyone",
+    "anyLabel": "Any label",
+    "stateValue": "State {value}",
+    "authorValue": "@{value}",
+    "labelValue": "Label {value}",
+    "linkedOnly": "Linked only",
+    "removeFilter": "Remove filter {name}",
+    "openTask": "Open task",
+    "openTaskNamed": "Open task {name}",
+    "branch": "Branch",
+    "description": "Description",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "viewsMenu": "Views, {count} saved",
+    "savedViews": "Saved views",
+    "noSavedViews": "No saved views",
+    "viewDefaultName": "{view} view",
+    "title": "Pull requests",
+    "source": "Repository",
+    "linkedPulls": "Linked pull requests",
+    "refresh": "Refresh",
+    "newPull": "New PR on GitHub",
+    "viewLabel": "Pull request views",
+    "views": {
+      "open": "Open",
+      "ready": "Ready to merge",
+      "merged": "Merged",
+      "all": "All"
+    },
+    "search": "Search pull requests",
+    "state": "State",
+    "author": "Author",
+    "label": "Label",
+    "grouping": "Group by",
+    "groups": {
+      "state": "State",
+      "repo": "Repository",
+      "author": "Author",
+      "none": "No grouping"
+    },
+    "states": {
+      "ready": "Ready to merge",
+      "attention": "Needs attention",
+      "pending": "Pending",
+      "draft": "Draft",
+      "open": "Open",
+      "merged": "Merged",
+      "closed": "Closed"
+    },
+    "clearFilters": "Clear filters",
+    "saveView": "Save view",
+    "viewName": "View name",
+    "deleteView": "Delete view {name}",
+    "save": "Save",
+    "cancel": "Cancel",
+    "repositoryError": "Could not read GitHub repositories.",
+    "connectGitHub": "Connect GitHub to browse repository pull requests.",
+    "connections": "Connections",
+    "retry": "Retry",
+    "loadError": "Could not load pull requests.",
+    "list": "Pull request list",
+    "loading": "Loading pull requests",
+    "noLoadedMatches": "No matches in the loaded pull requests. Load more to continue.",
+    "noMatches": "No pull requests match these filters.",
+    "empty": "No pull requests yet.",
+    "selectPull": "Select pull request #{number}",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "more": "Load more pull requests",
+    "loadedPartial": "{count, plural, one {# pull request loaded · more available} other {# pull requests loaded · more available}}",
+    "loaded": "{count, plural, one {# pull request loaded} other {# pull requests loaded}}",
+    "preview": "Pull request preview",
+    "copyLink": "Copy link",
+    "openGitHub": "Open on GitHub",
+    "closePreview": "Close preview",
+    "selection": "Selected pull requests",
+    "selected": "{count} selected",
+    "copyLinks": "Copy links",
+    "deselect": "Deselect",
+    "copied": "Copied",
+    "copyError": "Could not copy. Try again.",
+    "pinned": "Pinned",
+    "results": "Pull requests",
+    "unknownAuthor": "Unknown author",
+    "checks": "Checks",
+    "review": "Review",
+    "updated": "Updated",
+    "threads": "Threads",
+    "checksState": {
+      "SUCCESS": "Passing",
+      "PENDING": "Pending",
+      "FAILURE": "Failing",
+      "ERROR": "Error",
+      "EXPECTED": "Expected",
+      "unknown": "Not reported"
+    },
+    "reviewState": {
+      "APPROVED": "Approved",
+      "CHANGES_REQUESTED": "Changes requested",
+      "REVIEW_REQUIRED": "Review required",
+      "unknown": "Not reported"
+    },
+    "linkedSnapshot": "Last delivered state. Open on GitHub for current checks and review.",
+    "resizePreview": "Resize pull request preview",
+    "is": "is",
+    "eitherOfStates": "either of {count} states",
+    "openNewTab": "Open in new tab",
+    "copyBranch": "Copy branch",
+    "created": "Created",
+    "anyTime": "Any time",
+    "project": "Project",
+    "anyProject": "Any project",
+    "unknownProject": "Unavailable project",
+    "since": {
+      "day": "Past day",
+      "week": "Past week",
+      "month": "Past month"
+    },
+    "checkCounts": "{passed} passed · {failing} failed · {pending} pending",
+    "reviewers": "Reviewers",
+    "merge": "Merge",
+    "mergeAnyway": "Merge anyway, {count} failing",
+    "mergeFailed": "Could not merge."
   }
 }

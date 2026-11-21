@@ -10,6 +10,7 @@ import type { Flavor } from "@mikka/protocol"
 import { readJson, writeJsonAtomic } from "./fs-util"
 import { DaemonAlreadyRunningError, daemonProcessAlive, LOCK_TAKEOVER_MS } from "./lock"
 import { createLogger } from "./log"
+import { trackDaemonLifecycle } from "./lifecycle-record"
 import { managedAutoUpdateRuntime } from "./auto-update"
 import { installService } from "./service"
 import { deviceLogin, registrationLogin } from "./login"
@@ -219,6 +220,7 @@ export async function runCli(
     dir: daemonPaths(dataDir).logs,
     stdout: flavor === "dev",
   })
+  let lifecycle: ReturnType<typeof trackDaemonLifecycle> | undefined
   const speed = values["mock-speed"] ? Number(values["mock-speed"]) : undefined
   try {
     const daemon = await startDaemon({
@@ -243,15 +245,17 @@ export async function runCli(
       stallMs: values["stall-minutes"]
         ? Number(values["stall-minutes"]) * 60_000
         : undefined,
-      onDrained: () => process.exit(0),
-      onLockLost: () => process.exit(1),
+      onDrained: () => { lifecycle?.stopping("drained"); process.exit(0) },
+      onLockLost: () => { lifecycle?.disown(); process.exit(1) },
     })
-    const shutdown = () => {
-      void daemon.stop().then(() => process.exit(0))
+    lifecycle = trackDaemonLifecycle(daemonPaths(dataDir).logs)
+    const shutdown = (signal: NodeJS.Signals, code: number) => {
+      lifecycle?.stopping(`signal:${signal}`)
+      void daemon.stop().then(() => process.exit(code))
     }
-    process.once('SIGUSR2', () => { void daemon.stop().then(() => process.exit(1)) })
-    process.once("SIGINT", shutdown)
-    process.once("SIGTERM", shutdown)
+    process.once('SIGUSR2', () => shutdown('SIGUSR2', 1))
+    process.once("SIGINT", () => shutdown("SIGINT", 0))
+    process.once("SIGTERM", () => shutdown("SIGTERM", 0))
     return null
   } catch (error) {
     if (error instanceof DaemonAlreadyRunningError) {

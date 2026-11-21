@@ -1,10 +1,8 @@
 import { withRequestLog } from '@/lib/request-log'
 import { getTelegramBot, isTelegramConfigured } from '@/lib/telegram/bot'
 // oxlint-disable-next-line no-restricted-imports -- the chat SDK hands over a task that is already running under this webhook's label
-import { after } from 'next/server'
+import { after } from '@/lib/server-runtime/server'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 async function handlePOST(request: Request) {
   if (!isTelegramConfigured()) return new Response('Telegram webhook is not configured', { status: 503 })

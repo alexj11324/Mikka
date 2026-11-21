@@ -1,13 +1,9 @@
 import { factoryReviewCriteriaComplete, factoryReviewVerdict } from './validation';
-import { runChanged } from '../live/panels';
 import { factoryRunBotMatches } from './run-scope'
 import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-target'
-import { runListChanged } from '../live/lists'
-import { advanceTaskAfterRunStart } from '../task-status-run-start'
-import type { Pool, PoolClient } from "pg";
+import type { PoolClient } from "pg";
 import { isDeepStrictEqual } from 'node:util';
 import { orchestratorSettings } from '@mikka/protocol/orchestrator';
-import { z } from "zod";
 import { deviceIsOnline } from "../device-presence";
 import {
   applyApprovalMode,
@@ -317,7 +313,7 @@ export async function configureFactoryCheck(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT c.*,EXISTS(SELECT 1 FROM project_decisions pd WHERE (pd."runId"=producer.id OR pd."factoryTaskId"=c."taskId") AND pd."recordStatus"='active' AND NOT EXISTS(SELECT 1 FROM project_decisions replacement WHERE replacement."supersedesId"=pd.id)) AS "hasProjectDecision",producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
+    `SELECT c.*,EXISTS(SELECT 1 FROM project_decisions pd WHERE (pd."runId"=producer.id OR pd."factoryTaskId"=c."taskId") AND pd."recordStatus"='active' AND NOT EXISTS(SELECT 1 FROM project_decisions replacement WHERE replacement."supersedesId"=pd.id)) AS "hasProjectDecision",producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,a.harness,
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel',
@@ -363,7 +359,7 @@ export async function configureFactoryCheck(
       : null)
   if (
     !row.enabled ||
-    (row.deviceKind === 'cloud' ? cloudTarget?.deviceId !== row.deviceId || cloudTarget?.harness !== row.harness : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
+    (row.deviceKind === 'cloud' ? cloudTarget?.deviceId !== row.deviceId || cloudTarget?.harness !== row.harness : !deviceIsOnline(row)) ||
     (!freshCloudTarget && !row.harnesses?.some(
       (h: { harness: string; installed: boolean }) =>
         h.harness === row.harness && h.installed,
@@ -797,36 +793,4 @@ function verifierMcpResultPassed(result: unknown): boolean {
   } catch {
     return false;
   }
-}
-
-/** Legacy callers share the current canonical claim, owner/Bot/source and cancellation fences. */
-export async function isFactoryCheckRun(pool: Pool,userId:string,runId:string) {
- const {rows}=await pool.query(`WITH RECURSIVE lineage AS (
- SELECT id,"retryOf","issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2
- UNION SELECT r.id,r."retryOf",r."issueId" FROM agent_runs r JOIN lineage l ON r.id=l."retryOf" AND r."issueId"=l."issueId" WHERE r."userId"=$2
- ) SELECT EXISTS(SELECT 1 FROM lineage l JOIN factory_attempts a ON a."runId"=l.id JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$2 AND t."issueId"=l."issueId" AND a.stage IN ('review','verify','monitor')) AS bound`,[runId,userId]);
- return rows[0]?.bound === true;
-}
-export function createFactoryCheckClaim(pool:Pool,authorize:import('./store').FactoryAuthorize) {
- return async(userId:string,deviceId:string,runId:string,leaseExpiresAt:string,onClaim?:(tx:PoolClient)=>Promise<void>)=>{
-  const tx=await pool.connect();
-  try {
-   await tx.query('BEGIN');
-   const {createFactoryStore}=await import('./store');
-   const {createFactoryClaim,factoryClaimTask}=await import('./claim');
-   const {factoryMonitorDispatchAssignment}=await import('./monitor-dispatch');
-   const identity=await factoryClaimTask(tx,runId);
-   if(!identity)throw new FactoryError('factoryCheckBindingMismatch');
-   const store=createFactoryStore(pool,authorize,identity.botId);
-   const result=await createFactoryClaim(store,{claimContinuation:async()=>{throw new FactoryError('factoryQuestionContinuationUnavailable')}},(tx,task,id)=>task.stage==='monitor'?factoryMonitorDispatchAssignment(tx,task.userId,id):factoryCheckAssignment(tx,task.userId,id))(tx,userId,deviceId,runId,leaseExpiresAt);
-   await onClaim?.(tx);
-   const updated=await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1 AND status=\'queued\' AND "stopRequestedAt" IS NULL RETURNING id',[runId,leaseExpiresAt]);
-   if(updated.rowCount!==1)throw new FactoryError('factoryRunMismatch');
-    advanceTaskAfterRunStart(tx,runId);
-    await runListChanged(tx,runId);
-    await runChanged(tx,runId);
-   const policy = runPolicySchema.parse(result.policy);
-   await tx.query('COMMIT');return {...result,policy,baseBranch:z.string().parse(result.baseBranch)};
-  }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
- };
 }

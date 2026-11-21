@@ -15,27 +15,25 @@ services:
       MIKKA_EMAIL_FROM: ${MIKKA_EMAIL_FROM:-}
       SMTP_URL: ${SMTP_URL:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MIKKA_DEFAULT_MODEL_BASE_URL: ${MIKKA_DEFAULT_MODEL_BASE_URL:-}
-      MIKKA_DEFAULT_MODEL_API_KEY: ${MIKKA_DEFAULT_MODEL_API_KEY:-}
-      MIKKA_DEFAULT_MODEL_ID: ${MIKKA_DEFAULT_MODEL_ID:-}
-      # The model gateway's protocol converter, when the `litellm` profile runs it.
-      MIKKA_LITELLM_URL: ${MIKKA_LITELLM_URL:-}
-      MIKKA_LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      MIKKA_LITELLM_URL: ${MIKKA_LITELLM_URL:-http://litellm:4000}
+      MIKKA_LITELLM_MASTER_KEY: ${MIKKA_LITELLM_MASTER_KEY:?Set MIKKA_LITELLM_MASTER_KEY in .env}
     volumes:
       - app-data:/data
     depends_on:
+      litellm:
+        condition: service_started
       postgres:
         condition: service_healthy
     stop_grace_period: 60s
-  # Converts Claude Code's and Codex's protocols for API keys of providers that
-  # speak only Chat Completions. Start with `--profile litellm` and set
-  # MIKKA_LITELLM_URL=http://litellm:4000 and LITELLM_MASTER_KEY in .env.
+  # Mandatory model egress. Upstream credentials stay in this service.
   litellm:
-    profiles: ["litellm"]
     build: ./deploy/litellm
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      LITELLM_MASTER_KEY: ${MIKKA_LITELLM_MASTER_KEY:?Set MIKKA_LITELLM_MASTER_KEY in .env}
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped

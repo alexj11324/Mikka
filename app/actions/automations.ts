@@ -40,20 +40,27 @@ async function command<T>(input: Command, workspaceId?: string, finish?: (worksp
 
 const id = z.uuid()
 
-/** 创建者: each row's creator as the workspace's member list names them (members only read their own workspace). */
+/** 创建者: each row's creator as the workspace's member list names them, with their picture (members only read their own workspace). */
 async function withCreators(workspaceId: string, list: AutomationList): Promise<AutomationList> {
-  const owners = [...new Set(list.schedules.map(row => row.owner_id))]
+  const owners = [...new Set(list.schedules.flatMap(row => row.run_as_user_id ? [row.owner_id, row.run_as_user_id] : [row.owner_id]))]
   if (!owners.length) return list
-  const { workspacePool } = await import('@/lib/workspace-db')
-  const { rows } = await workspacePool.query<{ userId: string; name: string }>('SELECT "userId",name FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [workspaceId, owners])
-  const names = new Map(rows.map(row => [row.userId, row.name]))
-  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null })) }
+  const [{ workspacePool }, { pool }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/db')])
+  // Members live in the workspace database, accounts (and their pictures) in Mikka's: two reads, no cross-database join.
+  const [members, accounts] = await Promise.all([
+    workspacePool.query<{ userId: string; name: string }>('SELECT "userId",name FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [workspaceId, owners]),
+    pool.query<{ id: string; image: string | null }>('SELECT id,image FROM "user" WHERE id=ANY($1::text[])', [owners]),
+  ])
+  const names = new Map(members.rows.map(row => [row.userId, row.name]))
+  // A picture only for someone still a member, as the name.
+  const images = new Map(accounts.rows.filter(row => names.has(row.id)).map(row => [row.id, row.image]))
+  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null, owner_image: images.get(row.owner_id) ?? null,
+    ...(row.run_as_user_id ? { run_as_name: names.get(row.run_as_user_id) ?? null } : {}) })) }
 }
 const versioned = z.object({ scheduleId: z.uuid(), version: z.number().int().positive() }).strict()
 
-/** The workspace's automations, newest first; `cursor` continues a page. */
-export async function listAutomations(input: { cursor?: string; deleted?: boolean } = {}, workspaceId?: string): Promise<ActionResult<AutomationList>> {
-  const parsed = scheduleListInput.safeParse({ cursor: input.cursor, deleted: input.deleted })
+/** The workspace's automations, newest first; `cursor` continues a page; `owner` and `trigger` are 我的 and 定时. */
+export async function listAutomations(input: { cursor?: string; deleted?: boolean; owner?: 'me'; trigger?: 'schedule' } = {}, workspaceId?: string): Promise<ActionResult<AutomationList>> {
+  const parsed = scheduleListInput.safeParse({ cursor: input.cursor, deleted: input.deleted, owner: input.owner, trigger: input.trigger })
   if (!parsed.success) return { error: 'validationGeneric' }
   return command<AutomationList>({ action: 'list', ...parsed.data }, workspaceId, withCreators)
 }
@@ -123,6 +130,29 @@ export async function resumeAutomation(input: { scheduleId: string; version: num
 export async function takeOverAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
   return parsed.success ? command({ action: 'take_over', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
+}
+
+/** Runs as: who each run acts, is billed and posts as; null is the creator. A person can name only themselves. */
+export async function setAutomationRunAs(input: { scheduleId: string; version: number; userId: string | null }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = versioned.extend({ userId: z.string().min(1).max(200).nullable() }).safeParse(input)
+  return parsed.success ? command({ action: 'run_as', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
+}
+
+/** Runs as' choices: the reader themselves, while an active member (a person can name only themselves). */
+export async function automationRunAsChoices(workspaceId?: string): Promise<ActionResult<{ members: { id: string; name: string }[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    if (workspaceId !== undefined && !z.uuid().safeParse(workspaceId).success) throw new ActionFailureError('validationGeneric')
+    let actor
+    try { actor = await currentWorkspaceActor(workspaceId) } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
+      throw error
+    }
+    const { workspacePool } = await import('@/lib/workspace-db')
+    const { rows } = await workspacePool.query<{ id: string; name: string; role: string }>(`SELECT "userId" id,name,role FROM mikka_workspace_members
+      WHERE "workspaceId"=$1 AND status='active' ORDER BY lower(name),"userId"`, [actor.workspaceId])
+    return { members: rows.filter(row => row.id === actor.userId).map(({ id, name }) => ({ id, name })) }
+  })
 }
 
 /** Webhook 地址: a new secret URL key for the automation, returned once; the previous URL stops working. */
@@ -256,4 +286,10 @@ export async function cancelAutomationRun(input: { scheduleId: string; version: 
 export async function runAutomationNow(input: { scheduleId: string; version: number; requestId: string }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
   const parsed = versioned.extend({ requestId: z.uuid() }).safeParse(input)
   return parsed.success ? command({ action: 'run_now', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
+}
+
+/** Duplicate to: a copy in this or another workspace of the person's, checked there; `cleared` names what it could not keep. */
+export async function duplicateAutomation(input: { scheduleId: string; targetWorkspaceId: string; requestId: string }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; cleared: string[]; replayed: boolean }>> {
+  const parsed = z.object({ scheduleId: z.uuid(), targetWorkspaceId: z.uuid(), requestId: z.uuid() }).strict().safeParse(input)
+  return parsed.success ? command({ action: 'duplicate', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }

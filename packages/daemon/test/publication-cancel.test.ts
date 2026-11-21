@@ -11,7 +11,7 @@ import type { OutboxItem } from '../src/outbox'
 import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { WorktreeManager } from '../src/worktrees'
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
+import { cleanupTempDirs, loseDeviceSession, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(() => { vi.restoreAllMocks(); cleanupTempDirs() })
 
@@ -97,9 +97,9 @@ it.each(['revoke', 'expiry'] as const)('honors local lease %s after verification
   try {
     const signal = await f.entered.promise
     if (reason === 'revoke') {
-      f.supervisor.revokeLeases([f.runId])
+      loseDeviceSession(f.supervisor)
       expect(signal?.aborted).toBe(true)
-    } else f.supervisor.renewLeases({ [f.runId]: new Date(Date.now() - 1).toISOString() })
+    } else loseDeviceSession(f.supervisor, false)
     f.release.resolve()
     await f.supervisor.idle()
     expect(signal?.aborted).toBe(true)

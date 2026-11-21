@@ -1,0 +1,649 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import useSWR from "swr";
+import useSWRInfinite, { unstable_serialize } from "swr/infinite";
+import { useTranslations } from "@/lib/intl/i18n-client";
+import { Copy, Pin, X } from "lucide-react";
+import { listConversations } from "@/app/actions/task-runs";
+import { listWorkspaceProjects } from "@/app/actions/projects";
+import { deleteSavedView, listPullPins, listSavedViews, saveView as storeView, setPullPins } from "@/app/actions/list-views";
+import { useActionError } from "@/lib/use-action-error";
+import { useSearchParams } from "@/lib/client-runtime/navigation";
+import { withBasePath } from "@/lib/base-path";
+import { useViewState } from "@/lib/hooks/view-state";
+import { useLiveKey } from "@/hooks/use-live-key";
+import { githubPullRequestKey } from "@/lib/issue-metadata";
+import type { ConversationDirectoryPage } from "@/lib/conversation-directory-input";
+import {
+  filterDirectoryPulls,
+  groupDirectoryPulls,
+  initialPullFilters as initial,
+  pullFromAddress,
+  pullAddressRow,
+  pullSinceInstant,
+  readSavedPullView,
+  linkedPullDirectory,
+  pullViews,
+  type PullDirectoryPage,
+  type PullDirectoryRow,
+  type PullState,
+  type PullFilters,
+  type PullGroup,
+  type SavedPullView,
+} from "@/lib/pull-directory";
+import { Button } from "@/components/ui/button";
+import { PULL_REQUEST_ICONS } from "@/lib/pull-request-appearance";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResizablePane } from "@/components/ui/resizable-pane";
+import { cn } from "cn";
+import { PullConnectState, PullFilterBar } from "./pull-filters";
+import { PullPreview } from "./pull-preview";
+import { PullGroupHeader, PullRow, PullRowSkeleton } from "./pull-row";
+
+const EmptyMark = PULL_REQUEST_ICONS.open;
+
+const viewKeys: Record<PullFilters["view"], `views.${PullFilters["view"]}`> = {
+  open: "views.open",
+  ready: "views.ready",
+  merged: "views.merged",
+  all: "views.all",
+};
+type RepoStatus = {
+  viewerId: string;
+  connected: boolean;
+  repositories: { fullName: string }[];
+};
+const stateKeys: Record<PullState, `states.${PullState}`> = {
+  ready: "states.ready",
+  attention: "states.attention",
+  pending: "states.pending",
+  draft: "states.draft",
+  open: "states.open",
+  merged: "states.merged",
+  closed: "states.closed",
+};
+async function read<T>(path: string, ownerId: string): Promise<T> {
+  const response = await fetch(withBasePath(path), { cache: "no-store" });
+  const body = await response.json();
+  if (!response.ok || (body.viewerId && body.viewerId !== ownerId))
+    throw new Error("pullDirectoryReadFailed");
+  return body as T;
+}
+
+/** PR-native page. Thread archive/read settings deliberately remain in the thread directory. */
+export function PullDirectory({
+  ownerId,
+  workspaceId,
+  botId,
+  revision = 0,
+}: {
+  ownerId: string;
+  workspaceId: string | null;
+  botId: string | null;
+  revision?: number;
+}) {
+  const t = useTranslations("PullDirectory");
+  const scope = `pull-directory:${ownerId}:${workspaceId}:${botId ?? "all"}`;
+  const [stored, setFilters] = useViewState<PullFilters>(
+    scope + ":filters",
+    initial,
+  );
+  // Filters kept on this device before Created and Project existed read with their defaults.
+  const filters: PullFilters = { ...initial, ...stored };
+  const actionError = useActionError();
+  const [repo, setRepo] = useViewState(scope + ":repo", "");
+  const [grouping, setGrouping] = useViewState<PullGroup>(
+    scope + ":group",
+    "state",
+  );
+  // Pins and saved views follow the person across devices (pull_pins, saved_views).
+  const pins = useSWR(
+    workspaceId ? ["pull-pins", ownerId, workspaceId] : null,
+    ([, , workspace]) => listPullPins(workspace),
+    { revalidateOnFocus: false },
+  );
+  const pinned = pins.data ?? [];
+  const savedViews = useSWR(
+    workspaceId ? ["saved-views", "pulls", ownerId, workspaceId] : null,
+    ([, , , workspace]) => listSavedViews(workspace, "pulls"),
+    { revalidateOnFocus: false },
+  );
+  const views = (savedViews.data ?? []).flatMap((view): SavedPullView[] => {
+    const read = readSavedPullView(view);
+    return read ? [read] : [];
+  });
+  const projects = useSWR(
+    workspaceId ? ["pull-projects", ownerId, workspaceId] : null,
+    ([, , workspace]) => listWorkspaceProjects(workspace),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const projectOptions = (Array.isArray(projects.data) ? projects.data : []).map(
+    (project: { id: string; name: string }) => ({ id: project.id, name: project.name }),
+  );
+  const params = useSearchParams();
+  const addressed = pullFromAddress(params.get("pull"));
+  const [checked, setChecked] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"copied" | "copyError" | null>(
+    null,
+  );
+  const [collapsed, setCollapsed] = useViewState<string[]>(
+    scope + ":collapsed",
+    [],
+  );
+  const searchRef = useRef<HTMLInputElement>(null);
+  const {
+    data: repositories,
+    error: repositoryError,
+    mutate: retryRepositories,
+  } = useSWR<RepoStatus>(
+    workspaceId ? [scope, "repositories"] : null,
+    () => read("/api/integrations/github", ownerId),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const linkedKey = (
+    index: number,
+    previous: ConversationDirectoryPage | null,
+  ) =>
+    !workspaceId || (index > 0 && !previous?.cursor)
+      ? null
+      : ([
+          "pull-linked",
+          ownerId,
+          workspaceId,
+          botId,
+          previous?.cursor ?? null,
+          revision,
+          filters.project || null,
+          filters.since || null,
+        ] as const);
+  const linked = useSWRInfinite<
+    ConversationDirectoryPage,
+    Error,
+    typeof linkedKey
+  >(
+    linkedKey,
+    ([, , , bot, cursor, , project, since]) =>
+      listConversations({
+        botId: bot ?? undefined,
+        archived: "any",
+        pullState: "linked",
+        cursor: cursor ?? undefined,
+        projectId: project ?? undefined,
+        since: pullSinceInstant(since ?? "") ?? undefined,
+      }),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const githubKey = (index: number, previous: PullDirectoryPage | null) =>
+    !workspaceId || !repo || (index > 0 && !previous?.cursor)
+      ? null
+      : ([
+          "pull-github",
+          ownerId,
+          workspaceId,
+          repo,
+          filters.view,
+          previous?.cursor ?? null,
+          filters.since || null,
+        ] as const);
+  const github = useSWRInfinite<PullDirectoryPage, Error, typeof githubKey>(
+    githubKey,
+    ([, , , repository, view, cursor, since]) =>
+      read(
+        "/api/integrations/github/repositories/pulls?" +
+          new URLSearchParams({
+            repo: repository,
+            view,
+            ...(cursor ? { cursor } : {}),
+            ...(since ? { since: pullSinceInstant(since)! } : {}),
+          }),
+        ownerId,
+      ),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  useLiveKey(
+    "thread_list",
+    workspaceId,
+    workspaceId
+      ? [
+          unstable_serialize(linkedKey),
+          ...(repo ? [unstable_serialize(githubKey)] : []),
+        ]
+      : [],
+    workspaceId,
+  );
+  // GitHub's webhook invalidations are task-scoped; the repository view also has an explicit refresh, never a timer.
+  const linkedRows = linkedPullDirectory(
+    linked.data?.flatMap((page) => page.items) ?? [],
+  );
+  const linkedByUrl = new Map(
+    linkedRows.map((row) => [githubPullRequestKey(row.url), row.threads]),
+  );
+  const data = repo ? github.data : linked.data;
+  const rows = repo
+    ? [
+        ...new Map(
+          github.data
+            ?.flatMap((page) => page.items)
+            .map((row) => [
+              githubPullRequestKey(row.url),
+              {
+                ...row,
+                threads: linkedByUrl.get(githubPullRequestKey(row.url)) ?? [],
+              },
+            ]),
+        ).values(),
+      ]
+    : linkedRows;
+  const error = repo ? github.error : linked.error;
+  // GitHub's connection is the one state that replaces the list rather than
+  // sitting above it: an empty result under "connect GitHub" was two answers to
+  // one question.
+  const disconnected =
+    Boolean(repositoryError) ||
+    (repositories ? !repositories.connected : false);
+  const busy = repo ? github.isValidating : linked.isValidating;
+  const more = Boolean(data?.at(-1)?.cursor);
+  // A project names tasks; in a repository's list only PRs those tasks' threads delivered belong to it.
+  const scoped = repo && filters.project ? rows.filter((row) => row.threads.length > 0) : rows;
+  const visible = filterDirectoryPulls(scoped, filters);
+  const groups = groupDirectoryPulls(visible, grouping, pinned);
+  const ordered = groups.flatMap((group) =>
+    collapsed.includes(group.key) ? [] : group.rows,
+  );
+  // A PR's own address (`pull=owner/name/number`, "Open in new tab") opens its preview, which reads
+  // the PR itself (pulls/detail), so it opens whether or not the PR is in the loaded list or a task's.
+  const addressedRow = addressed ? pullAddressRow(addressed, linkedByUrl) : null;
+  const active =
+    visible.find((row) => row.url === selected) ??
+    (addressedRow && selected === addressedRow.url ? addressedRow : undefined);
+  const visibleChecked = visible.filter((row) => checked.includes(row.url));
+  const set = (patch: Partial<PullFilters>) => {
+    setFilters((previous) => ({ ...previous, ...patch }));
+    setSelected(null);
+    setChecked([]);
+    setCopyState(null);
+  };
+  const changeRepo = (value: string) => {
+    setRepo(value);
+    setSelected(null);
+    setChecked([]);
+    setCopyState(null);
+    setFilters((previous) => ({
+      ...previous,
+      author: "",
+      label: "",
+      linked: false,
+    }));
+  };
+  async function copy(urls: string[]) {
+    try {
+      await navigator.clipboard.writeText(urls.join("\n"));
+      setCopyState("copied");
+    } catch {
+      setCopyState("copyError");
+    }
+  }
+  async function refresh() {
+    await Promise.all([linked.mutate(), ...(repo ? [github.mutate()] : [])]);
+  }
+  function select(row: PullDirectoryRow) {
+    setSelected(row.url);
+    setCopyState(null);
+  }
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("copied"));
+    } catch {
+      toast.error(t("copyError"));
+    }
+  }
+  async function pin(urls: string[]) {
+    if (!workspaceId) return;
+    const keys = urls.map(githubPullRequestKey);
+    const next = !keys.every((key) => pinned.includes(key));
+    const optimistic = next
+      ? [...new Set([...pinned, ...keys])]
+      : pinned.filter((key) => !keys.includes(key));
+    try {
+      await pins.mutate(
+        async () => {
+          const result = await setPullPins(workspaceId, urls.slice(0, 100), next);
+          if (result.error) throw new Error(result.error);
+          return result.pins;
+        },
+        { optimisticData: optimistic, rollbackOnError: true, revalidate: false },
+      );
+    } catch (error) {
+      toast.error(actionError(error instanceof Error ? error.message : null));
+    }
+  }
+  const heading = (key: string) =>
+    key === "pinned" || key === "results" || key === "unknownAuthor"
+      ? t(key)
+      : grouping === "state"
+        ? t(stateKeys[key as PullState])
+        : key;
+  const filtered =
+    filters.search ||
+    filters.state ||
+    filters.author ||
+    filters.label ||
+    filters.linked ||
+    filters.since ||
+    filters.project ||
+    filters.view !== "all";
+  async function saveView() {
+    if (!workspaceId) return;
+    const name = t("viewDefaultName", { view: t(viewKeys[filters.view]) });
+    try {
+      const result = await storeView({ workspaceId, scope: "pulls", name, filters: { filters, repo, grouping } });
+      if (result.error) toast.error(actionError(result.error));
+      else await savedViews.mutate();
+    } catch {
+      toast.error(actionError());
+    }
+  }
+  async function removeView(id: string) {
+    if (!workspaceId) return;
+    try {
+      const result = await deleteSavedView(workspaceId, id);
+      if (result.error && result.error !== "savedViewNotFound") toast.error(actionError(result.error));
+      await savedViews.mutate();
+    } catch {
+      toast.error(actionError());
+    }
+  }
+  const addressKey = addressedRow?.url ?? null;
+  useEffect(() => {
+    if (addressKey) setSelected(addressKey);
+  }, [addressKey]);
+  return (
+    <section
+      aria-label={t("title")}
+      data-slot="pull-directory"
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      onKeyDown={(event) => {
+        const editing = (event.target as HTMLElement).closest(
+          "input,textarea,select,[contenteditable=true],[role=combobox],[role=menu],[role=dialog]",
+        );
+        if (editing || event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.key === "/") {
+          event.preventDefault();
+          searchRef.current?.focus();
+        }
+        if (event.key === "Escape") {
+          setSelected(null);
+          setChecked([]);
+        }
+        if (
+          ["j", "k", "ArrowDown", "ArrowUp"].includes(event.key) &&
+          ordered.length &&
+          (event.target as HTMLElement).closest("[data-pull-list]")
+        ) {
+          event.preventDefault();
+          const index = ordered.findIndex((row) => row.url === selected);
+          const next =
+            ordered[
+              Math.max(
+                0,
+                Math.min(
+                  ordered.length - 1,
+                  index +
+                    (event.key === "j" || event.key === "ArrowDown" ? 1 : -1),
+                ),
+              )
+            ];
+          select(next);
+          event.currentTarget
+            .querySelector<HTMLButtonElement>(
+              `[data-pull-index="${ordered.indexOf(next)}"]`,
+            )
+            ?.focus();
+        }
+      }}
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 pt-4">
+        <h1 className="me-1 text-xl font-semibold text-foreground">{t("title")}</h1>
+        <Tabs
+          value={filters.view}
+          onValueChange={(value) => set({ view: value as PullFilters["view"], state: "" })}
+        >
+          <TabsList variant="line" aria-label={t("viewLabel")}>
+            {pullViews.map((view) => (
+              <TabsTrigger key={view} value={view}>
+                {t(viewKeys[view])}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <NativeSelect
+          size="sm"
+          aria-label={t("source")}
+          value={repo}
+          onChange={(event) => changeRepo(event.target.value)}
+          className="ms-auto max-w-56"
+        >
+          <NativeSelectOption value="">{t("linkedPulls")}</NativeSelectOption>
+          {repo && !(repositories?.repositories ?? []).some((row) => row.fullName === repo) && (
+            <NativeSelectOption value={repo}>{repo}</NativeSelectOption>
+          )}
+          {(repositories?.repositories ?? []).map((row) => (
+            <NativeSelectOption key={row.fullName} value={row.fullName}>
+              {row.fullName}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
+      <PullFilterBar
+        filters={filters}
+        grouping={grouping}
+        repo={repo}
+        authors={[...new Set(rows.flatMap((row) => (row.author ? [row.author] : [])))].sort()}
+        labels={[...new Set(rows.flatMap((row) => row.labels))].sort()}
+        total={rows.length}
+        shown={visible.length}
+        busy={busy}
+        searchRef={searchRef}
+        onChange={set}
+        onGrouping={setGrouping}
+        onRefresh={() => void refresh()}
+        views={views}
+        onApplyView={(view) => {
+          setFilters(view.filters);
+          setRepo(view.repo);
+          setGrouping(view.grouping);
+          setSelected(null);
+          setChecked([]);
+        }}
+        onDeleteView={(id) => void removeView(id)}
+        onSaveView={() => void saveView()}
+        projects={projectOptions}
+      />
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        <div
+          data-pull-list
+          tabIndex={0}
+          aria-label={t("list")}
+          className={cn(
+            "min-h-0 min-w-0 flex-1 overflow-auto pb-4 outline-none",
+            active && "hidden md:block",
+          )}
+        >
+          <div className="px-2">
+            {disconnected ? (
+              <PullConnectState
+                error={Boolean(repositoryError)}
+                busy={busy}
+                onRetry={() => void retryRepositories()}
+              />
+            ) : null}
+            {!disconnected && error && (
+              <div role="alert" className="mx-4 mt-6 flex flex-col items-start gap-3 rounded-xl bg-control px-4 py-4">
+                <p className="text-sm text-foreground">{t("loadError")}</p>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void refresh()}>
+                  {t("retry")}
+                </Button>
+              </div>
+            )}
+            {!disconnected && !error && !data && (
+              <div role="status" aria-label={t("loading")} className="flex flex-col py-1">
+                {[0, 1, 2, 3, 4, 5, 6].map((key) => (
+                  <PullRowSkeleton key={key} />
+                ))}
+              </div>
+            )}
+            {!disconnected && !error && data && !visible.length && (
+              <Empty className="min-h-72 border-0">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <EmptyMark />
+                  </EmptyMedia>
+                  <EmptyTitle>{t(filtered ? "noMatches" : "empty")}</EmptyTitle>
+                  {more && <EmptyDescription>{t("noLoadedMatches")}</EmptyDescription>}
+                </EmptyHeader>
+                <EmptyContent>
+                  {filtered ? (
+                    <Button size="sm" variant="secondary" onClick={() => setFilters(initial)}>
+                      {t("clearFilters")}
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => void refresh()}>
+                      {t("refresh")}
+                    </Button>
+                  )}
+                </EmptyContent>
+              </Empty>
+            )}
+            {groups.map((group, position) => {
+              const open = !collapsed.includes(group.key);
+              return (
+                <section
+                  key={group.key}
+                  aria-label={heading(group.key)}
+                  className={cn("flex flex-col", position > 0 && "pt-1")}
+                >
+                  <PullGroupHeader
+                    label={heading(group.key)}
+                    count={group.rows.length}
+                    open={open}
+                    onToggle={() =>
+                      setCollapsed((previous) =>
+                        open
+                          ? [...previous, group.key]
+                          : previous.filter((key) => key !== group.key),
+                      )
+                    }
+                  />
+                  {open && (
+                    <ul className="flex flex-col">
+                      {group.rows.map((row) => (
+                        <PullRow
+                          key={row.url}
+                          row={row}
+                          index={ordered.indexOf(row)}
+                          selected={selected === row.url}
+                          checked={checked.includes(row.url)}
+                          pinned={pinned.includes(githubPullRequestKey(row.url))}
+                          onSelect={select}
+                          onCheck={(url, next) => {
+                            setChecked((previous) =>
+                              next
+                                ? [...new Set([...previous, url])]
+                                : previous.filter((item) => item !== url),
+                            );
+                            setCopyState(null);
+                          }}
+                          onPin={(url) => void pin([url])}
+                          onCopy={(text) => void copyText(text)}
+                          workspaceId={workspaceId}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            })}
+            {more && (
+              <div className="flex justify-center py-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void (repo ? github.setSize(github.size + 1) : linked.setSize(linked.size + 1))
+                  }
+                >
+                  {t(busy ? "loading" : "more")}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        {active && (
+          <ResizablePane
+            render="aside"
+            role="region"
+            aria-label={t("preview")}
+            label={t("resizePreview")}
+            storageKey={scope + ":width"}
+            defaultWidth={420}
+            min={320}
+            max={720}
+            edge="start"
+            from="md"
+            className="flex min-h-0 w-full flex-col border-s border-rule bg-background md:w-96"
+          >
+            <PullPreview row={active} source={Boolean(repo)} onClose={() => setSelected(null)} onMerged={() => void refresh()} />
+          </ResizablePane>
+        )}
+      </div>
+      {visibleChecked.length > 0 && (
+        <div
+          aria-label={t("selection")}
+          className="mx-2 mb-2 flex flex-wrap items-center gap-1 rounded-lg bg-control px-3 py-1.5"
+        >
+          <span className="me-auto text-xs tabular-nums text-muted-foreground">
+            {t("selected", { count: visibleChecked.length })}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void copy(visibleChecked.map((row) => row.url))}
+          >
+            <Copy data-icon />
+            {t("copyLinks")}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void pin(visibleChecked.map((row) => row.url))}>
+            <Pin data-icon />
+            {t(
+              visibleChecked.every((row) => pinned.includes(githubPullRequestKey(row.url)))
+                ? "unpin"
+                : "pin",
+            )}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setChecked([])}>
+            <X data-icon />
+            {t("deselect")}
+          </Button>
+          {copyState && (
+            <span
+              role={copyState === "copyError" ? "alert" : "status"}
+              className={cn(
+                "ms-1 text-xs",
+                copyState === "copyError" ? "text-destructive-foreground" : "text-muted-foreground",
+              )}
+            >
+              {t(copyState)}
+            </span>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

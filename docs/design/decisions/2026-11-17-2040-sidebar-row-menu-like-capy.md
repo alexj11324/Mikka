@@ -17,6 +17,6 @@
   - 删除：先问「删除「名字」？」，说明它的聊天记录会被永久删除、它派出的任务和线程会保留；按钮是取消、改为归档、删除，和 Capy 的 Cancel / Archive instead / Delete 一样。删除时 Bot 离开它所在的群聊，它带的线程继续存在但不再归它，它的聊天、附件、会话和定时任务随它删除，它派出的任务和运行记录保留。
   - Coordinator 不能归档或删除，菜单里也没有这两项。
   - 写入在 `lib/bot-lifecycle.ts`（`archiveBot`、`deleteBot`、`listArchivedOwnBots`，Desktop RPC 同名）。
-- Capy 菜单里 Mikka 网页侧栏还表现不出来的项（置顶、移到文件夹）先不加：网页侧栏还不按置顶排列，加了会让人以为操作成功了。
+- 同日 Alex 追加「这他妈都得做」：Bot 和群聊行加上个人资料、复制链接、置顶 / 取消置顶、静音、隐藏 / 取消隐藏（侧栏按置顶排列，隐藏的折叠在「已隐藏」下）；线程行的右键菜单有在新标签页中打开、复制链接、置顶、重命名、标为已读 / 未读、归档。移到文件夹仍不加：Mikka 没有侧栏文件夹。行的样子见 [2026-11-18-1200](2026-11-18-1200-sidebar-rows-as-capy.md)。
 
 实现：公开仓库 `components/nav/bot-list.tsx`（`ChatNavEntry.actions`）和 `components/nav/chat-row-actions.ts`；私有 `mikka-hosted-ui` 的 `slots/app-frame.tsx` 和 `patches/app-shell.patch`（`ShellNavItem.menu`、`menuOnClick`）。补充 [2026-11-10-1317](2026-11-10-1317-capy-sidebar-and-task-layout.md) 的「Sidebar」一节。

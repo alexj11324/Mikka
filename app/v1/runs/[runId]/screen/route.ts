@@ -4,7 +4,6 @@ import { screenCaptures } from '@/lib/captures/screen'
 import { maskFor } from '@/lib/secrets/runtime'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
-export const dynamic = 'force-dynamic'
 // A recording's file comes off the machine on stop.
 export const maxDuration = 120
 

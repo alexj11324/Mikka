@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/components/icons";
 import {
   AnimatePresence,
   type HTMLMotionProps,

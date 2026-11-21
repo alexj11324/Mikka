@@ -45,6 +45,15 @@ mock.module('@/app/actions/memory', { namedExports: {
     persisted.facts = persisted.facts.filter(fact => fact.id !== id)
     return true
   },
+  reviewFact: async (id: string, decision: 'approve' | 'reject') => {
+    writes.push(`review:${decision}`)
+    if (!allowed) return false
+    const fact = persisted.pending.find(item => item.id === id)
+    if (!fact) return false
+    persisted.pending = persisted.pending.filter(item => item.id !== id)
+    if (decision === 'approve') persisted.facts = [{ ...fact, reviewStatus: 'approved', userEdited: true }, ...persisted.facts]
+    return true
+  },
 } })
 
 const browser = new Window({ url: 'https://fixture.example/' })
@@ -136,6 +145,33 @@ test('the memory switch still accepts its void action result', async () => {
   assert.equal(memory.failed, false)
   await act(async () => { await refresh() })
   assert.equal(memory.data?.enabled, false)
+})
+
+const pendingId = '9d1f0d55-7f4e-4a63-8c1e-1a2b3c4d5e6f'
+const pendingFact = { ...original.facts[0], id: pendingId, subject: 'Learned but unconfirmed', reviewStatus: 'pending' as const, userEdited: false }
+
+test('a learned fact waits in pending and approving it makes it a visible fact', async () => {
+  persisted = structuredClone({ ...original, facts: [], total: 0, pending: [pendingFact] })
+  await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}><Probe /></SWRConfig>))
+  await settle()
+  assert.equal(container.textContent, '', 'a pending fact is not shown among approved facts')
+  assert.equal(memory.data?.pending.length, 1, 'but the person can see that one is waiting')
+  allowed = true
+  await act(async () => { await memory.review(pendingId, 'approve') })
+  assert.deepEqual(writes, ['review:approve'])
+  assert.equal(memory.data?.pending.length, 0)
+  assert.equal(container.textContent, 'Learned but unconfirmed', 'approving it makes it a fact Mikka uses')
+})
+
+test('rejecting a pending fact discards it without approving anything', async () => {
+  persisted = structuredClone({ ...original, facts: [], total: 0, pending: [pendingFact] })
+  await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}><Probe /></SWRConfig>))
+  await settle()
+  allowed = true
+  await act(async () => { await memory.review(pendingId, 'reject') })
+  assert.deepEqual(writes, ['review:reject'])
+  assert.equal(memory.data?.pending.length, 0)
+  assert.equal(container.textContent, '')
 })
 
 test('Retry saves the refused memory switch value', async () => {

@@ -3,7 +3,6 @@ import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { processLinearSyncBatch } from '@/lib/linear-sync/worker'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 async function handleGET(request: Request) {

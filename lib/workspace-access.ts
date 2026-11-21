@@ -1,11 +1,16 @@
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { getLocale } from 'next-intl/server'
+import { getLocale } from '@/lib/intl/i18n-server'
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
+// From lib/issue-access, not lib/acting-user directly: that module's
+// `requireUser` resolves the session lazily, so importing this file does not
+// statically pull lib/session.ts (and `next/headers`) into every reader.
+// issue-access reaches this module only through `await import()`, so the two
+// files are not a static cycle.
 import { requireUser } from '@/lib/issue-access'
 import * as workspaceDatabase from '@/lib/workspace-db'
 import { actingContext } from '@/lib/activity-actor'

@@ -4,7 +4,7 @@ import { withTaskDevicePresence } from './task-state-presence'
 import type { TaskStateRun } from './task-state'
 
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { db } from '@/lib/db'
 import { correlatedColumn } from '@/lib/db/correlated-column'
 import { agentRuns, agents, bots, issues } from '@/lib/db/schema'

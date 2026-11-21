@@ -16,6 +16,7 @@ const threadReadRevision = sql<number>`coalesce(${conversationReads.unreadRevisi
 export type ThreadReadChange =
   | { action: 'unread'; runId: string }
   | { action: 'unread'; chatId: string }
+  | { action: 'read'; chatId: string }
   | { action: 'read'; runId: string; through: string | null; revision: number }
   | { action: 'readAll' }
 
@@ -57,6 +58,13 @@ async function writeThreadRead(reader: IssueReader, workspaceId: string, change:
       [userId, workspaceId, 'chatId' in change ? change.chatId : null])
       if ('chatId' in change) {
         if (!rows.length) return false
+        if (change.action === 'read') {
+          // Up to its latest message, and the manual mark with it, as opening the chat does.
+          if (await (await import('./group-read-receipts')).acknowledgeGroupReads(client, userId, [change.chatId])) {
+            await (await import('./live/lists')).threadReadChanged(client, userId, workspaceId, 'group_list')
+          }
+          return true
+        }
         const { setGroupPreference } = await import('@/lib/chat-preferences')
         return await setGroupPreference(userId, change.chatId, { markedUnread: true }) === 'ok'
       }

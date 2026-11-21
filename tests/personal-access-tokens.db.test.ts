@@ -89,7 +89,8 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
         'insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,$4,$5,$6) returning scopes',
         [crypto.randomUUID(), owner, ws.id, 'post-M4', hashPersonalAccessToken(crypto.randomUUID()), 'abcd'],
       )
-      assert.deepEqual(inserted.rows[0].scopes, [...DEFAULT_API_SCOPES])
+      // This file's own default; 20261120044938_agent_bot_interop.sql later widens it to today's DEFAULT_API_SCOPES.
+      assert.deepEqual(inserted.rows[0].scopes, ['tasks:read', 'tasks:write', 'runs:read', 'runs:write'])
       await assert.rejects(
         client.query(
           `insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,'Mixed scope',$4,'AAAA',ARRAY['legacy:full','tasks:read']::text[])`,

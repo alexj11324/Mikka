@@ -47,6 +47,19 @@ test('custom origin is explicit; opaque, lookalike, embedded and resource frames
   assert.equal(isTrustedFrame('mikka://app/', RENDERER_URL), false)
 })
 
+test('Project checkout bookmarks forward only the three registered device/project methods', () => {
+  const id = '00000000-0000-4000-8000-000000000001'
+  const device = `/api/workspaces/${id}/devices/${id}/project-checkout`
+  const project = `/api/workspaces/${id}/projects/${id}/device-checkouts`
+  for (const path of [device, device + '/clear']) {
+    assert.equal(allowedApiPath(path, 'POST'), true)
+    for (const method of ['GET', 'PUT', 'DELETE']) assert.equal(allowedApiPath(path, method), false)
+  }
+  assert.equal(allowedApiPath(project, 'GET'), true)
+  assert.equal(allowedApiPath(project, 'POST'), false)
+  assert.equal(allowedApiPath(device + '/execute', 'POST'), false)
+})
+
 test('path policy rejects traversal, encoded delimiters, absolute targets and unknown API routes', () => {
   for (const path of ['/mikka/../secret', '/mikka/%2e%2e/secret', '/mikka/%252e%252e/secret', '/mikka/%2fapi/auth/token', '/mikka/a\\b', '//evil.test/api', '/mikka/a%00b']) assert.equal(normalizedRendererPath(path), null, path)
   assert.equal(rendererAssetPath('/safe/root', '/mikka/assets/file.js'), '/safe/root/assets/file.js')
@@ -63,6 +76,13 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
   assert.equal(allowedApiPath('/api/settings/issue-prefix/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'GET'), true)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'POST'), false)
+  // 收件箱 reads its authorized page and writes its lifecycle commands; nothing
+  // else about it is reachable, and the count query rides the same GET.
+  assert.equal(allowedApiPath('/api/inbox', 'GET'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'POST'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'HEAD'), true, 'HEAD reads as GET')
+  for (const method of ['PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/inbox', method), false, method)
+  assert.equal(allowedApiPath('/api/inbox/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token/metadata', 'GET'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/viewer`, 'POST'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/takeover`, 'POST'), false)
@@ -658,8 +678,11 @@ test('desktop forwards eve protocol headers and fences NDJSON bytes at account/w
   assert.equal(cancelled, true)
 })
 
-test('run environment settings forwarding permits only the exact read route', () => {
-  assert.equal(allowedApiPath('/api/settings/environments', 'GET'), true)
-  assert.equal(allowedApiPath('/api/settings/environments/extra', 'GET'), false)
-  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/settings/environments', method), false)
+test('run environment and thread title settings forwarding permits only exact read routes', () => {
+  for (const path of ['/api/settings/environments', '/api/settings/thread-titles']) {
+    assert.equal(allowedApiPath(path, 'GET'), true, path)
+    assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+    assert.equal(allowedApiPath(`${path}/`, 'GET'), false)
+    for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false)
+  }
 })

@@ -31,7 +31,7 @@ const detail = { ...artifact, latestVersion: 1, runId: null, issueId: null, live
 const thread = { id: 'run', issueId: 'issue', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true, createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run', prompt: 'Fixture thread', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false, detail: { name: 'Fixture thread', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
 stub('app/actions/artifacts.ts', {
   listArtifacts: () => read('library', [artifact]), getArtifact: () => read('detail', detail),
-  getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [],
+  getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [], listTaskArtifacts: async () => [],
 })
 stub('app/actions/agents.ts', {
   pollTaskDetail: async () => { throw Object.assign(new Error('older server'), { code: 'desktop_rpc_action_unknown', status: 404 }) },
@@ -55,15 +55,15 @@ stub('components/workspace/factory-acceptance.tsx', { useAcceptanceTasks: () => 
 stub('components/workspace/factory-acceptance-pane.tsx', { FactoryAcceptancePane: Empty })
 stub('components/workspace/thread-changes.tsx', { ThreadChangesPane: Empty, ChangesTabLabel: Empty })
 stub('components/workspace/self-improvement.tsx', { ThreadFeedback: Empty })
-stub('components/workspace/thread-run-place.tsx', { ThreadRunPlace: Empty })
+stub('components/workspace/thread-run-place.tsx', { ThreadRunPlace: Empty, MachineDetails: Empty, MachineIcon: Empty, useMachineName: () => '' })
 stub('components/workspace/thread-execution-identity.tsx', { ThreadExecutionIdentity: Empty })
-stub('components/workspace/artifact-review.tsx', { ThreadArtifactButton: Empty, ThreadArtifactCards: Empty })
+stub('components/workspace/artifact-review.tsx', { ThreadArtifactChips: Empty })
 stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty, ThreadQuotaPausedCard: Empty, ThreadQuotaSwitchLine: Empty })
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
-stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
+stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', threadTopologyKey: (id: string) => ['issue-thread-topology', id], IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
-mock.module('next/dynamic', { defaultExport: () => Empty })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => Empty })
 
 const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: { type: 'doc', content: [] }, status: 'review', priority: 'normal', revision: 1, identifier: 'FIX-1', metadata: {}, createdAt: new Date(0), updatedAt: new Date(0) }
 stub('app/actions/issues.ts', { pollIssue: () => read('task', { viewerId: 'owner', version: '1', issue }), pollIssueVersionSummaries: async () => ({ viewerId: 'owner', snapshot: { version: '1', items: [] } }), listIssueVersions: async () => [], saveIssue: async () => { throw new Error('This read test must not save') } })
@@ -72,7 +72,7 @@ stub('components/workspace/issue-editor.tsx', { createDocumentSeed: () => null, 
 for (const [file, name] of [['issue-description-history', 'IssueDescriptionHistory'], ['issue-relations', 'IssueRelations'], ['issue-members', 'IssueMembers'], ['issue-activity-feed', 'IssueActivityFeed']]) stub(`components/workspace/${file}.tsx`, { [name]: Empty })
 const groupMessages = await import('../lib/group-messages')
 stub('lib/group-messages.ts', { ...groupMessages, fetchGroupMessages: () => read('group', { messages: [{ id: 'message', conversationId: 'group', position: '1', authorType: 'user', authorId: 'owner', body: 'Retained group message', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null }) })
-stub('app/actions/link-preview.ts', { getLinkPreview: async () => null })
+stub('app/actions/link-preview.ts', { getLinkPreview: async () => null, getLinkPreviews: async () => ({}) })
 stub('components/nav/conversation-pill.tsx', { ConversationPill: Empty })
 stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) })
 stub('components/nav/letter-avatar.tsx', { LetterAvatar: Empty })
@@ -80,6 +80,7 @@ stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Emp
 // The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
 stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <Input id="task-title" value={titleField.value} readOnly /> })
 stub('components/slots/task-conversation.tsx', { TaskConversation: ({ issueId, runId }: { issueId: string; runId: string }) => <ol data-task-conversation={issueId}><li>{runId}</li></ol> })
+stub('components/slots/thread.tsx', { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) => <ol>{entries?.map(entry => <li key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, index) => part.kind === 'text' ? <span key={index}>{part.node}</span> : null)}</li>)}</ol> })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>
@@ -97,7 +98,7 @@ stub('components/theme-provider.tsx', { ThemeProvider: Pass })
 stub('components/swr-defaults.tsx', { SWRDefaults: Pass })
 stub('components/blocks/auth-19/components/auth.tsx', { Auth: Pass })
 stub('components/blocks/auth-19/components/auth-card.tsx', { AuthCard: Pass })
-stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty })
+stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty, TaskPageLoading: Empty })
 stub('components/workspace/create-workspace-form.tsx', { CreateWorkspaceForm: Empty })
 stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty, OrganizationInvitationCard: Empty })
 stub('components/device-authorization.tsx', { DeviceAuthorization: Empty })
@@ -107,7 +108,7 @@ const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig'], useSWRConfig: typeof import('swr')['useSWRConfig'], serialize: typeof import('swr')['unstable_serialize']
 let Toaster: typeof import('sonner')['Toaster'], toast: typeof import('sonner')['toast']
-let IntlProvider: typeof import('next-intl')['NextIntlClientProvider']
+let IntlProvider: typeof import('@/lib/intl/i18n-client')['NextIntlClientProvider']
 let ArtifactLibrary: typeof import('../components/artifacts/artifact-library')['ArtifactLibrary']
 let ArtifactViewer: typeof import('../components/artifacts/artifact-viewer')['ArtifactViewer']
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
@@ -134,7 +135,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ SWRConfig, useSWRConfig, unstable_serialize: serialize } = await import('swr'))
   ;({ Toaster, toast } = await import('sonner'))
-  ;({ NextIntlClientProvider: IntlProvider } = await import('next-intl'))
+  ;({ NextIntlClientProvider: IntlProvider } = await import('@/lib/intl/i18n-client'))
   ;({ ArtifactLibrary } = await import('../components/artifacts/artifact-library'))
   ;({ ArtifactViewer } = await import('../components/artifacts/artifact-viewer'))
   ;({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel'))

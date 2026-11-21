@@ -6,7 +6,6 @@ import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { WorkspaceError } from '@/lib/workspace-error'
 
-export const dynamic = 'force-dynamic'
 
 /** Native Cookie transport for the existing bounded Task presentation reader. */
 async function handlePOST(request: Request) {

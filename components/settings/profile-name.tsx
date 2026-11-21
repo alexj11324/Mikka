@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { useSaveDisplayName } from '@/hooks/settings/use-account'

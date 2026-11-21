@@ -22,7 +22,7 @@ const run = <T>(fn: () => T) => scope.run(fn)
 let browserOwner: string | null = null
 let freshSessionRead = false
 before(async () => {
-  // Device heartbeat uses bearer authentication; unrelated human-session setup is not used here.
+  // Device routes use bearer authentication; unrelated human-session setup is not used here.
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (options: { query?: { disableCookieCache?: boolean } }) => {
     freshSessionRead = options?.query?.disableCookieCache === true
     return browserOwner ? { user: { id: browserOwner } } : null
@@ -30,7 +30,7 @@ before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`)
   await run(async () => {
     const { pool } = await import('./db')
-    await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,kind text DEFAULT 'local',"removedAt" timestamptz,enabled boolean DEFAULT true,"lastSeenAt" timestamptz,"updatedAt" timestamptz);
+    await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,kind text DEFAULT 'local',"removedAt" timestamptz,enabled boolean DEFAULT true,"lastSeenAt" timestamptz,"sessionOpenedAt" timestamptz,"sessionClosedAt" timestamptz,"updatedAt" timestamptz);
     CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text NOT NULL,"tokenHash" text NOT NULL,name text,"createdAt" timestamptz NOT NULL DEFAULT now(),"lastUsedAt" timestamptz,"revokedAt" timestamptz,"boundDeviceId" uuid,"boundWorkspaceId" uuid,"expiresAt" timestamptz);
     CREATE TABLE device_token_devices ("tokenId" uuid,"deviceId" uuid,"userId" text,PRIMARY KEY("tokenId","deviceId"));
     CREATE TABLE agents (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"updatedAt" timestamptz);
@@ -271,10 +271,10 @@ test('daemon acceptance follows real local enrollment and owner routes without a
 async function removableDevice(online: boolean) {
   const { pool } = await import('./db')
   const id = randomUUID(), tokenId = randomUUID(), credential = `fixture-${randomUUID()}`
-  await pool.query(`INSERT INTO devices(id,"ownerId","lastSeenAt") VALUES($1,'owner-a',now()-$2::interval)`, [id, online ? '1 second' : '2 minutes'])
+  await pool.query(`INSERT INTO devices(id,"ownerId","sessionOpenedAt") VALUES($1,'owner-a',CASE WHEN $2::boolean THEN now() END)`, [id, online])
   await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,'owner-a',$2)`, [tokenId, hashDeviceToken(credential)])
   await pool.query(`INSERT INTO device_token_devices VALUES($1,$2,'owner-a')`, [tokenId, id])
-  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${credential}` } })
+  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${credential}` } })
   return { id, tokenId, request }
 }
 
@@ -284,28 +284,28 @@ test('online removal offers only uninstall, and its own receipt revokes credenti
   const prior = await enqueueDeviceCommand('owner-a', device.id, 'restart')
   const foreign = await enqueueDeviceCommand('owner-a', other.id, 'update')
   assert.deepEqual(await removeOwnedDevice('owner-a', device.id), { id: device.id, revokedTokens: 0, uninstall: 'queued' })
-  const heartbeat = device.request(`/v1/devices/${device.id}/heartbeat`)
-  assert.equal((await authenticateDevice(heartbeat))?.removingDeviceId, device.id)
-  for (const path of ['/v1/devices/register', `/v1/devices/${device.id}/repos`, `/v1/devices/${other.id}/heartbeat`, `/v1/devices/${device.id}/commands`]) {
+  const report = device.request(`/v1/devices/${device.id}/report`)
+  assert.equal((await authenticateDevice(report))?.removingDeviceId, device.id)
+  for (const path of ['/v1/devices/register', `/v1/devices/${device.id}/repos`, `/v1/devices/${other.id}/report`, `/v1/devices/${device.id}/commands`, `/v1/devices/${device.id}/heartbeat`]) {
     assert.equal(await authenticateDevice(device.request(path)), null)
   }
-  const { POST } = await import('../app/v1/devices/[deviceId]/heartbeat/route')
-  const postHeartbeat = (completedDeviceCommands: string[]) => POST(new Request(heartbeat, {
+  const { POST } = await import('../app/v1/devices/[deviceId]/report/route')
+  const postReport = (completedDeviceCommands: string[]) => POST(new Request(report, {
     method: 'POST',
-    body: JSON.stringify({ harnesses: [], runs: [], worktreeDiskBytes: 0, completedDeviceCommands }),
+    body: JSON.stringify({ harnesses: [], completedDeviceCommands }),
   }), { params: Promise.resolve({ deviceId: device.id }) })
-  const response = await postHeartbeat([prior!, foreign!])
+  const response = await postReport([prior!, foreign!])
   assert.equal(response.status, 200)
   const pending = (await response.json()).deviceCommands as { id: string; kind: string }[]
   assert.equal(pending.length, 1); assert.equal(pending[0].kind, 'uninstall')
   assert.equal((await pool.query(`SELECT "completedAt" FROM device_management_commands WHERE id=$1`, [prior])).rows[0].completedAt, null)
   assert.equal((await pool.query(`SELECT "completedAt" FROM device_management_commands WHERE id=$1`, [foreign])).rows[0].completedAt, null)
-  const acknowledged = await postHeartbeat([pending[0].id])
+  const acknowledged = await postReport([pending[0].id])
   assert.equal(acknowledged.status, 200)
   assert.deepEqual((await acknowledged.json()).deviceCommands, [])
   assert.ok((await pool.query(`SELECT "revokedAt" FROM device_tokens WHERE id=$1`, [device.tokenId])).rows[0].revokedAt)
-  assert.equal(await authenticateDevice(heartbeat), null)
-  assert.ok(await authenticateDevice(other.request(`/v1/devices/${other.id}/heartbeat`)))
+  assert.equal(await authenticateDevice(report), null)
+  assert.ok(await authenticateDevice(other.request(`/v1/devices/${other.id}/report`)))
 }))
 
 test('unacknowledged uninstall expires after ten minutes; offline removal revokes immediately', () => run(async () => {
@@ -318,9 +318,9 @@ test('unacknowledged uninstall expires after ten minutes; offline removal revoke
   const expiry = (await pool.query(`SELECT "expiresAt" FROM device_tokens WHERE id=$1`, [online.tokenId])).rows[0].expiresAt.getTime()
   assert.ok(expiry >= started + 10 * 60_000 && expiry <= Date.now() + 10 * 60_000)
   await pool.query(`UPDATE device_tokens SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [online.tokenId])
-  assert.equal(await authenticateDevice(online.request(`/v1/devices/${online.id}/heartbeat`)), null)
+  assert.equal(await authenticateDevice(online.request(`/v1/devices/${online.id}/report`)), null)
   assert.deepEqual(await removeOwnedDevice('owner-a', offline.id), { id: offline.id, revokedTokens: 1, uninstall: 'not_possible' })
-  assert.equal(await authenticateDevice(offline.request(`/v1/devices/${offline.id}/heartbeat`)), null)
+  assert.equal(await authenticateDevice(offline.request(`/v1/devices/${offline.id}/report`)), null)
   assert.equal((await pool.query(`SELECT 1 FROM device_management_commands WHERE "deviceId"=$1`, [offline.id])).rowCount, 0)
 }))
 
@@ -385,7 +385,7 @@ test('a fresh login cannot admit an old daemon, and updating cannot revive a rev
   let invoked = 0
   const handler = withDeviceRoute(async () => { await pool.query('SELECT 1'); invoked++; return Response.json({ ok: true }) })
   const request = (version: string | null, path = '/v1/devices/fixture/repos') => new Request(`http://localhost/mikka${path}`, {
-    headers: { authorization: `Bearer ${credential}`, ...(version === null ? {} : { 'x-mikka-client-version': version }) },
+    headers: { authorization: `Bearer ${credential}`, ...(version === null ? {} : { 'x-mikka-device-session': '1', 'x-mikka-client-version': version }) },
   })
   for (const version of ['0.0.329', '0.0.374', null]) {
     const response = await handler(request(version))
@@ -395,20 +395,20 @@ test('a fresh login cannot admit an old daemon, and updating cannot revive a rev
   assert.equal(invoked, 0, 'fresh authentication does not grant business access to old code')
   assert.equal((await handler(request(MIN_DAEMON_VERSION))).status, 200)
   assert.equal(invoked, 1)
-  // Already claimed work may finish using its original credential. A new
-  // credential cannot inherit this grace from merely owning the same device.
+  // No grace (decision 2026-11-17-2215): a live run of the same credential
+  // does not admit an old binary, and neither does a missing session header.
   const tokenId = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(credential)])).rows[0].id
   const claimedRun = randomUUID()
   await pool.query(`INSERT INTO agent_runs(id,status,"deviceTokenId","userId","leaseExpiresAt") VALUES($1,'running',$2,'version-owner',now()+interval '1 minute')`, [claimedRun, tokenId])
-  assert.equal((await handler(request('0.0.329'))).status, 426, 'a live run does not admit unrelated repos polling')
-  assert.equal((await handler(request('0.0.329', `/v1/runs/${randomUUID()}/events`))).status, 426, 'another run cannot borrow the lease')
-  assert.equal((await handler(request('0.0.329', `/v1/runs/${claimedRun}/events`))).status, 200)
-  const fresh = await consumeDeviceEnrollment(await mintDeviceEnrollment('version-owner'))
-  const freshRequest = new Request(request('0.0.329', `/v1/runs/${claimedRun}/events`), { headers: { authorization: `Bearer ${fresh}`, 'x-mikka-client-version': '0.0.329' } })
-  assert.equal((await handler(freshRequest)).status, 426)
+  assert.equal((await handler(request('0.0.329', `/v1/runs/${claimedRun}/events`))).status, 426, 'the run that the old binary holds gets no grace')
+  for (const path of ['/v1/devices/fixture/commands', '/v1/devices/fixture/report', `/v1/runs/${claimedRun}/events`]) {
+    const unsessioned: Request = new Request(`http://localhost/mikka${path}`, { method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': MIN_DAEMON_VERSION } })
+    assert.equal((await handler(unsessioned)).status, 426, `${path} requires the device session header`)
+  }
+  assert.equal(invoked, 1)
   await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
   assert.equal((await handler(request(MIN_DAEMON_VERSION))).status, 401, 'new binary plus revoked old session is still unauthorized')
-  assert.equal((await handler(request('0.0.329', '/v1/devices/fixture/commands'))).status, 401, 'control traffic does not bypass revocation')
+  assert.equal((await handler(request(MIN_DAEMON_VERSION, '/v1/devices/fixture/commands'))).status, 401, 'control traffic does not bypass revocation')
 }))
 
 test('registration metadata cannot disguise an old daemon behind a current header', () => run(async () => {
@@ -416,7 +416,7 @@ test('registration metadata cannot disguise an old daemon behind a current heade
   const { MIN_DAEMON_VERSION } = await import('@mikka/protocol/device')
   const credential = await consumeDeviceEnrollment(await mintDeviceEnrollment('body-version-owner'))
   const response = await POST(new Request('http://localhost/mikka/v1/devices/register', {
-    method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': MIN_DAEMON_VERSION, 'content-type': 'application/json' },
+    method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-device-session': '1', 'x-mikka-client-version': MIN_DAEMON_VERSION, 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'version fixture', platform: 'linux', arch: 'x64', daemonVersion: '0.0.329', protocolVersion: 1, harnesses: [] }),
   }))
   assert.equal(response.status, 426)

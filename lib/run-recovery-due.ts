@@ -1,5 +1,5 @@
 import type { Pool } from 'pg'
-import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { deviceSessionOpenSql } from './device-presence'
 import { ENDED_RUN_STATUSES } from './run-outcome'
 import { LEASED_RUN_STATUSES } from './run-retry'
 import { pendingTaskReportsSql } from './coordinator/group-factory'
@@ -26,20 +26,21 @@ export const OUTCOME_RETRY_AT_SQL = `("outcomeAt" + greatest(interval '1 hour', 
 export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'reviewSessions', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks'] as const
 export type RunRecoverySweep = typeof RUN_RECOVERY_SWEEPS[number]
 
-/** Each run-recovery due time, as rows of `at` and the `sweep` that does it; parameters $1-$4 come from runRecoveryDueParams. */
+/** Each run-recovery due time, as rows of `at` and the `sweep` that does it; parameters $1-$3 come from runRecoveryDueParams. */
 export const RUN_RECOVERY_DUE_SQL = `
-    -- sweepExpiredRunLeases: a lease is lost once leaseExpiresAt < now.
+    -- sweepExpiredRunLeases: a lease is lost once leaseExpiresAt < now (a closed device session ends it at once).
     SELECT min("leaseExpiresAt") + interval '1 millisecond' AS at, 'leases' AS sweep FROM agent_runs WHERE status = ANY($1::text[]) AND "leaseExpiresAt" IS NOT NULL
-    -- ... and a queued retry whose device stopped being seen (the gateway is asked again each minute).
-    UNION ALL SELECT min(CASE WHEN d."lastSeenAt" <= now() AND d."lastSeenAt" + $2::interval > now() THEN d."lastSeenAt" + $2::interval + interval '1 millisecond' ELSE now() + interval '${RECHECK}' END), 'leases'
+    -- ... and a queued retry whose device has no open session: due at once (reclaimLostRuns moves or ends it).
+    UNION ALL SELECT min(now()), 'leases'
       FROM agent_runs r LEFT JOIN devices d ON d.id = r."deviceId" WHERE r.status = 'queued' AND r."retryOf" IS NOT NULL
+        AND NOT coalesce(${deviceSessionOpenSql('d')}, false)
     -- reconcileCloudMachines: a running machine is checked with E2B once idle for an hour, then every MACHINE_RECHECK.
     UNION ALL SELECT min(CASE WHEN greatest("lastActiveAt" + interval '1 hour', "provisionLeaseUntil") > now()
         THEN greatest("lastActiveAt" + interval '1 hour', "provisionLeaseUntil") + interval '1 millisecond' ELSE now() + interval '${MACHINE_RECHECK}' END), 'machines'
       FROM cloud_machines WHERE state IN ('running','waking') AND "sandboxId" IS NOT NULL
     -- judgePendingOutcomes: an ended run is judged at once, and again OUTCOME_RETRY_AT_SQL after an unanswered try.
     UNION ALL SELECT min(coalesce(${OUTCOME_RETRY_AT_SQL} + interval '1 millisecond', now())), 'outcomes' FROM agent_runs
-      WHERE outcome IS NULL AND status = ANY($3::text[]) AND coalesce("finishedAt", "updatedAt") > now() - make_interval(days => ${OUTCOME_WINDOW_DAYS})
+      WHERE outcome IS NULL AND status = ANY($2::text[]) AND coalesce("finishedAt", "updatedAt") > now() - make_interval(days => ${OUTCOME_WINDOW_DAYS})
     -- Human review expiry and unacknowledged close retries share this timer.
     UNION ALL SELECT min(coalesce("retryAt","expiresAt")), 'reviewSessions' FROM coding_review_sessions
     -- Every task machine has a persisted lifecycle deadline independent of a per-run Workflow.
@@ -59,20 +60,21 @@ export const RUN_RECOVERY_DUE_SQL = `
       FROM factory_tasks t JOIN factory_attempts a ON a.id = t."attemptId" LEFT JOIN agent_runs live ON live.id = a."runId"
       LEFT JOIN LATERAL (SELECT max((e.result->>'nextAt')::timestamptz) AS "nextAt" FROM factory_events e
         WHERE e."taskId" = t.id AND e.request->>'kind' = 'task_watchdog' AND e.request->>'attemptId' = t."attemptId"::text) w ON true
-      WHERE $4 AND (t.status IN ('pending','running') OR (t.status = 'blocked' AND a.output->'watchdog'->>'reasonCode' = 'task_stalled'))
+      WHERE $3 AND (t.status IN ('pending','running') OR (t.status = 'blocked' AND a.output->'watchdog'->>'reasonCode' = 'task_stalled'))
         AND t.stage IN ('spec','execute','review','verify','monitor') AND (live.status IS NULL OR live.status NOT IN ('paused','waiting_input'))
 `
 
-export const runRecoveryDueParams = (factoryLifecycle: boolean) => [[...LEASED_RUN_STATUSES], `${DEVICE_ONLINE_WINDOW_MS} milliseconds`, [...ENDED_RUN_STATUSES], factoryLifecycle]
+export const runRecoveryDueParams = (factoryLifecycle: boolean) => [[...LEASED_RUN_STATUSES], [...ENDED_RUN_STATUSES], factoryLifecycle]
 
 /**
  * The earliest time any run-recovery work is due (epoch ms, rounded up from
  * PostgreSQL microseconds), or null when none can come due without a new write
  * (#1212 D). Each term matches the condition its sweep selects on
  * (lib/run-recovery.ts), so the run-recovery due timer wakes when the first one
- * flips. Work that depends on outside state (a device the gateway may still see,
- * a sandbox E2B may still run) is re-checked every 60 s while it exists, as the
- * minute sweep did. One statement; at idle every term is empty.
+ * flips. Work that depends on outside state (a sandbox E2B may still run) is
+ * re-checked every 60 s while it exists, as the minute sweep did; device
+ * presence is the session columns, which a gateway report changes (and arms
+ * this timer). One statement; at idle every term is empty.
  */
 export async function nextRunRecoveryDue(pool: Pick<Pool, 'query'>, options: { factoryLifecycle: boolean }): Promise<number | null> {
   const { rows } = await pool.query<{ at: string | null }>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (${RUN_RECOVERY_DUE_SQL}) due`, runRecoveryDueParams(options.factoryLifecycle))

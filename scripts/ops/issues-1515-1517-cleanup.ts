@@ -79,9 +79,9 @@ try {
   // The shared test account does not own Alex's old demo devices. Verify these
   // exact production rows through the unchanged deployed presence function,
   // separately from the normal account API proof, before removing them.
-  const future = (await pool.query(`SELECT id,"lastSeenAt" FROM devices WHERE ${demo} AND "removedAt" IS NULL AND "lastSeenAt">now() ORDER BY id LIMIT 100`)).rows
+  const future = (await pool.query(`SELECT id,"sessionOpenedAt","sessionClosedAt" FROM devices WHERE ${demo} AND "removedAt" IS NULL AND "lastSeenAt">now() ORDER BY id LIMIT 100`)).rows
   check(future.length < 100, 'cleanup_future_sample_limit')
-  const futureStates = await deviceOnlineStates(future, Date.now())
+  const futureStates = deviceOnlineStates(future)
   report.futureDemoPresence = { samples: future.length, online: [...futureStates.values()].filter(Boolean).length, verification: 'deployed_business_module_readonly' }
   check([...futureStates.values()].every(online => !online), 'cleanup_future_device_online')
   report.realDevicesBefore = before.real.filter(row => !row.removedAt).length

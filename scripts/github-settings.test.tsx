@@ -12,7 +12,7 @@ mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExpor
   useSession: () => ({ data: userId ? { user: { id: userId } } : null, isPending: pending }),
   linkSocial: async () => ({ error: true }),
 }, endSession: async () => undefined } })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'en', useFormatter: () => ({}) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useLocale: () => 'en', useFormatter: () => ({}) } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, nativeButton: _nativeButton, ...props }: ComponentProps<'button'> & { render?: ReactElement; nativeButton?: boolean }) => render ? cloneElement(render as ReactElement<ComponentProps<'button'>>, props, children) : <button {...props}>{children}</button> } })
 
 const browser = new Window({ url: 'https://mikka.example/en?settings=integrations' })

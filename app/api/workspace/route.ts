@@ -1,6 +1,6 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { NextResponse } from 'next/server'
-import { getTranslations } from 'next-intl/server'
+import { NextResponse } from '@/lib/server-runtime/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { auth } from '@/lib/api-auth'
 import { loadWorkspaceSettings, WorkspaceError } from '@/lib/workspace-access'
 

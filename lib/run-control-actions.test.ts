@@ -115,7 +115,7 @@ before(async () => {
     if (input?.query?.disableCookieCache && !freshSession) return null
     return viewer ? { user: { id: sessionUser ?? viewer }, session: { id: 'synthetic-session' } } : null
   } } } } })
-  mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => requestHeaders } })
   mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
     if (sql.includes('AS "canSteer"')) {
       const live = current.continuation ?? current.run

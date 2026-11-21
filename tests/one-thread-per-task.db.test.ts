@@ -84,8 +84,8 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const deviceId = randomUUID()
     const agent = state.agent ?? 'codex'
     const harnesses = state.old ? [{ harness: agent, installed: true }] : state.reports || agent !== 'codex' ? [{ harness: agent, installed: true, subscriptionBroker: true, modelSlots: [{ slot: state.reports ?? 'gpt-5', model: state.reports ?? 'gpt-5', name: state.reports ?? 'gpt-5' }] }] : mac
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7)`,
-      [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt","sessionOpenedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7,CASE WHEN $8::boolean THEN $5::timestamptz END)`,
+      [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null, state.online !== false])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), userId, deviceId, agent, `${agent}-${deviceId.slice(0, 8)}`])
     return deviceId
   }

@@ -40,8 +40,9 @@ for (const locale of ['en', 'zh-CN']) {
       const acceptWorkspace = t.mock.fn(async () => admitted ? { ok: true, data: { workspaceId } } : { ok: false, error: 'Declined' })
       const go = t.mock.method(window.location, 'assign', () => {})
       const boundary = {
-        'lucide-react': { Loader2: () => null, Users: () => null },
-        'next-intl': { useTranslations: namespace => key => namespace.split('.').reduce((dict, part) => dict[part], messages)[key] },
+        '@/components/icons': { LoaderCircle: () => null, Users: () => null },
+        '@/components/ui/spinner': { Spinner: () => null },
+        '@/lib/intl/i18n-client': { useTranslations: namespace => key => namespace.split('.').reduce((dict, part) => dict[part], messages)[key] },
         '@/components/ui/card': { Card: plain, CardContent: plain, CardFooter: plain, CardHeader: plain, CardTitle: plain },
         '@/components/ui/button': { Button: props => createElement('button', props), buttonVariants: () => '' },
         '@/components/ui/alert': { Alert: plain, AlertDescription: plain },

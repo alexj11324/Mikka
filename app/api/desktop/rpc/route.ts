@@ -9,7 +9,6 @@ import { withDesktopLocale, desktopRotatedToken } from '@/lib/desktop-rpc/sessio
 import { desktopAuthentication } from '@/lib/desktop-rpc/authentication'
 import { causeFields } from '@mikka/protocol/coded-error'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 const sessions = desktopAuthentication(input => auth.api.getSession(input), async () => (await auth.$context).authCookies.sessionData.name)
 

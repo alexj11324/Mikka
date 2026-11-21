@@ -2,7 +2,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 // beui.dev/components/agents/chat-app
 
-import { Check, Copy, FileCode2, LoaderCircle } from "lucide-react";
+import { Check, Copy, FileCode2, LoaderCircle } from "@/components/icons";
 import { motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,
@@ -115,7 +115,7 @@ export function CodeBlock({
       <div className="flex h-10 items-center gap-2.5 px-3">
         <FileCode2
           aria-hidden="true"
-          className="size-3.5 shrink-0 text-muted-foreground/70"
+          className="size-3.5 shrink-0 text-tertiary"
         />
         {filename ? (
           <span className="min-w-0 truncate font-mono text-xs text-foreground/80">
@@ -177,7 +177,7 @@ export function CodeBlock({
                   )}
                 >
                   {showLineNumbers ? (
-                    <span className="select-none pr-3 text-right tabular-nums text-muted-foreground/35">
+                    <span className="select-none pr-3 text-right tabular-nums text-tertiary">
                       {lineNumber}
                     </span>
                   ) : null}

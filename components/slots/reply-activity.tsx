@@ -2,10 +2,11 @@
 
 // The default reply-activity slot (docs/ui-overlay.md): thinking and tool calls as shadcn/ui's Trace draws them.
 import { useState, type ReactNode } from 'react'
-import { CircleAlert, CircleCheckIcon, LoaderCircleIcon } from 'lucide-react'
+import { CircleAlert, CircleCheck } from '@/components/icons'
 import { Badge } from '@/components/reui/badge'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { ActivityGroupProps, ActivityThinkingProps, ActivityToolView } from '@/components/slots/reply-activity-contract'
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
 /** The rows of one reply's activity, or the wait before a reply. */
@@ -21,7 +22,7 @@ export function ActivityList({ children, ...data }: { children: ReactNode; 'data
 export function ActivityThinking({ running, title, text, onOpen }: ActivityThinkingProps) {
   const [open, setOpen] = useState<boolean>()
   const line = <TraceLine status={running ? 'running' : undefined}>
-    <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : <CircleCheckIcon />}</TraceIcon>
+    <TraceIcon>{running ? <Spinner /> : <CircleCheck />}</TraceIcon>
     <TraceTitle>{title}</TraceTitle>
   </TraceLine>
   if (text === undefined) return <div data-activity-thinking={running ? 'active' : 'done'} data-reasoning="none">{line}</div>
@@ -36,10 +37,10 @@ export function ActivityTool({ tool }: { tool: ActivityToolView }) {
   const running = tool.state === 'running'
   const failed = tool.state === 'error'
   const line = <TraceLine status={running ? 'running' : failed ? 'error' : undefined}>
-    <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failed ? <CircleAlert /> : tool.icon}</TraceIcon>
+    <TraceIcon>{running ? <Spinner /> : failed ? <CircleAlert /> : tool.icon}</TraceIcon>
     <TraceTitle>
       {tool.title}
-      {tool.target && <span className={cn('ml-1.5', !failed && 'text-muted-foreground/70')}>{tool.target}</span>}
+      {tool.target && <span className={cn('ml-1.5', !failed && 'text-tertiary')}>{tool.target}</span>}
       {tool.why && <span className="ml-1.5">· {tool.why}</span>}
     </TraceTitle>
   </TraceLine>
@@ -58,7 +59,7 @@ export function ActivityGroup({ tools, running, summary, failures, failuresLabel
     <div className="group/activity flex min-w-0 items-center gap-1">
       <TraceCollapsibleTrigger>
         <TraceLine status={running ? 'running' : undefined}>
-          <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive-foreground" /> : leadIcon}</TraceIcon>
+          <TraceIcon>{running ? <Spinner /> : failures ? <CircleAlert className="text-destructive-foreground" /> : leadIcon}</TraceIcon>
           <TraceTitle>{summary}</TraceTitle>
           {/* The failure count never truncates with the summary: it is what the line must say (R-83, R-87). */}
           {failures > 0 && !running && <Badge data-activity-failed="" variant="destructive-light" size="sm" className="shrink-0">{failuresLabel}</Badge>}

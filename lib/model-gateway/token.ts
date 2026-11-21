@@ -24,7 +24,7 @@ export interface GatewayGrant {
 const PREFIX = 'mkg_'
 /** A run's machine budget is shorter; the run's own state ends the token sooner (`verifyGatewayToken`). */
 export const GATEWAY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
-/** The run states in which its CLI may still call a model, as `apiKeyForRun` checks them. */
+/** The run states in which its CLI may still call a model, as `validateRunApiKey` checks them. */
 const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 
 export const hashGatewayToken = (token: string) => createHash('sha256').update(token).digest('hex')

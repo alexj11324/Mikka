@@ -9,7 +9,6 @@ import { linearWebhookNotifications } from '@/lib/suggestions/sources'
 import { ingestNotifications } from '@/lib/suggestions/store'
 import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
-export const runtime = 'nodejs'
 
 async function handlePOST(request: Request) {
   const parsed = await parseLinearWebhookRequest(request, process.env.LINEAR_WEBHOOK_SECRET)

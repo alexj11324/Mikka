@@ -10,7 +10,6 @@ import { coordinatorBot, openChatBotId } from '@/lib/coordinator/coordinator-bot
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { botOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/mobile/bots/<id>`: a bot's page, `coordinator` for the Coordinator: its threads, PRs, scheduled tasks, library and the person's 置顶 / 通知 for it. */
 async function handleGET(request: Request, context: { params: Promise<{ id: string }> }) {

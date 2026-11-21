@@ -4,7 +4,6 @@ import { reviewHttp } from '@/lib/coding-workspace/diff/http'
 import { deliverAgentReview } from '@/lib/coding-workspace/diff/agent-delivery'
 import { readReviewDeliveries, reviewDeliveryQuery } from '@/lib/coding-workspace/diff/delivery'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const query = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(), batchId: z.uuid().optional(), cursor: z.string().max(1024).optional() })
 const command = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(), mutation: reviewBatchRequest })

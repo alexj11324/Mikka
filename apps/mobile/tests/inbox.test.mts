@@ -24,6 +24,14 @@ stub('components/NavBar.tsx', { NavBar: noop, underBar: {} })
 stub('components/ReadNotice.tsx', { ReadNotice: noop })
 stub('components/settings.tsx', { Row: ({ label, detail, onPress }: { label: string; detail: string; onPress: () => void }) => createElement('a', { onClick: onPress }, label, detail) })
 stub('components/Text.tsx', { Text: ({ children }: { children: ReactNode }) => createElement('span', null, children) })
+// The list's empty state, inline as the two plain elements: its own icons module pulls in react-native-svg,
+// which has no native bridge here.
+stub('shared/components/empty-state.tsx', {
+  EmptyState: ({ title }: { title: string }) => createElement('p', null, title),
+  ListLoading: () => createElement('p', null, messages.Common.loading),
+})
+// lucide's native entry draws through react-native-svg, which has no bridge here.
+mock.module(createRequire(import.meta.url).resolve('lucide-react-native'), { namedExports: { Inbox: noop } })
 stub('components/GlassButton.tsx', { GlassButton: ({ label, onPress }: { label: string; onPress: () => void }) => createElement('button', { onClick: onPress }, label) })
 stub('components/Segmented.tsx', { Segmented: ({ options, onChange }: { options: { value: string; label: string }[]; onChange: (value: string) => void }) =>
   createElement(Fragment, null, ...options.map(option => createElement('button', { key: option.value, onClick: () => onChange(option.value) }, option.label))) })

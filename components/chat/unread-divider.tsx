@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { UNREAD_DIVIDER_ATTR } from '@/lib/hooks/use-unread-indicators'

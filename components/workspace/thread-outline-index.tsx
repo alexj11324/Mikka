@@ -1,7 +1,7 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { ListTree } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ListTree } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { ThreadOutlineEntry } from '@/lib/thread-outline'

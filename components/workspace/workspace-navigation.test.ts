@@ -100,6 +100,18 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
 })
 
+test('a Bot sidebar thread is the main conversation, with room for a child thread beside it', () => {
+  const main = `/mikka?bot=${BOT}&mainThread=${RUN}`
+  assert.equal(workspaceHref(at(`/mikka?bot=${BOT}&thread=${ISSUE}`), { mainThread: RUN }), main)
+  assert.equal(readLocation(at(main).searchParams).mainThread, RUN)
+  const withChild = workspaceHref(at(main), { thread: ISSUE })
+  assert.equal(withChild, `${main}&thread=${ISSUE}`)
+  assert.equal(readLocation(at(withChild).searchParams).thread, ISSUE)
+  assert.equal(workspaceHref(at(withChild), { thread: null }), main)
+  assert.equal(workspaceHref(at(withChild), { mainThread: null }), `/mikka?bot=${BOT}`)
+  assert.equal(workspaceHref(at(withChild), { section: 'all-issues' }), '/mikka?section=all-issues')
+})
+
 test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
   const list = at(`/mikka?threads=all&thread=${RUN}`)
   assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')
@@ -135,6 +147,15 @@ test('the conversation directory has its own route alongside the default coordin
   assert.equal(directory, '/?section=conversations')
   assert.equal(readLocation(new URL(directory, 'https://example.invalid').searchParams).section, 'conversations')
   assert.equal(readLocation(new URLSearchParams()).section, 'coordinator')
+})
+
+test('查看运行 is `section=conversations&directoryAutomation=<id>`; the editor keeps its own `automation=<id>`', () => {
+  const runs = workspaceLink({ section: 'conversations', directoryAutomation: RUN })
+  assert.equal(runs, `/?section=conversations&directoryAutomation=${RUN}`)
+  assert.equal(readLocation(new URL(runs, 'https://example.invalid').searchParams).directoryAutomation, RUN)
+  assert.equal(workspaceHref(at(`/mikka?section=conversations&directoryAutomation=${RUN}`), { section: 'all-issues' }), '/mikka?section=all-issues', 'another page drops the filter')
+  // An open automation in the editor survives a move inside its page, such as a task opened beside it.
+  assert.equal(workspaceHref(at(`/mikka?section=automations&automation=${RUN}`), { task: ISSUE }), `/mikka?section=automations&automation=${RUN}&task=${ISSUE}`)
 })
 
 test('a saved chat is `section=agent&session=<id>`', () => {

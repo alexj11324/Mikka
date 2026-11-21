@@ -25,6 +25,10 @@ let retried = 0
 mock.module(new URL('../../../../lib/cloud-computer/workspace-teardown.ts', import.meta.url).href, { namedExports: {
   retrySandboxKills: async () => { retried++; return { killed: 1, pending: 1 } },
 } })
+let backstops = 0
+mock.module(new URL('../../../../lib/device-session.ts', import.meta.url).href, { namedExports: {
+  closeLostDeviceSessions: async () => { backstops++; return { checked: 2, closed: 1 } },
+} })
 mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 let swept: number[] = []
 let taskSweeps = 0
@@ -38,7 +42,7 @@ let nextDue: number | null = null, armed = 0
 mock.module(new URL('../../../../lib/run-recovery-due.ts', import.meta.url).href, { namedExports: { runRecoveryNextDue: async () => nextDue } })
 mock.module(new URL('../../../../lib/due-timer.ts', import.meta.url).href, { namedExports: { armDueTimer: async (kind: string) => { assert.equal(kind, 'run-recovery'); armed++ } } })
 const later: (() => unknown)[] = []
-mock.module('next/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false; nextDue = null; armed = 0 })
@@ -60,8 +64,9 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
   // Stale Bot computers are reconciled, ended runs judged (R-52), closed tasks' sandboxes ended and deleted workspaces' unfinished kills retried, in the same pass.
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, reviewSessions: { closed: 2, pending: 1 }, taskMachines: { reconciled: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, sessions: { checked: 2, closed: 1 }, machines: 2, outcomes: 4, reviewSessions: { closed: 2, pending: 1 }, taskMachines: { reconciled: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
   assert.equal(taskSweeps, 1)
+  assert.equal(backstops, 1, 'the session backstop runs once per cron sweep, at its cadence')
   assert.equal(reconciled, 1)
   assert.equal(expireReviews.mock.callCount(), 1)
   assert.equal(judged, 1)
@@ -79,9 +84,9 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.doesNotMatch(await failed.text(), /private-database-error/)
 })
 
-test('lost runs are reclaimed by this sweep only, not by the task-run poll or each heartbeat', async () => {
+test('lost runs are reclaimed by this sweep only, not by the task-run poll, a device report or a session report', async () => {
   const { readFile } = await import('node:fs/promises')
-  for (const file of ['../../../actions/task-runs.ts', '../../../v1/devices/[deviceId]/heartbeat/route.ts']) {
+  for (const file of ['../../../actions/task-runs.ts', '../../../v1/devices/[deviceId]/report/route.ts', '../../../../lib/device-session.ts']) {
     assert.doesNotMatch(await readFile(new URL(file, import.meta.url), 'utf8'), /reclaimLostRuns/, file)
   }
 })

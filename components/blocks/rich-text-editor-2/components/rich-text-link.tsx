@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type FormEvent, type RefObject } from "react"
 import { useEditorState, type Editor } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/tooltip"
 import type { RichTextSnapshot } from "./rich-text-state"
 import { keepEditorFocus, ShortcutKeys } from "./rich-text-toolbar"
-import { LinkIcon, CheckIcon, Link2OffIcon, ExternalLinkIcon, PencilIcon } from "lucide-react"
+import { Link, Check, Link2Off, ExternalLink, Pencil } from "@/components/icons"
 
 const BARE_DOMAIN = /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#]\S*)?$/
 
@@ -98,7 +98,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
       <Field data-invalid={invalid || undefined}>
         <InputGroup>
           <InputGroupAddon>
-            <LinkIcon aria-hidden="true" />
+            <Link aria-hidden="true" />
           </InputGroupAddon>
           <InputGroupInput
             ref={inputRef}
@@ -123,7 +123,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
               focusableWhenDisabled
               className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
-              <CheckIcon aria-hidden="true" />
+              <Check aria-hidden="true" />
             </InputGroupButton>
             {href ? (
               <InputGroupButton
@@ -134,7 +134,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
                   onDone()
                 }}
               >
-                <Link2OffIcon aria-hidden="true" />
+                <Link2Off aria-hidden="true" />
               </InputGroupButton>
             ) : null}
           </InputGroupAddon>
@@ -183,7 +183,7 @@ export function RichTextLinkPopover({
               />
             }
           >
-            <LinkIcon aria-hidden="true" />
+            <Link aria-hidden="true" />
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>
@@ -267,7 +267,7 @@ export function RichTextLinkBubble({
               <a href={safeHref} target="_blank" rel="noopener noreferrer" />
             }
           >
-            <ExternalLinkIcon aria-hidden="true" />
+            <ExternalLink aria-hidden="true" />
             <span className="truncate">
               {safeHref.replace(/^https?:\/\//, "")}
             </span>
@@ -285,7 +285,7 @@ export function RichTextLinkBubble({
               />
             }
           >
-            <PencilIcon aria-hidden="true" />
+            <Pencil aria-hidden="true" />
           </TooltipTrigger>
           <TooltipContent>{t('editLink')}</TooltipContent>
         </Tooltip>
@@ -300,7 +300,7 @@ export function RichTextLinkBubble({
               />
             }
           >
-            <Link2OffIcon aria-hidden="true" />
+            <Link2Off aria-hidden="true" />
           </TooltipTrigger>
           <TooltipContent>{t('removeLink')}</TooltipContent>
         </Tooltip>

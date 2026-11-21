@@ -3,7 +3,6 @@ import { AgentKitError } from '@/lib/agent-kit/store'
 import { agentScope } from '@/lib/agent-kit/service'
 import { readAppToolCatalogue } from '@/lib/app-tool-catalogue'
 
-export const dynamic = 'force-dynamic'
 
 const APP = /^[a-z][a-z0-9_]{0,63}$/
 

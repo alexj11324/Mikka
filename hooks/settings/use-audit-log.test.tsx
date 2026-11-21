@@ -10,7 +10,7 @@ import type { AuditLogState } from './use-audit-log'
 let status = 200
 let failOnlyNextPage = false
 const requests: string[] = []
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => () => 'Read failed' } })
 mock.module('@/lib/settings-read', { namedExports: { settingsRead: async (_read: string, { cursor }: { cursor?: string }) => {
   requests.push(cursor ?? 'first')

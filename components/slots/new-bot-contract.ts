@@ -29,8 +29,16 @@ export type NewBotProps = {
   onShape: (shape: BotShape) => void
   /** The model the Bot's runs use (the model picker's menu); saved after the Bot is created. */
   model: NewBotDetail
-  /** The repository the Bot works in; `NO_REPOSITORY` for none (the Bot works on Mikka Cloud). */
+  /** The repository the Bot works in; `NO_REPOSITORY` for none (the Bot works on Mikka Cloud). Superseded by `environment`: a pick binds the Environment that lists it. */
   repository: NewBotDetail
+  /** The Environment the Bot works in (its repositories, setup and variables); the workspace default first. */
+  environment?: NewBotDetail
+  /** Machine: where the tasks it dispatches run (`cloud` Mikka Cloud, `cloudflare` the Cloudflare coding machine, or a device ID under 其他设备). */
+  machine?: NewBotDetail
+  /** The model's reasoning effort; `NO_EFFORT` is the model's default. */
+  effort?: NewBotDetail
+  /** Access: `private` or `shared` with the workspace. */
+  access?: NewBotDetail
   saving: boolean
   /** Creates the Bot; errors show as a toast and the window stays. */
   onSubmit: () => void
@@ -38,3 +46,6 @@ export type NewBotProps = {
 
 /** The 仓库 row's value for no repository. */
 export const NO_REPOSITORY = ''
+
+/** The effort row's value for the model's default. */
+export const NO_EFFORT = ''

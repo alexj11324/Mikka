@@ -1,7 +1,6 @@
-import {NextResponse} from 'next/server'
+import {NextResponse} from '@/lib/server-runtime/server'
 import {auth} from '@/lib/api-auth'
 
-export const dynamic='force-dynamic'
 /** The old wire label is retained for installed clients; Eve owns execution. */
 export async function GET(request:Request) {
   const session=await auth.api.getSession({headers:request.headers})

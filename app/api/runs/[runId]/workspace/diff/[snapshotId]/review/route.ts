@@ -3,7 +3,6 @@ import { reviewMutation } from '@mikka/protocol/coding-workspace-review'
 import { reviewHttp } from '@/lib/coding-workspace/diff/http'
 import { mutateReview, readReviewBoard } from '@/lib/coding-workspace/diff/review'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const query = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(), cursor: z.string().max(4096).optional() })
 const command = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(), mutation: reviewMutation })

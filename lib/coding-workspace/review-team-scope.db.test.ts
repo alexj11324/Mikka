@@ -29,15 +29,15 @@ test('review capabilities follow real team relation changes and their transactio
   Object.assign(process.env, { E2E_DATABASE_URL: url.toString(), MIKKA_DATABASE_URL: url.toString(), DATABASE_URL: url.toString() })
   // Run real after() work at the request boundary. Bare Node otherwise starts
   // unrelated Live membership readers inside the gateway's exclusive lock probe.
-  const next = await import('next/server')
+  const next = await import('@/lib/server-runtime/server')
   const afterResponse: Array<() => unknown> = []
-  t.mock.module('next/server', { namedExports: { ...next, after: (work: () => unknown) => { afterResponse.push(work) } } })
+  t.mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => unknown) => { afterResponse.push(work) } } })
   t.afterEach(async () => { await Promise.all(afterResponse.splice(0).map(work => work())) })
   // Framework translation and audit request metadata are outside this SQL
   // regression. Session rows, membership, issue access, action authorization
   // and transactions are real; actAs uses the existing verified-actor path.
-  t.mock.module('next-intl/server', { namedExports: { getTranslations: async () => Object.assign((key: string) => key, { has: () => false }), getLocale: async () => 'en' } })
-  t.mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, set() {}, delete() {} }) } })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => Object.assign((key: string) => key, { has: () => false }), getLocale: async () => 'en' } })
+  t.mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, set() {}, delete() {} }) } })
   const { resolveTaskReviewAuthority: resolve, ReviewAuthorityError } = await import('./review-authority')
   const { beginReviewSession, readReviewSession, closeReviewSession, drainRevokedReviewSessions, reviewSessionTransport } = await import('./review-sessions')
   const { actAs } = await import('../acting-user')
@@ -59,7 +59,7 @@ test('review capabilities follow real team relation changes and their transactio
     const sandboxId = `synthetic-review-${randomUUID()}`, remoteKey = 'v2/github.com/mikka-ci/review-team-fixture'
     await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Review team fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'personal\')', [taskId, owner, home.workspaceId])
     if (linked) await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, home.teamId, home.workspaceId, owner])
-    await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now())', [deviceId, owner])
+    await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now(),now())', [deviceId, owner])
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,\'https://github.com/mikka-ci/review-team-fixture.git\')', [repoId, deviceId, owner, remoteKey])
     await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1::uuid,$2,$1::text,$3,$4,now()+interval \'1 hour\')', [tokenId, owner, deviceId, home.workspaceId])
     const definition = { executionIdentity: { workspaceId: home.workspaceId }, repositoryAdmission: { workspaceId: home.workspaceId,

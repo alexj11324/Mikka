@@ -1,4 +1,39 @@
 {
+  "lib/project-resources/device-checkouts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation database under the existing active Project content lease to list, set or clear only the signed-in person's local-device Git directory bookmarks.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "drizzle/20261117062300_device_project_checkouts.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store private Git directory bookmarks scoped to their account, local device and Project. Device removal and Project or account deletion erase the associated bookmarks.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save a private checkout bookmark for an owned local device and a readable active Project. No filesystem access or execution is granted.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Clear only the signed-in person’s checkout bookmark for the specified local device and active Project.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/projects/[projectId]/device-checkouts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only the signed-in person’s local checkout bookmarks for an active, readable Project.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/subscription-ui.ts": {
     "mode": "built-in",
     "environment": [],
@@ -33,6 +68,13 @@
     "behavior": "Authenticate the conversation owner to read, enqueue, cancel or version input through the installation PostgreSQL database. Also read the conversation continuation model menu only for its authorized owner.",
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "app/actions/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts for a task using the signed-in reader's existing workspace, task and artifact authorization in the installation PostgreSQL database.",
+    "test": "tests/task-workspace-governance.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "app/actions/issues.ts": {
     "mode": "built-in",
@@ -73,7 +115,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "A signed-in owner can page through visible active thread roots on their local device in the current workspace, using the installation PostgreSQL database.",
-    "test": "lib/device-heartbeat.db.test.ts",
+    "test": "lib/device-session.db.test.ts",
     "suite": "test:device-revocation-db"
   },
   "app/api/drive/scopes/route.ts": {
@@ -134,14 +176,18 @@
   },
   "app/api/drive/shares/[shareId]/route.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
   "lib/drive/share-view.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
@@ -554,6 +600,13 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/dictation/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Transcribe a spoken new-task description with the person's own authorized OpenAI transcription key; nothing is stored.",
+    "test": "app/api/tasks/dictation/route.test.ts",
+    "suite": "test:issues"
+  },
   "app/api/tasks/[taskId]/review/machine-sessions/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -689,8 +742,11 @@
   },
   "apps/api/scripts/dev.mjs": {
     "mode": "built-in",
-    "environment": [],
-    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "environment": [
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_LOCAL_TEST_ACCOUNTS"
+    ],
+    "behavior": "The development server uses Nitro’s native drain during worker replacement so admitted requests can finish with their original worker, and before it listens it prepares a loopback database, the official UI overlay’s dependencies and one local development account.",
     "test": "apps/api/runtime/dev-tracing.test.mjs"
   },
   "apps/api/scripts/finalize-build.mjs": {
@@ -1008,7 +1064,7 @@
       "DATABASE_URL"
     ],
     "behavior": "Keep explicit Run cancellation intent in the installation database so a paired local device can distinguish it from a lost lease.",
-    "test": "lib/device-heartbeat.db.test.ts",
+    "test": "lib/device-session.db.test.ts",
     "suite": "test:device-revocation-db"
   },
   "drizzle/20261117051905_organization_join_domain_receipts.sql": {
@@ -1145,17 +1201,6 @@
     "test": "tests/resource-access.db.test.ts",
     "suite": "test:visibility-db"
   },
-  "lib/abuse/workers-ai.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN",
-      "MIKKA_WORKERS_AI_CAPABILITY"
-    ],
-    "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
-    "test": "lib/abuse/model.test.ts",
-    "suite": "test:abuse"
-  },
   "lib/account-deletions-due.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1231,7 +1276,7 @@
     ],
     "behavior": "Community installations retain file bytes in PostgreSQL when no object store is configured; an operator may use an S3-compatible bucket.",
     "test": "lib/artifacts/storage.test.ts",
-    "suite": "test:self-hosted-byok"
+    "suite": "test:service-config"
   },
   "lib/artifacts/store.ts": {
     "mode": "built-in",
@@ -1256,6 +1301,111 @@
     "behavior": "Validate audit events locally. Forwarded location metadata is read only from a recognized deployment ingress.",
     "test": "lib/audit/events.test.ts",
     "suite": "test:audit"
+  },
+  "lib/auth-cookies.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Carry Better Auth's renewed session cookies into the request's cookie journal so the transport commits them, replacing the framework integration's after hook.",
+    "test": "lib/auth-cookies.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/dynamic.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Load a component on first render behind the caller's loading boundary. There is no server render to skip, so the deployment needs no configuration.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/link.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Render an application route as an anchor that navigates in place, adding the deployment base path exactly once. Modified clicks, downloads and external URLs stay with the browser.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/localized-navigation.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Navigate with the active locale applied to the href, and keep an explicit locale choice in the NEXT_LOCALE cookie under the deployment base path.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/location.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and write the browser's location as router state, stripping the deployment base path and separating locale segments. An installation that serves auth as a server document keeps those links on the server entry.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the browser router hooks. Route assets are already in the bundle, so a prefetch resolves without any server read.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/script.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Load a third-party script once per key and re-announce readiness on each mount. No installation configuration and no server runtime are involved.",
+    "test": "components/auth/turnstile.test.tsx",
+    "suite": "test:signup-turnstile"
+  },
+  "lib/intl/i18n-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the client translation hooks directly over use-intl instead of a framework package. Messages are bundled, so no installation value is read.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/intl/i18n-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Translate on the server from the locale of the request in scope, falling back to the default locale when the request carries none.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-only.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Mark a module as server-only so the browser build rejects it. This replaces the framework marker package; the build enforces the boundary, not the deployment.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/headers.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current request's headers and cookie jar from the request scope. Headers stay read-only and cookie writes are journalled until the response boundary commits them.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/localized-navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build locale-prefixed redirect targets for server code, agreeing with the browser helper on every application path.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Raise a redirect or not-found answer from nested handler code as a marker the request dispatcher turns into the matching HTTP response.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/react.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve the server graph's React entry, replacing only cache with the request-scoped memo so one request's reads are never shared with another.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Provide the server request and response types, including the deployment base path on the request URL and the after-work queue bound to the request scope.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
   },
   "lib/auth-error.ts": {
     "mode": "built-in",
@@ -1566,6 +1716,20 @@
     "test": "lib/thread-artifacts.test.ts",
     "suite": "test:lib-units"
   },
+  "lib/thread-history-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Page conversation chunks and message keys from the installation PostgreSQL database for the authorized run chain selected by the thread action.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
+  "lib/thread-history.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate and type the history page cursor and bound each page without any external service.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/thread-title-schedule.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1617,22 +1781,20 @@
   "lib/coordinator/decision-provider.ts": {
     "mode": "operator-configured",
     "environment": [
-      "AI_GATEWAY_API_KEY",
-      "DECISIONS_API_KEY",
-      "DECISIONS_BILLING_PROFILE",
-      "OPENAI_DECISIONS_API_KEY"
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "The native decision route requires an explicit billing profile, matching model and operator key. Unconfigured or disallowed routes cannot reserve or send a provider request.",
+    "behavior": "Decisions use only the installation LiteLLM endpoint and master key, without provider-specific keys, endpoints or fallback.",
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
   },
   "lib/coordinator/decision.ts": {
     "mode": "operator-configured",
     "environment": [
-      "DECISIONS_URL",
-      "DECISION_MODEL"
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "The Coordinator allows an operator-selected decision endpoint and model. Requests use the existing credential and budget policy for that route.",
+    "behavior": "The built-in Decision request uses the mikka-decision alias managed in LiteLLM; the application does not select a provider model.",
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
   },
@@ -1733,23 +1895,12 @@
   "lib/default-model-config.ts": {
     "mode": "operator-configured",
     "environment": [
-      "AI_GATEWAY_API_KEY",
-      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN",
-      "MIKKA_DEFAULT_MODEL_API_KEY",
-      "MIKKA_DEFAULT_MODEL_BASE_URL",
-      "MIKKA_DEFAULT_MODEL_ID",
-      "MIKKA_EDITION",
-      "MIKKA_HOSTED_MODEL_FALLBACK",
-      "MIKKA_WORKERS_AI_CAPABILITY",
-      "VERCEL",
-      "VERCEL_OIDC_TOKEN",
-      "ZEROCAT_API_KEY",
-      "ZEROCAT_BASE_URL"
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "Community installations may configure their own complete model endpoint, key and model ID. An incomplete private route is unavailable and optional hosted provider configurations are evaluated separately.",
+    "behavior": "Model readiness requires the installation LiteLLM URL and master key; retired direct-provider settings do not enable models.",
     "test": "lib/default-model-config.test.ts",
-    "suite": "test:self-hosted-byok"
+    "suite": "test:service-config"
   },
   "lib/deployment-stage.mjs": {
     "mode": "operator-configured",
@@ -1913,6 +2064,13 @@
     "environment": [],
     "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
+  },
+  "lib/eve/host-authorization.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sign the internal Eve scope with the host key supplied by the caller and the existing clock-skew allowance.",
+    "test": "lib/eve/auth.test.ts",
+    "suite": "test:eve"
   },
   "lib/eve/product-definitions.ts": {
     "mode": "built-in",
@@ -2241,6 +2399,13 @@
     "test": "components/workspace/issue-relations.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-run-conversation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project recorded commands and exit status from existing thread chunks. The thread preserves the serialized result for other clients and applies credential masking to displayed command and output text.",
+    "test": "lib/issue-run-conversation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2307,6 +2472,13 @@
     "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
+  },
+  "lib/mobile-task-refresh.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Version the existing native task list and validate bounded failure metadata. The list works without an observability exporter.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
   },
   "lib/mobile-web-scope.ts": {
     "mode": "built-in",
@@ -2873,18 +3045,6 @@
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
   },
-  "lib/workers-ai-config.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN",
-      "MIKKA_HOSTED_MODEL_FALLBACK",
-      "MIKKA_WORKERS_AI_CAPABILITY"
-    ],
-    "behavior": "A hosted Cloudflare container authorizes its fixed account with an instance-scoped service binding. Operators can also configure a model-specific REST token. Community installations can use their own configured model.",
-    "test": "lib/abuse/model.test.ts",
-    "suite": "test:abuse"
-  },
   "lib/workspace-db.ts": {
     "mode": "built-in",
     "environment": [
@@ -3263,7 +3423,7 @@
       "MIKKA_LITELLM_URL",
       "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "Protocol conversion uses the operator's own LiteLLM when both variables are set; without them a key that speaks the client's protocol still works and conversion is refused.",
+    "behavior": "LiteLLM is mandatory model egress for both hosted and community installations. Missing or invalid configuration refuses model requests with no direct-provider fallback.",
     "test": "lib/model-gateway/gateway.test.ts",
     "suite": "test:subscription-usability"
   },
@@ -3291,7 +3451,7 @@
   "lib/model-gateway/upstream.ts": {
     "mode": "operator-configured",
     "environment": [],
-    "behavior": "Chooses the provider endpoint for a person's key, the operator's LiteLLM for conversion, or the operator's Gateway for credits.",
+    "behavior": "All API-key and credits model requests go to the configured LiteLLM endpoint; authorized user-key routing metadata is passed per request and cannot fall back to a Mikka upstream key.",
     "test": "lib/model-gateway/gateway.test.ts",
     "suite": "test:subscription-usability"
   },
@@ -3343,6 +3503,34 @@
     "behavior": "Works out the setup checklist from the installation's own data.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
+  },
+  "app/api/integrations/github/repositories/pulls/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the signed-in owner’s pull requests from their authorized GitHub repositories through the existing GitHub App access policy. Missing GitHub configuration or denied repository access cannot return pull requests.",
+    "test": "app/api/integrations/github/repositories/pulls/route.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "app/api/integrations/github/repositories/pulls/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads one pull request's changed files through the signed-in owner's existing GitHub repository authorization. A missing session, an unknown query key or a denied repository is refused before any provider call, and the credential never leaves the server.",
+    "test": "app/api/integrations/github/repositories/pulls/files/route.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a bounded pull-request page only through the signed-in owner's existing GitHub repository authorization, validates repository identity and provider response, and never exposes the credential.",
+    "test": "lib/github/pull-directory.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/pull-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates bounded pull-directory inputs and derives metadata-only filtering, grouping, saved-view and linked-thread projections without accessing another user's GitHub data.",
+    "test": "lib/pull-directory.test.ts",
+    "suite": "test:github-pulls"
   },
   "app/api/integrations/github/repositories/branches/route.ts": {
     "mode": "built-in",
@@ -3414,11 +3602,725 @@
     "test": "lib/enterprise/governance.db.test.ts",
     "suite": "test:enterprise-db"
   },
+  "app/v1/devices/[deviceId]/report/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A paired daemon reports changed device state, command receipts and update failures once to the installation database; the report renews no lease and records no presence.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "app/v1/internal/device-sessions/[deviceId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The device gateway reports a device socket opening or closing, authenticated with the gateway push secret; the installation database records the session and extends or ends the device's run leases.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "drizzle/20261117221604_device_session.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store each device's gateway session (opened, closed, socket) in the installation database, so presence and run leases follow the session instead of a heartbeat.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/builtin-gateway/session-reports.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The built-in gateway reports device sessions to the installation in process, after a 30 second close grace, in order and with retries.",
+    "test": "lib/builtin-gateway/session-reports.test.ts",
+    "suite": "test:device-gateway"
+  },
+  "lib/daemon-release.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Refuse every device request without the device session header with 426 and the daemon versions, so an old daemon updates before it can be used.",
+    "test": "lib/daemon-release.test.ts",
+    "suite": "test:platform"
+  },
+  "lib/device-link.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticate device credentials against the installation database; a removed device reaches only its report, and a commands read stops runs whose lease the server ended.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-presence.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read device presence from the recorded gateway session in the installation database, without a heartbeat window or a gateway round trip.",
+    "test": "lib/device-presence.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-report-body.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bound the device report request body before parsing.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-session.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply gateway session reports in order to the installation database, extend or end run leases, and close sessions the gateway no longer holds during run recovery.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/secrets/egress-binding.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check a task Secret capability against the live run, claim credential and device session in the installation database on every use.",
+    "test": "tests/task-secret-access.db.test.ts",
+    "suite": "test:secrets-db"
+  },
   "lib/agent-no-model.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
     "test": "tests/cloud-runtime-auto.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/run-authority-stop.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "When a change takes a run's authority away (Bot archived, task deleted, member gone, workspace or account deleted), stop the affected runs in the installation database and push the stop to their devices.",
+    "test": "lib/run-authority-stop.db.test.ts",
+    "suite": "test:bot-chats-db"
+  },
+  "drizzle/20261118120000_conversation_model_device.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds an optional model and device to a conversation: a thread may pin which model answers it and which machine runs it, while every existing row and every caller that sends neither keeps the lead Bot's own model and any eligible device.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/bot-models.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Names the three models a Bot or a thread may pin, shared by the conversations CHECK constraint, the strict create schema and the create dialog's picker; no network, no credentials.",
+    "test": "lib/bot-models.test.ts",
+    "suite": "test:lib-units"
+  },
+  "app/api/devices/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/devices/dispatchable.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable local devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/acting-user.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve the acting person for a server action or route from the installation's own session or an explicit actAs principal, including the token's workspace scope and the request-log attribution. No external service.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
+  },
+  "lib/link-preview-batch.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bounds how many links one batched preview request carries. A constant shared by the web and desktop clients; no installation dependency.",
+    "test": "components/workspace/group-chat-revalidation.test.tsx",
+    "suite": "test:groups"
+  },
+  "app/actions/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetch a public web page's Open Graph title, summary and image for a signed-in person's chat citation. Private and loopback addresses are refused, so the installation never becomes an open proxy.",
+    "test": "components/workspace/group-chat-revalidation.test.tsx",
+    "suite": "test:groups"
+  },
+  "lib/issue-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve the signed-in or acting person and authorize a task read against the installation's own PostgreSQL records, including workspace membership, token scope and Enterprise principal.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261119165111_agent_runs_status_lease_idx.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Indexes agent_runs on (status, leaseExpiresAt) so the due-timer recovery sweep and the lease reclaim stop scanning the table once per pass and once per owner. Schema only; the installation database serves it.",
+    "test": "lib/run-recovery-due.db.test.ts",
+    "suite": "test:run-recovery-db"
+  },
+  "lib/account/billing-cleanup.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Cancels a deleted account’s Stripe subscription before its workspace row is removed, so the installation stops billing a person who no longer has an account. Needs no installation dependency when the workspace has no customer.",
+    "test": "lib/account/owner-cleanup.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "lib/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetches a link preview from a public address only. Every connection resolves the host and refuses a private answer at dial time, so the installation never reaches an internal or metadata address on a person’s behalf.",
+    "test": "lib/link-preview.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "apps/api/scripts/dev-preflight.mjs": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "E2E_DATABASE_URL",
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_LOCAL_TEST_ACCOUNTS"
+    ],
+    "behavior": "Prepares what pnpm dev needs before anything listens: a loopback PostgreSQL database created and migrated, the official UI overlay’s own dependencies installed when missing, and one development account whose password is generated on the machine and kept in a gitignored file. Refuses to create a database anywhere but this machine.",
+    "test": "apps/api/scripts/dev-preflight.test.mjs"
+  },
+  "lib/hooks/use-sidebar-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores the rail’s collapsed-or-open choice per workspace in the person’s own browser. No server read, no installation dependency.",
+    "test": "lib/hooks/use-sidebar-view.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/pull-request-diff.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates and folds a pull request’s changed-file pages into one bounded summary. Text only: no provider call, no credential and no filesystem access.",
+    "test": "lib/pull-request-diff.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/state-mark.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The one mark registry: a status, priority, thread group or run indicator in, the shape and tone every surface draws out. Pure data, no installation dependency.",
+    "test": "lib/state-mark.test.ts",
+    "suite": "test:lib-units"
+  },
+  "drizzle/20261120045013_pull_pins_and_saved_views.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store each person's PR pins and saved list views per workspace in the installation database; deleting the account removes them.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "app/actions/list-views.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in workspace member reads and writes only their own PR pins and saved list views in the installation PostgreSQL database.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/pull-pins.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pin or unpin pull requests for one person in one workspace in the installation database, up to a fixed limit.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/saved-views-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save, list and delete one person's named list views per workspace and list in the installation database, up to a fixed limit.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/saved-views.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate a saved list view's scope, name and small filter object before it is stored; no external service.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/list-owner-lock.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serialize one person's writes to a list in one workspace with a transaction-scoped PostgreSQL advisory lock, so pin and saved-view limits hold under concurrent requests.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "app/actions/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task property reads and writes use PostgreSQL; the new-task options read lists active workspace members and visible labels, and assigning a Bot records its wake in the same transaction.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/coordinator-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Coordinator event inputs, including the task assignment and task activity wakes, are pure values stored in the installation's own PostgreSQL.",
+    "test": "lib/coordinator-events.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/task-activity-wake-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A task document save records Bot wakes for new comments and Bot mentions in the installation's own PostgreSQL, in the same transaction.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-activity-wake.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure rules for which Bots a task comment or mention wakes; no external service.",
+    "test": "lib/task-activity-wake.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/task-create-properties.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create-only task properties (assignee, due date, labels, access) are applied in the create transaction in the installation's own PostgreSQL.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-due-presets.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure local-date shortcuts for a new task's due date; no external service.",
+    "test": "lib/task-due-presets.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/model-gateway/litellm-client.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
+    ],
+    "behavior": "The sole SDK client sends managed models and authorized BYOK requests to LiteLLM, preserving cost and request receipts without following redirects or exposing the master key to Agents.",
+    "test": "lib/model-gateway/litellm-client.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/coordinator/model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Uses administrator-managed LiteLLM aliases for default and title purposes, and preserves the Coordinator round cap and closed finish warnings without provider credentials in application constants.",
+    "test": "lib/coordinator/model.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/model-admission/runtime.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks every affected workspace through the installation model admission store before LiteLLM or owner-bound subscription transport; a revoked policy cannot spend or issue a provider request.",
+    "test": "lib/model-admission/revocation-postpay.db.test.ts",
+    "suite": "test:model-admission-db"
+  },
+  "lib/model-gateway/protocol-fields.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Projects only supported public protocol fields before server-owned LiteLLM routing and credentials are attached, excluding task-supplied proxy control fields and mock responses.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-gateway/provider-config.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Provides trusted preset endpoint metadata for LiteLLM request routing and read-only credential/model discovery; it does not make model requests or hold provider keys.",
+    "test": "lib/model-api-key-providers.test.ts",
+    "suite": "test:execution-rules"
+  },
+  "app/api/integrations/github/repositories/pulls/detail/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in person reads one pull request of a repository their GitHub connection admits: summary, checks on its current head and reviews. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-detail.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-detail.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one pull request through the person's admitted repository credential and refuse another repository's identity. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-detail.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "app/api/integrations/github/repositories/pulls/merge/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in person merges one pull request as themselves with their own GitHub token, bound to the head they saw; failing checks need their confirmation. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-merge.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Merge one pull request with the person's own GitHub token through the existing merge port, bound to the expected head. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/factory/merge.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map GitHub's merge refusal to the existing stable codes for both task merges and merging one pull request; no new service.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "drizzle/20261120044638_workspace_issue_states.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create each workspace's task states in the installation database, seed the seven built-in states and keep every task's status equal to its state's category.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/issue-states-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and change a workspace's task states in the installation database; deleting a state first moves its tasks to another state.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/issue-states.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate task state input and order states for the picker; no external service.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/issue-states.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Members read the workspace's task states and admins change them through the installation's own session and workspace checks.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120054548_task_list_filter_indexes.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add expression indexes on the installation database's tasks for the task list's metadata and due-date filters; no rows change.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/task-list-filters.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Narrow the task list in the installation database by view, assignee, creator, labels, due date, PRs, relations and subscription before the page limit.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120063603_task_reads.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store each person's own unread flag on a task in the installation database; it goes with the person, the task or the workspace.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/task-list.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Count the task list's views and read or set the person's unread flags through the installation's own session and workspace checks.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120044919_issues_source_schedule.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds issues.source_schedule_id: a task an automation's run made remembers that automation, so the thread directory can list one automation's runs (View runs). Backfilled from schedule_occurrences in the installation database; nothing outside it.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261120044753_environment_default_machine_size.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Keep each Environment's default machine size in the installation workspace database; NULL keeps Mikka's default.",
+    "test": "tests/environment-settings.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/task-run-settings.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An automation's run settings (Environment, model and effort, machine size, pin) are stored on its request event in the installation PostgreSQL database and read back only from that event when the run is created.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/task-run-settings-schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The shape of an automation's run settings (Environment, model and effort, machine size, pin) carried on a task command; no environment input and no server dependency.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261120052101_schedule_run_as.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep the workspace member an automation runs as in the installation PostgreSQL database; NULL runs as its creator.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261120044916_bot_settings.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Adds the Bot's Environment, alias, task defaults, run location, followers, model effort and Slack thread routes to the installation PostgreSQL database; scripts/bot-environment-backfill.mjs moves each old repository into a workspace Environment during the normal migration."
+  },
+  "lib/bot-settings.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Parses a Bot's alias, Environment, task place, default Agent and profile and run location, and applies task > Bot > personal precedence; pure code with no installation dependency."
+  },
+  "lib/bot-settings-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Checks every Bot setting against its owner's own Environment, devices, Agents and profiles, and stores the chat model's effort, in the installation PostgreSQL database."
+  },
+  "lib/bot-environment.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Reads the workspace's Environments from the installation's workspace database to bind a Bot and find the repository its work starts in."
+  },
+  "lib/bot-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Shares a Bot with the workspace or keeps it private through the installation's resource access policies, keeps its followers and hands it to another member, all in the installation PostgreSQL database."
+  },
+  "lib/bot-route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Authenticates a Bot HTTP request with the installation's own session and workspace checks; no external service."
+  },
+  "app/api/bots/[botId]/follow/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Follows or unfollows a Bot the person can find, in the installation database."
+  },
+  "app/api/bots/[botId]/transfer/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Hands a Bot to another active member of the workspace, in the installation database."
+  },
+  "lib/slack/thread-bots.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Remembers which of the person's Bots a Slack thread started with bot=<alias> goes to, in the installation PostgreSQL database; only used where the operator configured Slack."
+  },
+  "lib/model-effort.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds the Bot's saved reasoning effort to the chat model's provider options; pure code, the provider is whatever the installation already uses.",
+    "test": "lib/model-effort.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/bot-model-effort.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the Bot's saved reasoning effort beside its model choice in the installation PostgreSQL database; absent, the model's default applies.",
+    "test": "lib/bot-model-selection.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "app/api/v1/artifacts/[artifactId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one artifact version for a scoped PAT or an mksvc_ service key, under the resource ACL of the credential's own Workspace, from the installation database and configured artifact storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/artifacts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts a scoped PAT or service key may read in its own Workspace, from the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/bots/[botId]/messages/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a shared Bot chat (masked) or hand a Bot a peer message and wake it through the existing coordinator outbox, under the Bot ACL of the credential's Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/bots/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List Bots a scoped PAT or service key may discover in its own Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/drive/volumes/[volumeId]/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read or compare-and-swap write one file of a bot, thread, environment or team Workspace Drive folder, using the installation database and configured Drive storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/drive/volumes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a bot, thread, environment or team Workspace Drive scope and its default folder's files, or write one file into that default folder (creating it), for a scoped PAT or service key.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/threads/[runId]/messages/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a thread (masked) or send a peer message that queues, steers or continues it on its owner's own admission, under the thread ACL of the credential's Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/threads/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List threads a scoped PAT or service key may read in its own Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "drizzle/20261120044938_agent_bot_interop.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds bot/run ACL subjects (explicit grants only), the bot, thread and environment Drive scopes, the interop PAT scopes and the peer thread-send receipt table to the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/drive/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure Drive contract, including the agent Drive scopes and their storage namespace; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked, tenant-pinned artifact reads from the installation database and configured artifact storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/bots.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked Bot discovery, masked chat reads and peer sends through the existing coordinator outbox.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/drive.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked Drive folders for bot, thread, environment and team Workspace scopes on the existing Drive store and its compare-and-swap.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/errors.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure interop refusal codes registered for user copy; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/http.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticates /api/v1 interop requests by scoped PAT or mksvc_ service key and maps refusals to their codes.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/principal.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The interop principal pinned to one Workspace and the owner-or-own-grant ACL decision in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/threads.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked thread reads, masked checkpoint diffs and idempotent peer sends that continue a thread on its owner's admission.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/tool-schemas.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure tool input schemas shared by the Bot and the worker MCP; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/tools.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Runs one interop tool for a principal and returns its registered refusal code.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/resource-access/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure resource ACL contract, including the bot and run subject kinds; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/thread-continue.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sends a message to a thread or continues an ended thread on the owner's admission; a peer send is recorded as peer, never as the owner.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "workflows/coordinator/interop-steps.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A Bot's interop tool step: the Bot acts in its own Workspace with its owner's identity and its own grants.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/grants/[kind]/[resourceId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List (owner or Workspace admin) or create (owner only) Bot, run and service grants on one resource for a scoped PAT, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Revoke one Bot, run or service grant (owner or Workspace admin) for a scoped PAT, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/grants.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Owner-created, owner- or admin-revoked explicit grants to Bot, run and service subjects in the same Workspace, audited through the existing ACL events.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/continuation-grant.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks the owner's explicit canSteer grant before a peer continues an ended thread, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/factory/agent-profile-mark.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure Agent Profile mark glyphs, colours and thread-status-to-ProfileMarkState mapping; no network or credentials.",
+    "test": "components/labels/profile-mark.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/api-key-models-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure projection partitioning an API key’s discovered models into recognized and unrecognized entries with select-all state; no network or credentials.",
+    "test": "lib/api-key-models-view.test.ts",
+    "suite": "test:lib-units"
   }
 }

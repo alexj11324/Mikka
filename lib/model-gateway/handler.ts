@@ -7,7 +7,8 @@ import { requestGatewayToken, verifyGatewayToken, type GatewayGrant } from './to
 import { upstreamRequest, type GatewayOperation, type GatewayUpstream } from './upstream'
 import { gatewayCostMicroUsd, readGatewayUsage, type GatewayProtocol } from './usage'
 import { withoutDisabledFeatures } from './features'
-import { gatewayLiteLlm } from './config'
+import { isCloudEdition } from '@/lib/edition'
+import { gatewayLiteLlm, SELF_HOSTED_DEFAULT_CATALOG_ID } from './config'
 
 /** The same input-size boundary the hosted model applies to one call. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024
@@ -20,7 +21,7 @@ export interface GatewayDependencies {
   upstream(grant: GatewayGrant, protocol: GatewayProtocol): Promise<{ upstream: GatewayUpstream; features?: import('./features').GatewayFeatures }>
   /** Mikka 额度 only: holds a call's worth of credit; resolves to the hold's id. Throws `PaidResourceError` when nothing can pay. */
   reserve(grant: GatewayGrant, id: string): Promise<void>
-  settle(id: string, cost: number | null, usage: ReturnType<typeof readGatewayUsage>): Promise<void>
+  settle(id: string, cost: number | null, usage: ReturnType<typeof readGatewayUsage>, generationId?: string): Promise<void>
   /** The catalogue the cost is priced from. */
   catalogue(): Promise<readonly import('@/lib/model-catalog').CatalogModel[]>
   /** Nothing can pay: the run stops with the refusal as its reason, so the thread shows 「Mikka 额度已用完」. */
@@ -117,22 +118,23 @@ export async function handleModelGateway(request: Request, protocol: GatewayProt
     console.warn(JSON.stringify({ msg: 'model_gateway_upstream_failed', runId: grant.runId, source: grant.source.kind, error: error instanceof Error ? error.name : 'unknown' }))
     return errorResponse(protocol, 502, 'model_gateway_upstream_failed')
   }
+  const generationId = response.headers.get('x-litellm-call-id') ?? undefined
   const headers = new Headers({ 'cache-control': 'no-store' })
   const type = response.headers.get('content-type')
   if (type) headers.set('content-type', type)
   if (!metered || !response.body) {
-    if (metered) await dependencies.settle(holdId, response.ok ? null : 0, null)
+    if (metered) await dependencies.settle(holdId, response.ok ? null : 0, null, generationId)
     return new Response(response.body, { status: response.status, headers })
   }
   if (!response.ok) {
     // A refused request (bad parameters, provider limits) cost nothing.
-    await dependencies.settle(holdId, 0, null)
+    await dependencies.settle(holdId, 0, null, generationId)
     return new Response(response.body, { status: response.status, headers })
   }
   const tap = usageTap(async text => {
     const usage = readGatewayUsage(protocol, text)
     const model = catalogModel(grant.model, await dependencies.catalogue())
-    await dependencies.settle(holdId, usage ? gatewayCostMicroUsd(model, usage) : null, usage)
+    await dependencies.settle(holdId, usage ? gatewayCostMicroUsd(model, usage) : null, usage, generationId)
   })
   // A client that stops reading still owes what the provider already produced.
   request.signal.addEventListener('abort', () => { void tap.finish() }, { once: true })
@@ -152,9 +154,9 @@ function defaultDependencies(): GatewayDependencies {
       await hostedBillingScope.run({ workspaceId, ownerId: grant.ownerId, runId: grant.runId, actorId: grant.ownerId },
         () => withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, grant.model, id, process.env)))
     },
-    async settle(id, cost, usage) {
+    async settle(id, cost, usage, generationId) {
       const { hostedUsage } = await import('@/lib/abuse/runtime')
-      await hostedUsage.settle(id, cost, usage?.inputTokens ?? 0, usage?.outputTokens ?? 0, undefined,
+      await hostedUsage.settle(id, cost, usage?.inputTokens ?? 0, usage?.outputTokens ?? 0, generationId,
         usage ? { read: usage.cacheReadTokens, write: usage.cacheWriteTokens } : null)
     },
     catalogue: async () => (await import('@/lib/model-catalog-server')).modelCatalog(),
@@ -168,22 +170,21 @@ function defaultDependencies(): GatewayDependencies {
 
 /** The run's frozen source, opened for this one request. */
 export async function resolveGatewayUpstream(grant: GatewayGrant, protocol: GatewayProtocol, env: Record<string, string | undefined> = process.env): Promise<{ upstream: GatewayUpstream; features?: import('./features').GatewayFeatures }> {
+  const litellm = gatewayLiteLlm(env)
+  if (!litellm) throw new GatewayRefusal(503, 'model_gateway_unconfigured')
   if (grant.source.kind === 'credits') {
+    if (!isCloudEdition(env) && grant.model === SELF_HOSTED_DEFAULT_CATALOG_ID) return { upstream: litellm }
     const models = await (await import('@/lib/model-catalog-server')).modelCatalog()
     if (!catalogModel(grant.model, models)?.pricing) throw new GatewayRefusal(400, 'model_gateway_model_unpriced')
-    const auth = await (await import('@/lib/ai-gateway-auth')).gatewayAuth(env)
-    if (!auth) throw new GatewayRefusal(503, 'model_gateway_unconfigured')
-    return { upstream: { kind: 'vercel', token: auth.token } }
+    return { upstream: litellm }
   }
   const { openGatewayApiKey } = await import('@/lib/model-api-keys')
   const opened = await openGatewayApiKey(pool, grant.source.keyId, env).catch((error: unknown) => {
     throw new GatewayRefusal(401, 'model_gateway_key_unavailable', { cause: error })
   })
-  const { apiKeyEndpoint, apiKeyChatBaseUrl } = await import('@/lib/model-api-key-providers')
-  const native = apiKeyEndpoint(opened.key, protocol === 'anthropic' ? 'claude_code' : 'codex')
-  if (native) return { upstream: { kind: 'provider', baseUrl: native.baseUrl, key: opened.apiKey }, features: opened.features }
-  const chatBaseUrl = apiKeyChatBaseUrl(opened.key)
-  const litellm = gatewayLiteLlm(env)
-  if (!chatBaseUrl || !litellm) throw new GatewayRefusal(400, 'model_gateway_protocol_unsupported')
-  return { upstream: { kind: 'litellm', url: litellm.url, masterKey: litellm.masterKey, chatBaseUrl, key: opened.apiKey }, features: opened.features }
+  const { apiKeyChatBaseUrl, apiKeyEndpoint } = await import('@/lib/model-api-key-providers')
+  const anthropic = opened.key.provider === 'anthropic' || (opened.key.provider === 'custom' && opened.key.protocol === 'anthropic')
+  const apiBase = anthropic ? apiKeyEndpoint(opened.key, 'claude_code')?.baseUrl : apiKeyChatBaseUrl(opened.key)
+  if (!apiBase) throw new GatewayRefusal(400, 'model_gateway_protocol_unsupported')
+  return { upstream: { ...litellm, credential: { key: opened.apiKey, provider: anthropic ? 'anthropic' : 'openai', apiBase, chatCompletionsOnly: !anthropic && opened.key.provider !== 'openai' } }, features: opened.features }
 }
