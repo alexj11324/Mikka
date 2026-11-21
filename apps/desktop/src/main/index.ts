@@ -22,6 +22,7 @@ import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
 import { meetsMinimumVersion } from '@mikka/protocol/version'
 import { windowAppearance } from './window-appearance'
+import { windowKindArgument } from '../window-kind'
 import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
 import { BundledAuth } from './bundled-auth'
@@ -36,6 +37,7 @@ import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
 import { agentLogins } from './agent-logins'
 import { openBundledWebPage } from './bundled-web'
+import { newWindowMenuItem } from './window-menu'
 import { markStartup } from '../startup'
 
 const APP_URL = __MIKKA_APP_URL__
@@ -255,7 +257,7 @@ function openChild(url: string): void {
       devTools: !app.isPackaged,
       ...(trusted ? {
         preload: join(__dirname, 'preload.cjs'),
-        additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`],
+        additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, windowKindArgument('child')],
       } : {}),
     },
   })
@@ -323,7 +325,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, windowKindArgument('main')],
     },
   })
   markStartup('main.window.created')
@@ -489,9 +491,11 @@ const ZOOM_ITEMS: Electron.MenuItemConstructorOptions[] = [
 ]
 
 function installMenu(): void {
+  const fileMenu = { label: 'File', submenu: [newWindowMenuItem(() => openChild(PAGE_URL))] }
   if (process.platform !== 'darwin') {
     // Windows and Linux show no menu bar; the menu stays only to keep its shortcuts.
     Menu.setApplicationMenu(Menu.buildFromTemplate([
+      fileMenu,
       { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
       { label: 'View', submenu: [{ label: 'Reload', accelerator: 'CommandOrControl+R', click: reloadApp }, ...ZOOM_ITEMS, ...(app.isPackaged ? [] : [{ role: 'forceReload' as const }, { role: 'toggleDevTools' as const }])] },
     ]))
@@ -513,6 +517,7 @@ function installMenu(): void {
         { role: 'quit' },
       ],
     },
+    fileMenu,
     {
       label: 'Edit',
       submenu: [

@@ -23,7 +23,10 @@ desktop capability.
 | `quota.snapshot` | yes |
 | `bundled` session, browser sign-in and live transport | yes; public identity only, credentials stay in main |
 | `device.pickRepo` | yes; native directory dialog, validated Git repository |
-| General local `settings`, `preview` scheme, saved tabs | deferred |
+| Additional authenticated app window | yes; File menu (Alt to show on Windows/Linux) / Ctrl+Shift+N (Cmd+Shift+N on macOS) |
+| Main-window saved tabs and per-tab back/forward history | yes |
+
+The desktop main window keeps up to 50 in-app tabs and their local navigation history in local storage, then restores the active tab on launch. Authentication, invitation, device-authorization, and credential-bearing routes are intentionally excluded. Child windows remain independent.
 
 The bundled renderer cannot read the session token, authentication cookies or
 live socket ticket. Main stores the session using OS-backed `safeStorage`,
