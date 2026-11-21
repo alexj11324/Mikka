@@ -600,11 +600,3 @@ export async function botChatSnapshot(reader: IssueReader) {
   for (const [botId, preference] of preferences) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), ...preference }
   return { items: result, expiries, observedAt: now.getTime() }
 }
-
-/** The whole conversation for display, newest last. */
-export async function conversationForDisplay(userId: string, limit = 200, botId: string) {
-  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(messagesOf(userId, botId))
-    .orderBy(desc(coordinatorMessages.position)).limit(limit)
-  return (await projectMessageDisplays(db, userId, rows)).reverse().map(({ id: _id, ...row }) => row)
-}
