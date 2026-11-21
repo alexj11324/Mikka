@@ -52,6 +52,32 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   // Settlement writes the cache breakdown, so this ledger's schema needs the
   // migration that adds those columns as well.
   await pool.query(readFileSync('drizzle/20261111060000_hosted_usage_token_breakdown.sql', 'utf8'))
+  await t.test('ledger attribution upgrades existing receipts and can be applied twice', async () => {
+    const migration = readFileSync('drizzle/20261121043334_add_hosted_usage_message_attribution.sql', 'utf8')
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const [legacyId, runId, threadId] = [randomUUID(), randomUUID(), randomUUID()]
+      await client.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"usageRunId","usageThreadId","inputTokens","costMicroUsd")
+        VALUES ($1,$2,'fixture/model','settled',$3,$4,11,23)`, [legacyId, old, runId, threadId])
+      await client.query(migration)
+      await client.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"usageRunId","usageMessageId","billingSource")
+        SELECT source,$1,'fixture/model','settled',$2,'harness-message-1',source
+        FROM unnest(ARRAY['credits','subscription','api_key']) source`, [old, runId])
+      await client.query(migration)
+      assert.deepEqual((await client.query(`SELECT "usageRunId","usageThreadId","usageMessageId","billingSource",
+        "inputTokens"::int AS tokens,"costMicroUsd"::int AS cost FROM hosted_usage WHERE id=$1`, [legacyId])).rows,
+      [{ usageRunId: runId, usageThreadId: threadId, usageMessageId: null, billingSource: null, tokens: 11, cost: 23 }])
+      assert.deepEqual((await client.query(`SELECT DISTINCT "usageMessageId", "billingSource" FROM hosted_usage
+        WHERE "usageRunId"=$1 AND "billingSource" IS NOT NULL ORDER BY "billingSource"`, [runId])).rows,
+      ['api_key', 'credits', 'subscription'].map(billingSource => ({ usageMessageId: 'harness-message-1', billingSource })))
+      await assert.rejects(client.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"billingSource")
+        VALUES ('invalid-source',$1,'fixture/model','settled','invalid')`, [old]), { code: '23514' })
+    } finally {
+      await client.query('ROLLBACK')
+      client.release()
+    }
+  })
   const store = new HostedUsageStore(pool)
   /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
   const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
