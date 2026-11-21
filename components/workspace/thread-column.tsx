@@ -56,8 +56,8 @@ export function ThreadColumn({ runId, issueId: known, overList = false, name, ma
   const back = main ? () => navigate({ mainThread: null }, 'replace') : closeThread
   const content = thread
       ? issueId
-        ? <TaskConversation key={issueId} issueId={issueId} runId={runId} name={name} onBack={back} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={() => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null })} />
-        : <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onBack={back} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} />
+        ? <TaskConversation key={issueId} host={main ? 'page' : 'column'} issueId={issueId} runId={runId} name={name} onBack={back} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={() => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null })} />
+        : <IssueThreadPanel key={runId} host={main ? 'page' : 'column'} issueId={issueId} runId={runId} name={name} onBack={back} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} />
       : error ? <div className="p-4"><InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} /></div>
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>
   return main ? <div data-own-scroll="" data-slot="main-thread" className="flex min-h-0 min-w-0 flex-1 flex-col">{content}</div>

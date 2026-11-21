@@ -32,6 +32,7 @@ let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
 const notices: unknown[] = []
 const notes = [{ n: 1, kind: 'region' as const, url: 'https://example.com', label: 'fixture', note: 'keep this note', rect: { x: 0, y: 0, width: 1, height: 1, viewportWidth: 1, viewportHeight: 1 } }]
+let ThreadTranscript: typeof import('../slots/thread-transcript')['ThreadTranscript']
 let composer: { sending?: boolean; editableWhileSending?: boolean; value: string; onChange: (value: string) => void; onSubmit: () => void }
 const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
@@ -41,7 +42,8 @@ mock.module(new URL('../../hooks/use-factory-questions.ts', import.meta.url).hre
   useFactoryQuestions: () => ({ questions: [], error: null, reload: nothing }),
 } })
 mock.module(new URL('../slots/thread.tsx', import.meta.url).href, { namedExports: {
-  ThreadScreen: (props: import('../slots/thread-contract').ThreadScreenProps) => {
+  ThreadScreen: (props: import('../slots/thread-contract').ThreadScreenProps | import('../slots/thread-contract').ThreadTranscriptScreenProps) => {
+    if ('transcript' in props) return <ThreadTranscript {...props} />
     composer = props.composer
     const { entries } = props
     return <div data-official-thread="">
@@ -49,7 +51,7 @@ mock.module(new URL('../slots/thread.tsx', import.meta.url).href, { namedExports
       {entry.text}{entry.attachments?.map(item => <span key={item.id}>{item.name}</span>)}{entry.deliveryMessage}
       {entry.onRetry && <Button onClick={entry.onRetry}>Retry</Button>}
     </div> : <div key={entry.id}>{entry.parts.map((part, i) =>
-      part.kind === 'error' ? <span key={i}>{part.text}{part.actions}</span> : null)}</div>)}
+      part.kind === 'error' ? <span key={i} data-message-failure={part.failure}>{part.text}{part.actions}</span> : null)}</div>)}
   </div>
   },
 } })
@@ -135,6 +137,7 @@ before(async () => {
   }
   ;({ createRoot } = await import('react-dom/client'))
   ;({ RetryReplyButton } = await import('./retry-reply-button'))
+  ;({ ThreadTranscript } = await import('../slots/thread-transcript'))
   ;({ CoordinatorChat } = await import('./coordinator-chat'))
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
@@ -193,6 +196,34 @@ test('a generic current reply failure retains its explicit retry action', async 
   await act(async () => notice.querySelector<HTMLButtonElement>('button')!.click())
   assert.equal(calls, 1)
   assert.deepEqual(modelPicks, [])
+})
+
+for (const state of ['live', 'welcome', 'welcome-empty', 'past'] as const) test(`the full chat keeps one ${state} failure marker with its existing recovery action`, async () => {
+  chatEnabled = true
+  chatError = state === 'past' ? null : 'model timed out'
+  chatItems = state === 'welcome-empty' ? [] : [{ id: 'fixture-failure', position: 7,
+    from: state === 'welcome' ? 'coordinator' : 'person', text: state === 'welcome' ? '' : 'retry this original message',
+    tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:08:00Z',
+    ...(state === 'welcome' ? { welcome: true as const } : {}), failure: { kind: 'failed' } }]
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  const kind = state === 'welcome-empty' ? 'welcome' : state
+  const notice = container.querySelector(`[data-message-failure="${kind}"]`)
+  assert.ok(notice)
+  assert.equal(container.querySelectorAll('[data-message-failure]').length, 1, 'the historical notice is not marked again by its surrounding error line')
+  assert.match(notice.textContent ?? '', /Coordinator.failedTitle/)
+  const button = notice.querySelector<HTMLButtonElement>('button')!
+  assert.equal(button.textContent, state === 'past' ? 'Coordinator.resend' : 'Common.retry')
+  assert.equal(calls, 0)
+  assert.equal(submissions, 0)
+  await act(async () => button.click())
+  assert.equal(calls, state === 'past' ? 0 : 1)
+  assert.equal(submissions, state === 'past' ? 1 : 0)
+  if (state === 'past') {
+    assert.deepEqual(submitted, [{ text: 'retry this original message', context: {
+      retryOf: 7, botId: null, expectedOwnerId: 'fixture-owner', expectedWorkspaceId: undefined, notes: undefined, quote: undefined,
+    } }])
+    assert.equal(container.querySelector('[data-message-failure]'), null)
+  }
 })
 
 test('background chat catch-up preserves the reading position and an in-progress draft', async () => {
