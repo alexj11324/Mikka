@@ -222,7 +222,7 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
     if (invitation.createdBy !== candidate.createdBy || scopesAfter.length !== scopesBefore.length
       || scopesAfter.some((scope, index) => scope.teamId !== scopesBefore[index].teamId || scope.workspaceId !== scopesBefore[index].workspaceId))
       throw new GovernanceError('invalid_request')
-    await requireEnterpriseOrganization(user.id, candidate.organizationId, sessionId ?? '')
+    await requireEnterpriseOrganization(user.id, candidate.organizationId, sessionId)
     // Pending invites cannot outlive the issuer's current Organization membership, including SCIM suspensions.
     const [issuer] = await tx.select({ userId: organizationMembers.userId, role: organizationMembers.role }).from(organizationMembers)
       .where(and(eq(organizationMembers.organizationId, candidate.organizationId),

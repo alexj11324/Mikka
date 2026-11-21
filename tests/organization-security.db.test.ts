@@ -293,6 +293,7 @@ test('native second-factor verification enforces Organization security without d
     assert.ok(created.created)
     const inviteeSession = await context.internalAdapter.createSession(invitee.id)
     assert.ok(inviteeSession)
+    await assert.rejects(invitation.acceptOrganizationInvitation({ invitationId: created.id }, invitee), { code: 'workspaceAccessDenied' })
     await assert.rejects(invitation.acceptOrganizationInvitation({ invitationId: created.id }, invitee, inviteeSession.id), { code: 'workspaceAccessDenied' })
     const enrollment = await authRequest('/two-factor/enable', memberBrowser, {}, memberSession.token)
     assert.equal(enrollment.status, 200)
