@@ -1,18 +1,14 @@
-import { z } from 'zod'
 import { freshSessionRoute } from '@/lib/fresh-session'
 import { pluginActor } from '@/lib/plugins/actor'
-import { pluginBody, pluginResponse } from '@/lib/plugins/http'
+import { pluginBody, pluginResponse, pluginUuidParam } from '@/lib/plugins/http'
+import { mcpOAuthStart } from '@/lib/plugins/connection-contracts'
 import { mcpConnections } from '@/lib/plugins/runtime'
-import { PluginError } from '@/lib/plugins/contracts'
 
 type Context = { params: Promise<{ id: string }> }
-const serverId = async (ctx: Context) => { const parsed = z.uuid().safeParse((await ctx.params).id); if (!parsed.success) throw new PluginError('invalidPluginInput', 400); return parsed.data }
-
-import { mcpOAuthStart } from '@/lib/plugins/connection-contracts'
 export const POST = freshSessionRoute((request: Request, ctx: Context) => pluginResponse(async () => {
   const userId = await pluginActor(request, { humanOnly: true })
   await pluginBody(request, mcpOAuthStart)
-  const id = await serverId(ctx)
+  const id = await pluginUuidParam(ctx, 'id')
   const result = await mcpConnections.oauth.start(userId, id)
   return result.authorizationUrl ? result : mcpConnections.check(userId, id)
 }))

@@ -69,7 +69,7 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
     send({ jsonrpc: '2.0', id: input.id, result: input.method === 'initialize'
       ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'settings-fixture', version: '1' } }
       : input.method === 'tools/list'
-        ? { tools: [{ name: 'read_docs', description: 'Read docs', inputSchema: { type: 'object' } }, { name: 'write_docs', description: 'Write docs', inputSchema: { type: 'object' } }] }
+        ? { tools: [{ name: 'read_docs', description: 'Read docs', inputSchema: { type: 'object' } }, { name: 'write_docs', description: 'd'.repeat(4001), inputSchema: { type: 'object' } }] }
         : { content: [{ type: 'text', text: 'done' }] } })
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -100,6 +100,7 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       const checked = await connections.check(owner, installed.id)
       assert.equal(checked.status, 'connected'); assert.ok(checked.lastCheckedAt)
       assert.deepEqual(checked.tools.map(tool => tool.name), ['read_docs', 'write_docs'])
+      assert.equal(checked.tools.find(tool => tool.name === 'write_docs')?.description, 'd'.repeat(4000))
       await connections.setTool(owner, installed.id, 'write_docs', false)
       assert.equal((await connections.check(owner, installed.id)).tools.find(tool => tool.name === 'write_docs')?.enabled, false)
       failCheck = true

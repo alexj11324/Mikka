@@ -6,6 +6,8 @@ import { WorkspaceMcpStore } from './workspace-mcp'
 import { mcpEnvironmentSettings, mcpToolName, type McpConnectionDetails, type McpConnectionStatus, type McpToolView } from './connection-contracts'
 import { McpOAuthStore } from './mcp-oauth'
 import { mcpFailure, runMcpCommand, type McpDependencies } from './mcp'
+import { saveToolSnapshot } from './tool-snapshot'
+import { withPluginTransaction } from './transaction'
 
 const pageSchema = z.object({ tools: z.array(z.object({ name: mcpToolName, description: z.string().max(100_000).optional() })), nextCursor: z.string().max(2048).nullable() })
 
@@ -51,16 +53,12 @@ export class McpConnectionStore {
   }
 
   private async write<T>(userId: string, serverId: string, work: (client: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.personal.pool.connect()
-    try {
-      await client.query('BEGIN')
+    return withPluginTransaction(this.personal.pool, async client => {
       if (!(await client.query('SELECT 1 FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 FOR UPDATE', [serverId, userId])).rowCount) throw new PluginError('mcpNotFound', 404)
       const result = await work(client)
       await client.query('UPDATE personal_mcp_servers SET revision=revision+1 WHERE id=$1', [serverId])
-      await client.query('COMMIT')
       return result
-    } catch (error) { await client.query('ROLLBACK'); throw error }
-    finally { client.release() }
+    })
   }
 
   async setTool(userId: string, serverId: string, name: string, enabled: boolean) {
@@ -119,20 +117,11 @@ export class McpConnectionStore {
       if (cursors.has(parsed.data.nextCursor) || page === 19) { status = 'check_failed'; failureReason = 'toolCatalogueIncomplete'; break }
       cursors.add(parsed.data.nextCursor); cursor = parsed.data.nextCursor
     }
-    const client = await this.personal.pool.connect()
-    try {
-      await client.query('BEGIN')
+    await withPluginTransaction(this.personal.pool, async client => {
       const { rows: [current] } = await client.query<{ revision: number }>('SELECT revision FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 FOR UPDATE', [serverId, userId])
       if (!current || current.revision !== installation.revision) throw new PluginError('mcpConnectionChanged', 409)
-      await client.query('UPDATE personal_mcp_servers SET connection_status=$2,last_checked_at=now(),check_failure=$3 WHERE id=$1', [serverId, status, failureReason])
-      if (status === 'connected') {
-        await client.query('UPDATE mcp_server_tools SET available=false WHERE server_id=$1', [serverId])
-        for (const tool of tools) await client.query(`INSERT INTO mcp_server_tools(server_id,tool_name,description) VALUES($1,$2,$3)
-          ON CONFLICT(server_id,tool_name) DO UPDATE SET description=$3,available=true,updated_at=now()`, [serverId, tool.name, (tool.description ?? '').slice(0, 4000)])
-      }
-      await client.query('COMMIT')
-    } catch (error) { await client.query('ROLLBACK'); throw error }
-    finally { client.release() }
+      await saveToolSnapshot(client, serverId, status, failureReason, tools)
+    })
     const checked = await this.detail(userId, serverId)
     if (checked.status !== 'needs_connect' || !authorize) return checked
     const authorized = await this.oauth.start(userId, serverId).catch(error => { if (!(error instanceof PluginError)) throw error })
