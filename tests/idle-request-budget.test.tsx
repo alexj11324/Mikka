@@ -259,6 +259,7 @@ Object.assign(fixtures, {
   'agents.getThreadChanges': () => ({ state: 'none' }),
   'agents.getThreadMachine': () => ({ kind: 'laptop', state: 'online', name: 'Ada’s MacBook', platform: 'darwin', arch: 'arm64', hostname: null, lastSeenAt: new Date(AT).toISOString(), cloud: null }),
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],
+  'teams.listTeams': () => [],
   'linear-sync.getLinearBoardSync': () => ({ synced: false }),
   'task-runs.listConversationSidebar': () => ({ [BOT]: { more: false, items: [{
     id: RUN, issueId: ISSUE, identifier: null, title: 'Fix sign-in redirect', at: AT,

@@ -5522,6 +5522,8 @@
       "details": "详情",
       "expand": "放大窗口",
       "collapse": "缩小窗口",
+      "workspaceChanged": "打开此对话框后工作区已切换，任务没有创建。请重新打开新建任务，在当前显示的工作区创建。",
+      "workspaceUnconfirmed": "无法确认工作区，任务没有创建。已保留你输入的内容。",
       "createMore": "继续新建",
       "created": "任务已创建",
       "createdTask": "已创建 {identifier}",
@@ -9029,5 +9031,21 @@
     "merge": "合并",
     "mergeAnyway": "仍然合并，{count} 项失败",
     "mergeFailed": "合并没有完成。"
+  },
+  "MobileTaskPush": {
+    "workspaceUnconfirmed": "无法确认工作区"
+  },
+  "TaskWorkspace": {
+    "label": "工作区",
+    "createIn": "创建到 {name}",
+    "fixed": "任务创建时已确定归属，不能转到其他工作区。",
+    "otherWorkspace": "其他工作区",
+    "loading": "正在读取工作区",
+    "error": "无法读取工作区",
+    "retry": "重试",
+    "mismatchCreate": "现在是 {current}",
+    "mismatchCreateHint": "此对话框是在 {target} 打开的。重新打开新建任务，才会创建到 {current}。",
+    "mismatchDetail": "不是当前显示的工作区（{current}）。切换到 {target} 后再处理此任务。",
+    "unknownWorkspace": "其他工作区"
   }
 }

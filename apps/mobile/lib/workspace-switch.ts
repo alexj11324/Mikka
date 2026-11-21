@@ -4,7 +4,8 @@
  * reached. Returns null on success, else the line to show.
  */
 export async function switchWorkspace(target: { id: string; name: string }, previous: string | null, deps: {
-  save: (id: string) => Promise<void>
+  /** Its result is not read: a guarded save (lib/task-push.ts) throws instead of writing into a context it lost. */
+  save: (id: string) => Promise<unknown>
   current: () => Promise<string>
 }): Promise<string | null> {
   try {

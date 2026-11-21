@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { AgentProfilesView } from '../settings/factory-profiles-data'
 import type { CoordinatorMessageContext } from './use-coordinator-submit'
+import type { SubmitOutcome } from '../../lib/eve/client'
 
 // Source component contracts in Node, not a browser acceptance test. The
 // existing Select primitive is reduced to its value/disabled/onChange contract.
@@ -66,8 +67,29 @@ let failManual = false, requireConsent = false
 mock.module(new URL('../workspace/issue-metadata-controls.tsx', import.meta.url).href, { namedExports: {
   AccessChangeDialog: ({ onConfirm }: { onConfirm: () => Promise<boolean> }) => <Button data-confirm onClick={() => void onConfirm()}>Confirm</Button>,
 } })
+// The account menu's read: what the server shows as the current workspace, and how often the create action re-read it.
+type Shown = { id: string; name: string; kind: string } | null
+let shown: Shown = null, nextShown: Shown = null, switcherReads = 0, readFails = false, switcherError: Error | undefined
+// After the fresh read answers: another tab switches before the create request is sent.
+let afterRead: (() => void) | null = null
+const switcher = (workspace: Shown) => workspace ? { workspace, accounts: [{ choices: [workspace] }] } : undefined
+mock.module(new URL('../../lib/settings-data.ts', import.meta.url).href, { namedExports: {
+  fetchSettingsData: async (url: string) => {
+    assert.equal(url, '/api/workspace/switcher')
+    switcherReads++
+    if (readFails) throw new Error('fixture switcher read failure')
+    shown = nextShown ?? shown
+    const answer = switcher(shown)
+    afterRead?.()
+    return answer
+  },
+} })
+// What the next submissions answer, in order; accepted once these run out.
+let outcomes: SubmitOutcome[] = []
+let refuseWorkspace = false
 mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { namedExports: { createTaskOnly: async (command: import('../../lib/task-create-command').CreateOnlyCommand) => {
   manualCommands.push(command)
+  if (refuseWorkspace) return { error: 'workspaceAccessDenied' }
   if (failManual) throw new Error('response lost')
   if (requireConsent && !command.confirmAccess) return { error: 'accessChangeConfirmationRequired', params: { tasks: 1 }, confirmable: true }
   return { version: 1, taskId: 'one-task', identifier: 'TEST-1', dispatch: null }
@@ -79,6 +101,7 @@ const toasts: string[] = []
 mock.module('sonner', { namedExports: { toast: { success: (text: string) => { toasts.push(text) }, error: (text: string) => { toasts.push(`error:${text}`) } } } })
 const mutate = async () => { refreshes++ }
 mock.module('swr', { defaultExport: (key: unknown) => {
+  if (key === '/api/workspace/switcher') return { data: switcherError ? undefined : switcher(shown), error: switcherError, mutate: async () => switcher(shown) }
   if (key === null) return { data: undefined, mutate }
   if (Array.isArray(key) && key[0] === 'factory-agent-profiles') return { data, error: readError, mutate }
   if (Array.isArray(key) && key[0] === 'settings:model-order') return { data: { location: 'cloud', first: { kind: 'cloud' }, entries: [], readyDeviceIds: [] }, mutate }
@@ -107,6 +130,9 @@ mock.module(new URL('../chat/use-chat-files.ts', import.meta.url).href, { namedE
   useChatFiles: (text: string, edit: (text: string) => void) => ({ text, edit, add: () => {}, locked: false, files: [], pending: [] }),
 } })
 mock.module(new URL('../chat/chat-file-cards.tsx', import.meta.url).href, { namedExports: { ChatFileCards: () => null } })
+mock.module(new URL('../slots/task-workspace.tsx', import.meta.url).href, { namedExports: {
+  TaskWorkspace: ({ state }: { state: { status: string } }) => <span data-task-workspace={state.status} />,
+} })
 
 const customId = '12250000-0000-4000-8000-000000000001'
 const workspaceId = '12250000-0000-4000-8000-000000000002'
@@ -133,7 +159,8 @@ before(async () => {
   ;({ StartWorkDialog } = await import('./start-work-dialog'))
 })
 beforeEach(() => {
-  manualCommands.length = 0; failManual = false; requireConsent = false; botList = []
+  manualCommands.length = 0; failManual = false; requireConsent = false; botList = []; refuseWorkspace = false; outcomes = []
+  shown = { id: workspaceId, name: 'Fixture workspace', kind: 'team' }; nextShown = null; switcherReads = 0; readFails = false; switcherError = undefined; afterRead = null
   options = { viewerId: 'viewer', members: [{ id: 'viewer', name: 'Viewer', image: null }], labels: [] }
   submitted.length = 0; refreshes = 0; readError = undefined; cacheRefreshes.length = 0; toasts.length = 0; dispatchedTask = undefined
   data = { profiles: [{
@@ -430,4 +457,94 @@ test('opened from a Bot chat, the task is assigned to that Bot', async () => {
   await typeTitle('From the chat')
   await act(async () => create().click())
   assert.deepEqual(manualCommands[0].assignee, { kind: 'bot', id: 'bot-1' })
+})
+
+const slotState = () => container.querySelector('[data-task-workspace]')?.getAttribute('data-task-workspace')
+const newTask = () => <NewTaskDialog open onOpenChange={() => {}} workspaceId={workspaceId} initialText="Perform this one fixture task." />
+
+test('the create action confirms the captured workspace once and sends that id', async () => {
+  await render(newTask())
+  assert.equal(slotState(), 'ready')
+  await typeTitle('Fix the login redirect')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1)
+  assert.equal(manualCommands[0].workspaceId, workspaceId, 'the captured workspace rides the create command')
+  assert.equal(switcherReads, 1, 'one fresh read right before submitting, no polling')
+})
+
+test('a switch in another tab between opening and submitting is a mismatch, and nothing is submitted', async () => {
+  await render(newTask())
+  nextShown = otherWorkspace
+  await typeTitle('Fix the login redirect')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 0, 'the task is never created in a workspace other than the captured one')
+  assert.deepEqual(toasts, ['error:Shell.newTaskDialog.workspaceChanged'])
+  await render(newTask())
+  assert.equal(slotState(), 'mismatch')
+  assert.equal(create().disabled, true)
+})
+
+test('a switch after the check does not change the workspace the create command carries', async () => {
+  await render(newTask())
+  afterRead = () => { shown = otherWorkspace }
+  await typeTitle('Fix the login redirect')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1)
+  assert.equal(manualCommands[0].workspaceId, workspaceId, 'still the captured workspace; the server checks it against its trusted selection')
+})
+
+test('the server refusing the captured workspace (switched after the check) creates nothing and keeps the text', async () => {
+  await render(newTask())
+  refuseWorkspace = true
+  await typeTitle('Fix the login redirect')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1)
+  assert.equal(manualCommands[0].workspaceId, workspaceId)
+  assert.deepEqual(toasts, ['error:Shell.newTaskDialog.workspaceChanged'])
+  assert.equal(textField().value, 'Perform this one fixture task.')
+})
+
+test('a retry after an uncertain send reuses the same request and captured workspace', async () => {
+  await render(newTask())
+  failManual = true
+  await typeTitle('Fix the login redirect')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1)
+  assert.equal(textField().value, 'Perform this one fixture task.')
+  failManual = false
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 2)
+  assert.equal(manualCommands[1].requestId, manualCommands[0].requestId, 'the frozen request reuses its id')
+  nextShown = otherWorkspace
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 2, 'nothing is sent to the newly selected workspace')
+  assert.deepEqual(manualCommands.map(item => item.workspaceId), [workspaceId, workspaceId])
+})
+
+test('loading, a failed read and no workspace refuse to create', async () => {
+  shown = null
+  await render(newTask())
+  assert.equal(slotState(), 'loading')
+  assert.equal(create().disabled, true)
+  switcherError = new Error('fixture read failure')
+  await render(newTask())
+  assert.equal(slotState(), 'error')
+  assert.equal(create().disabled, true)
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 0)
+  assert.equal(switcherReads, 0, 'nothing is captured without a workspace')
+})
+
+test('a failed confirmation sends nothing and keeps the text for 重试', async () => {
+  await render(newTask())
+  readFails = true
+  await typeTitle('Fix the login redirect')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 0)
+  assert.equal(textField().value, 'Perform this one fixture task.')
+  assert.deepEqual(toasts, ['error:Shell.newTaskDialog.workspaceUnconfirmed'])
+  readFails = false
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1, 'retrying the same request after a successful read creates it')
+  assert.equal(manualCommands[0].workspaceId, workspaceId)
 })

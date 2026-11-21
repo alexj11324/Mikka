@@ -56,6 +56,7 @@ test('a confirmed remote Workspace selection reaches every RPC/REST and survives
   const confirmed = await f.directory.fetch('/mikka/api/rpc', switching(workspaceA))
   assert.equal((await confirmed.json()).result.data.workspaceId, workspaceA, 'the switch response survives aborting older requests')
   assert.equal(f.directory.isCurrentResponse(confirmed), true)
+  assert.equal(f.directory.getConfirmedWorkspaceId(), workspaceA, 'the task-workspace hook reads the acknowledged choice')
   assert.equal(f.changes, before + 1, 'the browser read/asset cache invalidation runs on a confirmed Workspace transition')
   assert.equal(f.directory.getVersion(), ownerVersion, 'the selection acknowledgement does not invent an account change')
   f.respond(() => Response.json({ ok: true }))
@@ -85,7 +86,9 @@ test('server/account/logout transitions clear Workspace selection instead of inh
   f.respond(undefined); f.users.set('https://a.test', 'another-account'); await f.signIn('a')
   await f.directory.fetch('/mikka/api/workspace')
   assert.equal(f.calls.at(-1)!.headers.has(WORKSPACE_SELECTION_HEADER), false)
+  assert.equal(f.directory.getConfirmedWorkspaceId(), null, 'a new session has no confirmed choice of its own yet')
   await f.directory.signOut()
+  assert.equal(f.directory.getConfirmedWorkspaceId(), null)
   assert.equal(JSON.stringify([...f.sessionStorage.values]).includes(workspaceA), false)
 })
 

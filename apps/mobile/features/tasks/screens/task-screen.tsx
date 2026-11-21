@@ -1,6 +1,6 @@
 import { presentedFactoryEvents, taskFactoryProgress } from '../../../../../lib/task-factory-events'
 import { mobileMessages } from '@/lib/messages'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,6 +16,7 @@ import { GlassButton } from '@/components/GlassButton'
 import { Row } from '@/components/settings'
 import { useHome } from '@/lib/home'
 import { taskLinkAttempt } from '@/lib/push-route'
+import { readPushedTask } from '@/lib/task-push-app'
 import { taskDetailLive } from '@/lib/live-keys'
 import { readPresentedTask } from '../model/task-presentation-read'
 import type { TaskDetail } from '@/lib/types'
@@ -34,7 +35,8 @@ import { reviewHref } from '@/features/review/model/routes'
 
 
 /** Where an attempt opens: the task's one conversation, scrolled to that attempt (2026-11-07). */
-export const conversationHref = (taskId: string, attempt?: string): Href => ({ pathname: '/task/[id]/conversation', params: attempt ? { id: taskId, attempt } : { id: taskId } })
+export const conversationHref = (taskId: string, attempt?: string, workspace?: string): Href => ({ pathname: '/task/[id]/conversation',
+  params: { id: taskId, ...(attempt ? { attempt } : {}), ...(workspace ? { workspace } : {}) } })
 
 /**
  * A task's detail as the web task page, after Capy's issue page (decisions/2026-11-14-2330, R-61–R-63): its code and
@@ -44,13 +46,15 @@ export const conversationHref = (taskId: string, attempt?: string): Href => ({ p
  * `attempt` and opens it once. 「+ 评论」 floats at the foot.
  */
 export function TaskScreen() {
-  const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
+  // `workspace`: a push opened it after confirming the task's workspace (lib/task-push.ts); it reads only there.
+  const { id, attempt, workspace } = useLocalSearchParams<{ id: string; attempt?: string; workspace?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const bar = useScrolledUnderBar()
   const home = useHome().data
-  const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`,
-    detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id, detail?.task.factoryTaskId, detail?.live?.factoryActivityVersion, Array.isArray(detail?.work?.connections)), readPresentedTask)
+  const read = useCallback((path: string) => workspace ? readPushedTask(id, workspace) : readPresentedTask(path), [id, workspace])
+  const { data, error, loading, reload } = useLiveApi<TaskDetail>(workspace ? `/api/mobile/tasks/${id}?workspace=${workspace}` : `/api/mobile/tasks/${id}`,
+    detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id, detail?.task.factoryTaskId, detail?.live?.factoryActivityVersion, Array.isArray(detail?.work?.connections)), read)
   const task = data?.task
   const openTaskOnWeb = () => { if (task) void openOnWeb(`/?issue=${encodeURIComponent(task.id)}`) }
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
@@ -84,8 +88,8 @@ export function TaskScreen() {
   useEffect(() => {
     if (!target || opened.current) return
     opened.current = true
-    router.push(conversationHref(id, target))
-  }, [id, target, router])
+    router.push(conversationHref(id, target, workspace))
+  }, [id, target, router, workspace])
 
   return (
     <View style={styles.screen}>
@@ -113,7 +117,7 @@ export function TaskScreen() {
             {earlier > 0 ? <Row label={filterLabels.showEarlier.replace('{count}', String(Math.min(50, earlier)))} onPress={() => setShownRows(n => n + 50)} /> : null}
             {visibleActivity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === visibleActivity.length - 1}
               taskId={task.id} code={task.identifier} stretches={stretches}
-              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId)) : undefined} />)}
+              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId, workspace)) : undefined} />)}
           </>
         ) : null}
       </ScrollView>

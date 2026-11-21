@@ -7,6 +7,7 @@ import { endLostSession } from '@/lib/session'
 import { apiCache } from './api-cache'
 import { mobileTraceHeaders } from './tracing'
 import { accountStorageKey } from './server-store'
+import { workspaceFromCookie } from './workspace-cookie'
 import { presenceScope } from './presence-scope'
 
 export class ApiError extends Error {
@@ -21,13 +22,16 @@ export class ApiTransportError extends Error {
   }
 }
 
-type ApiRequest = { method?: string; body?: unknown; timeoutMs?: number; diagnostics?: { headers?: Record<string, string> } }
+type ApiRequest = { method?: string; body?: unknown; timeoutMs?: number; diagnostics?: { headers?: Record<string, string> }; headers?: Record<string, string> }
 export const apiConnection = () => ({ account: currentAccount(), client: authClient })
 export type ApiConnection = ReturnType<typeof apiConnection>
 
-/** The workspace the person picked in Settings; the server reads it as its `mikka-workspace` cookie. */
+/**
+ * The workspace the person picked in Settings; the server reads it as its `mikka-workspace` cookie. On web that cookie
+ * is the saved pick (saveWorkspace writes it), so a pushed task's read (lib/task-push.ts) can compare against it.
+ */
 export async function savedWorkspace(account = currentAccount()): Promise<string | null> {
-  if (Platform.OS === 'web') return null
+  if (Platform.OS === 'web') return typeof document === 'undefined' ? null : workspaceFromCookie(document.cookie)
   return SecureStore.getItemAsync(accountStorageKey(account.id, 'workspace'))
 }
 
@@ -39,12 +43,22 @@ export function onWorkspaceChange(listener: () => void) {
   return () => { workspaceListeners.delete(listener) }
 }
 
-export async function saveWorkspace(id: string) {
+/** The account and cache context an action started in (lib/task-push.ts): it may write only while both are current. */
+export type WorkspaceOwner = { account: string; context: number }
+
+/**
+ * Saves the workspace pick for the current account. With `owner`, nothing is written unless that account and context
+ * are still current. Returns the context this save's own switch produced, or null when it wrote nothing or the
+ * context moved while it was writing (then no screen is told to reload).
+ */
+export async function saveWorkspace(id: string, owner?: WorkspaceOwner): Promise<number | null> {
   const account = currentAccount(), context = apiCache.context()
+  if (owner && (owner.account !== account.id || owner.context !== context)) return null
   if (Platform.OS === 'web') document.cookie = `mikka-workspace=${id}; path=/; samesite=lax`
   else await SecureStore.setItemAsync(accountStorageKey(account.id, 'workspace'), id)
   // Every screen's data belongs to the workspace: reload it now, not at the next poll.
-  apiCache.commit(context, () => { for (const listener of workspaceListeners) listener() })
+  const committed = currentAccount().id === account.id && apiCache.commit(context, () => { for (const listener of workspaceListeners) listener() })
+  return committed ? apiCache.context() : null
 }
 
 /**
@@ -63,6 +77,7 @@ export async function authHeaders(connection: ApiConnection = apiConnection()): 
 /** A request that has not answered by then fails, so nothing waits on it forever (a send shows 重试). */
 export const REQUEST_TIMEOUT_MS = 30_000
 
+/** `headers` adds request preferences (a task push's x-mikka-workspace-id, lib/task-push.ts); the sign-in headers always win. */
 export async function api<T>(path: string, init: ApiRequest = {}, connection: ApiConnection = apiConnection()): Promise<T> {
   const context = apiCache.context()
   let authentication: Record<string, string>
@@ -71,7 +86,7 @@ export async function api<T>(path: string, init: ApiRequest = {}, connection: Ap
     if (init.diagnostics) throw new ApiTransportError('credentials', error)
     throw error
   }
-  const headers: Record<string, string> = { ...init.diagnostics?.headers, accept: 'application/json', ...authentication }
+  const headers: Record<string, string> = { ...init.diagnostics?.headers, accept: 'application/json', ...init.headers, ...authentication }
   const traceId = validTraceparent(authentication.traceparent) ? authentication.traceparent.slice(3, 35) : undefined
   if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET' && currentAccount().id === connection.account.id) {
     const proof = presenceScope.token(context)
