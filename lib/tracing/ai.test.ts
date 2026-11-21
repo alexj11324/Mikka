@@ -29,6 +29,22 @@ before(() => provider.register())
 beforeEach(() => { captured.length = 0; memory.reset() })
 after(async () => { await provider.shutdown(); trace.disable(); context.disable(); propagation.disable() })
 
+test('decision HTTP diagnostics reach span and PostHog properties', async () => {
+  await assert.rejects(observeAiRequest({ operation: 'decision', route: 'litellm', posthog: sink }, async report => {
+    report({ upstreamStatus: 503, errorMessage: 'Decision provider returned HTTP 503' })
+    const error = new Error('Decision provider returned HTTP 503')
+    error.name = 'DecisionHttpError'
+    throw error
+  }), /HTTP 503/)
+  await provider.forceFlush()
+  for (const attributes of [captured[0].properties!, memory.getFinishedSpans()[0].attributes]) {
+    assert.equal(attributes['http.response.status_code'], 503)
+    assert.equal(attributes['error.type'], 'DecisionHttpError')
+    assert.equal(attributes['mikka.error.message'], 'Decision provider returned HTTP 503')
+  }
+  assert.equal(captured[0].properties!.$ai_is_error, true)
+})
+
 test('each generation shares its APM ancestry and session, captures numeric usage/cost and never captures content', async () => {
   let clock = 100
   const model = observedModel(base(undefined, async () => {

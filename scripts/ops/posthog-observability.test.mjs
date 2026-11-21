@@ -53,12 +53,12 @@ function fakePosthog() {
   }
 }
 
-test('a fresh project gets the dashboard, every insight, the note and five alerts; a second run writes nothing', async () => {
+test('a fresh project gets the dashboard, every insight, the note and all alerts; a second run writes nothing', async () => {
   const posthog = fakePosthog()
   const first = await sync(posthog, { apply: true })
   assert.equal(posthog.store.dashboards.length, 1)
   assert.equal(posthog.store.insights.length, INSIGHTS.length)
-  assert.equal(posthog.store.alerts.length, 5)
+  assert.equal(posthog.store.alerts.length, ALERTS.length)
   const [dashboard] = posthog.store.dashboards
   assert.equal(dashboard.name, DASHBOARD.name)
   assert.equal(dashboard.tiles.filter(tile => tile.insight).length, INSIGHTS.filter(item => item.tile).length)
@@ -114,6 +114,20 @@ test('every alert reads one row: no any_row, and each SQL alert query aggregates
     assert.ok(singleRow, `${alert.key} may return more than one row`)
     assert.doesNotMatch(outer, /\bLIMIT\s+(?!1\b)\d+/, `${alert.key} truncates its rows`)
   }
+})
+
+test('the existing error alert also covers low-volume LiteLLM decision failures', () => {
+  const alert = ALERTS.find(item => item.key === 'error-spike')
+  const query = INSIGHTS.find(item => item.key === alert.insight).query.source.query
+  assert.match(query, /event = '\$ai_generation'/)
+  assert.match(query, /mikka.ai.operation` = 'decision'/)
+  assert.match(query, /mikka.ai.route` = 'litellm'/)
+  assert.match(query, /count\(\) < 3, NULL/)
+  assert.match(query, /countIf\(properties.\$ai_is_error = true\) \/ count\(\) > 0.2/)
+  assert.match(query, /INTERVAL 1 HOUR/)
+  assert.equal(alert.enabled, true)
+  assert.equal(ALERTS.length, 5)
+  assert.match(query, /UNION ALL SELECT value, source FROM decision_errors/)
 })
 
 test('the API key is required and never appears in errors', async () => {

@@ -86,6 +86,9 @@ export interface ObservedModelOptions extends AiRoute, AiMetadata {
 }
 
 interface AiReceipt {
+  upstreamStatus?: number
+  /** Host-generated diagnostic only; never provider text or response bodies. */
+  errorMessage?: string
   usage?: unknown
   totalCostUsd?: number | null
   metadata?: AiMetadata
@@ -116,6 +119,8 @@ function beginGeneration(options: ObservedModelOptions, args: Pick<CallArgs, 'ab
   let receivedFinish = false
   let tools = 0
   let invalid = false
+  let upstreamStatus: number | undefined
+  let errorMessage: string | undefined
   const finish = (outcome: Outcome, error?: unknown) => {
     if (ended) return
     ended = true
@@ -142,6 +147,8 @@ function beginGeneration(options: ObservedModelOptions, args: Pick<CallArgs, 'ab
       const cost = modelMetric(route.totalCostUsd)
       if (cost !== null) attributes['mikka.ai.total_cost_usd'] = cost
       if (error !== undefined) Object.assign(attributes, safeErrorAttributes(error))
+      if (upstreamStatus !== undefined) attributes['http.response.status_code'] = upstreamStatus
+      if (errorMessage !== undefined) attributes['mikka.error.message'] = errorMessage
       span.setAttributes({ ...metadataAttributes(metadata), ...attributes })
       if (outcome !== 'success') span.setStatus({ code: SpanStatusCode.ERROR })
       const spanContext = span.spanContext()
@@ -180,6 +187,8 @@ function beginGeneration(options: ObservedModelOptions, args: Pick<CallArgs, 'ab
   return {
     scope, finish,
     receipt(receipt: AiReceipt) {
+      if (receipt.upstreamStatus !== undefined) upstreamStatus = receipt.upstreamStatus
+      if (receipt.errorMessage !== undefined) errorMessage = receipt.errorMessage
       if (receipt.usage !== undefined) usage = receipt.usage
       if (receipt.totalCostUsd !== undefined) observation.route.totalCostUsd = receipt.totalCostUsd
       if (receipt.metadata) Object.assign(metadata, receipt.metadata)
