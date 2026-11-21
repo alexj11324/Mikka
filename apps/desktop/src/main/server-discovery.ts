@@ -1,4 +1,4 @@
-import { meetsMinimumVersion } from '@mikka/protocol/version'
+import { HOSTED_API_HEADERS, meetsMinimumVersion } from '@mikka/protocol/version'
 import { remoteBase } from './bundled-policy'
 
 /** The wire version this app sends as `x-mikka-desktop-protocol` (bundled-auth.ts). */
@@ -82,7 +82,7 @@ type Fetcher = (url: string, init: RequestInit) => Promise<Response>
 export async function probeServer(input: unknown, options: { fetch: Fetcher; appVersion: string; enforceMinimum: boolean; timeoutMs?: number }): Promise<ServerProbe> {
   const address = serverAddress(input)
   if (typeof address === 'string') return { status: address }
-  const get = (url: string) => options.fetch(url, { headers: { accept: 'application/json', 'x-mikka-client': 'desktop', 'x-mikka-client-version': options.appVersion, 'x-mikka-desktop-protocol': String(DESKTOP_PROTOCOL) }, redirect: 'manual', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(options.timeoutMs ?? 10_000) })
+  const get = (url: string) => options.fetch(url, { headers: { accept: 'application/json', 'x-mikka-client': 'desktop', 'x-mikka-client-version': options.appVersion, 'x-mikka-desktop-protocol': String(DESKTOP_PROTOCOL), ...HOSTED_API_HEADERS }, redirect: 'manual', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(options.timeoutMs ?? 10_000) })
   const paths = address.pathname === '/' || address.pathname === '' ? ['', '/mikka'] : [address.pathname]
   const legacyCandidates: string[] = []
   for (const path of paths) {

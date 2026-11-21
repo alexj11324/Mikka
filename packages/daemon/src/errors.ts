@@ -48,8 +48,8 @@ export class ServerUnreachableError extends DaemonError {
 export class DaemonUpgradeRequiredError extends ServerUnreachableError {
   /** The release the refusing server names, when it names one. */
   readonly latest?: string
-  constructor(latest?: string) {
-    super("daemonUpgradeRequired")
+  constructor(latest?: string, cause: unknown = "daemonUpgradeRequired") {
+    super(cause)
     this.message = "This daemon is too old for the server; update it."
     this.latest = latest
   }

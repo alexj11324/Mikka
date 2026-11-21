@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { expectedRelease, assertReleaseIdentity, selectRelease, REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW } from './thread-lifecycle-ci.mjs'
 import { assertCurrentMain, PRODUCTION_VERSION_URL } from '../release/web-deploy.mjs'
 import { assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export { REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW }
 export const MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
@@ -153,11 +154,12 @@ export function archiveReport(bytes) {
   catch (cause) { throw new SecretCIError('artifact_archive', cause) }
 }
 
-export async function downloadReleaseReport(proof, { token, fetchImpl = fetch }) {
+export async function downloadReleaseReport(proof, { token, fetchImpl = fetch, repository = REPOSITORY }) {
+  check(officialMikkaRepository(repository, publicRepositoryId), 'attestation')
   check(proof?.selected === true && positive(proof.artifact?.id) && DIGEST.test(proof.artifact.sha256 ?? ''), 'attestation')
   let response
   try {
-    const redirect = await fetchImpl(`${API}/actions/artifacts/${proof.artifact.id}/zip`, {
+    const redirect = await fetchImpl(`https://api.github.com/repos/${repository}/actions/artifacts/${proof.artifact.id}/zip`, {
       headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'x-github-api-version': '2022-11-28' },
       redirect: 'manual', signal: AbortSignal.timeout(20_000) })
     check(redirect.status === 302, 'artifact_redirect')

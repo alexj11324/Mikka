@@ -1,10 +1,10 @@
-import { generateKeyPairSync, randomBytes } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { createBoundFetch } from '../src/bound-fetch.mjs'
@@ -64,6 +64,41 @@ async function start(workflowName, input = Uint8Array.of(7)) {
   await world.events.create(run.runId, { ...spec, eventType: 'run_started' })
   return run.runId
 }
+
+test('the last serving Eve caller creates and reads a run through the new World service', async () => {
+  // Byte-for-byte caller from the successful serving release 44473639414,
+  // public source 64a3a8df. This exercises the old HTTP/CBOR producer and old
+  // response reader against today's Worker and Durable Object implementation.
+  const fixture = new URL('../../../docs/release-fixtures/released-64a3a8df/', import.meta.url)
+  const receipt = JSON.parse(await readFile(new URL('release.json', fixture), 'utf8'))
+  const releasedRoot = join(directory, 'released-caller')
+  for (const [path, blob] of Object.entries(receipt.files)) {
+    const bytes = await readFile(new URL(path + '.txt', fixture))
+    expect(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex'), path).toBe(blob)
+    const target = join(releasedRoot, path)
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, bytes, { flag: 'wx' })
+  }
+  // Historical source is archived documentation, never a current build input.
+  // Execute its verified bytes in this test's temporary directory with the
+  // same installed SDK dependencies used by the live client contract tests.
+  await symlink(fileURLToPath(new URL('../node_modules/', import.meta.url)), join(releasedRoot, 'node_modules'), 'dir')
+  const { createNodeWorld: releasedNodeWorld } = await import(pathToFileURL(join(releasedRoot,
+    'packages/eve-cloudflare-world/src/node-world.mjs')).href)
+  const released = releasedNodeWorld({ deploymentId, signingKey, fetchBound: (url, options) => outbound.fetch(url, options) })
+  const runId = 'wrun_01KAG1MMXVFBQB4JWDN0BYNSKB'
+  const { run: created } = await released.events.create(runId, {
+    specVersion: 8, eventType: 'run_created',
+    eventData: { workflowName: 'released-caller', deploymentId, input: Uint8Array.of(4, 2) },
+  })
+  expect(created.runId).toBe(runId)
+  await released.events.create(runId, { specVersion: 8, eventType: 'run_started' })
+  const read = await released.runs.get(runId)
+  expect(read).toMatchObject({ runId, status: 'running', workflowName: 'released-caller', deploymentId })
+  expect(new Uint8Array(read.input)).toEqual(Uint8Array.of(4, 2))
+  const metadataOnly = await released.runs.get(runId, { resolveData: 'none' })
+  expect(metadataOnly.input).toBeUndefined()
+})
 
 test('the Node World crosses only its bound private service for catalogues, attributed events, and independent hook deliveries', async () => {
   const a = await start('private-a')

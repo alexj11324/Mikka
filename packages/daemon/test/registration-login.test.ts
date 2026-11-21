@@ -5,7 +5,7 @@ it('exchanges the one-use grant under the exact app base path and validates the 
   const token = `orv_${'a'.repeat(43)}`, credential = `orv_${'b'.repeat(43)}`
   const result = await registrationLogin({ serverUrl: 'https://example.com/preview/mikka', token, fetchImpl: (async (url, init) => {
     expect(String(url)).toBe('https://example.com/preview/mikka/v1/devices/enroll')
-    expect(init?.headers).toEqual({ authorization: `Bearer ${token}`, 'x-mikka-client-version': expect.any(String), 'x-mikka-device-session': '1' })
+    expect(init?.headers).toEqual({ authorization: `Bearer ${token}`, 'x-mikka-client-version': expect.any(String), 'x-mikka-device-session': '1', 'x-mikka-api-version': '1' })
     expect(init?.redirect).toBe('error')
     return Response.json({ credential })
   }) as typeof fetch })

@@ -11,6 +11,7 @@ const options = (routes: Record<string, () => Response | Promise<Response>>, see
     assert.equal(init.redirect, 'manual')
     assert.equal(init.credentials, 'omit')
     assert.equal(new Headers(init.headers).get('authorization'), null)
+    assert.equal(new Headers(init.headers).get('x-mikka-api-version'), '1')
     const route = routes[url]
     if (!route) return new Response('<html>not found</html>', { status: 404, headers: { 'content-type': 'text/html' } })
     return route()

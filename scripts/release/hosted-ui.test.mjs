@@ -108,6 +108,84 @@ test('official jobs keep private code out of public artifacts and pin desktop to
   assert.equal(checkout.with.token, undefined)
   assert.ok(desktop.jobs.macos.steps.some(step => step.run?.includes('audit "$RUNNER_TEMP/official-packaged-app"')))
 })
+
+const mobileUpdateWorkflow = async () => yaml.load(await readFile(new URL('../../.github/workflows/mobile-update.yml', import.meta.url), 'utf8'))
+
+test('the main OTA path reaches the shared private policy before either production credential', async () => {
+  const job = (await mobileUpdateWorkflow()).jobs.update
+  const steps = job.steps
+  const candidate = steps.find(step => step.id === 'candidate')
+  for (const identity of ["github.ref == 'refs/heads/main'", "github.repository == 'alexj11324/Mikka'",
+    "github.repository_id == '1427517699'", "github.repository_owner_id == '183887963'", "github.actor_id == '183887963'"])
+    assert.ok(candidate.if.includes(identity), identity)
+  assert.ok(!candidate.if.includes("github.event_name == 'pull_request'"))
+  const gate = steps.find(step => step.id === 'eligibility')
+  assert.equal(gate.run, 'node .mikka-cloud/operations/business-api/pipeline-policy.mjs mobile-eligibility')
+  assert.ok(steps.findIndex(step => step.run === 'pnpm --filter @mikka/mobile typecheck') < steps.indexOf(gate))
+  for (const name of ['EXPO_TOKEN', 'HOSTED_UI_READ_KEY']) {
+    const delivery = steps.filter(step => step.with?.['secret-name'] === name)
+    assert.equal(delivery.length, 1)
+    assert.ok(steps.indexOf(gate) < steps.indexOf(delivery[0]))
+    assert.ok(delivery[0].if.includes("steps.eligibility.outputs.allowed == 'true'"), name)
+  }
+  const token = steps.find(step => step.id === 'source-token')
+  assert.deepEqual(token.with.repositories.trim().split(/\s+/), ['Mikka', 'mikka-cloud'])
+  assert.deepEqual(Object.fromEntries(Object.entries(token.with).filter(([key]) => key.startsWith('permission-'))), {
+    'permission-contents': 'read', 'permission-actions': 'read', 'permission-issues': 'read',
+  })
+  const checkout = steps.find(step => step.with?.repository === 'alexj11324/mikka-cloud')
+  assert.equal(checkout.with.ref, '${{ steps.operations.outputs.source }}')
+  assert.equal(checkout.with['persist-credentials'], false)
+  assert.ok(steps.indexOf(steps.find(step => step.name === 'Remove source App credentials')) < steps.indexOf(checkout))
+  assert.deepEqual(job.permissions, { contents: 'read', 'id-token': 'write' }, 'no new workflow permissions')
+})
+
+test('production OTA rechecks the same source and staged overlay after checkout and before publication', async () => {
+  const steps = (await mobileUpdateWorkflow()).jobs.update.steps
+  const gates = ['eligibility', 'publication-eligibility'].map(id => steps.find(step => step.id === id))
+  assert.equal(gates[0].run, gates[1].run)
+  assert.deepEqual(gates[0].env, gates[1].env)
+  assert.equal(gates[0].env.MIKKA_CF_OPERATIONS_SHA, '${{ steps.operations.outputs.source }}')
+  assert.equal(gates[0].env.MIKKA_PUBLIC_SOURCE_SHA, '${{ steps.candidate.outputs.source }}')
+  assert.equal(gates[0].env.MIKKA_STAGE_RUN_ID, '${{ inputs.staging_run }}')
+  assert.equal(gates[0].env.MIKKA_STAGE_RUN_ATTEMPT, '${{ inputs.staging_attempt }}')
+  assert.equal(gates[0].env.MIKKA_STAGE_ARTIFACT_ID, '${{ inputs.staging_artifact }}')
+  const overlay = steps.find(step => step.with?.path === '.hosted-ui')
+  assert.equal(overlay.with.ref, '${{ steps.eligibility.outputs.overlay_sha }}')
+  assert.equal(overlay.with['persist-credentials'], false)
+  const publish = steps.find(step => step.name === 'Publish to production')
+  assert.ok(steps.indexOf(overlay) < steps.indexOf(gates[1]) && steps.indexOf(gates[1]) < steps.indexOf(publish))
+  assert.ok(publish.if.includes("steps.publication-eligibility.outputs.allowed == 'true'"))
+  assert.ok(publish.if.includes('steps.publication-eligibility.outputs.overlay_sha == steps.eligibility.outputs.overlay_sha'))
+  assert.ok(steps.find(step => step.name === 'Record when production OTA is not authorized').run.includes('was not published'))
+  assert.ok(steps.find(step => step.name === 'Record a closed window before publication').run.includes('was not published'))
+  assert.ok(!steps.some(step => step['continue-on-error']), 'a credential or publication error still fails the run')
+})
+
+test('completed automatic staging can wake OTA, while a new main push cannot cancel an active publication', async () => {
+  const parsed = await mobileUpdateWorkflow()
+  assert.deepEqual(parsed.on.workflow_run, { workflows: ['Cloudflare application deployment'], types: ['completed'] })
+  assert.ok(parsed.jobs.update.if.includes("github.event.workflow_run.event == 'workflow_run'"))
+  assert.ok(parsed.jobs.update.if.includes('!github.event.workflow_run.head_repository.fork'))
+  assert.equal(parsed.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
+})
+
+test('mobile input evidence precedes Expo access and stays immutable before a guarded publication', async () => {
+  const steps = (await mobileUpdateWorkflow()).jobs.update.steps
+  const select = steps.find(step => step.id === 'mobile-source')
+  const source = steps.find(step => step.name === 'Preserve the immutable mobile source receipt')
+  const expo = steps.find(step => step.with?.['secret-name'] === 'EXPO_TOKEN')
+  const publish = steps.find(step => step.name === 'Publish to production')
+  assert.equal(select.run, 'node scripts/release/mobile-ota-source.mjs select')
+  assert.equal(select.env.GH_TOKEN, '${{ github.token }}')
+  assert.equal(source.with.name, 'mobile-production-ota-source')
+  assert.equal(source.with.path, '${{ runner.temp }}/mobile-ota-source/release.json')
+  assert.equal(source.with['if-no-files-found'], 'error')
+  assert.equal(source.with.overwrite, undefined)
+  assert.ok(steps.indexOf(select) < steps.indexOf(source) && steps.indexOf(source) < steps.indexOf(expo))
+  for (const step of [source, expo, publish]) assert.ok(step.if.includes("steps.mobile-source.outputs.selected == 'true'"))
+  assert.ok(publish.run.indexOf('mobile-ota-source.mjs verify') < publish.run.indexOf('eas-cli@'))
+})
 test('native release admission requires a coherent official identity before credentials or paid work', async () => {
   for (const [file, job] of [['desktop-release', 'preflight'], ['mobile-update', 'update'], ['mobile-native', 'release'], ['e2b-official-runtime', 'check'], ['e2b-runtime-release', 'recheck'], ['e2b-runtime-release', 'cleanup'], ['e2b-template', 'build'], ['publish-daemon', 'publish']]) {
     const workflow = yaml.load(await readFile(new URL(`../../.github/workflows/${file}.yml`, import.meta.url), 'utf8'))

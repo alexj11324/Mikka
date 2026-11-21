@@ -1,6 +1,7 @@
 import { METHOD_NAME_ALL } from 'hono/router'
 import { TrieRouter } from 'hono/router/trie-router'
 import { H3, onDispose } from 'h3'
+import { hostedApiUpgradeRequired, UPDATE_REQUIRED_STATUS } from '@mikka/protocol/version'
 import { NextRequest } from '@/lib/server-runtime/server'
 import { NavigationResponse } from '../../../lib/server-runtime/navigation'
 import { allowedMethods, routeMatcher, routerPath, type ApiRoute, type RouteMatch } from './routes'
@@ -83,6 +84,12 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
       if (prepared instanceof Response) { result = prepared; return prepared }
       const transport: WebTransport | null = prepared ?? null
       const request = transport?.request ?? original
+      const upgrade = matched && template !== '/api/version' && request.method !== 'OPTIONS'
+        ? hostedApiUpgradeRequired(request.headers) : null
+      if (upgrade) {
+        result = Response.json(upgrade, { status: UPDATE_REQUIRED_STATUS, headers: { 'cache-control': 'private, no-store' } })
+        return transport ? transport.response(result) : result
+      }
       const scope = createRequestScope(request)
       // The adapted request owns the business scope. H3 invokes disposal in
       // registration order: end its trace, then drain after work and nested after().

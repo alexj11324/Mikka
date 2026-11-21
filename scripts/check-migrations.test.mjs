@@ -28,6 +28,34 @@ test('晚于 main 最新迁移通过', () => assert.deepEqual(run([{ name: '2026
 test('时间戳重复被拒绝', () => assert.match(run([{ name: '20261024000000_a.sql', content: '' }, { name: '20261024000000_b.sql', content: '' }]).join(), /相同/))
 test('拿不到 main 时保留文件名和冻结旧迁移检查', () => assert.deepEqual(run([{ name: '20261023005959_old.sql', content: '' }], null), []))
 
+test('扩展迁移通过，新的删列必须独立说明已退役旧读写方', () => {
+  const name = '20261120130000_retire_old_column.sql'
+  assert.deepEqual(run([{ name, content: 'ALTER TABLE items ADD COLUMN new_title text;' }]), [])
+  for (const sql of [
+    'ALTER TABLE items DROP COLUMN old_title;',
+    'ALTER TABLE items DROP old_title;',
+    'ALTER TABLE items DROP identity;',
+    'ALTER TABLE items DROP expression;',
+    'ALTER TABLE "items" ADD COLUMN "title" text, DROP COLUMN IF EXISTS "oldTitle";',
+    'DO $$ BEGIN ALTER TABLE items DROP COLUMN old_title; END $$;',
+    "INSERT INTO notes(body) VALUES ('-- not a comment'); ALTER TABLE items DROP COLUMN old_title;",
+  ]) {
+    assert.match(run([{ name, content: sql }]).join(), /新增迁移删除列/)
+    assert.deepEqual(run([{ name, content: `-- migrate: contract #2896 all released readers use title; see issue receipts\n${sql}` }]), [])
+  }
+  assert.match(run([{ name, content: '-- migrate: contract\nALTER TABLE items DROP COLUMN old_title;' }]).join(), /新增迁移删除列/)
+  assert.match(run([{ name, content: "SELECT '-- migrate: contract #2896 not a header';\nALTER TABLE items DROP COLUMN old_title;" }]).join(), /新增迁移删除列/)
+  assert.deepEqual(run([{ name, content: '-- DROP COLUMN is documentation\nALTER TABLE items DROP CONSTRAINT old_constraint;' }]), [])
+  for (const action of ['IDENTITY', 'EXPRESSION', 'DEFAULT', 'NOT NULL']) {
+    assert.deepEqual(run([{ name, content: `ALTER TABLE items ALTER COLUMN id DROP ${action};` }]), [])
+    assert.match(run([{ name, content: `ALTER TABLE items ALTER COLUMN id DROP ${action}, DROP identity;` }]).join(), /新增迁移删除列/)
+  }
+  assert.deepEqual(run([{ name, content: "INSERT INTO notes(body) VALUES ('ALTER TABLE items DROP COLUMN old_title');" }]), [])
+  assert.deepEqual(run([{ name, content: 'ALTER TABLE "DROP COLUMN old_title" ADD COLUMN "new--title" text;' }]), [])
+  const old = { name, content: 'ALTER TABLE items DROP COLUMN old_title;' }
+  assert.deepEqual(run([old], [...main, old]), [], 'already merged SQL remains immutable history')
+})
+
 // --all-refs: the main-only check cannot see a race that is still in flight, so a
 // slot check has to ask what every ref claimed, not only what main already merged.
 test('slotCollisions reports a timestamp two files claim and leaves a lone slot alone', () => {
@@ -88,6 +116,7 @@ test('the actual CLI accepts a stale branch with an older pending file and freez
   const scripts = join(root, 'scripts'), directory = join(root, 'drizzle')
   mkdirSync(scripts); mkdirSync(directory)
   writeFileSync(join(scripts, 'check-migrations.mjs'), readFileSync(new URL('./check-migrations.mjs', import.meta.url)))
+  writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url)))
   const actual = new URL('../drizzle/', import.meta.url)
   const names = readdirSync(actual).filter(name => name.endsWith('.sql'))
   for (const name of names) writeFileSync(join(directory, name), readFileSync(new URL(name, actual)))

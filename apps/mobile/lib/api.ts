@@ -1,6 +1,7 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { validTraceparent } from '@mikka/protocol/trace-context'
+import { hostedApiUpgrade } from '@mikka/protocol/version'
 import { authClient } from '@/lib/auth'
 import { currentAccount } from '@/lib/config'
 import { endLostSession } from '@/lib/session'
@@ -8,10 +9,11 @@ import { apiCache } from './api-cache'
 import { mobileTraceHeaders } from './tracing'
 import { accountStorageKey } from './server-store'
 import { presenceScope } from './presence-scope'
+import { requireMobileUpdate } from './startup'
 
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, readonly traceId?: string) {
-    super(code)
+  constructor(readonly status: number, readonly code: string, readonly traceId?: string, cause?: unknown) {
+    super(code, { cause })
   }
 }
 
@@ -106,7 +108,11 @@ export async function api<T>(path: string, init: ApiRequest = {}, connection: Ap
       if (response.ok && init.diagnostics) throw new ApiTransportError(controller.signal.aborted ? 'timeout' : 'invalid_response', error, traceId)
       return null
     }) as (T & { error?: string }) | null
-    if (!response.ok) throw new ApiError(response.status, data?.error ?? `http${response.status}`, traceId)
+    if (!response.ok) {
+      const upgrade = response.status === 426 ? hostedApiUpgrade(data) : null
+      if (upgrade && currentAccount().id === connection.account.id) requireMobileUpdate(connection.account.server.url)
+      throw new ApiError(response.status, data?.error ?? `http${response.status}`, traceId, upgrade?.cause)
+    }
     return data as T
   } finally { clearTimeout(timer) }
 }

@@ -25,6 +25,7 @@ test('discovery falls back from a bare origin and never sends session credential
     const headers = new Headers(init?.headers)
     assert.equal(headers.has('cookie'), false); assert.equal(headers.has('authorization'), false)
     assert.equal(headers.get('x-mikka-client'), 'mobile'); assert.equal(headers.get('x-mikka-desktop-protocol'), '1')
+    assert.equal(headers.get('x-mikka-api-version'), '1')
     return url.includes('/mikka/') ? reply() : new Response('not found', { status: 404 })
   }))
   assert.equal(result.status, 'ok')

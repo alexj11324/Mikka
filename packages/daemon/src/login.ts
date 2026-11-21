@@ -12,6 +12,7 @@ import {
   AUTH_BASE_PATH,
   CLIENT_VERSION_HEADER,
   DAEMON_CLIENT_ID,
+  hostedApiUpgrade,
 } from "@mikka/protocol"
 import { arch, hostname, platform } from "node:os"
 import { z } from "zod"
@@ -21,7 +22,7 @@ import { DAEMON_VERSION } from "./paths"
 import { deviceSessionHeaders, serverUrl } from "./server-link-http"
 
 /** The server refuses this daemon's version (426): signing in cannot help until it is updated. */
-const updateRequired = () => new LoginError("failed", "This daemon is too old for the server. Update it first: npm install -g @aspectlylabs/mikka@latest")
+const updateRequired = async (response: Response) => new LoginError("failed", "This daemon is too old for the server. Update it first: npm install -g @aspectlylabs/mikka@latest", hostedApiUpgrade(await response.json().catch(() => null))?.cause)
 
 export const DEVICE_CODE_PATH = `${AUTH_BASE_PATH}/device/code`
 export const DEVICE_TOKEN_PATH = `${AUTH_BASE_PATH}/device/token`
@@ -43,9 +44,11 @@ const errorResponse = z.object({ error: z.string() })
 export class LoginError extends DaemonError {
   constructor(
     readonly reason: "access_denied" | "expired_token" | "failed",
-    message: string
+    message: string,
+    cause?: unknown,
   ) {
     super(4003, message)
+    this.cause = cause
   }
 }
 
@@ -82,7 +85,7 @@ async function post(
   } catch (error) {
     throw new ServerUnreachableError(error)
   }
-  if (response.status === 426) throw updateRequired()
+  if (response.status === 426) throw await updateRequired(response)
   return {
     status: response.status,
     json: await response.json().catch(() => null),
@@ -152,7 +155,7 @@ export async function registrationLogin(options: { serverUrl: string; token: str
   const response = await (options.fetchImpl ?? fetch)(serverUrl(options.serverUrl, '/v1/devices/enroll'), {
     method: 'POST', headers: { authorization: `Bearer ${options.token}`, [CLIENT_VERSION_HEADER]: DAEMON_VERSION, ...deviceSessionHeaders }, redirect: 'error', signal: AbortSignal.timeout(30_000),
   })
-  if (response.status === 426) throw updateRequired()
+  if (response.status === 426) throw await updateRequired(response)
   const body = await response.json().catch(() => null) as { credential?: unknown } | null
   const parsed = tokenResponse.safeParse({ access_token: body?.credential })
   if (!response.ok || !parsed.success) throw new LoginError('failed', 'Device registration token expired or already used.')

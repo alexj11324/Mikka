@@ -232,6 +232,9 @@ test('native logout waits for queued shared-cache writes and clears them before 
 
 test('unsupported renderer state cannot be cleared by an older in-flight success', () => browser(async () => {
   const api = await moduleFrom({ source: `export { callAction } from ${JSON.stringify(join(renderer, 'rpc.ts'))}; export { getTransportState } from ${JSON.stringify(join(renderer, 'transport-state.ts'))};` })
+  const cause = { code: 'api_version_below_floor', version: 1, minimum: 2 }
+  globalThis.fetch = async () => Response.json({ error: 'update_required', minVersion: '2', minApiVersion: 2, message: 'Update Mikka before continuing.', cause }, { status: 426 })
+  await assert.rejects(api.callAction('module.action', []), { code: 'desktop_client_update_required', cause })
   globalThis.fetch = async () => new Response('', { status: 426 })
   await assert.rejects(api.callAction('module.action', []), { code: 'desktop_client_update_required' })
   globalThis.fetch = async () => Response.json({ version: 1, ok: true, result: null })

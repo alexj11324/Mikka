@@ -51,6 +51,8 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 ## Verify and operate
 
 - [Acceptance](acceptance.md) defines required evidence, identities and cleanup.
+- [Released protocol fixtures](release-fixtures/README.md) preserve published
+  callers that contract tests execute against current services.
 - [Isolated test accounts](test-accounts.md) describes the loopback account pool
   and its application, database and lease boundaries.
 - [UI review checklist](review-checklist.md) applies before presenting UI.

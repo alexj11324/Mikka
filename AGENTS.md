@@ -53,6 +53,43 @@
 - **Keep error causes** ([2026-11-05-0330](docs/design/decisions/2026-11-05-0330-error-causes.md)): a `catch` that throws a new error hands on the caught one (`{ cause: error }`); one code from several checks carries a detail from a closed set (`CodedError` in `@mikka/protocol/coded-error`); every code a person can see has copy in both `messages/*.json` (`RunErrors.*`, registry `packages/protocol/src/user-error-codes.ts`). Log causes by name and code, never by message. `scripts/error-cause-policy.mjs` fails CI otherwise.
 - **Scope discipline:** Do not design for rare or future cases nobody asked about. Prefer the smallest verified fix to a demonstrated defect or explicit requirement; introduce defensive complexity only when justified by a realistic, material failure mode.
 
+## 破坏性接口改动分三步
+
+Hosted services can deploy independently; Desktop, iOS, CLI and daemon may
+remain installed for weeks. Reuse `packages/protocol/src/version.ts` and the
+existing update-required UI/errors for their shared reader version. An app's
+store/semver release, Desktop RPC envelope and daemon device session remain
+separate contracts. Follow [decision 2026-11-20-1300](docs/design/decisions/2026-11-20-1300-hosted-api-compatibility.md):
+
+1. Ship readers that accept both old and new shapes and send the next
+   `HOSTED_API_VERSION`. Services still serve the old shape; renamed fields
+   keep both keys. Add a regression for the existing caller before changing
+   its service.
+2. Release **all four installed clients** from that reader commit or a
+   descendant, and record their immutable release sources. A merged source,
+   an unreleased build or only one client's update does not complete this step.
+3. In a later change, remove the old shape and raise `HOSTED_API_FLOOR`.
+   An older identified client receives HTTP 426 `update_required` with a typed
+   `cause`, and its existing upgrade flow stops incompatible operations.
+   Keep `/api/version` readable. The initial version is 1 and floor is 0:
+   clients released before the header count as 0 until step 2 is proven.
+
+Internal API ↔ Eve ↔ Task ↔ World changes first accept both caller versions;
+remove the old contract only after every affected caller has been deployed
+and the rollback version remains compatible. Preserve at least one
+old-caller → new-service test using immutable source from the last successful
+serving release, with its source SHA, release receipt and file hashes. Never
+regenerate an old fixture from the code under test to make the check pass.
+
+Database migrations first add tables/columns and compatible readers/writers,
+then switch all code and backfill, then contract in a separate later migration.
+`scripts/check-migrations.mjs` rejects a new `DROP COLUMN` (including shorthand
+`DROP name`). A justified contract migration needs a leading
+`-- migrate: contract #<issue> <reader-cutover/backfill/rollback evidence>`
+comment and review of that evidence. The marker is a reviewed exception,
+not permission to remove a live reader's column. Preserve executed migration
+names and bytes; deployment rollback restores code/artifacts, not deleted data.
+
 ## Cursor Cloud runtime
 
 These notes apply to Cursor Cloud images provisioned with Mikka's `start`
