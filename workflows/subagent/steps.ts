@@ -39,9 +39,12 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
         await store.update(actor,botId,id,'running','Approval expired; observing current page')
         return 'running'
       }
-      // A recorded decision is a known outcome: release the binding and keep
-      // observing instead of holding the task for a person.
-      if(previous?.action==='browser_operation' && previous.status!=='running') {
+      // A recorded decision is a known outcome only when it proves the
+      // action never ran (declined) or ran with its receipt (done). 'failed'
+      // is ambiguous: the legacy executor marked rows failed even after
+      // dispatch, and 'running' was lost mid-flight — both keep the
+      // unknown-outcome path below.
+      if(previous?.action==='browser_operation' && (previous.status==='declined' || previous.status==='done')) {
         await pool.query(`UPDATE bot_subagents SET "activeActionId"=NULL WHERE id=$1 AND "ownerId"=$2`,[id,actor.userId])
         await store.update(actor,botId,id,'running','Decision recorded; observing current page')
         return 'running'
