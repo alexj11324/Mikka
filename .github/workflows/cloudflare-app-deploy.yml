@@ -235,7 +235,7 @@ jobs:
 
 
   pipeline:
-    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.actor_id == '183887963' && github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.id == github.event.repository.id) || (github.event_name == 'workflow_dispatch' && (inputs.phase == 'pipeline-stage' || inputs.phase == 'pipeline-rollback')))
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_run' && (github.actor_id == '183887963' || (github.actor_id == '118344674' && github.actor == 'github-merge-queue[bot]' && (github.triggering_actor == 'github-merge-queue[bot]' || github.triggering_actor == 'alexj11324'))) && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.id == github.event.repository.id) || (github.event_name == 'workflow_dispatch' && github.actor_id == '183887963' && (inputs.phase == 'pipeline-stage' || inputs.phase == 'pipeline-rollback')))
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 45
