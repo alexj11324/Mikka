@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
 import type { MikkaBridge, SshInstallState, BundledBridge, BundledLiveEvent, BundledViewerEvent } from '@mikka/protocol/bridge'
 import { IPC, BUNDLED_IPC } from '@mikka/protocol/ipc'
+import { windowKindFromArgv } from '../window-kind'
 
 const prefix = '--mikka-app-origin='
 const appOrigin = process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length)
@@ -25,8 +26,8 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
   // The preload runs before <html> exists, so wait for the document.
   const markPlatform = () => {
     document.documentElement.dataset.desktopPlatform = process.platform
-    const windowKind = process.argv.find(argument => argument.startsWith('--mikka-window-kind='))?.slice('--mikka-window-kind='.length)
-    if (windowKind === 'main' || windowKind === 'child') document.documentElement.dataset.desktopWindow = windowKind
+    const windowKind = windowKindFromArgv(process.argv)
+    if (windowKind) document.documentElement.dataset.desktopWindow = windowKind
   }
   if (document.documentElement) markPlatform()
   else window.addEventListener('DOMContentLoaded', markPlatform, { once: true })
