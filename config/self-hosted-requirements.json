@@ -201,6 +201,13 @@
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
   },
+  "drizzle/20261115175552_bot_model_choices_credits_model.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores an optional credits model in PostgreSQL while preserving existing binding and API-key choices, and rejects mixed model sources.",
+    "test": "tests/migration-steps.db.test.mjs",
+    "suite": "test:migration-steps-db"
+  },
   "drizzle/20261112030502_task_attachments.sql": {
     "mode": "built-in",
     "environment": [

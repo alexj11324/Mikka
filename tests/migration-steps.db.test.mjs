@@ -82,6 +82,57 @@ test('PG17: the real runner converges fresh and upgraded databases with an older
   console.log('Retained real migration runner fixture: ' + root)
 })
 
+test('PG17: credits-model migration preserves old choices and enforces storage invariants', async t => {
+  const client = new Client({ connectionString: process.env.E2E_DATABASE_URL })
+  await client.connect()
+  const schema = 'migration_credits_' + randomUUID().replaceAll('-', '')
+  t.after(async () => {
+    console.log('Retained credits migration schema: ' + schema)
+    await client.end()
+  })
+  const version = Number((await client.query('show server_version_num')).rows[0].server_version_num)
+  assert.ok(version >= 170000 && version < 180000, 'Requires PostgreSQL 17')
+  await client.query(`create schema ${schema}; set search_path to ${schema};
+    create table "user" (id text primary key);
+    create table byos_bindings (id uuid primary key);
+    create table model_api_keys (id uuid primary key);
+    create table schema_migrations (name text primary key)`)
+  const migrate = async name => {
+    const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+    await applyMigration(client, name, planMigration(name, sql))
+  }
+  // Execute the original table and choice migrations unchanged. The parent
+  // tables supply only foreign-key identities; no model or provider is called.
+  for (const name of [
+    '20261030200610_execution_rules.sql',
+    '20261101001200_bot_model_hosted_choice.sql',
+    '20261101021100_bot_api_key_choice.sql',
+  ]) await migrate(name)
+  const owner = 'migration-credits-' + randomUUID(), workspace = randomUUID()
+  const binding = randomUUID(), key = randomUUID()
+  await client.query('insert into "user" (id) values ($1)', [owner])
+  await client.query('insert into byos_bindings (id) values ($1)', [binding])
+  await client.query('insert into model_api_keys (id) values ($1)', [key])
+  for (const [bot, bindingId, apiKeyId, apiKeyModel] of [
+    ['empty', null, null, null], ['binding', binding, null, null], ['key', null, key, 'existing/model'],
+  ]) await client.query('insert into bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") values ($1,$2,$3,$4,$5,$6)', [owner, workspace, bot, bindingId, apiKeyId, apiKeyModel])
+  const oldChoices = (await client.query('select * from bot_model_choices order by "botKey"')).rows
+  await assert.rejects(client.query('select "creditsModel" from bot_model_choices'), { code: '42703' })
+
+  await migrate('20261115175552_bot_model_choices_credits_model.sql')
+  assert.deepEqual((await client.query('select * from bot_model_choices order by "botKey"')).rows,
+    oldChoices.map(row => ({ ...row, creditsModel: null })), 'adding the column preserves every old choice')
+  await client.query('insert into bot_model_choices ("ownerId","workspaceId","botKey","creditsModel") values ($1,$2,$3,$4)', [owner, workspace, 'credits', 'openai/gpt-6-luna'])
+  assert.deepEqual((await client.query('select "bindingId","apiKeyId","apiKeyModel","creditsModel" from bot_model_choices where "botKey"=$1', ['credits'])).rows,
+    [{ bindingId: null, apiKeyId: null, apiKeyModel: null, creditsModel: 'openai/gpt-6-luna' }])
+  const rejected = { code: '23514', constraint: 'bot_model_choices_credits_one_source' }
+  for (const bot of ['binding', 'key']) await assert.rejects(
+    client.query('update bot_model_choices set "creditsModel"=$1 where "botKey"=$2', ['openai/gpt-6-luna', bot]), rejected)
+  await assert.rejects(client.query('update bot_model_choices set "creditsModel"=$1 where "botKey"=$2', ['x'.repeat(129), 'credits']), rejected)
+  assert.deepEqual((await client.query('select * from bot_model_choices where "botKey"<>$1 order by "botKey"', ['credits'])).rows,
+    oldChoices.map(row => ({ ...row, creditsModel: null })), 'rejected mixed-source writes leave the old choices intact')
+})
+
 test('PG17: nontransactional indexes, invalid retry, ledger and separate validation', async (t) => {
   const client = new Client({ connectionString: process.env.E2E_DATABASE_URL })
   await client.connect()
