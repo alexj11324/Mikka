@@ -43,4 +43,29 @@ test('reconcileCloudMachines: a sandbox E2B no longer has stops claiming to run'
   assert.equal((await read(ids.keyless)).state, 'waking', 'an unusable key is not proof the sandbox is gone')
   assert.ok(!probed.includes(fresh), 'a machine active in the last hour is not checked')
   assert.equal(await reconcileCloudMachines(pool, probe, 100), 0, 'a second pass changes nothing')
+
+  for (const wake of ['completed', 'started'] as const) {
+    await t.test(`a wake ${wake} during the probe wins`, async () => {
+      const sandboxId = `wake-${randomUUID()}`
+      const workspaceId = await machine(sandboxId, '2 hours')
+      const leaseId = randomUUID()
+      let probes = 0
+      const changed = await reconcileCloudMachines(pool, async (ws, sandbox) => {
+        if (ws !== workspaceId) return 'running'
+        assert.equal(sandbox, sandboxId)
+        probes++
+        await pool.query(`UPDATE cloud_machines SET state='waking',"provisionLeaseId"=$3,"provisionLeaseUntil"=now()+interval '3 minutes'
+          WHERE "workspaceId"=$1 AND "ownerId"=$2`, [ws, owner, leaseId])
+        if (wake === 'completed') {
+          await pool.query(`UPDATE cloud_machines SET state='running',"lastActiveAt"=now(),"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL
+            WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3`, [ws, owner, leaseId])
+        }
+        return 'sleeping'
+      }, 100)
+      assert.equal(probes, 1)
+      assert.deepEqual({ changed, ...(await read(workspaceId)) }, {
+        changed: 0, state: wake === 'completed' ? 'running' : 'waking', sandboxId, runtimeReady: true,
+      })
+    })
+  }
 })

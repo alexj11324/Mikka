@@ -27,9 +27,11 @@ export async function reconcileCloudMachines(pool: Pick<Pool, 'query'>, probe?: 
       state = 'gone'
     }
     if (state === 'running') continue
-    // The same sandbox and an unchanged state: a wake that raced this check wins.
+    // Recheck staleness and the lease so a wake that raced the probe wins.
     const updated = await pool.query(`UPDATE cloud_machines SET state='sleeping'${state === 'gone' ? ',"sandboxId"=NULL,"runtimeReady"=false' : ''}
-      WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "sandboxId"=$3 AND state IN ('running','waking')`, [row.workspaceId, row.ownerId, row.sandboxId])
+      WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "sandboxId"=$3 AND state IN ('running','waking')
+        AND "lastActiveAt"<now()-interval '1 hour'
+        AND ("provisionLeaseUntil" IS NULL OR "provisionLeaseUntil"<now())`, [row.workspaceId, row.ownerId, row.sandboxId])
     changed += updated.rowCount ?? 0
     if (updated.rowCount) await machineCommitted(pool, row.ownerId, row.workspaceId)
   }
