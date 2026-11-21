@@ -64,6 +64,23 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 
 - [Inbox API](inbox-api.md) defines pending, snoozed and completed items, actions, permissions and live refresh.
 
+## Historical media and large evidence
+
+Keep current design decisions, product contracts, operating guides, and active
+acceptance evidence in their authoritative locations. A completed task's dated
+research screenshots or very large raw evidence payloads may be moved out of
+the working tree **only after** confirming its current file references, linking
+back to an immutable commit containing the original bytes, and preserving the
+summary, version binding, checksums and recovery instructions.
+
+For future large visual evidence, prefer a durable artifact location with a
+known retention policy and link it from the PR/issue and the concise repository
+receipt. Do not use expiring CI artifacts as the sole archival copy. Never
+delete active issue evidence, executable fixtures, decision records or release
+proof just because a file looks old or unreferenced. Removing a tracked file
+reduces the present checkout, **not** the repository's existing Git history;
+do not rewrite shared history to reduce size.
+
 ## Update documentation
 
 Dated audits and screenshot snapshots are not a second source of operating instructions. Consult live code, accepted current rules and the active release owner first; use Git history only when investigating old evidence.
