@@ -1,7 +1,8 @@
 # 代码工作区布局调研：Conductor / Claude Code Desktop / Codex（附 Cursor、Linear、GitHub Mobile）
 
 - 日期：2026-11-08
-- 历史草图图片：64 张截图固定引用 [清理前 Git 快照](https://github.com/aspectly-labs/Mikka/tree/ed905baee7482c43b29e8b15480ebbae160278c1/docs/research/assets)（commit `ed905baee7482c43b29e8b15480ebbae160278c1`）；保留原始像素与 Figma 帧编号，不将草图视为当前 UI。需要离线复核时运行 `git restore --source=ed905baee7482c43b29e8b15480ebbae160278c1 -- docs/research/assets/`。\n- 范围：调研和结构草图，不改产品代码。Alex 已批准（「可以，先做调研和草图」），由协调会话审阅后再给 Alex。
+- 历史草图图片：64 张截图固定引用 [清理前 Git 快照](https://github.com/aspectly-labs/Mikka/tree/ed905baee7482c43b29e8b15480ebbae160278c1/docs/research/assets)（commit `ed905baee7482c43b29e8b15480ebbae160278c1`）；保留原始像素与 Figma 帧编号，不将草图视为当前 UI。需要离线复核时运行 `git restore --source=ed905baee7482c43b29e8b15480ebbae160278c1 -- docs/research/assets/`。
+- 范围：调研和结构草图，不改产品代码。Alex 已批准（「可以，先做调研和草图」），由协调会话审阅后再给 Alex。
 - 来源：只用厂商官网、官方文档、changelog 和发布文章。每条结论都附 URL；查不到一手来源的标「未确认」。只借鉴模式，不复制代码或素材。
 - 草图：Figma `zPe5LKycb2XuT1ivCLRw07`，页面 `1110:2`「代码工作区 草图 2026-11-08」。这是结构草图，不是视觉规范（同决定 2026-11-07-2045 的草图约定）。
 
