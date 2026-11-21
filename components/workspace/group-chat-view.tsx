@@ -10,7 +10,6 @@ import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadGroupRow, ThreadTranscriptMessage } from '@/components/slots/thread-contract'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
 import { namedConversationModelBot } from '@/lib/named-conversation-model'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { CHAT_SURFACE } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
 import { GroupLeaveAction } from './group-leave-action'
@@ -221,12 +220,9 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
         ? { id: message.id, message: { from: 'person', speaker,
           body: <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage>,
           after: <MessageReactions reactions={reactions[message.id]} align="end" /> } }
-        : { id: message.id, content: <>
-          <Bubble variant="muted" align="start" className="max-w-full">
-            <BubbleContent size="roomy" className="whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
-          </Bubble>
-          <MessageReactions reactions={reactions[message.id]} align="start" />
-        </> }),
+        : { id: message.id, message: { from: 'bot', speaker, presentation: 'group-received',
+          body: run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />,
+          after: <MessageReactions reactions={reactions[message.id]} align="start" /> } }),
     }
   })
   for (const item of unsent) rows.push({

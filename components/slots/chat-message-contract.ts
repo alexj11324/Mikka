@@ -12,6 +12,10 @@ export type ChatMessageProps = {
   speaker: ChatSpeaker
   /** The chat inside the Artifact reader: narrower bubbles. */
   compact?: boolean
+  /** Existing message frames: received group words or a sent suggestion's extra words. */
+  presentation?: 'default' | 'group-received' | 'suggestion'
+  /** An embedded chat's local row until stored history replaces it; the caller owns its status copy and retry action. */
+  delivery?: { phase: 'sending' | 'accepted' | 'failed'; label: ReactNode; retry?: ReactNode }
   /** The reply is still streaming: no actions yet. */
   streaming?: boolean
   /** Above the message: the 建议 card it was sent from. */
