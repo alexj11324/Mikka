@@ -19,7 +19,7 @@ test('current deletion journal replays only into explicit isolated restore targe
     'mikka_workspaces', 'mikka_workspace_members', 'mikka_workspace_invitations', 'mikka_teams', 'mikka_team_members', 'mikka_team_issues', 'mikka_team_projects', 'team_issue_create_receipts', 'team_issue_promotion_receipts', 'workspace_projects', 'workspace_project_events']
   for (const table of tables) await restored.query(`CREATE TABLE "${scope}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
   for (const table of ['mikka_organizations', 'mikka_organization_members', 'mikka_organization_audit_events']) await restored.query(`CREATE TABLE "${scope}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS ${table === 'mikka_organization_audit_events' ? 'INCLUDING INDEXES' : ''})`)
-  for (const migration of ['20261031050731_account_deletion_jobs.sql', '20261031050732_workspace_deletion_guards.sql', '20261031050737_account_deletion_warnings.sql']) await restored.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))
+  for (const migration of ['20261031050731_account_deletion_jobs.sql', '20261031050732_workspace_deletion_guards.sql', '20261031050737_account_deletion_warnings.sql', '20261121055333_account_deletion_blocker_errors.sql']) await restored.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))
   const user = await seedUser(source, 'restore-deleted'), ws = await seedWorkspace(source, user, [{ userId: user, role: 'admin' }]), untouched = await seedUser(source, 'restore-untouched')
 
   const retainedWorkspace = await seedWorkspace(source, untouched, [{ userId: untouched, role: 'admin' }, { userId: user, role: 'member' }])

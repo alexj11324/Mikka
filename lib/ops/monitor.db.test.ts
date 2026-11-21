@@ -63,6 +63,33 @@ test('overdue secret cleanup follows ordinary worker ownership and connection re
   await count(0)
 })
 
+test('open account deletions older than 24 hours alert and resolve without exposing job data', { skip: !dbUrl }, async t => {
+  const admin = new Pool({ connectionString: dbUrl }), schema = `ops_deletion_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  const pool = new Pool({ connectionString: dbUrl, options: `-c search_path=${schema},public` })
+  t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
+  for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences', 'account_deletion_jobs'])
+    await pool.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
+  await pool.query(await readFile(new URL('../../drizzle/20261031050736_ops_monitor_observations.sql', import.meta.url), 'utf8'))
+  const server = createServer((_request, response) => { response.writeHead(204); response.end() })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => new Promise<void>(resolve => server.close(() => resolve())))
+  const address = server.address(); assert.ok(address && typeof address !== 'string')
+  const sink = `http://127.0.0.1:${address.port}/alerts`
+  const now = new Date(), privateMarker = `private-${randomUUID()}`
+  assert.equal((await collectOperationalSignals(pool, { now: new Date(now.getTime() - 2), sink })).signals.overdueAccountDeletion, 0)
+  for (const [stage, hours] of [['external_pending', 25], ['requested', 26], ['storage_pending', 27], ['completed', 30], ['cancelled', 30], ['external_pending', 24], ['external_pending', 1]] as const)
+    await pool.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,"requestedAt") VALUES($1,$2,repeat('0',64),$3,$4::timestamptz-$5*interval '1 hour')`, [randomUUID(), privateMarker, stage, now, hours])
+  const fired = await collectOperationalSignals(pool, { now: new Date(now.getTime() - 1), sink })
+  assert.equal(fired.signals.overdueAccountDeletion, 3)
+  assert.deepEqual(fired.transitions.map(event => [event.id, event.state]), [['overdueAccountDeletion', 'firing']])
+  assert.ok(!JSON.stringify(fired).includes(privateMarker))
+  await pool.query(`UPDATE account_deletion_jobs SET stage='completed' WHERE "requestedAt"<$1::timestamptz-interval '24 hours'`, [now])
+  const recovered = await collectOperationalSignals(pool, { now, sink })
+  assert.equal(recovered.signals.overdueAccountDeletion, 0)
+  assert.deepEqual(recovered.transitions.map(event => [event.id, event.state]), [['overdueAccountDeletion', 'resolved']])
+})
+
 test('minute collector persists real SQL signals without a sink and keeps delivery retries separate from incident deduplication', { skip: !dbUrl }, async t => {
   const admin = new Pool({ connectionString: dbUrl }), schema = `ops_${randomUUID().replaceAll('-', '')}`
   await admin.query(`CREATE SCHEMA "${schema}"`)
@@ -164,7 +191,7 @@ test('fault matrix preserves failed SLO history while live wake, lease, uncertai
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const sink = `http://127.0.0.1:${address.port}/internal-alerts`
   const fired = await collectOperationalSignals(pool, { sink, now: at })
-  assert.deepEqual(fired.signals, { databaseAvailable: 1, staleWake: 1, exhaustedWake: 0, expiredRunLease: 1, uncertainEffect: 1, staleEffect: 1, overdueSecretCleanup: 1, dueTotal: 3, dueSuccessful: 1, dispatchTotal: 3, dispatchStarted: 1 })
+  assert.deepEqual(fired.signals, { databaseAvailable: 1, staleWake: 1, exhaustedWake: 0, expiredRunLease: 1, uncertainEffect: 1, staleEffect: 1, overdueAccountDeletion: 0, overdueSecretCleanup: 1, dueTotal: 3, dueSuccessful: 1, dispatchTotal: 3, dispatchStarted: 1 })
   assert.equal(fired.notificationStatus, 'delivered'); assert.equal(received.length, 7)
   await collectOperationalSignals(pool, { sink, now: new Date(at.getTime() + 1) }); assert.equal(received.length, 7)
 

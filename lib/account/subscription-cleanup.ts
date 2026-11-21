@@ -1,11 +1,11 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import type { Pool, PoolClient } from 'pg'
-import type { AccountCleanupReport } from './cleanup-result'
+import type { Pool } from 'pg'
+import { cleanupErrorIdentifier, type AccountCleanupReport, type AccountDeletionLease } from './cleanup-result'
 import type { SubscriptionService } from '@/lib/subscription-service'
 
 type Service = Pick<SubscriptionService, 'repository' | 'worker' | 'status'>
-export type SubscriptionDeletionLease = { id: string; client: PoolClient }
+export type SubscriptionDeletionLease = AccountDeletionLease
 export type SubscriptionCleanupFactory = (grant?: string) => Promise<Service>
 const runtime: SubscriptionCleanupFactory = async grant => (await import('@/lib/subscription-runtime')).subscriptionRuntime(false, true, { accountDeletionGrant: grant })
 
@@ -32,6 +32,7 @@ async function drain(ownerId: string, database: Pool, connections: { id: string 
   let service: Service
   try { service = await serviceFactory(grant) } catch { return { blockedReasons: ['subscription_custody_cleanup_required'], warnings: [] } }
   const reasons = new Set<string>(), warnings = new Set<string>()
+  const blockerErrors: Record<string, string> = {}
   for (const { id } of connections) {
     try {
       const row = await service.repository.connection(ownerId, id)
@@ -51,7 +52,7 @@ async function drain(ownerId: string, database: Pool, connections: { id: string 
         // The provider does not offer global revocation here: disclose that boundary, not a false failure.
         warnings.add('subscription_upstream_revocation_not_supported_revoke_at_provider')
       }
-    } catch { reasons.add('subscription_cleanup_failed') }
+    } catch (error) { blockerErrors.subscription_cleanup_failed = cleanupErrorIdentifier(error); reasons.add('subscription_cleanup_failed') }
   }
-  return { blockedReasons: [...reasons], warnings: [...warnings] }
+  return { blockedReasons: [...reasons], warnings: [...warnings], ...(reasons.size && Object.keys(blockerErrors).length ? { blockerErrors } : {}) }
 }

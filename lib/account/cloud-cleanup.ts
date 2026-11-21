@@ -1,7 +1,9 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { randomUUID } from 'node:crypto'
 import { observePoolCommits } from '@/lib/db/commit-effects'
 import { machineChanged } from '@/lib/live/computer-state'
+import { cleanupErrorIdentifier, type AccountCleanupOptions } from './cleanup-result'
 
 export interface AccountCloudProvider {
   kill(workspaceId: string, sandboxId: string): Promise<void>
@@ -39,7 +41,15 @@ const ownerProvider = (ownerId: string): AccountCloudProvider => ({
 })
 
 /** Main Bot computers are keyed by workspace AND owner (20261029080001), never workspace alone. */
-export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = ownerProvider(ownerId)): Promise<string[]> {
+export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = ownerProvider(ownerId), { job, blockerErrors = {} }: AccountCleanupOptions = {}): Promise<string[]> {
+  if (!job) return drain(ownerId, database, runtime, blockerErrors)
+  const grant = randomUUID(), key = 'mikka-account-cloud-cleanup:' + job.id + ':' + grant
+  await job.client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [key])
+  try { return await drain(ownerId, database, runtime, blockerErrors, grant) }
+  finally { await job.client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [key]) }
+}
+
+async function drain(ownerId: string, database: Pool, runtime: AccountCloudProvider, blockerErrors: Record<string, string>, grant?: string): Promise<string[]> {
   observePoolCommits(database)
   const reasons = new Set<string>()
   const machines = (await database.query<{ workspaceId: string }>('SELECT "workspaceId" FROM cloud_machines WHERE "ownerId"=$1 ORDER BY "workspaceId"', [ownerId])).rows
@@ -48,6 +58,8 @@ export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool,
     let sandboxId: string | null = null, runs: string[] = [], pending = false
     try {
       await client.query('BEGIN')
+      // Only the backend holding this deletion job can authorize its guarded cleanup.
+      if (grant) await client.query("SELECT set_config('mikka.account_cloud_cleanup_grant',$1,true)", [grant])
       const row = (await client.query('SELECT * FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2 FOR UPDATE', [machine.workspaceId, ownerId])).rows[0]
       if (!row) { await client.query('COMMIT'); continue }
       // An expired lease is not proof an external allocation did not happen.
@@ -62,11 +74,11 @@ export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool,
       }
       if (!pending) await machineChanged(client, database, ownerId, machine.workspaceId)
       await client.query('COMMIT')
-    } catch { await client.query('ROLLBACK'); reasons.add('cloud_runtime_cleanup_required'); continue }
+    } catch (error) { blockerErrors.cloud_runtime_cleanup_required = cleanupErrorIdentifier(error); await client.query('ROLLBACK'); reasons.add('cloud_runtime_cleanup_required'); continue }
     finally { client.release() }
     if (pending) { reasons.add('cloud_provision_cleanup_pending'); continue }
     try { await runtime.endRuns(ownerId, runs); if (sandboxId) await runtime.kill(machine.workspaceId, sandboxId) }
-    catch { reasons.add('cloud_runtime_cleanup_required') }
+    catch (error) { blockerErrors.cloud_runtime_cleanup_required = cleanupErrorIdentifier(error); reasons.add('cloud_runtime_cleanup_required') }
   }
   // Keep source references until every provider deletion acknowledges. Repeated
   // DELETE of a known owned object is idempotent; no mapping disappears first.
@@ -81,11 +93,11 @@ export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool,
   const owned = new Map(snapshots.map(row => [`${row.workspaceId}:${row.snapshotId}`, row]))
   for (const source of sources) {
     try { for (const snapshotId of await runtime.snapshots(source.workspaceId, source.sandboxId)) owned.set(`${source.workspaceId}:${snapshotId}`, { workspaceId: source.workspaceId, snapshotId }) }
-    catch { reasons.add('cloud_snapshot_inventory_pending') }
+    catch (error) { blockerErrors.cloud_snapshot_inventory_pending = cleanupErrorIdentifier(error); reasons.add('cloud_snapshot_inventory_pending') }
   }
   for (const snapshot of owned.values()) {
     try { await runtime.deleteSnapshot(snapshot.workspaceId, snapshot.snapshotId) }
-    catch { reasons.add('cloud_snapshot_cleanup_required') }
+    catch (error) { blockerErrors.cloud_snapshot_cleanup_required = cleanupErrorIdentifier(error); reasons.add('cloud_snapshot_cleanup_required') }
   }
   return [...reasons]
 }

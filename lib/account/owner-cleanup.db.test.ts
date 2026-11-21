@@ -21,8 +21,10 @@ test('account cleanup calls only owner-scoped adapters and retains unresolved ex
     await database.query('INSERT INTO byos_secret_artifacts(name,"connectionId","ownerId","workspaceId",provider,kind,"notBefore","publishedAt","createStarted","createSettled") VALUES($1,$2,$3,$4,\'codex\',\'grant\',now(),now(),true,true)', [`${secret}-${owner}`, ownConnection, owner, ws.id])
     const repository = new SubscriptionRepository(database), calls: string[] = []
     let acknowledgeCustody = false
+    let workerError = true
     const factory: SubscriptionCleanupFactory = async () => ({ repository,
       worker: scope => ({ call: async (method: string) => {
+        if (workerError) throw Object.assign(new Error('private provider body'), { name: 'WorkerRefusal', code: 'metadata_unavailable' })
         assert.equal(scope.ownerId, owner); assert.equal(scope.connectionId, ownConnection)
         calls.push(method)
         if (method === 'disconnect') await database.query('UPDATE byos_connections SET state=\'disconnected\',epoch=epoch+1,"secretName"=NULL,"secretDigest"=NULL,"providerSubject"=NULL WHERE id=$1 AND "ownerId"=$2', [scope.connectionId, scope.ownerId])
@@ -31,6 +33,8 @@ test('account cleanup calls only owner-scoped adapters and retains unresolved ex
       } } as unknown as SubscriptionWorkerClient),
       status: async (userId, id) => { const row = await repository.connection(userId, id); return { id, provider: row.provider, state: row.state, revision: Number(row.epoch), cleanup: { pending: acknowledgeCustody ? 0 : 1, failed: 0, providerRevocation: 'not_implemented' as const, uncertainCreates: 0 } } },
     })
+    assert.deepEqual(await cleanupAccountSubscriptions(owner, database, factory), { blockedReasons: ['subscription_cleanup_failed'], warnings: [], blockerErrors: { subscription_cleanup_failed: 'WorkerRefusal:metadata_unavailable' } })
+    workerError = false
     const options = { mainPool: database, workspacePool: database, externalCleanup: async (subject: string, target: Pool) => cleanupAccountSubscriptions(subject, target, factory) }
     const requested = await requestAccountDeletion(owner, `${owner}@example.invalid`, randomUUID(), options)
     assert.ok(requested.ok)

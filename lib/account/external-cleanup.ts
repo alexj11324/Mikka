@@ -3,8 +3,8 @@ import type { Pool } from 'pg'
 import { pool } from '@/lib/db'
 import { getComposio, retireComposioAccount } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
-import type { AccountCleanupReport } from './cleanup-result'
-import { cleanupAccountSubscriptions, type SubscriptionDeletionLease } from './subscription-cleanup'
+import type { AccountCleanupReport, AccountDeletionLease } from './cleanup-result'
+import { cleanupAccountSubscriptions } from './subscription-cleanup'
 import { cleanupAccountBilling } from './billing-cleanup'
 import { cleanupAccountRuntimes } from './runtime-cleanup'
 
@@ -13,7 +13,7 @@ import { cleanupAccountRuntimes } from './runtime-cleanup'
  * `soloWorkspaceIds` are the workspaces this deletion removes (Plan.solo); their paid plans must be
  * cancelled here, before the delete path takes the only entry point that could cancel them.
  */
-export async function cleanupAccountConnections(ownerId: string, database: Pool, job?: SubscriptionDeletionLease, soloWorkspaceIds: readonly string[] = []): Promise<AccountCleanupReport> {
+export async function cleanupAccountConnections(ownerId: string, database: Pool, job?: AccountDeletionLease, soloWorkspaceIds: readonly string[] = []): Promise<AccountCleanupReport> {
   // Remote adapters resolve custody/key material through the current server scope.
   // A restore or caller-supplied SQL target must use explicit adapters, never ambient remote credentials.
   if (database.options.connectionString !== pool.options.connectionString || database.options.options !== pool.options.options) return { blockedReasons: ['external_cleanup_target_mismatch'], warnings: [] }
@@ -32,6 +32,7 @@ export async function cleanupAccountConnections(ownerId: string, database: Pool,
   }
   const subscription = await cleanupAccountSubscriptions(ownerId, database, undefined, job)
   blocked.push(...subscription.blockedReasons); warnings.push(...subscription.warnings)
-  blocked.push(...await cleanupAccountRuntimes(ownerId, database))
-  return { blockedReasons: [...new Set(blocked)], warnings: [...new Set(warnings)] }
+  const blockerErrors = { ...subscription.blockerErrors }
+  blocked.push(...await cleanupAccountRuntimes(ownerId, database, { job, blockerErrors }))
+  return { blockedReasons: [...new Set(blocked)], warnings: [...new Set(warnings)], ...(Object.keys(blockerErrors).length ? { blockerErrors } : {}) }
 }

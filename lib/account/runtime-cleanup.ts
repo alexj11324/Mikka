@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool } from 'pg'
 import { cleanupOwnedCloudMachines } from './cloud-cleanup'
 import { retrySandboxKills } from '@/lib/cloud-computer/workspace-teardown'
+import type { AccountCleanupOptions } from './cleanup-result'
 
 export type EndAccountThread = (database: Pool, actor: { userId: string; workspaceId: string }, runId: string) => Promise<void>
 const end: EndAccountThread = async (database, actor, runId) => {
@@ -13,8 +14,10 @@ const end: EndAccountThread = async (database, actor, runId) => {
   }
 }
 /** Called only by the authorized owner's deletion job, before any runtime mapping is erased. */
-export async function cleanupAccountRuntimes(ownerId: string, database: Pool, endThread = end, cleanupCloud = cleanupOwnedCloudMachines,
+export async function cleanupAccountRuntimes(ownerId: string, database: Pool, endThreadOrOptions: EndAccountThread | AccountCleanupOptions = end, cleanupCloud = cleanupOwnedCloudMachines,
   retryKills = (owner: string, target: Pool) => retrySandboxKills(target, { ownerId: owner, limit: 1000 })): Promise<string[]> {
+  const endThread = typeof endThreadOrOptions === 'function' ? endThreadOrOptions : end
+  const options = typeof endThreadOrOptions === 'function' ? {} : endThreadOrOptions
   const reasons = new Set<string>()
   // Sandboxes of deleted workspaces still waiting for a kill: only this person's key can kill them, and it goes with the account.
   try { if ((await retryKills(ownerId, database)).pending) reasons.add('cloud_sandbox_kill_pending') }
@@ -25,7 +28,7 @@ export async function cleanupAccountRuntimes(ownerId: string, database: Pool, en
     try { await endThread(database, { userId: ownerId, workspaceId: thread.workspaceId }, thread.runId) }
     catch { reasons.add('cloud_thread_cleanup_pending') }
   }
-  for (const reason of await cleanupCloud(ownerId, database)) reasons.add(reason)
+  for (const reason of await cleanupCloud(ownerId, database, undefined, options)) reasons.add(reason)
   // A prior close can fail before a successful VM kill. Drain again while
   // the owner's provider key still exists, including already deleted sources.
   // Pending ACKs must not outlive deletion of the key needed to prove VM loss.
