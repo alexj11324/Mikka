@@ -44,6 +44,35 @@ test('the completed main push selects only the latest queued source, without rew
   assert.throws(() => selectAutomaticCandidate(forged, original, source))
 })
 
+test('merge queue provenance is accepted only on automatic main runs with both bot identifiers', () => {
+  const bot = { id: 118344674, login: 'github-merge-queue[bot]' }
+  const original = { ...run(), actor: bot, triggering_actor: bot }
+  assert.equal(selectAutomaticCandidate(event(original), original, source), 'selected')
+  const rerun = { ...original, triggering_actor: { id: 183887963, login: 'alexj11324' } }
+  assert.equal(selectAutomaticCandidate(event(rerun), rerun, source), 'selected')
+  const deployed = { ...original, path: '.github/workflows/cloudflare-app-deploy.yml', event: 'workflow_run' }
+  assert.equal(checkedRun(deployed, deployed.path, { automaticDeployment: true }).id, 101)
+  assert.equal(checkedRun({ ...deployed, triggering_actor: rerun.triggering_actor }, deployed.path, { automaticDeployment: true }).id, 101)
+  assert.throws(() => checkedRun(deployed, deployed.path))
+  for (const actor of [{ ...bot, id: 7 }, { ...bot, login: 'outsider' }, { login: bot.login }, undefined]) {
+    for (const field of ['actor', 'triggering_actor']) {
+      const forged = { ...original, [field]: actor }
+      assert.throws(() => selectAutomaticCandidate(event(forged), forged, source))
+    }
+  }
+  for (const path of [producer, '.github/workflows/cloud-services-ci.yml', '.github/workflows/cloudflare-app-deploy.yml'])
+    assert.throws(() => checkedRun({ ...original, path, event: 'workflow_dispatch' }, path))
+})
+
+test('merge queue identity cannot select a manual stage, rollback or production promotion', async () => {
+  const env = { GITHUB_REPOSITORY: repo.full_name, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
+    GITHUB_REF: 'refs/heads/main', GITHUB_ACTOR_ID: '118344674', GITHUB_ACTOR: 'github-merge-queue[bot]' }
+  const api = async () => assert.fail('Untrusted selection must not read GitHub')
+  for (const phase of ['pipeline-stage', 'pipeline-rollback'])
+    await assert.rejects(selectPipeline({ env: { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', MIKKA_DEPLOYMENT_PHASE: phase }, api }))
+  await assert.rejects(selectPromotion({ env: { ...env, GITHUB_EVENT_NAME: 'workflow_run' }, api }))
+})
+
 test('failed builds, fork PRs, branches and different actors never become deployable candidates', () => {
   for (const change of [
     { conclusion: 'failure' }, { status: 'in_progress' }, { event: 'pull_request' },
@@ -215,6 +244,57 @@ test('automatic, manual staging and production candidate selection require migra
   const valid = candidateApi(manifest)
   assert.equal((await selectPipeline({ env, api: valid.api })).status, 'superseded')
   assert.equal(valid.calls.length, 4)
+})
+
+test('owner promotion scans bot staging history without granting the bot production authority', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-promotion-history-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const env = { GITHUB_REPOSITORY: repo.full_name, GITHUB_REPOSITORY_ID: String(repo.id), GITHUB_REPOSITORY_OWNER_ID: '183887963',
+    GITHUB_REF: 'refs/heads/main', GITHUB_ACTOR_ID: '183887963', GITHUB_EVENT_NAME: 'workflow_run',
+    GITHUB_EVENT_PATH: join(directory, 'event.json'), GITHUB_ENV: join(directory, 'env'), RUNNER_TEMP: directory,
+    GITHUB_RUN_ID: '201', GITHUB_RUN_ATTEMPT: '1', INPUT_STAGE_ARTIFACT: '401', INPUT_OPERATIONS_SOURCE: 'f'.repeat(40) }
+  await writeFile(env.GITHUB_EVENT_PATH, JSON.stringify(event(run())))
+  const manifest = manifestFixture()
+  const current = { ...run(), id: 201, run_attempt: 1, path: '.github/workflows/cloudflare-app-deploy.yml', event: 'workflow_run' }
+  const bot = { id: 118344674, login: 'github-merge-queue[bot]' }
+  const earlier = { ...current, id: 199, actor: bot, triggering_actor: bot }
+  const qualified = { ...run(), id: 501, run_attempt: 1, path: '.github/workflows/cloud-services-ci.yml', event: 'workflow_dispatch' }
+  function packet(origin, id, prefix, files) {
+    const bytes = execFileSync('python3', ['-c',
+      'import io,json,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,"w") as z:\n for name,value in json.loads(sys.argv[1]).items(): z.writestr(name,json.dumps(value))\nsys.stdout.buffer.write(b.getvalue())', JSON.stringify(files)])
+    return { bytes, artifact: { id, name: `${prefix}-${origin.id}-${origin.run_attempt}`, expired: false, size_in_bytes: bytes.length,
+      digest: 'sha256:' + createHash('sha256').update(bytes).digest('hex'), workflow_run: {
+        id: origin.id, head_sha: source, head_branch: 'main', repository_id: repo.id, head_repository_id: repo.id } } }
+  }
+  const release = packet(run(), 301, 'release-manifest', { 'release-manifest.json': manifest })
+  const stage = packet(current, 401, 'deploy-pipeline', { 'release-manifest.json': manifest,
+    'pipeline-summary.json': { status: 'passed', target: 'staging' } })
+  const qualification = packet(qualified, 601, 'cloud-services-ci-receipt', { 'receipt.json': {} })
+  for (const production of [undefined, { name: 'pipeline-production', conclusion: 'skipped' }]) {
+    let scanned = false
+    const api = async path => {
+      if (path.endsWith('/runs/101/attempts/2')) return run()
+      if (path.endsWith('/runs/201/attempts/1')) return current
+      for (const [id, value] of [[101, release], [201, stage], [501, qualification]]) {
+        if (path.includes(`/runs/${id}/artifacts?`)) return { total_count: 1, artifacts: [value.artifact] }
+        if (path.endsWith(`/artifacts/${value.artifact.id}/zip`)) return value.bytes
+      }
+      if (path.includes('workflows/cloudflare-app-deploy.yml/runs?')) return { total_count: 1, workflow_runs: [earlier] }
+      if (path.includes('/runs/199/attempts/1/jobs?')) {
+        scanned = true
+        const jobs = [{ name: 'pipeline', status: 'completed', conclusion: 'success' }, ...(production ? [production] : [])]
+        return { total_count: jobs.length, jobs }
+      }
+      if (path.includes('workflows/cloud-services-ci.yml/runs?')) return { total_count: 1, workflow_runs: [qualified] }
+      assert.fail('Unexpected promotion request: ' + path)
+    }
+    const result = await selectPromotion({ env, api })
+    assert.equal(result.status, 'selected')
+    assert.equal(result.source, source)
+    assert.equal(scanned, true)
+    await assert.rejects(selectPromotion({ env: { ...env, GITHUB_ACTOR_ID: String(bot.id), GITHUB_ACTOR: bot.login },
+      api: async () => assert.fail('Bot promotion must fail before reading GitHub') }))
+  }
 })
 
 test('canonical GitHub reads keep the Actions and private operations token scopes separate', async t => {
