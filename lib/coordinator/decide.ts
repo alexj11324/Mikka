@@ -7,8 +7,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_PATH, type DecisionReceiptModel, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
 import type { HostedModelBilling } from '@/lib/abuse/model'
 import { observeAiRequest, type AiMetadata } from '@/lib/tracing/ai'
+import { decisionTimeoutMs } from './decision-timeout'
+import { safeErrorAttributes } from '@mikka/protocol/tracing'
 
-const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 /** Issued by this host after a successful, validated provider envelope. Never
  * construct one from model prose, a screenshot label, peer data or a tool arg.
@@ -69,10 +70,15 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
         redirect: 'error',
         headers: { Authorization: 'Bearer ' + proxy.masterKey, 'Content-Type': 'application/json' },
         body: logicalBody,
-        signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
+        signal: AbortSignal.any([AbortSignal.timeout(decisionTimeoutMs()), ...(signal ? [signal] : [])]),
       }
       const response = await fetch(endpoint, init)
-      if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
+      if (!response.ok) {
+        const error = new DecisionHttpError(response.status)
+        report({ upstreamStatus: error.status, errorMessage: error.message })
+        await response.body?.cancel().catch(() => {})
+        throw error
+      }
       const payload: unknown = await response.json()
       const receipt = decisionProviderReceipt(payload, response.headers)
       {
@@ -111,11 +117,19 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       // (including decide/callDecisionRequest) remains null for invalid answers.
       return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
     }, signal)
-  } catch {
+  } catch (error) {
     if (store) await store.settle(callId,requestStarted ? null : 0)
     // No upstream text, credentials, image bytes or untrusted purpose in logs.
-    console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
+    console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80), ...safeErrorAttributes(error),
+      ...(error instanceof DecisionHttpError ? { status: error.status, message: error.message } : {}) })
     return null
+  }
+}
+
+class DecisionHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`Decision provider returned HTTP ${status}`)
+    this.name = 'DecisionHttpError'
   }
 }
 
