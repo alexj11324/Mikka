@@ -4152,6 +4152,7 @@
     },
     "loadError": "Could not load the conversation.",
     "failedTitle": "Reply failed",
+    "modelRequired": "No task started. Choose a model first.",
     "replyToolUnavailable": "This reply could not be completed. Please try again.",
     "apiBalance": "Insufficient API balance",
     "subscriptionRefusal": {

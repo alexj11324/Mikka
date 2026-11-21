@@ -92,6 +92,7 @@ export interface Chat {
 
 /** lib/chat-failure.ts on the server. */
 export type ChatFailure = (
+  | { kind: 'modelRequired' }
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }

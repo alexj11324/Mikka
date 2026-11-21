@@ -16,6 +16,7 @@ import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 type WakeCode = 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted'
 
 export type ChatFailure = (
+  | { kind: 'modelRequired' }
   | { kind: 'hosted'; code: NonNullable<ReturnType<typeof hostedRefusal>> }
   | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
   | { kind: 'wake'; code: WakeCode }
@@ -27,7 +28,7 @@ export type ChatFailure = (
 
 export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; failureDetails?: unknown; items?: readonly { from: string; pending?: true; native?:true }[] }): ChatFailure | null {
   const details = chat.working || !chat.error ? null : readRunFailure(chat.failureDetails)
-  const legacy = failureOf(chat) ?? (details ? { kind: 'failed' as const } : null)
+  const legacy = failureOf({ ...chat, error: chat.error?.replace(/ · ref [A-Za-z0-9_-]{1,128}$/, '') ?? null }) ?? (details ? { kind: 'failed' as const } : null)
   const failure = legacy && details ? { ...legacy, failureDetails: details } : legacy
   if (!failure || !chat.error) return failure
   // A stored code (with its detail) always goes; other text only when nothing else names the failure,
@@ -52,6 +53,7 @@ function failureOf(chat: { working: boolean; error: string | null; items?: reado
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
   if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending && !chat.items.at(-1)?.native ? { kind: 'failed' } : null
+  if (chat.error === 'executionModelUnknown') return { kind: 'modelRequired' }
   const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error.trim().replace(CLOUD_STREAM_STEP, ''))?.code)
   if (cloudCode) return { kind: 'failed', cloudCode }
   const hosted = hostedRefusal(chat.error)
@@ -69,11 +71,12 @@ const TRANSIENT_HOSTED = new Set(['usage_in_progress', 'usage_concurrency_limit'
 /** Where a failure's words live in messages/*.json: the web line, Telegram and the phone all read this one key. */
 export type FailureMessageKey =
   | { namespace: 'Billing.refusal'; key: 'unavailable' | 'verificationRequiredPlain' | 'free_allowance_used' | 'points_exhausted' | 'platform_paused' | 'usage_budget_exhausted' | 'billing_authorization_revoked' }
-  | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' | 'replyToolUnavailable' }
+  | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' | 'replyToolUnavailable' | 'modelRequired' }
   | { namespace: 'RunErrors'; key: `${CloudErrorCode}.default` }
 
 export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
   switch (failure.kind) {
+    case 'modelRequired': return { namespace: 'Coordinator', key: 'modelRequired' }
     case 'hosted':
       return { namespace: 'Billing.refusal', key: TRANSIENT_HOSTED.has(failure.code) ? 'unavailable' : failure.code === 'verification_required' ? 'verificationRequiredPlain' : failure.code as 'free_allowance_used' | 'points_exhausted' | 'platform_paused' | 'usage_budget_exhausted' | 'billing_authorization_revoked' }
     case 'subscription': return { namespace: 'Coordinator', key: `subscriptionRefusal.${failure.notice}` }

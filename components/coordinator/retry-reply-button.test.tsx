@@ -82,7 +82,7 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
   readAppVersion: async () => { versionReads++; return serverVersion },
 } })
 mock.module('@/lib/client-runtime/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
-mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
+mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
 mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: chatEnabled, working: false, error: chatError, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
@@ -159,6 +159,20 @@ for (const full of [true, false]) for (const live of [true, false]) test(`a ${li
   assert.equal(notice.querySelector('button')?.textContent, 'Coordinator.modelPicker.changeModel')
   await act(async () => notice.querySelector<HTMLButtonElement>('button')!.click())
   assert.deepEqual(modelPicks, ['fixture-bot'])
+  assert.equal(calls, 0)
+  assert.equal(submissions, 0)
+})
+
+for (const full of [true, false]) for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} missing model links settings in ${full ? 'full' : 'embedded'} chat without resending`, async () => {
+  chatEnabled = true
+  chatError = live ? 'executionModelUnknown' : null
+  chatItems = [{ id: 'fixture-no-model', position: 86, from: 'person', text: 'Start a cloud machine and print the Node.js version.', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: { kind: 'modelRequired' } }]
+  await act(async () => root.render(<CoordinatorChat embedded={full ? undefined : artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  const notice = container.querySelector(full ? '[data-official-thread]' : `[data-message-failure="${live ? 'live' : 'past'}"]`)!
+  assert.ok(notice)
+  assert.match(notice.textContent ?? '', /Coordinator.modelRequired/)
+  assert.doesNotMatch(notice.textContent ?? '', /Coordinator.failedTitle|Common.retry|Coordinator.resend/)
+  assert.equal(notice.querySelector('a')?.getAttribute('href'), '/settings?section=models')
   assert.equal(calls, 0)
   assert.equal(submissions, 0)
 })
@@ -462,6 +476,50 @@ const welcomeFailed = (error = 'Error: verification_required') => {
   refusalCode = error.includes('verification_required') ? 'verification_required' : error
 }
 const chat = () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />)
+
+test('a gated welcome shows model settings without looping, then starts once a model is chosen', async () => {
+  chatEnabled = true
+  welcomeReply = { queued: false, reason: 'modelRequired' }
+  menu = { current: { id: 'none', kind: 'none', available: false } }
+  await act(async () => chat())
+  await act(async () => chat())
+  assert.equal(welcomeCalls, 1)
+  assert.ok(container.querySelector('[data-chat-failure="model-required"]'))
+  assert.equal(container.querySelector('a')?.getAttribute('href'), '/settings?section=models')
+  assert.doesNotMatch(container.textContent ?? '', /Nav.writingWelcome|Coordinator.failedTitle|Coordinator.resend/)
+  welcomeReply = { queued: true }
+  menu = { current: { id: 'credits:fixture/model', kind: 'hosted', available: true } }
+  await act(async () => chat())
+  await act(async () => chat())
+  assert.equal(welcomeCalls, 2)
+  assert.equal(container.querySelector('[data-chat-failure="model-required"]'), null)
+  assert.equal(calls, 0)
+})
+
+test('a stored model-required welcome retries once after choosing a model', async () => {
+  chatItems = [{ id: 'fixture-model-welcome', position: 1, from: 'coordinator', text: '', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:00:00Z', welcome: true, failure: { kind: 'modelRequired' } }]
+  chatData = { items: chatItems, enabled: true, working: false, error: 'executionModelUnknown', artifacts: {} }
+  menu = { current: { id: 'none', kind: 'none', available: false } }
+  await act(async () => chat())
+  assert.equal(calls, 0)
+  menu = { current: { id: 'credits:fixture/model', kind: 'hosted', available: true } }
+  await act(async () => chat())
+  await act(async () => chat())
+  assert.equal(calls, 1)
+  assert.equal(welcomeCalls, 0)
+})
+
+test('a stale runnable menu cannot repeatedly submit a welcome refused for no model', async () => {
+  chatEnabled = true
+  welcomeReply = { queued: false, reason: 'modelRequired' }
+  menu = { current: { id: 'credits:fixture/model', kind: 'hosted', available: true } }
+  await act(async () => chat())
+  const attempts = welcomeCalls
+  await act(async () => chat())
+  await act(async () => chat())
+  assert.equal(welcomeCalls, attempts)
+  assert.ok(attempts <= 2)
+})
 
 test('a failed welcome shows on the Bot\'s side in the chat, not only above the composer', async () => {
   welcomeFailed()

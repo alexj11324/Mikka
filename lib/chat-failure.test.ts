@@ -22,6 +22,21 @@ const copy = mobileMessages.MobileCore.failure
 const person = { from: 'person' }, reply = { from: 'coordinator' }, event = { from: 'event' }
 const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)'
 
+test('missing preparation model has its own copy and model settings recovery without retry', () => {
+  const failure = chatFailure({ working: false, error: 'executionModelUnknown' })!
+  assert.deepEqual(failure, { kind: 'modelRequired' })
+  assert.deepEqual(failureMessageKey(failure), { namespace: 'Coordinator', key: 'modelRequired' })
+  assert.deepEqual(failureLine(failure), { text: mobileMessages.Coordinator.modelRequired, retry: false, recovery: 'models' })
+  assert.equal(chatFailure({ working: true, error: 'executionModelUnknown' }), null)
+})
+
+test('generic failure references remain available to Details without changing known classifications', () => {
+  assert.deepEqual(chatFailure({ working: false, error: 'HOOK_FAILED · ref fixture-reference' }), { kind: 'failed', raw: 'HOOK_FAILED · ref fixture-reference' })
+  const failure = chatFailure({ working: false, error: 'cloud_quota_exhausted · ref fixture-reference' })!
+  assert.equal(failure.kind, 'failed')
+  assert.deepEqual(failureMessageKey(failure), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
+})
+
 test('exhausted tool recovery has a stable friendly failure and retry',()=>{
   const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
   assert.deepEqual(failure,{kind:'failed',reason:'tools',raw:'model_tool_unavailable'})

@@ -4,12 +4,19 @@ import type { EveScope } from './scope'
 
 export const eveStreamId = (sessionId:string,turnId:string) => `eve:${sessionId}:${turnId}`
 
+const FAILURE_CODE = /^[a-zA-Z][a-zA-Z0-9_.:-]{0,127}(?: · ref [A-Za-z0-9_-]{1,128})?$/
+
 /** Compatibility history is derived from the eve committed view, never used as eve model history. */
 export function projectEveTurn(view:SessionView,sessionId:string,turnId:string,outcome:TurnOutcome,stoppedText?:string) {
-  const code=turn(view,turnId)?.error?.code
-  const failure=typeof code==='string' && /^[a-zA-Z][a-zA-Z0-9_.:-]{0,127}$/.test(code) ? code : 'turn_failed'
+  const error=turn(view,turnId)?.error
+  const code=typeof error?.code==='string' && error.code===error.code.trim() && /^[a-zA-Z][a-zA-Z0-9_.:-]{0,127}$/.test(error.code) ? error.code : 'turn_failed'
   const content = parts(view,{turnId}).flatMap(part => (part.kind === 'text' || part.kind === 'reasoning') && typeof part.value === 'string' ? [{type:part.kind,text:part.value}] : [])
   const tools = calls(view,{turnId,kind:'tool'})
+  // Only the closed preparation refusal, before any tool ran, establishes that no task started.
+  const modelRequired=code==='HOOK_FAILED' && !tools.length && typeof error?.message==='string' && /^Hook "[^"\r\n]{1,128}" failed: executionModelUnknown$/.test(error.message)
+  // Eve's committed facts map its internal details.errorId to ErrorInfo.id.
+  const reference=error?.id
+  const failure=modelRequired ? 'executionModelUnknown' : code+(typeof reference==='string' && reference===reference.trim() && /^[A-Za-z0-9_-]{1,128}$/.test(reference) ? ` · ref ${reference}` : '')
   const toolCalls = tools.map(call => ({ type:'tool-call',toolCallId:call.callId,toolName:call.name,input:call.input ?? {} }))
   const stopped = outcome === 'cancelled' ? { mikkaStopped:true, ...(stoppedText ? {mikkaDisplay:{version:1, kind:'reply', text:stoppedText}} : {}) } : {}
   const output = tools.filter(call => ['completed','failed','cancelled','rejected'].includes(call.state)).map(call => ({type:'tool-result',toolCallId:call.callId,toolName:call.name,output:{type:'json',value:call.output ?? {error:call.error?.code ?? call.state}}}))
@@ -58,7 +65,7 @@ export async function projectTurnState(scope:EveScope,sessionId:string,turnId:st
     const leaseUntil = working ? new Date(Date.now()+24*60*60*1000) : null
     if (working) await tx.execute(sql`INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil","updatedAt") VALUES(${scope.ownerId},${scope.botId}::uuid,${sessionId},${leaseUntil},now()) ON CONFLICT("userId","botId") DO UPDATE SET "leaseHolder"=excluded."leaseHolder","leaseUntil"=excluded."leaseUntil","lastError"=null,"lastErrorAt"=null,"lastFailure"=null,"updatedAt"=now()`)
     else {
-      const code=settlement?.outcome==='failed' ? messages?.flatMap(value=>value&&typeof value==='object'&&'mikkaFailure' in value&&typeof value.mikkaFailure==='string'&&/^[a-zA-Z][a-zA-Z0-9_.:-]{0,127}$/.test(value.mikkaFailure)?[value.mikkaFailure]:[])[0]??'turn_failed' : null
+      const code=settlement?.outcome==='failed' ? messages?.flatMap(value=>value&&typeof value==='object'&&'mikkaFailure' in value&&typeof value.mikkaFailure==='string'&&FAILURE_CODE.test(value.mikkaFailure)?[value.mikkaFailure]:[])[0]??'turn_failed' : null
       await tx.execute(sql`UPDATE coordinator_sessions SET "leaseHolder"=null,"leaseUntil"=null,"lastError"=${code},"lastErrorAt"=${code?new Date():null},"lastFailure"=null,"updatedAt"=now() WHERE "userId"=${scope.ownerId} AND "botId"=${scope.botId}::uuid AND "leaseHolder"=${sessionId}`)
       if(code&&settlement?.sourceEventId) await tx.execute(sql`UPDATE coordinator_messages m SET message=m.message||jsonb_build_object('mikkaFailure',${code}::text)
         WHERE m."userId"=${scope.ownerId} AND m."botId"=${scope.botId}::uuid AND m.message->>'role'='user'

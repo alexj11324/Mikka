@@ -17,6 +17,11 @@ import type { ReactNode } from 'react'
 const TRANSIENT = new Set(['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'])
 const ACTION = 'h-auto px-0 py-0.5 text-xs text-foreground underline'
 
+export function ModelSettingsAction() {
+  const chat = useTranslations('Coordinator')
+  return <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{chat('subscriptionRefusal.open')}</Button>
+}
+
 /** The current failure and its history share the same explicit cloud recovery. */
 export function CloudFailureAction({ code, fallback }: { code: CloudErrorCode; fallback: ReactNode }) {
   const cloud = useTranslations('Settings.cloud')
@@ -48,8 +53,8 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
   const action = cloudCode ? <CloudFailureAction code={cloudCode} fallback={resend} />
     : failure.kind === 'hosted' && !transient && failure.code !== 'platform_paused'
     ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{balance('topUp')}</Button>
-    : recovery === 'settings'
-      ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{chat('subscriptionRefusal.open')}</Button>
+    : recovery === 'settings' || failure.kind === 'modelRequired'
+      ? <ModelSettingsAction />
       : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused') || (failure.kind === 'failed' && failure.reason === 'balance')
       ? <Button variant="link" size="xs" className={ACTION} onClick={() => openModelPicker(botId)}>{picker('changeModel')}</Button>
       : resend

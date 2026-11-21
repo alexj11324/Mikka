@@ -32,6 +32,7 @@ export function failureLine(failure: ChatFailure): FailureLine {
       recovery: recovery === 'retry' ? null : recovery }
   }
   switch (failure.kind) {
+    case 'modelRequired': return { text: mobileMessages.Coordinator.modelRequired, retry: false, recovery: 'models' }
     case 'subscription': {
       if (!Object.hasOwn(SUBSCRIPTION_LINES, failure.notice)) return { text: SUBSCRIPTION_LINES.retry, retry: true, recovery: null }
       const recovery = subscriptionRecovery(failure.notice)
