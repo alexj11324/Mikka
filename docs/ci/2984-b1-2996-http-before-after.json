@@ -1,0 +1,1133 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "case": "B1 mandatory #2996 actual empty-body / empty-stream native session.create HTTP regression",
+  "capturedAt": "2026-11-21T02:16:56.493980+00:00",
+  "status": "actual two-round RED reproduced and Owner-merged fix GREEN verified over loopback HTTP with native SDK and PostgreSQL17",
+  "ownership": {
+    "productFix": "Original #2996 / #2912 Owner; this work reuses the already merged product implementation",
+    "ownerPr": "https://github.com/aspectly-labs/Mikka/pull/2996",
+    "ownerFixHead": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+    "ownerFixMerge": "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33",
+    "originalOwnerRealHttpComment": "https://github.com/aspectly-labs/Mikka/pull/2996#issuecomment-7052767951",
+    "newProductFixPrCreatedByThisVerification": false
+  },
+  "source": {
+    "redBrokenParent": "128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87",
+    "redLocalNormalIntegration": "71320074133a3ec4705ec94576b248de8d54b232",
+    "redTree": "ef9fdcd4d03ff8f981f89f863ba2b0f1b48cc33d",
+    "greenLocalNormalIntegration": "5f5d198d70a1209b9b34ba927409a667985dc432",
+    "greenTree": "e74f9238b032ec8adb470674984ca2d2871cdcf6",
+    "fixtureBase": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+    "greenParents": [
+      "71320074133a3ec4705ec94576b248de8d54b232",
+      "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33"
+    ],
+    "greenOwnerPathBlobs": {
+      "lib/coordinator-submission.ts": "0a7331cb1a90944ab2e82bc87fdc1c768e01002a",
+      "lib/eve/channel.ts": "0ee09714b7fb39be3823b9e296e257d204b12d7d",
+      "lib/eve/channel-auth.test.ts": "87753137495a99b53298df8ef5114e131dc07f05"
+    },
+    "localIntegrationNotClaimedAsMainOrDeployment": true,
+    "privateOfficialUiPinHeldConstantAndVerifiedPrivately": true
+  },
+  "runtime": {
+    "node": "v24.22.3",
+    "nativeClient": "eve 1.0.0-rc.9",
+    "postgres": "17.12",
+    "databaseType": "two fresh independently initialized owned loopback-only *_e2e PostgreSQL clusters",
+    "fixtureTime": "2026-11-20T12:00:00.000Z",
+    "originalFixtureEntryPoints": [
+      "prepareFixture({built:true})",
+      "startFixture({scenario:\"all\"})",
+      "fixture.close()"
+    ],
+    "migrationCountPerCluster": 396,
+    "scenarios": [
+      "empty",
+      "board",
+      "task",
+      "automations",
+      "bot-settings",
+      "pulls"
+    ],
+    "originalFakes": [
+      "LiteLLM HTTP fake",
+      "GitHub/Slack/E2B HTTP fake via original fixture preload"
+    ],
+    "providerCredentialsInherited": false,
+    "productionDatabaseOrCustomerDataUsed": false,
+    "realModelInvocationAdded": false,
+    "modelCallCounterCaptured": false,
+    "observedNativeModelTurnEvents": 0,
+    "observedUserMessageSubmissions": 0,
+    "nativeModelTurnEvidence": "Each fresh native snapshot returned zero events and cursor zero; empty creation only, no send call. Original loopback-only fixture transport retained."
+  },
+  "denominators": {
+    "phases": 2,
+    "roundsPerPhase": 2,
+    "nativeSdkEmptyRequestsPerPhase": 2,
+    "actualZeroByteStreamRequestsPerPhase": 2,
+    "jsonControlRequestsPerPhase": 2,
+    "malformedJsonRequestsPerPhase": 2,
+    "freshNativeClientReadbacksPerPhase": 2,
+    "completeBrowserJourneys": 0,
+    "activeModelStopJourneys": 0
+  },
+  "beforeAfter": {
+    "emptyRequestHttp400": {
+      "before": 4,
+      "after": 0,
+      "denominatorPerPhase": 4
+    },
+    "emptyRequestHttp200": {
+      "before": 0,
+      "after": 4,
+      "denominatorPerPhase": 4
+    },
+    "malformedJsonHttp400": {
+      "before": 2,
+      "after": 2,
+      "denominatorPerPhase": 2
+    },
+    "jsonControlHttp200": {
+      "before": 2,
+      "after": 2,
+      "denominatorPerPhase": 2
+    },
+    "scopedDatabaseAndFreshNativeReadback": {
+      "before": 2,
+      "after": 2,
+      "denominatorPerPhase": 2
+    },
+    "scopedSessionsAfterTwoRounds": {
+      "before": 1,
+      "after": 1
+    },
+    "userMessageSubmissionsAfterTwoRounds": {
+      "before": 0,
+      "after": 0
+    },
+    "fixtureTasksAfterTwoRounds": {
+      "before": 8,
+      "after": 8
+    },
+    "nativeEmptyClientMilliseconds": {
+      "before": [
+        141.20083800000066,
+        11.003303999999844
+      ],
+      "after": [
+        238.817008,
+        17.280385000000024
+      ]
+    },
+    "actualEmptyStreamClientMilliseconds": {
+      "before": [
+        22.8486869999997,
+        9.192449000000124
+      ],
+      "after": [
+        27.945012000000133,
+        14.305942000000869
+      ]
+    },
+    "timingInterpretation": "Request timings are observed samples, not a speedup claim. A successful prewarm does more work than a guard rejection. Whole supervisor durations are not comparable because the incorrect idle-control wait was removed under the native contract."
+  },
+  "phases": [
+    {
+      "phase": "red",
+      "publicSource": "71320074133a3ec4705ec94576b248de8d54b232",
+      "tree": "ef9fdcd4d03ff8f981f89f863ba2b0f1b48cc33d",
+      "buildManifestSha256": "7b2cbeefb78731f7c4dc96d48c719121260f18e76747f5b900d8dabff9e332da",
+      "execution": {
+        "command": [
+          "node",
+          "/workspace/scratch/b55cdf575d56/research/fixture-recovery/http-2996-original.mjs",
+          "red"
+        ],
+        "startedAt": "2026-11-21T01:21:10.571797+00:00",
+        "finishedAt": "2026-11-21T01:21:45.252264+00:00",
+        "wallSeconds": 34.680494696000096,
+        "exitCode": 1,
+        "logSha256": "5f4b649916a678465f81bf49bdf7f77189b89a860a20c0a75f59cf8af8f51974"
+      },
+      "fixtureStages": [
+        {
+          "stage": "postgres-started",
+          "at": "2026-11-21T01:21:12.787Z",
+          "database": "mikka_2984_2996_red_e2e",
+          "address": "127.0.0.1",
+          "version": "PostgreSQL 17.12 (Debian 17.12-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+        },
+        {
+          "stage": "prepareFixture-passed",
+          "at": "2026-11-21T01:21:17.010Z",
+          "elapsedMs": 4218.425876,
+          "migrationCount": 396
+        },
+        {
+          "stage": "startFixture-passed",
+          "at": "2026-11-21T01:21:21.351Z",
+          "elapsedMs": 4340.141163,
+          "origin": "http://127.0.0.1:34929",
+          "scenes": [
+            "empty",
+            "board",
+            "task",
+            "automations",
+            "bot-settings",
+            "pulls"
+          ]
+        }
+      ],
+      "initialDatabaseCounts": {
+        "sessions": 0,
+        "submissions": 0,
+        "tasks": 8
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "freshNormalPasswordLogin": true,
+          "freshNativeClient": true,
+          "before": {
+            "sessions": 0,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "nativeEmptyCreate": {
+            "status": 400,
+            "code": "http_error",
+            "bodySha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+            "elapsedMs": 141.20083800000066
+          },
+          "zeroByteStream": {
+            "status": 400,
+            "bytesWritten": 0,
+            "elapsedMs": 22.8486869999997,
+            "response": {
+              "ok": false,
+              "error": "messageRequired"
+            }
+          },
+          "afterEmptyRequests": {
+            "sessions": 0,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "malformedJsonStatus": 400,
+          "controlJson": {
+            "status": 200,
+            "sessionId": "wrun_01M7XV35GTXQTPXRJWWFFD0FG7",
+            "snapshotEvents": 0,
+            "snapshotStreamIndex": 0,
+            "exactDatabaseMapping": {
+              "owner_id": "777e6609-5553-48cf-a691-82f6c1a3214c",
+              "bot_id": "9ebe3dcd-cc20-4384-a093-b919bafee331",
+              "workspace_id": "b1ff9a9e-a5f6-49ce-a645-91d67542f606",
+              "surface": "web"
+            }
+          },
+          "after": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          }
+        },
+        {
+          "round": 2,
+          "freshNormalPasswordLogin": true,
+          "freshNativeClient": true,
+          "before": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "nativeEmptyCreate": {
+            "status": 400,
+            "code": "http_error",
+            "bodySha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+            "elapsedMs": 11.003303999999844
+          },
+          "zeroByteStream": {
+            "status": 400,
+            "bytesWritten": 0,
+            "elapsedMs": 9.192449000000124,
+            "response": {
+              "ok": false,
+              "error": "messageRequired"
+            }
+          },
+          "afterEmptyRequests": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "malformedJsonStatus": 400,
+          "controlJson": {
+            "status": 200,
+            "sessionId": "wrun_01M7XV35GTXQTPXRJWWFFD0FG7",
+            "snapshotEvents": 0,
+            "snapshotStreamIndex": 0,
+            "exactDatabaseMapping": {
+              "owner_id": "777e6609-5553-48cf-a691-82f6c1a3214c",
+              "bot_id": "9ebe3dcd-cc20-4384-a093-b919bafee331",
+              "workspace_id": "b1ff9a9e-a5f6-49ce-a645-91d67542f606",
+              "surface": "web"
+            }
+          },
+          "after": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          }
+        }
+      ],
+      "http": [
+        {
+          "at": "2026-11-21T01:21:21.678Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 400,
+          "headersElapsedMs": 137.78062599999976,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:21.819Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "ReadableStream",
+          "requestBodyBytes": null,
+          "status": 400,
+          "headersElapsedMs": 18.8221539999995,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:21.844Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 1,
+          "status": 400,
+          "headersElapsedMs": 13.087266000000454,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:21.865Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 2,
+          "status": 200,
+          "headersElapsedMs": 156.17948700000125,
+          "responseBytes": 57,
+          "responseSha256": "62021854a717c938c6eb7158afe81362836c2f2597aa78c25edb9ab097543ca7",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XV35GTXQTPXRJWWFFD0FG7"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:22.023Z",
+          "method": "GET",
+          "pathname": "/mikka/api/agents/eve/v1/session/wrun_01M7XV35GTXQTPXRJWWFFD0FG7/stream",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 29.989684000000125
+        },
+        {
+          "at": "2026-11-21T01:21:22.159Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 400,
+          "headersElapsedMs": 9.827534999998534,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:22.170Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "ReadableStream",
+          "requestBodyBytes": null,
+          "status": 400,
+          "headersElapsedMs": 8.404504999998608,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:22.180Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 1,
+          "status": 400,
+          "headersElapsedMs": 9.60121000000072,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:22.190Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 2,
+          "status": 200,
+          "headersElapsedMs": 39.34080100000028,
+          "responseBytes": 57,
+          "responseSha256": "62021854a717c938c6eb7158afe81362836c2f2597aa78c25edb9ab097543ca7",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XV35GTXQTPXRJWWFFD0FG7"
+          }
+        },
+        {
+          "at": "2026-11-21T01:21:22.230Z",
+          "method": "GET",
+          "pathname": "/mikka/api/agents/eve/v1/session/wrun_01M7XV35GTXQTPXRJWWFFD0FG7/stream",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 47.07194499999969
+        },
+        {
+          "at": "2026-11-21T01:21:22.284Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session/wrun_01M7XV35GTXQTPXRJWWFFD0FG7/cancel",
+          "requestBodyType": "string",
+          "requestBodyBytes": 2,
+          "status": 202,
+          "headersElapsedMs": 43.82145900000069
+        },
+        {
+          "at": "2026-11-21T01:21:22.330Z",
+          "method": "GET",
+          "pathname": "/mikka/api/agents/eve/v1/session/wrun_01M7XV35GTXQTPXRJWWFFD0FG7/stream",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 46.971668999998656
+        }
+      ],
+      "cleanup": {
+        "reason": "failure",
+        "fixtureClosed": true,
+        "databaseClientClosed": true,
+        "postgresStopped": true,
+        "postgresStatusExit": 3,
+        "postgresStillRunning": false,
+        "elapsedMs": 2844.782547999999
+      },
+      "nativeClientReadbacksCompleted": 2,
+      "browserJourneysCompleted": 0
+    },
+    {
+      "phase": "green",
+      "publicSource": "5f5d198d70a1209b9b34ba927409a667985dc432",
+      "tree": "e74f9238b032ec8adb470674984ca2d2871cdcf6",
+      "buildManifestSha256": "973e93960ddf245ba4713c3c22fed4c04bbfd73ec3a32893fc426b8ba85db77d",
+      "execution": {
+        "command": [
+          "node",
+          "/workspace/scratch/b55cdf575d56/research/fixture-recovery/http-2996-original.mjs",
+          "green"
+        ],
+        "startedAt": "2026-11-21T02:14:11.034427+00:00",
+        "orchestratorSha256": "2da41c784c43c78c038a8b522a0ea8fc6ae8f8e8e4dc67a917c5bcb0dfb2f346",
+        "status": "completed",
+        "finishedAt": "2026-11-21T02:14:31.911345+00:00",
+        "wallSeconds": 20.87694053300038,
+        "exitCode": 0,
+        "logSha256": "015ce14c30b49fdd3441dd6c636fb88b79c5ffb2663f9d8a39612c7aa744b530"
+      },
+      "fixtureStages": [
+        {
+          "stage": "postgres-started",
+          "at": "2026-11-21T02:14:12.438Z",
+          "database": "mikka_2984_2996_green_e2e",
+          "address": "127.0.0.1",
+          "version": "PostgreSQL 17.12 (Debian 17.12-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+        },
+        {
+          "stage": "prepareFixture-passed",
+          "at": "2026-11-21T02:14:15.886Z",
+          "elapsedMs": 3442.558161,
+          "migrationCount": 396
+        },
+        {
+          "stage": "startFixture-passed",
+          "at": "2026-11-21T02:14:20.333Z",
+          "elapsedMs": 4446.696757000001,
+          "origin": "http://127.0.0.1:42545",
+          "scenes": [
+            "empty",
+            "board",
+            "task",
+            "automations",
+            "bot-settings",
+            "pulls"
+          ]
+        }
+      ],
+      "initialDatabaseCounts": {
+        "sessions": 0,
+        "submissions": 0,
+        "tasks": 8
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "freshNormalPasswordLogin": true,
+          "freshNativeClient": true,
+          "before": {
+            "sessions": 0,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "nativeEmptyCreate": {
+            "status": 200,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM",
+            "elapsedMs": 238.817008
+          },
+          "zeroByteStream": {
+            "status": 200,
+            "bytesWritten": 0,
+            "elapsedMs": 27.945012000000133,
+            "response": {
+              "ok": true,
+              "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+            }
+          },
+          "afterEmptyRequests": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "malformedJsonStatus": 400,
+          "controlJson": {
+            "status": 200,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM",
+            "snapshotEvents": 0,
+            "snapshotStreamIndex": 0,
+            "exactDatabaseMapping": {
+              "owner_id": "777e6609-5553-48cf-a691-82f6c1a3214c",
+              "bot_id": "9ebe3dcd-cc20-4384-a093-b919bafee331",
+              "workspace_id": "b1ff9a9e-a5f6-49ce-a645-91d67542f606",
+              "surface": "web"
+            }
+          },
+          "after": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          }
+        },
+        {
+          "round": 2,
+          "freshNormalPasswordLogin": true,
+          "freshNativeClient": true,
+          "before": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "nativeEmptyCreate": {
+            "status": 200,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM",
+            "elapsedMs": 17.280385000000024
+          },
+          "zeroByteStream": {
+            "status": 200,
+            "bytesWritten": 0,
+            "elapsedMs": 14.305942000000869,
+            "response": {
+              "ok": true,
+              "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+            }
+          },
+          "afterEmptyRequests": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          },
+          "malformedJsonStatus": 400,
+          "controlJson": {
+            "status": 200,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM",
+            "snapshotEvents": 0,
+            "snapshotStreamIndex": 0,
+            "exactDatabaseMapping": {
+              "owner_id": "777e6609-5553-48cf-a691-82f6c1a3214c",
+              "bot_id": "9ebe3dcd-cc20-4384-a093-b919bafee331",
+              "workspace_id": "b1ff9a9e-a5f6-49ce-a645-91d67542f606",
+              "surface": "web"
+            }
+          },
+          "after": {
+            "sessions": 1,
+            "submissions": 0,
+            "tasks": 8
+          }
+        }
+      ],
+      "http": [
+        {
+          "at": "2026-11-21T02:14:20.615Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 236.4343260000005,
+          "responseBytes": 57,
+          "responseSha256": "68fbbbfcaa473e863820c4f080f1bc2338549f35288e94d2390e0ca553b74a9e",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:20.853Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "ReadableStream",
+          "requestBodyBytes": null,
+          "status": 200,
+          "headersElapsedMs": 27.379350999999588,
+          "responseBytes": 57,
+          "responseSha256": "68fbbbfcaa473e863820c4f080f1bc2338549f35288e94d2390e0ca553b74a9e",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:20.883Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 1,
+          "status": 400,
+          "headersElapsedMs": 11.186131000000387,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:20.895Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 2,
+          "status": 200,
+          "headersElapsedMs": 19.15433799999846,
+          "responseBytes": 57,
+          "responseSha256": "68fbbbfcaa473e863820c4f080f1bc2338549f35288e94d2390e0ca553b74a9e",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:20.916Z",
+          "method": "GET",
+          "pathname": "/mikka/api/agents/eve/v1/session/wrun_01M7XY45V8WXS2G6FZPF7H30NM/stream",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 22.730795999999827
+        },
+        {
+          "at": "2026-11-21T02:14:21.044Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 16.82278700000097,
+          "responseBytes": 57,
+          "responseSha256": "68fbbbfcaa473e863820c4f080f1bc2338549f35288e94d2390e0ca553b74a9e",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:21.061Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "ReadableStream",
+          "requestBodyBytes": null,
+          "status": 200,
+          "headersElapsedMs": 14.0059710000005,
+          "responseBytes": 57,
+          "responseSha256": "68fbbbfcaa473e863820c4f080f1bc2338549f35288e94d2390e0ca553b74a9e",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:21.076Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 1,
+          "status": 400,
+          "headersElapsedMs": 8.068256999998994,
+          "responseBytes": 38,
+          "responseSha256": "1240182f963c7c6a8a62d9087adfd1636a5efb3d34eee237d2f100d5b25d69b1",
+          "response": {
+            "ok": false,
+            "error": "messageRequired"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:21.085Z",
+          "method": "POST",
+          "pathname": "/mikka/api/agents/eve/v1/session",
+          "requestBodyType": "string",
+          "requestBodyBytes": 2,
+          "status": 200,
+          "headersElapsedMs": 15.624195000000327,
+          "responseBytes": 57,
+          "responseSha256": "68fbbbfcaa473e863820c4f080f1bc2338549f35288e94d2390e0ca553b74a9e",
+          "response": {
+            "ok": true,
+            "sessionId": "wrun_01M7XY45V8WXS2G6FZPF7H30NM"
+          }
+        },
+        {
+          "at": "2026-11-21T02:14:21.102Z",
+          "method": "GET",
+          "pathname": "/mikka/api/agents/eve/v1/session/wrun_01M7XY45V8WXS2G6FZPF7H30NM/stream",
+          "requestBodyType": "absent",
+          "requestBodyBytes": 0,
+          "status": 200,
+          "headersElapsedMs": 12.91839600000094
+        }
+      ],
+      "cleanup": {
+        "reason": "normal",
+        "fixtureClosed": true,
+        "databaseClientClosed": true,
+        "postgresStopped": true,
+        "postgresStatusExit": 3,
+        "postgresStillRunning": false,
+        "elapsedMs": 10736.386217000001
+      },
+      "nativeClientReadbacksCompleted": 2,
+      "browserJourneysCompleted": 0
+    }
+  ],
+  "builds": {
+    "red": {
+      "publicSource": "71320074133a3ec4705ec94576b248de8d54b232",
+      "tree": "ef9fdcd4d03ff8f981f89f863ba2b0f1b48cc33d",
+      "startedAt": "2026-11-21T01:17:43.010273+00:00",
+      "mode": "resume original unchanged stages after successful exact-source Eve build",
+      "originalTopLevelBuildExitCode": 1,
+      "previousFailedTopLevelAttempts": [
+        "2996-red",
+        "2996-red-attempt2",
+        "2996-red-attempt3"
+      ],
+      "eveManifest": {
+        "version": 1,
+        "eve": "1.0.0-rc.9",
+        "revision": "71320074133a3ec4705ec94576b248de8d54b232",
+        "preset": "node-server"
+      },
+      "reusedEveOutputSha256": "5d34332edd6070cdd847106cc0badacf213199e51ac1d78d6be2d05b19d61297",
+      "reusedEveBuildLogSha256": "fa1d00bc63d7f7b5f8236c7fe0ac04316f0946816b884b4019dc0d958cd95013",
+      "officialOverlayPinVerifiedPrivately": true,
+      "providerCredentialsInherited": false,
+      "nodeOptionsInherited": false,
+      "stages": [
+        {
+          "command": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {installationBuild} from './scripts/build-installation.mjs'; import {assertFixtureBuild} from './scripts/fixtures/guard.mjs'; assertFixtureBuild(process.env); if(await installationBuild(process.env)!=='build:app')throw Error('OFFICIAL_BUILD_REQUIRED')"
+          ],
+          "startedAt": "2026-11-21T01:17:43.010296+00:00",
+          "finishedAt": "2026-11-21T01:17:43.124635+00:00",
+          "wallSeconds": 0.11437575300078606,
+          "exitCode": 0,
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "node",
+            "apps/frontend/scripts/build.mjs"
+          ],
+          "startedAt": "2026-11-21T01:17:43.125086+00:00",
+          "finishedAt": "2026-11-21T01:17:57.593360+00:00",
+          "wallSeconds": 14.468296592000115,
+          "exitCode": 0,
+          "logSha256": "a27485cf69b3a9b04ddd321ee366d8285ee88bbf7e437f4cec3ddd98f7539f9a"
+        },
+        {
+          "command": [
+            "node",
+            "apps/api/scripts/build.mjs"
+          ],
+          "startedAt": "2026-11-21T01:17:57.593894+00:00",
+          "finishedAt": "2026-11-21T01:20:06.071824+00:00",
+          "wallSeconds": 128.4779528859999,
+          "exitCode": 0,
+          "logSha256": "fd2ebb20c53a2d9d2a00a07aeb9c5e57ac9c0775316f34d8840f53dcfc577e5e"
+        },
+        {
+          "command": [
+            "node",
+            "scripts/package-eve.mjs"
+          ],
+          "startedAt": "2026-11-21T01:20:06.072392+00:00",
+          "finishedAt": "2026-11-21T01:20:06.437267+00:00",
+          "wallSeconds": 0.3648955520002346,
+          "exitCode": 0,
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {assertNoFixtureAuthInOutput} from './scripts/fixtures/bundle-check.mjs'; await assertNoFixtureAuthInOutput(process.cwd())"
+          ],
+          "startedAt": "2026-11-21T01:20:06.437908+00:00",
+          "finishedAt": "2026-11-21T01:20:07.954906+00:00",
+          "wallSeconds": 1.5170204339992779,
+          "exitCode": 0,
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "exitCode": 0,
+      "manifestSha256": "7b2cbeefb78731f7c4dc96d48c719121260f18e76747f5b900d8dabff9e332da",
+      "manifestTarget": "local-fixture",
+      "eveOutputUnchanged": true,
+      "finishedAt": "2026-11-21T01:20:08.076134+00:00",
+      "trackedStatus": ""
+    },
+    "green": {
+      "publicSource": "5f5d198d70a1209b9b34ba927409a667985dc432",
+      "tree": "e74f9238b032ec8adb470674984ca2d2871cdcf6",
+      "parents": [
+        "71320074133a3ec4705ec94576b248de8d54b232",
+        "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33"
+      ],
+      "changedPathBlobs": {
+        "lib/coordinator-submission.ts": "0a7331cb1a90944ab2e82bc87fdc1c768e01002a",
+        "lib/eve/channel.ts": "0ee09714b7fb39be3823b9e296e257d204b12d7d",
+        "lib/eve/channel-auth.test.ts": "87753137495a99b53298df8ef5114e131dc07f05"
+      },
+      "originalRegressionSource": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+      "startedAt": "2026-11-21T02:07:20.367996+00:00",
+      "mode": "Original build-application stages in original order; resume from first incomplete Eve stage with per-stage durable receipts",
+      "originalTopLevelBuildExitCode": null,
+      "priorInterruptedAttempt": "2996-green/build-interruption-observation.json",
+      "officialOverlayPinVerifiedPrivately": true,
+      "providerCredentialsInherited": false,
+      "nodeOptionsInherited": false,
+      "stages": [
+        {
+          "command": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {installationBuild} from './scripts/build-installation.mjs'; import {assertFixtureBuild} from './scripts/fixtures/guard.mjs'; assertFixtureBuild(process.env); if(await installationBuild(process.env)!=='build:app')throw Error('OFFICIAL_BUILD_REQUIRED')"
+          ],
+          "startedAt": "2026-11-21T02:07:25.632879+00:00",
+          "status": "completed",
+          "exitCode": 0,
+          "finishedAt": "2026-11-21T02:07:25.747820+00:00",
+          "wallSeconds": 0.11495994899996731,
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "node",
+            "scripts/build-eve.mjs"
+          ],
+          "startedAt": "2026-11-21T02:07:25.748241+00:00",
+          "status": "completed",
+          "exitCode": 0,
+          "finishedAt": "2026-11-21T02:10:01.926702+00:00",
+          "wallSeconds": 156.17848028200024,
+          "logSha256": "3d0ee77470c0687fff604a3d228f6d94c3ef95b2a8b0c9cd4a991d3276098f99"
+        },
+        {
+          "command": [
+            "node",
+            "apps/frontend/scripts/build.mjs"
+          ],
+          "startedAt": "2026-11-21T02:10:01.927362+00:00",
+          "status": "completed",
+          "exitCode": 0,
+          "finishedAt": "2026-11-21T02:10:19.122802+00:00",
+          "wallSeconds": 17.195457292000356,
+          "logSha256": "34480d10d5d002d445d8f67bf3cff81136a68d6b74d30aca81cd6536a67267aa"
+        },
+        {
+          "command": [
+            "node",
+            "apps/api/scripts/build.mjs"
+          ],
+          "startedAt": "2026-11-21T02:10:19.123615+00:00",
+          "status": "completed",
+          "exitCode": 0,
+          "finishedAt": "2026-11-21T02:12:32.794046+00:00",
+          "wallSeconds": 133.67045382200013,
+          "logSha256": "a545307d8b6bb6b08001af7ac0110a4ffd50f50302ad563047d01905ffa61647"
+        },
+        {
+          "command": [
+            "node",
+            "scripts/package-eve.mjs"
+          ],
+          "startedAt": "2026-11-21T02:12:32.795087+00:00",
+          "status": "completed",
+          "exitCode": 0,
+          "finishedAt": "2026-11-21T02:12:33.215959+00:00",
+          "wallSeconds": 0.42089076599950204,
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import {assertNoFixtureAuthInOutput} from './scripts/fixtures/bundle-check.mjs'; await assertNoFixtureAuthInOutput(process.cwd())"
+          ],
+          "startedAt": "2026-11-21T02:12:33.216447+00:00",
+          "status": "completed",
+          "exitCode": 0,
+          "finishedAt": "2026-11-21T02:12:33.732213+00:00",
+          "wallSeconds": 0.5157864419998077,
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "catalog": {
+        "url": "https://ai-gateway.vercel.sh/v1/models/catalog",
+        "method": "GET",
+        "status": 200,
+        "fetchedAt": "2026-11-21T02:07:25.622775+00:00",
+        "bytes": 189876,
+        "sha256": "e15876c2c24fd0e5a24f12575d751db844d52368f2c31c44ae6069e7af274a04",
+        "inferenceRequest": false,
+        "authorizationHeader": false,
+        "cookieHeader": false,
+        "contract": "Original Eve v2 compiler catalog cache; native 300000ms TTL unchanged"
+      },
+      "exitCode": 0,
+      "manifestSha256": "973e93960ddf245ba4713c3c22fed4c04bbfd73ec3a32893fc426b8ba85db77d",
+      "manifestTarget": "local-fixture",
+      "allOriginalStagesSucceeded": true,
+      "finishedAt": "2026-11-21T02:12:33.764866+00:00",
+      "trackedStatus": ""
+    }
+  },
+  "preservedPriorBuildFailures": [
+    {
+      "receipt": {
+        "path": "2996-red/build-receipt.json",
+        "bytes": 1157,
+        "sha256": "bc2e06f36f6052d67c3ab66f08c77b25be22b3faa0bd96cc2df4886b5a6a7adb"
+      },
+      "classification": "Temporary dependency-copy omission: required original semver workspace dependency missing; restored pinned existing dependencies",
+      "exitCode": 1,
+      "startedAt": "2026-11-21T01:04:36.792695+00:00",
+      "finishedAt": "2026-11-21T01:05:07.485649+00:00",
+      "buildSeconds": 23.55081842399977,
+      "logSha256": "1215f11046262c6fda938ec3f1d9b2bb3caac4f6d34a90c682696f67835874d8"
+    },
+    {
+      "receipt": {
+        "path": "2996-red-attempt2/build-receipt.json",
+        "bytes": 1158,
+        "sha256": "5695f5d0b182e61f1b5b36880b20044428589f72e7526febe9f26a27abfa67e1"
+      },
+      "classification": "Original official UI guard correctly refused omitted explicit private UI pin; wrapper corrected without changing guard",
+      "exitCode": 1,
+      "startedAt": "2026-11-21T01:06:31.917637+00:00",
+      "finishedAt": "2026-11-21T01:08:58.480062+00:00",
+      "buildSeconds": 143.21894532399983,
+      "logSha256": "fa1d00bc63d7f7b5f8236c7fe0ac04316f0946816b884b4019dc0d958cd95013"
+    },
+    {
+      "receipt": {
+        "path": "2996-red-attempt3/build-receipt.json",
+        "bytes": 1156,
+        "sha256": "5a8f11f79759637fdad593401b929159f95eb92cc319e32d806e9c3a01f5dbfa"
+      },
+      "classification": "Native Eve compiler SIGKILL observed; OOM or platform cause not inferred",
+      "exitCode": 1,
+      "startedAt": "2026-11-21T01:10:16.141611+00:00",
+      "finishedAt": "2026-11-21T01:11:20.441177+00:00",
+      "buildSeconds": 61.30696366000029,
+      "logSha256": "56573ed6836e629cc0a7efca1d1c4bfa70e2d5db548324898f301e7aeaaef7c5"
+    }
+  ],
+  "preservedRedOrchestrationFailure": {
+    "supervisorExitCode": 1,
+    "failureName": "TimeoutError",
+    "message": "The operation was aborted due to timeout",
+    "idleCancelHttpStatus": 202,
+    "idleResultTimeoutMilliseconds": 20000,
+    "nativeContract": "Cancel is cooperative active-turn cancellation. A prewarmed session with new projection state defers an ignored control delivery settlement until a first turn starts; it does not terminally end the session. The temporary requirement for immediate idle cancellation result was incorrect.",
+    "currentNativeCallgraph": [
+      "eve-channel POST cancel → channel/session.cancel → dispatchSession control command",
+      "nextTurnDelivery without active budget/working tasks → ignore(cancel, ignored)",
+      "runSessionLoop.ignore stores settlements until started() changes from new; awaitPrewarmedAction continues waiting"
+    ],
+    "nativeContractReceipt": {
+      "path": "2996-idle-cancel-contract.json",
+      "bytes": 3002,
+      "sha256": "571433b85f8ad482d612ac3b74ddbc7b03fb1eb9e15141f190cf1cf3a6799021"
+    },
+    "originalRedScript": {
+      "path": "2996-red-http/orchestrator-original.mjs",
+      "bytes": 13722,
+      "sha256": "148c4f5bff3387b2c9dd3483fa6f3777c80818f6c378d0320f255f0f7cfd71b2"
+    },
+    "greenCorrection": "Only this erroneous extra temporary wait/end sequence was removed. Two-round status/body/DB/native snapshot and malformed JSON assertions remain; GREEN additionally binds all create IDs and requires cleanup success. No product assertion or timeout was lowered."
+  },
+  "greenEarlierInterruptedBuild": {
+    "observedAt": "2026-11-21T02:00:02.843770+00:00",
+    "publicSource": "5f5d198d70a1209b9b34ba927409a667985dc432",
+    "tree": "e74f9238b032ec8adb470674984ca2d2871cdcf6",
+    "originalCommand": [
+      "node",
+      "scripts/build-application.mjs",
+      "--local-fixture"
+    ],
+    "startedAt": "2026-11-21T01:23:59.846818Z",
+    "executionSession": 42433,
+    "sessionReadback": "Unknown process id 42433",
+    "observedExitCode": null,
+    "buildReceiptPresent": false,
+    "logBytes": 32579,
+    "logLastModifiedAt": "2026-11-21T01:25:35.148269+00:00",
+    "logSha256": "bec27f86fc30f4d3088f2e74533067bb6a2dea06c7eb443fa0a75941b391fddc",
+    "mainManifestStillSource": "71320074133a3ec4705ec94576b248de8d54b232",
+    "eveManifestStillSource": "71320074133a3ec4705ec94576b248de8d54b232",
+    "stageConclusion": "No completed GREEN Eve output or final manifest; initial original Eve stage must complete before source can be accepted",
+    "currentNamespaceOwnBuildProcessesObserved": 0,
+    "sourceForProcessObservation": "fresh /proc check at 2026-11-21T01:53:08Z",
+    "notAcceptedAsBuildSuccess": true,
+    "noInferredOomOrExitStatus": true
+  },
+  "boundaries": [
+    "Actual loopback application HTTP, native SDK and PostgreSQL; this case does not claim a browser UI journey.",
+    "No active model turn was submitted, so this case does not claim active Stop behavior.",
+    "Owner fix was already merged; local normal integration is recorded exactly and is not asserted to be current main or a production artifact.",
+    "No release, paid model, production cutover, customer data or production migration execution is claimed.",
+    "The public compiler catalog GET is metadata only; its response hash is equal across RED and GREEN.",
+    "The zero-byte stream producer closes without enqueuing chunks. Raw observer requestBodyBytes remains null for a stream; the separate bytesWritten=0 is the producer fact."
+  ],
+  "artifacts": [
+    {
+      "path": "2996-red-http/receipt.json",
+      "bytes": 12676,
+      "sha256": "25f92a27506b513bd351942ab04a9a5b51353b066ce57463c1ef56a5f8b7ea7d"
+    },
+    {
+      "path": "2996-green-http/receipt.json",
+      "bytes": 12080,
+      "sha256": "15308d3470cb59fe04560f116eca90a1f5ffba771fa1d22af81ca0144f266ada"
+    },
+    {
+      "path": "2996-red-http-execution.json",
+      "bytes": 373,
+      "sha256": "1ee309aca1867d6a40fd02eed210c5ca1187ba1d71c0a4900f0e57989e315df8"
+    },
+    {
+      "path": "2996-green-http-execution.json",
+      "bytes": 491,
+      "sha256": "440d5c6ade1ffbf93a2196f7de2f7ebdb1c1c5943c60698b072f5797f3d50b2a"
+    },
+    {
+      "path": "2996-red-resume/build-receipt.json",
+      "bytes": 3327,
+      "sha256": "248a814b7ecb89cb361d6ead90e6fddc40ca2d0a28e14d88cafada88d12623de"
+    },
+    {
+      "path": "2996-green-resume/build-receipt.json",
+      "bytes": 4442,
+      "sha256": "a917b8e7ece318642742dc6524a91019e834bed1305b5f6e4a4f2e5fb7215378"
+    },
+    {
+      "path": "2996-green/build-interruption-observation.json",
+      "bytes": 1108,
+      "sha256": "d13a8835b311590d9266e13385ea40f3a905325653a1809fe2d52c6130517c1c"
+    },
+    {
+      "path": "2996-idle-cancel-contract.json",
+      "bytes": 3002,
+      "sha256": "571433b85f8ad482d612ac3b74ddbc7b03fb1eb9e15141f190cf1cf3a6799021"
+    },
+    {
+      "path": "2996-world-isolation.json",
+      "bytes": 1222,
+      "sha256": "02ffc5fa8480fa9d77484e07f2bc40a934d8554e8ae26c41ffa6b77122d962d6"
+    },
+    {
+      "path": "2996-local-test-integrations.json",
+      "bytes": 1545,
+      "sha256": "76b26ada53021d9177c3df9c21a4486f232886d0ca6db6a75a663a86e5ea35bf"
+    },
+    {
+      "path": "2996-local-test-integrations.bundle",
+      "bytes": 13089,
+      "sha256": "eebbe054b5fbe46bd12b8041bb223af3fa9f940f2e469657e5bf7930be9b7b42"
+    },
+    {
+      "path": "http-2996-original.mjs",
+      "bytes": 13974,
+      "sha256": "2da41c784c43c78c038a8b522a0ea8fc6ae8f8e8e4dc67a917c5bcb0dfb2f346"
+    },
+    {
+      "path": "resume-2996-green.py",
+      "bytes": 6204,
+      "sha256": "9407b083f6e5012d66dbf8df7d9255dcd8f99fd80c058c617dc0721fb8678b7d"
+    }
+  ]
+}

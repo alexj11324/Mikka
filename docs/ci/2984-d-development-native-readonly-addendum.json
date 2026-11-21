@@ -1,0 +1,79 @@
+{
+  "schema": "mikka.sdlc2984.d-development-native-followup.v1",
+  "capturedAt": "2026-11-21T04:45:33.222535+00:00",
+  "publicSource": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+  "priorDiagnosis": {
+    "path": "research/fixture-recovery/2984-d-development-inspect-sigkill.json",
+    "sha256": "e62e587f37c8247b9dc5e99c47feec03e18d726175577a6387c6bac5ed55e023",
+    "unchanged": true
+  },
+  "inputs": [
+    {
+      "path": "research/fixture-recovery/d-development-inspect-2026-11-21T04-15-49.797Z/native-observation-2026-11-21T04-20-55.723Z.json",
+      "sha256": "06fe6af87a729116bf1e1f1aa5c328a48f09d786de8fb3d6f9379c15e943af95",
+      "native": {
+        "name": "processes/proc-1795234874938843940-174",
+        "exitCode": 0,
+        "incomplete": false
+      }
+    },
+    {
+      "path": "research/fixture-recovery/d-development-inspect-2026-11-21T04-15-49.797Z/native-resource-2026-11-21T04-27-35.831Z.json",
+      "sha256": "d719997bb1bf45e89ae721be8b8d11528cc143e6d423d4f4c694a8eafcfb8334",
+      "native": {
+        "name": "processes/proc-1795235274011887809-175",
+        "exitCode": 0,
+        "incomplete": false
+      }
+    }
+  ],
+  "actualNativeEveDependency": {
+    "observedAt": "2026-11-21T04:21:15.074836+00:00",
+    "exists": true,
+    "sha256": "6bcda4a497dec92d1a5c799303c6f32732ca5429e3c4a951144e063e41d2bec5",
+    "lockSha256": "b69a4eeb908bf0dc817da0095f7a3b1d7066ae593e50367d8c28dd767b4b578d",
+    "matchesIndependentlyReadOfficialDependencySource": true,
+    "meaning": "The original stderr diagnostic is bound to the reviewed Eve createExitError SIGKILL branch. This does not identify the sender or prove an OOM kill."
+  },
+  "firstObservationLimitation": {
+    "matchedRows": [
+      {
+        "pid": 19279,
+        "containsInspectionCaller": true
+      }
+    ],
+    "meaning": "The initial process filter matched the diagnostic caller; that row is not accepted as a surviving application process."
+  },
+  "laterNativeObservation": {
+    "observedAt": "2026-11-21T04:27:54.084836+00:00",
+    "selfCgroup": [
+      "0::/"
+    ],
+    "memoryControllerFilesCaptured": [],
+    "cumulativeOomKill": 4,
+    "preExecutionCounterBaseline": null,
+    "oomAttributionProved": false,
+    "memory": {
+      "MemTotal": "4033056 kB",
+      "MemAvailable": "1748956 kB",
+      "SwapTotal": "0 kB",
+      "SwapFree": "0 kB"
+    },
+    "freeDiskBytes": 336056320,
+    "availableInodes": 312505,
+    "ownMatchingProcesses": [],
+    "ownedPgVersionMarker": "17",
+    "ownedPgPostmasterPidPresent": false,
+    "kernelLogPermissionDenied": true,
+    "journalCommandAvailable": false
+  },
+  "boundaries": [
+    "Read-only post-failure native snapshots; no service restart, new resource, model/provider call, cleanup mutation or browser run by this reviewer.",
+    "No pre-run OOM counter baseline exists; cumulative value4 and an Eve SIGKILL diagnostic do not establish this run was OOM-killed.",
+    "Later absence of matching owned processes does not rewrite the original immediate application cleanup result, which remained unconfirmed without a pre-exit descendant snapshot.",
+    "Original bootstrap succeeded; original dev startup failed before readiness and before browser launch. The historical raw receipt retains its incorrect last-completed-stage label and is not rewritten.",
+    "Completed browser journeys remain0/2; this is environment diagnosis, not product or browser acceptance."
+  ],
+  "completeBrowserJourneys": 0,
+  "requiredBrowserJourneys": 2
+}

@@ -1,0 +1,937 @@
+{
+  "schemaVersion": 1,
+  "issue": 2984,
+  "finding": "SDLC-016",
+  "recordedAt": "2026-11-21T05:14:32.566163+00:00",
+  "repository": "aspectly-labs/Mikka",
+  "source": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+  "sourceBlobs": {
+    "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+    "scripts/ci/tasks.json": "b576cb22b2fa57494ecf65576ea25cb48cd86ed8",
+    "scripts/ci/graph.mjs": "640c97ef1327ba7e8b2ada4ba397b507b9fb382a",
+    "scripts/ci/run-units.mjs": "8e70c18b0c67c2e2827f72c60b17f92ea93f0c8b",
+    "scripts/ci/select.mjs": "97d68a4dede98586bfc3ad3f756444693a41a27a",
+    ".github/workflows/ui-policy.yml": "e1a534079ec6916e45da4555042ea003af2032bf",
+    "docs/ci/test-ownership.md": "be2b345b1a23c67b65f355ef2af857c7c261db5c",
+    "docs/ci/incremental.md": "e62052f5e0f5dee6717681f6cf1e89689aef947a"
+  },
+  "scope": {
+    "rootCheck": {
+      "reachableRootScripts": 109,
+      "rootScriptInvocations": 109,
+      "repeatedRootScriptNames": 0,
+      "explicitRepeatedTestPaths": 13,
+      "boundary": "Literal recursive root-script references; workspace commands and wildcard files are separately identified, not counted as additional root scripts or claimed leaf test cases."
+    },
+    "nx": {
+      "registeredTasks": 94,
+      "expandedRootScriptInvocations": 106,
+      "uniqueRootScripts": 105,
+      "completeRepeatedSuiteNames": [
+        "test:approved-writes"
+      ],
+      "nodeMatrix": [
+        "22",
+        "24"
+      ],
+      "actualSampleNode": "24.22.3"
+    },
+    "retainedBoundaries": [
+      "Node22/24 compatibility matrix; no cross-version result reuse",
+      "Distinct daemon/protocol package commands and process/transport contracts",
+      "Different server-only/server-test/real React loader and flag combinations",
+      "Original per-task ENV overrides, strict shell and native exit propagation",
+      "No remote result cache, fake job conclusion or new scheduler"
+    ]
+  },
+  "sampleDenominators": {
+    "runAttempts": 1,
+    "jobLogs": 2,
+    "unchangedSuiteFiles": 24,
+    "nativeCaseCountPerInvocation": 94,
+    "actualNodeMajorsSampled": 1,
+    "afterCiSamples": 0
+  },
+  "beforeSamples": [
+    {
+      "lane": "core",
+      "runId": 44852387451,
+      "attempt": 1,
+      "jobId": 136686904731,
+      "jobName": "Core unit checks",
+      "url": "https://github.com/aspectly-labs/Mikka/actions/runs/44852387451/job/136686904731",
+      "conclusion": "success",
+      "checkout": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "checkoutLogLines": [
+        114,
+        115
+      ],
+      "node": "v24.22.3",
+      "os": "Ubuntu 22.04.5",
+      "runnerImage": "ubuntu-22.04/20261116.365.1",
+      "cwd": "/home/runner/work/Mikka/Mikka",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/calendar-conditional.test.ts lib/operations/slack-conversation-read.test.ts lib/operations/write-planning-model.test.ts lib/operations/model-write-tools.test.ts lib/operations/model-write-registry.test.ts lib/operations/ledger-run.test.ts lib/operations/write-feature.test.ts lib/operations/write-policy.test.ts lib/operations/write-judgment.test.ts lib/operations/write-policy-store.test.ts lib/operations/policy-authorization.test.ts lib/operations/write-policy-settings.test.ts lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts lib/operations/write-client.test.ts scripts/approved-write-actions.test.tsx lib/operations/slack-delivery.test.ts lib/operations/write-notice.test.ts lib/live/approval-cache.test.ts scripts/approved-write-actions.live.test.tsx",
+      "suiteHeaderAt": "2026-11-21T01:54:00.6386592Z",
+      "suiteEndAt": "2026-11-21T01:54:32.2250641Z",
+      "nativeSuiteDurationMs": 31453.223079,
+      "tests": 94,
+      "passed": 94,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "log": "main59b-core-node24.log",
+      "logSha256": "ed26f2251b9ca713638166cc530a02b8cb20ed96cf332f51eee1a933d182d17b",
+      "logBytes": 1356054,
+      "logRelevantLines": [
+        3614,
+        4398
+      ],
+      "jobCreatedAt": "2026-11-21T01:50:23Z",
+      "jobStartedAt": "2026-11-21T01:50:25Z",
+      "jobCompletedAt": "2026-11-21T01:59:42Z"
+    },
+    {
+      "lane": "integration",
+      "runId": 44852387451,
+      "attempt": 1,
+      "jobId": 136686904801,
+      "jobName": "Integration unit checks",
+      "url": "https://github.com/aspectly-labs/Mikka/actions/runs/44852387451/job/136686904801",
+      "conclusion": "success",
+      "checkout": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "checkoutLogLines": [
+        114,
+        115
+      ],
+      "node": "v24.22.3",
+      "os": "Ubuntu 22.04.5",
+      "runnerImage": "ubuntu-22.04/20261116.365.1",
+      "cwd": "/home/runner/work/Mikka/Mikka",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/calendar-conditional.test.ts lib/operations/slack-conversation-read.test.ts lib/operations/write-planning-model.test.ts lib/operations/model-write-tools.test.ts lib/operations/model-write-registry.test.ts lib/operations/ledger-run.test.ts lib/operations/write-feature.test.ts lib/operations/write-policy.test.ts lib/operations/write-judgment.test.ts lib/operations/write-policy-store.test.ts lib/operations/policy-authorization.test.ts lib/operations/write-policy-settings.test.ts lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts lib/operations/write-client.test.ts scripts/approved-write-actions.test.tsx lib/operations/slack-delivery.test.ts lib/operations/write-notice.test.ts lib/live/approval-cache.test.ts scripts/approved-write-actions.live.test.tsx",
+      "suiteHeaderAt": "2026-11-21T01:53:23.8270356Z",
+      "suiteEndAt": "2026-11-21T01:53:46.5728406Z",
+      "nativeSuiteDurationMs": 22714.932922,
+      "tests": 94,
+      "passed": 94,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "log": "main59b-integration-node24.log",
+      "logSha256": "4bbfa26282bc51b0b1e1285fe386ca53433b4c3ff5b4328668521985350e284d",
+      "logBytes": 867032,
+      "logRelevantLines": [
+        2411,
+        2537
+      ],
+      "jobCreatedAt": "2026-11-21T01:50:23Z",
+      "jobStartedAt": "2026-11-21T01:50:25Z",
+      "jobCompletedAt": "2026-11-21T01:57:37Z"
+    }
+  ],
+  "sameInputAssessment": {
+    "identicalCheckoutCommandCwdNodeImage": true,
+    "explicitWorkflowAndJobEnvironmentEqual": true,
+    "originalTaskEnvironmentBothEmpty": true,
+    "originalRunUnitsEnvironmentShared": true,
+    "incidentalRunnerIdentity": "Distinct ephemeral runner IDs and Azure regions remain in the raw logs; not claimed as identical machine instances. The isolated fake/unit suite does not use those identities as an intended test matrix.",
+    "noCausalWallTimeSavingClaim": true
+  },
+  "rootFileOverlapDispositions": [
+    {
+      "file": "tests/workspace-only-permissions-source.test.mjs",
+      "scripts": [
+        "test:settings-backend",
+        "test:workspace-settings"
+      ],
+      "blob": "867b81a2bf7b3237e7273da39e56478d79557d2a",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    },
+    {
+      "file": "lib/agent-kit/registry-compat.test.ts",
+      "scripts": [
+        "test:agent-kit-compat",
+        "test:personal-mailbox-core"
+      ],
+      "blob": "b23b54eb158346fe5f164e04278946e8588776e5",
+      "decision": "retain_distinct_domain_entries",
+      "reason": "The same test file is included in independently selectable domain scripts with different complete sibling argument lists. Matching file/flags alone does not prove the whole entry redundant. No test body or domain membership is removed by SDLC-016."
+    },
+    {
+      "file": "lib/agent-kit/tool-defaults-compat.test.ts",
+      "scripts": [
+        "test:agent-kit-model",
+        "test:personal-mailbox-core"
+      ],
+      "blob": "f47010092c86227437507ccee7736e148da9d97e",
+      "decision": "retain_distinct_domain_entries",
+      "reason": "The same test file is included in independently selectable domain scripts with different complete sibling argument lists. Matching file/flags alone does not prove the whole entry redundant. No test body or domain membership is removed by SDLC-016."
+    },
+    {
+      "file": "lib/run-prompt.test.ts",
+      "scripts": [
+        "test:lib-units",
+        "test:coordinator-events"
+      ],
+      "blob": "7e43cdcf0c936e3c602467c5e436f2a0a37a6146",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    },
+    {
+      "file": "lib/run-prompt-copy.test.ts",
+      "scripts": [
+        "test:lib-units",
+        "test:coordinator-events"
+      ],
+      "blob": "9a0d64d7c734e966f51b7d57168c716c701401b7",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    },
+    {
+      "file": "components/workspace/issue-workspace-settings.test.tsx",
+      "scripts": [
+        "test:issue-readonly-dom",
+        "test:view-state"
+      ],
+      "blob": "3440d80e4f63f0029c25f272357b83666f3553ec",
+      "decision": "retain_distinct_domain_entries",
+      "reason": "The same test file is included in independently selectable domain scripts with different complete sibling argument lists. Matching file/flags alone does not prove the whole entry redundant. No test body or domain membership is removed by SDLC-016."
+    },
+    {
+      "file": "lib/search/search.test.ts",
+      "scripts": [
+        "test:agent",
+        "test:integrations"
+      ],
+      "blob": "90c2d328ca6818637bc413624e5062571a8e0123",
+      "decision": "retain_distinct_domain_entries",
+      "reason": "The same test file is included in independently selectable domain scripts with different complete sibling argument lists. Matching file/flags alone does not prove the whole entry redundant. No test body or domain membership is removed by SDLC-016."
+    },
+    {
+      "file": "lib/coordinator/issue-tools.test.ts",
+      "scripts": [
+        "test:coordinator-issue-mutations",
+        "test:personal-mailbox-core"
+      ],
+      "blob": "c9f8f1680094cd8e091c7a5000cba988cebf11bc",
+      "decision": "retain_distinct_domain_entries",
+      "reason": "The same test file is included in independently selectable domain scripts with different complete sibling argument lists. Matching file/flags alone does not prove the whole entry redundant. No test body or domain membership is removed by SDLC-016."
+    },
+    {
+      "file": "lib/run-control-actions.test.ts",
+      "scripts": [
+        "test:issues",
+        "test:issues"
+      ],
+      "blob": "fd8ed8b1c21471cbc7ee636d639869ef8e0f984e",
+      "decision": "retain_environment_matrix",
+      "reason": "Second invocation explicitly enables both Factory routing/lifecycle variables; the first invocation and complete shell command differ. Native original entry evidence retains both runs."
+    },
+    {
+      "file": "lib/factory/note-mask.test.ts",
+      "scripts": [
+        "test:factory-approval",
+        "test:factory"
+      ],
+      "blob": "fb23c27064099ad4b372435aaaca2e53f9d3a56f",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    },
+    {
+      "file": "lib/factory/local-publication.test.ts",
+      "scripts": [
+        "test:factory-approval",
+        "test:factory"
+      ],
+      "blob": "cd58791926553140aa175fc84be19c806f4413c3",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    },
+    {
+      "file": "lib/factory/vercel-publication.test.ts",
+      "scripts": [
+        "test:factory-approval",
+        "test:factory"
+      ],
+      "blob": "7184f13c40db1b9f1c0378241953de03f04bf654",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    },
+    {
+      "file": "lib/factory/check-independence.test.ts",
+      "scripts": [
+        "test:factory-check-independence",
+        "test:factory"
+      ],
+      "blob": "90d629f8d0353d18cd92b4661d8e74c3e01ab539",
+      "decision": "retain_different_loader_or_flags",
+      "reason": "Complete Node invocation differs in server loader, real React loader, experimental mock support or other flags. No same-input equivalence was proved; no deletion."
+    }
+  ],
+  "historicalOrigin": {
+    "explicitCoreRegistrationCommit": "1de27ebd79f327a328f2f9ec589a55e6b3d5e61d",
+    "explicitCoreRegistrationPr": 409,
+    "explicitPurpose": "Run approved-write regressions in required source checks",
+    "nxPreservationCommit": "4df6cbb23d826259c1611d01daf1a4c791bf9739",
+    "observation": "The pre-Nx workflow already ran the explicit approved-write command and the integrating umbrella in separate lanes. Nx retained these commands; no new runtime cache or duplicate verifier is needed."
+  },
+  "ownership": {
+    "capturedAt": "2026-11-21T05:01:22.976Z",
+    "openPrCount": 64,
+    "fileEntries": 2729,
+    "auditFile": "owner-deduplication.json",
+    "auditSha256": "102d1cdae400b91991b70edc69b6b515aafb9795029b8ad8dd51e506b8e0daa7",
+    "assessment": {
+      "2863": "Only removes the existing write-judgment.test.ts from the suite for original product policy work; does not change its duplicate invocation or either task. No copying of that unmerged change.",
+      "3012": "Existing own DB selector repair adds DB path coverage; does not change approved-write task ownership.",
+      "3021": "Adds standalone legacy redirect script/task only; leaves this existing task and integrations/check commands unchanged.",
+      "3023": "Own local-preflight Git metadata fix only; no package/task or selection changes.",
+      "conclusion": "No active PR changes the duplicated approved-writes invocation or establishes a new single owner. Shared package/test files require normal integration, not duplicate implementation."
+    }
+  },
+  "alternatives": {
+    "removeCore30": "Rejected for this change: an older trusted selection emits the existing task ID, which the candidate run-units unknown-task guard requires. Removing it adds cross-lane migration/compatibility work and changes the original explicit Core ownership.",
+    "keepCoreMoveLocalComposition": "Chosen: unchanged core-30 remains the approved-write primary owner. Remove only the nested call in test:integrations; expand it immediately before test:integrations in check. Complete local command order, all unit bodies, task IDs and frozen/main selection mechanisms remain."
+  },
+  "existingABClassification": "Reuses #2984 baseline retained build/typecheck/receipt/trust-time boundaries; this is the newly inspected nested-command scope, not a replacement for the 54-workflow assessment.",
+  "evidenceBoundary": "No production action, credentials, provider/model request, deployment or private UI source. Before measurements are native CI; after CI is pending and local execution cannot be relabelled as a CI speedup.",
+  "pr": 3024,
+  "branch": "feat/sdlc-2984-approved-writes-dedup",
+  "head": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+  "tree": "1a9be2a6a0f3a83be75bbb52e5a3ea91d4fc1534",
+  "parents": [
+    "cffa5a187bf22ba92e7ad5ab094c1b1d5d2a0982"
+  ],
+  "redHead": "cffa5a187bf22ba92e7ad5ab094c1b1d5d2a0982",
+  "implementation": {
+    "changedPaths": [
+      "package.json",
+      "scripts/ci/select.test.mjs"
+    ],
+    "exactBlobs": {
+      "package.json": "0dfbcee8a440712f77b67d05f5d81506f031dd6e",
+      "scripts/ci/select.test.mjs": "6d5adc04b4af86ba4b5b02e801c3b1664c874c94"
+    },
+    "packageScriptChanges": [
+      "check",
+      "test:integrations"
+    ],
+    "productionCodePathsChanged": 0,
+    "businessTestPathsChanged": 0,
+    "taskRegistryRunnerSelectorWorkflowAndLockBlobsChanged": 0,
+    "testAuthoringContract": "Original real graph/selector must assign approved-write source/UI proof to one executable primary owner. The previous scheduler selects two; the retained owner runs the original unchanged tests."
+  },
+  "retainedApprovedWriteInputs": {
+    "lib/operations/calendar-conditional.test.ts": "d974b2634f1072d5249766fe4664f1c5b7fa1148",
+    "lib/operations/slack-conversation-read.test.ts": "43dffca8cfb6fd9decef051464b83dd340e137fe",
+    "lib/operations/write-planning-model.test.ts": "d9ba103643bd382ccf4813cbb23c48951ef8b08f",
+    "lib/operations/model-write-tools.test.ts": "c92fefd3a4cff432e3343e9457b4a39106462620",
+    "lib/operations/model-write-registry.test.ts": "ea3097ef07ff137b539df100caff841c432ed40c",
+    "lib/operations/ledger-run.test.ts": "4296b83d1c5635d0fbda69ba5ed214fdb9e6f1a4",
+    "lib/operations/write-feature.test.ts": "e2eed66f453a097626154fe447e46cf742a9c7de",
+    "lib/operations/write-policy.test.ts": "ae0004e2f394ac0c2bb52389181a3b942f62b0c0",
+    "lib/operations/write-judgment.test.ts": "400e682ebc8e90c71ac36e44eaef6533c88b3eaf",
+    "lib/operations/write-policy-store.test.ts": "51497d3e89135d3d93d5a845bacdccaa89406e5a",
+    "lib/operations/policy-authorization.test.ts": "9e7a445b9b3e57dc0cecbbc1768789e7ee635f52",
+    "lib/operations/write-policy-settings.test.ts": "8398d8065ce511da41db57607e470215ee0f7f1a",
+    "lib/operations/write-preparation.test.ts": "3e7178d7d19e89bd5bc50fb377ce1613f0e1f51e",
+    "lib/operations/write-discovery.test.ts": "6c17ac33b80700b80bf6c3b6314ce1e847daa34f",
+    "lib/operations/write-http.test.ts": "ece95347f3937e98e4b16e30432af3f448866184",
+    "lib/operations/write-provider.test.ts": "a33499f402139b8fbb780045a18cd1f515ae0dca",
+    "lib/operations/write-route.test.ts": "7d6934dd37acbd175e8e266910070c3e49aeb585",
+    "lib/operations/write-view.test.ts": "6370c8edc06b265bebc7593ea3a92eb841629248",
+    "lib/operations/write-client.test.ts": "fe66dae99cabc7002ce14925de3b6e755fd573dd",
+    "scripts/approved-write-actions.test.tsx": "79a63d7fd6127ec0b9b6d24fc9a9b82e3d7d31f1",
+    "lib/operations/slack-delivery.test.ts": "de1f470f2c8f11ef3a496d27b6fe17d6e32a467d",
+    "lib/operations/write-notice.test.ts": "046e042287ca820c20c717d415440318d5e12cb2",
+    "lib/live/approval-cache.test.ts": "0dde12f04abeb95dcb34e1a35ae73bc00b281c15",
+    "scripts/approved-write-actions.live.test.tsx": "2435f6020b4f94911f5ecd08569eaa892bbe9785"
+  },
+  "localEvidence": {
+    "dependencies-pinned": {
+      "path": "dependencies-pinned/receipt.json",
+      "receiptSha256": "b0a421f43dcd7f6c32acfdccd347f972284e3ba3c80ee1413db5f6d55089623d",
+      "data": {
+        "startedAt": "2026-11-21T05:04:13.884218+00:00",
+        "source": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "command": [
+          "pnpm",
+          "install",
+          "--offline",
+          "--frozen-lockfile",
+          "--package-import-method=hardlink"
+        ],
+        "node": "v24.22.3",
+        "pnpm": "10.34.3",
+        "priorWrongPnpmAttempt": {
+          "pnpm": "11.25.0",
+          "exit": 1,
+          "reason": "ERR_PNPM_NO_OFFLINE_TARBALL using v11 store",
+          "testCasesStarted": 0,
+          "boundary": "Isolated own partial node_modules removed; original v10 cache and other worktrees untouched."
+        },
+        "exitCode": 0,
+        "seconds": 13.798362252000516,
+        "finishedAt": "2026-11-21T05:04:27.687578+00:00",
+        "stdoutSha256": "48dd6c67a740a307bbb54f05ce91035f689ee786abda4335eb8e7d29634cedc6",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "plan-red": {
+      "path": "plan-red/receipt.json",
+      "receiptSha256": "7950aaa05302a5bd78224728a4bbda0a38e7c7308664655ed697fc601bd42e5c",
+      "data": {
+        "startedAt": "2026-11-21T05:06:38.200553+00:00",
+        "head": "cffa5a187bf22ba92e7ad5ab094c1b1d5d2a0982",
+        "tree": "ddbccb289205879d60b5ca7cb7cda9fe3d26a283",
+        "command": [
+          "pnpm",
+          "local:plan"
+        ],
+        "seconds": 10.837840930998937,
+        "exitCode": 0,
+        "stdoutSha256": "83feb749aeea4d7eacdb40b11954ef590c37d15cb8d9f440d627cd2419cff88c",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "selector-red": {
+      "path": "selector-red/receipt.json",
+      "receiptSha256": "bf78575dab491db1c2212946f40c771746f69a3383c4e270e0128e27d1a5c32b",
+      "data": {
+        "startedAt": "2026-11-21T05:05:18.126438+00:00",
+        "head": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "executedTree": "ddbccb289205879d60b5ca7cb7cda9fe3d26a283",
+        "sourceState": "Base main59b plus staged regression only; implementation unchanged",
+        "command": [
+          "node",
+          "--test",
+          "scripts/ci/select.test.mjs"
+        ],
+        "node": "v24.22.3",
+        "pnpm": "10.34.3",
+        "inputBlobs": {
+          "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+          "scripts/ci/select.test.mjs": "6d5adc04b4af86ba4b5b02e801c3b1664c874c94",
+          "scripts/ci/select.mjs": "97d68a4dede98586bfc3ad3f756444693a41a27a",
+          "scripts/ci/graph.mjs": "640c97ef1327ba7e8b2ada4ba397b507b9fb382a",
+          "scripts/ci/tasks.json": "b576cb22b2fa57494ecf65576ea25cb48cd86ed8",
+          "scripts/ci/run-units.mjs": "8e70c18b0c67c2e2827f72c60b17f92ea93f0c8b"
+        },
+        "exitCode": 1,
+        "seconds": 14.44143962200178,
+        "finishedAt": "2026-11-21T05:05:32.929858+00:00",
+        "stdoutSha256": "0523fefee0a98d2951299931632931c97e0b032d2a227abd6987ea0f517cdb81",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nativeSummaryLines": [
+          "ℹ tests 30",
+          "ℹ pass 29",
+          "ℹ fail 1",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 14394.931285"
+        ]
+      }
+    },
+    "selector-green": {
+      "path": "selector-green/receipt.json",
+      "receiptSha256": "251702cd72bb9926759fe4853c8c87c500fe8d06be9e5e8992d0ddef0e515bda",
+      "data": {
+        "startedAt": "2026-11-21T05:09:35.526148+00:00",
+        "head": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+        "tree": "1a9be2a6a0f3a83be75bbb52e5a3ea91d4fc1534",
+        "command": [
+          "node",
+          "--test",
+          "scripts/ci/select.test.mjs",
+          "scripts/ci/run-units.test.mjs",
+          "scripts/ci/frozen-inventory.test.mjs"
+        ],
+        "sourceState": "Exact clean remote implementation checkpoint",
+        "node": "v24.22.3",
+        "pnpm": "10.34.3",
+        "environment": {
+          "edition": "cloud, matching the measured CI suite caller",
+          "authOrigin": "https://127.0.0.1:3000",
+          "authSecret": "ephemeral synthetic value; not recorded",
+          "ci": "absent",
+          "providerCredentials": "not inherited",
+          "databaseCredentials": "not inherited",
+          "noProductionModelBuildOrDeployment": true
+        },
+        "exitCode": 0,
+        "seconds": 18.191693668999505,
+        "finishedAt": "2026-11-21T05:09:54.740788+00:00",
+        "stdoutSha256": "31a034222bb280ba4dfe071e48532dfaf5d50291c824ee200e74335c729a3097",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingHead": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+        "endingClean": true,
+        "nativeSummaryLines": [
+          "ℹ tests 54",
+          "ℹ pass 54",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 18143.310994"
+        ]
+      }
+    },
+    "original-owner-green": {
+      "path": "original-owner-green/receipt.json",
+      "receiptSha256": "2c4ca1b51ea008b91ee77f3b1e8da19974800be2efa03e2e200283b3a50f7f7a",
+      "data": {
+        "startedAt": "2026-11-21T05:09:54.771531+00:00",
+        "head": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+        "tree": "1a9be2a6a0f3a83be75bbb52e5a3ea91d4fc1534",
+        "command": [
+          "pnpm",
+          "local:check",
+          "--test=test:approved-writes",
+          "--test=test:integrations"
+        ],
+        "sourceState": "Exact clean remote implementation checkpoint",
+        "node": "v24.22.3",
+        "pnpm": "10.34.3",
+        "environment": {
+          "edition": "cloud, matching the measured CI suite caller",
+          "authOrigin": "https://127.0.0.1:3000",
+          "authSecret": "ephemeral synthetic value; not recorded",
+          "ci": "absent",
+          "providerCredentials": "not inherited",
+          "databaseCredentials": "not inherited",
+          "noProductionModelBuildOrDeployment": true
+        },
+        "exitCode": 0,
+        "seconds": 67.64600095199785,
+        "finishedAt": "2026-11-21T05:11:02.689092+00:00",
+        "stdoutSha256": "6b768af63a05cce846e7085a9b8a243b8ab0b9a4f27302457b5f5c5d6451c793",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingHead": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+        "endingClean": true,
+        "nativeSummaryLines": [
+          "ℹ tests 94",
+          "ℹ pass 94",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 24720.884557",
+          "ℹ tests 10",
+          "ℹ pass 10",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 517.155001",
+          "ℹ tests 80",
+          "ℹ pass 80",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 1876.792207",
+          "ℹ tests 29",
+          "ℹ pass 29",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 2894.824645",
+          "ℹ tests 30",
+          "ℹ pass 30",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 1854.623773",
+          "ℹ tests 8",
+          "ℹ pass 8",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 697.449133",
+          "ℹ tests 4",
+          "ℹ pass 4",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 833.793718",
+          "ℹ tests 7",
+          "ℹ pass 7",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ duration_ms 19932.232475"
+        ]
+      }
+    },
+    "lint": {
+      "path": "lint/receipt.json",
+      "receiptSha256": "50519d450d572b06315dfb4e929fe2a49bf7111676f35561be3d32fb7dfe6758",
+      "data": {
+        "head": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+        "command": [
+          "pnpm",
+          "exec",
+          "oxlint",
+          "--deny-warnings",
+          "scripts/ci/select.test.mjs"
+        ],
+        "startedAt": "2026-11-21T05:14:02.879027+00:00",
+        "version": "Version: 1.89.0",
+        "exitCode": 0,
+        "seconds": 0.32489854199957335,
+        "stdoutSha256": "6453686606499dda0964d547fe6bb5e0e438f5e0c9e3b5b044a3ba3adddb334c",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "coverage": {
+    "path": "coverage-after.json",
+    "sha256": "826567c61d90e99d4eb848c8fdaa4ca4018b45db815724dcf7701a0144e9ad0b",
+    "originalData": {
+      "head": "6594e5093fd61e34f0aff215a7275bce20e026a4",
+      "tree": "1a9be2a6a0f3a83be75bbb52e5a3ea91d4fc1534",
+      "scope": "Read-only original graph/selector/scheduler execution; scheduler spawn captured only, not a test/job success claim",
+      "beforeHead": "cffa5a187bf22ba92e7ad5ab094c1b1d5d2a0982",
+      "beforeGraphSha256": "35d766938c8572d353faa2d14d3ebcf616e51ed46c1b2ac58806fa5b928e9d86",
+      "taskCount": 94,
+      "sourceNodeCount": 9673,
+      "unchangedTaskDefinitions": true,
+      "unchangedDirectTaskEdges": 93,
+      "changedDirectTaskEdges": [
+        "ci-integration-9"
+      ],
+      "removedIntegrationDirectEdges": [
+        "source:lib/live/approval-cache.test.ts",
+        "source:lib/operations/calendar-conditional.test.ts",
+        "source:lib/operations/ledger-run.test.ts",
+        "source:lib/operations/model-write-registry.test.ts",
+        "source:lib/operations/model-write-tools.test.ts",
+        "source:lib/operations/policy-authorization.test.ts",
+        "source:lib/operations/slack-conversation-read.test.ts",
+        "source:lib/operations/slack-delivery.test.ts",
+        "source:lib/operations/write-client.test.ts",
+        "source:lib/operations/write-discovery.test.ts",
+        "source:lib/operations/write-feature.test.ts",
+        "source:lib/operations/write-http.test.ts",
+        "source:lib/operations/write-judgment.test.ts",
+        "source:lib/operations/write-notice.test.ts",
+        "source:lib/operations/write-planning-model.test.ts",
+        "source:lib/operations/write-policy-settings.test.ts",
+        "source:lib/operations/write-policy-store.test.ts",
+        "source:lib/operations/write-policy.test.ts",
+        "source:lib/operations/write-preparation.test.ts",
+        "source:lib/operations/write-provider.test.ts",
+        "source:lib/operations/write-route.test.ts",
+        "source:lib/operations/write-view.test.ts",
+        "source:scripts/approved-write-actions.live.test.tsx",
+        "source:scripts/approved-write-actions.test.tsx"
+      ],
+      "all24StillDirectlyOwnedByCore30": true,
+      "allTaskInputUnionIdentical": true,
+      "unionInputCount": 1603,
+      "allOtherSourceGraphCodeUnchanged": true,
+      "literalCheckExpandedOriginalOrderIdentical": true,
+      "approvedSuiteCommandUnchanged": true,
+      "all24ExactOriginalSelections": [
+        {
+          "file": "lib/live/approval-cache.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/calendar-conditional.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/ledger-run.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/model-write-registry.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/model-write-tools.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/policy-authorization.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": true,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/slack-conversation-read.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/slack-delivery.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-client.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-discovery.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-feature.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-http.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-judgment.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-notice.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-planning-model.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-policy-settings.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-policy-store.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-policy.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-preparation.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-provider.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-route.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "lib/operations/write-view.test.ts",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": false,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "scripts/approved-write-actions.live.test.tsx",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": true,
+          "dbSuiteCount": 87
+        },
+        {
+          "file": "scripts/approved-write-actions.test.tsx",
+          "owners": [
+            "ci-core-30"
+          ],
+          "source": true,
+          "full": true,
+          "dbSuiteCount": 87
+        }
+      ],
+      "oldTrustedInventoryNativeSchedule": [
+        {
+          "kind": "core",
+          "command": "pnpm",
+          "args": [
+            "exec",
+            "nx",
+            "run-many",
+            "-t",
+            "core-2,core-3,core-4,core-5,core-7,core-8,core-9,core-10,core-11,core-12,core-13,core-14,core-15,core-16,core-17,core-18,core-19,core-20,core-21,core-22,core-23,core-24,core-25,core-26,core-27,core-28,core-29,core-30,core-31,core-32,core-33,core-34,core-35,core-36,core-37,core-38,core-39,core-40,core-41,core-42,core-43,core-44,core-45,core-46,core-47,core-48,core-49,core-50,core-51,core-52,core-53,core-54,core-55,core-56,core-57,core-triage,core-view-state,core-governance,core-coding-workspace-review-runtime,core-drive,core-interop,core-github-pulls,core-model-gateway-litellm,core-factory-query-http,core-factory-monitor-http",
+            "--projects",
+            "ci-tasks",
+            "--parallel=2",
+            "--outputStyle=stream",
+            "--skip-nx-cache"
+          ]
+        },
+        {
+          "kind": "integration",
+          "command": "pnpm",
+          "args": [
+            "exec",
+            "nx",
+            "run-many",
+            "-t",
+            "integration-2,integration-3,integration-4,integration-5,integration-6,integration-7,integration-8,integration-9,integration-10,integration-11,integration-12,integration-13,integration-14,integration-15,integration-16,integration-17,integration-18,integration-19,integration-20,integration-21,integration-22,integration-23,integration-24,integration-25,integration-26,integration-27,integration-28,integration-29,integration-factory-activity",
+            "--projects",
+            "ci-tasks",
+            "--parallel=2",
+            "--outputStyle=stream",
+            "--skip-nx-cache"
+          ]
+        }
+      ],
+      "oldTrustedInventoryBoundary": "Captures only the unmodified scheduler requested command/arguments. No substitute gate/job success or disabled unknown-task assertion."
+    },
+    "fieldClarification": "originalData.sourceNodeCount is the total number of graph nodes (9673), including virtual task/package/DB nodes; it is not a count of source files.",
+    "graphNodeCount": 9673
+  },
+  "localFirstRecord": {
+    "path": "original-owner-green/local-first-record.json",
+    "sha256": "08c40b98d52e853ecc938b9dcb40b3a031206ac4f6ac6aa18b8861ea9d06e50a",
+    "ready": false,
+    "checks": [
+      {
+        "script": "test:approved-writes",
+        "exitCode": 0,
+        "durationMs": 25165
+      },
+      {
+        "script": "test:integrations",
+        "exitCode": 0,
+        "durationMs": 30980
+      }
+    ],
+    "scope": "Only the two recorded owning scripts; no complete pnpm check, acceptance or Ready qualification."
+  },
+  "afterMeasurement": {
+    "nativeLocalOwnerInvocations": 1,
+    "nativeApprovedWriteCases": 94,
+    "nativeIntegrationSummaryCounts": [
+      10,
+      80,
+      29,
+      30,
+      8,
+      4,
+      7
+    ],
+    "allFailedCancelledSkipped": 0,
+    "allOriginalCommandsAssertedUnchangedExceptComposition": true,
+    "completeLocalCheckOrderEquivalent": true,
+    "protectedAfterCiSamples": 0,
+    "ciRuntimeImprovementSeconds": null,
+    "wallTimeImprovementSeconds": null,
+    "interpretation": "Original current-main CI executes the suite twice per sampled Node24 lane pair; this exact local candidate executes both retained owning entries successfully with one approved-write invocation. New protected CI and exact-main observations remain pending; local/CI environments and timing cannot be compared causally."
+  },
+  "completionState": {
+    "draft": true,
+    "independentReview": "pending",
+    "fullLocalBeforeReady": "not executed on this candidate; original main still has separately tracked fixture defects",
+    "protectedCurrentHeadCi": "not yet a Ready candidate",
+    "gitGuardian": "no current-head receipt asserted",
+    "merged": false,
+    "mergeSha": null,
+    "postmerge": null,
+    "productionAcceptance": "not performed; no deployment or product change"
+  }
+}

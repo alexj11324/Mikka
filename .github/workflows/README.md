@@ -113,7 +113,7 @@ product regression. Main pushes and merge groups continue normal full coverage.
 
 ## Cloud worker template release
 
-`e2b-official-runtime.yml` is the only production release coordinator. It checks
+`e2b-official-runtime.yml` is the template publication coordinator. It checks
 the immutable worker digest and failed runtime input fingerprints before entering
 the publication queue. Its reusable `e2b-runtime-release.yml` holds that queue
 through validation, publication and cleanup, and calls `e2b-template.yml` to build unique
@@ -122,43 +122,47 @@ executes the existing additive installer beneath `/opt/mikka`, leaving an
 anonymous worker preloaded at E2B's ready checkpoint. No runtime credential or
 user data enters the template.
 
-Publication has two mandatory gates: original official files retain their
-SHA-256, type, mode, owner and link target; and both official Claude Code
-(`claude-haiku-5-5`) and Codex (`gpt-6-luna`) execute a real subscription task on
-the exact candidates. A model catalogue probe is additional capability data,
-not subscription acceptance. Candidate tests use normal device enrollment,
-owner-bound runs and subscription leases. Each release records original CLI
-paths and hashes in its own manifest; production, probing and acceptance use
-the same resolver, without an acceptance-only binary override.
-The gate also requires the official CLI to acknowledge this exact task
-(Claude's matching first-prompt UUID echo or Codex's `turn/start` ACK), plus a
-complete run-bound HTTP receipt with no extra execution-time authorization or
-provider-proxy calls. Process startup and `system/init` cannot satisfy it.
+Publication requires original-file conservation and candidate build-time
+readiness: the template builds, both official CLIs start and the execution
+fence opens. Original files retain their SHA-256, type, mode, owner and link
+target. E2B uses the user's own key, so live subscription execution is not a
+template-publication gate
+([#2789](https://github.com/alexj11324/Mikka/pull/2789)). Runtime acceptance
+retains its own criteria; build-time readiness does not prove a completed
+subscription task. Each release records original CLI paths and hashes in its
+own manifest; production, probing and acceptance use the same resolver,
+without an acceptance-only binary override.
 Installation preserves every original persistent entry exactly. E2B's final
 boot and a disposable fresh instance are checked separately against the
 recorded exact-path provider-runtime policy; original CLI/software bytes and
 all other fields remain protected. File-scan verification instances are never
 reused as cold-start performance samples.
 The finalizer always closes instances labelled with this exact source, run and
-attempt. A failed build, obsolete source, failed Web wait or subscription gate
-also removes this run's exact named private candidates and verifies their
+attempt. It also removes this run's exact named private candidates and verifies their
 absence. Public images and previous releases remain available. Cleanup receipts
-are artifacts; a cleanup error fails the workflow. After a build or subscription failure on current main, the workflow retains a
-SHA-256 fingerprint of all `runtime_paths` Git entries, including dependency
-locks, in an Actions artifact for 90 days. A subsequent automatic push with the
-same inputs reports `skipped: same inputs as failed run <id>` and succeeds before
-entering the release queue or creating E2B machines. The queue checks again after
-entry to suppress already-queued duplicates. Obsolete sources, cancellations,
-Web failures and cleanup-only failures do not create failure fingerprints.
+are artifacts; a cleanup error fails the workflow. An eligible candidate-build
+failure on current main records a fingerprint of the declared runtime inputs
+in an Actions artifact for 90 days. `scripts/e2b/runtime-inputs.mjs` verifies
+the original failed step and current attempt before an automatic input decision
+can skip matching failed inputs. The queue checks again after entry. Obsolete
+sources, cancellations, Web failures and cleanup-only failures do not create
+failure fingerprints.
 
 A push only compares the worker inputs and builds no candidate. When they
 changed, its run summary says so. The release starts by itself when the
-Cloudflare deployment workflow's serving-release observation shows current main
-and the worker differs from the last release that made templates public. A
+Cloudflare deployment workflow's serving-release observation identifies the
+eligible current-main source and the existing input checks select a release. A
 dispatch of **E2B additive runtime release** on current main with `reason` and
 `cloudflare_receipt` also starts it; a dispatch without a receipt fails before
-any template builder starts. Every gate rechecks the receipt against the live
-gateway and current main.
+any template builder starts. Initial automatic runtime selection binds the
+observed product to current main and the consumer run's recorded source.
+Subsequent gates recheck the original receipt, live serving identity and the
+served commit's membership in main's history. Later merges neither replace
+that source nor block its publication
+([#2699](https://github.com/alexj11324/Mikka/pull/2699)). A manual dispatch may
+therefore build an earlier still-served commit from main's history, never the
+newer dispatch commit in its place. Respect release windows explicitly declared
+by the #1752/#1954 owner; an offline push run itself holds no publication window.
 
 The Coding Workspace, Task VM and Task Secret consumers accept this official
 producer's `workflow_run` event alongside its retained push/manual events. The
@@ -176,25 +180,28 @@ runtime inputs produce a new fingerprint. Missing or expired failure artifacts
 permit the normal worker comparison; history API errors fail the check. Do not
 retry only failed candidate/gate jobs: cleanup has removed their candidates.
 
-After both gates pass, the workflow makes the candidates public and keeps the
+After the candidate and receipt checks pass, the workflow makes the candidates
+public and keeps the
 release report (all three IDs, their official base kinds, worker digest, source
-commit and measured models) as an immutable artifact for the private Cloudflare
+commit and original candidate evidence) as an immutable artifact for the private Cloudflare
 API deployment. Old template IDs and aliases are never updated or deleted. A
-failure before publication leaves the selected release unchanged. Exact-main and
-exact-serving source checks reject stale jobs. A rollback uses the normal
-rollback PR and matched application/worker release, preserving these gates.
+failure before publication leaves the selected release unchanged. Publication
+verifies the candidate's source, run, attempt and report digests. The private
+Cloudflare deployment selects the verified IDs under the #1954 release owner;
+publishing IDs alone does not change production selection. Rollback follows
+that owner's existing procedure and a normal rollback PR when code changes,
+preserving matched application/worker sources and the current admission gates.
 
 PR runs use no release credentials. Main builds read the existing `E2B_API_KEY`
-from Infisical `prod:/vercel`. The subscription gate reads the authorized
-`SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` from `prod:/`, signs in normally, uses
-tasks titled “测试” in `alexj11324/Mikka-handoff`, then removes its own fixtures.
-Delivery uses the existing GitHub OIDC identity; credential values never enter reports or logs.
+from the existing Infisical `prod:/vercel` path. That retained secret location
+does not imply a Vercel publisher. Delivery uses the existing GitHub OIDC
+identity; credential values never enter reports or logs.
 
 The worker digest excludes unrelated Web lock entries and package scripts.
-Every main push compares that wanted digest with the published production
-digest. Matching digests reuse the release. After a failed publication, a
-documentation-only push can still rebuild and revalidate the unpublished worker. The existing no-new-polling rule
-and task-owner E2B billing apply. See
+A main push compares the immutable event's before/after inputs and reports the
+result; it never starts candidate builders. Publication and retry use the
+serving-observation or authorized-dispatch paths above. The existing
+no-new-polling rule and task-owner E2B billing apply. See
 [Alex's preservation clarification](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
 
 ## Factory visual evidence acceptance
@@ -250,16 +257,15 @@ retained as workflow artifacts; credentials and raw task logs are excluded.
 
 ## GitHub branch protection (separate repository setting)
 
-Keep required status checks enabled. Disable **Require branches to be up to
-date before merging** (GitHub's *loose* status-check mode), as in Codex.
-Moving `main` does not by itself force every otherwise-mergeable PR to rebase
-or rerun its existing checks. Git merge conflicts and PR-head changes still
-need resolution and a fresh check; integration risks can require additional
-targeted tests.
-
-This branch-protection toggle **cannot be changed by editing workflow YAML**.
-Verify it in `Settings > Branches > main > Edit`, and do not claim that the
-repository is already in loose mode without verifying its effective settings.
+Keep the existing protection and required checks. Read the effective repository
+settings; workflow YAML and a permission-denied administration API cannot
+establish them. Do not change protection to shorten a validation cycle. Follow
+the single [merge procedure](../../docs/dev-workflow.md#5-ownership-and-merging):
+normally integrate `main` when protection requires it, a conflict exists or a
+relevant landed change requires verification, then validate that candidate.
+An unrelated main change does not justify a rebase or an invented up-to-date
+requirement. Missing external-check evidence is not a successful check or an
+exemption from its existing requirement.
 
 Do not skip the required gates, silently accept failed/skipped dependencies or
 publish from a red PR. The workflows bootstrap the trusted Nx selector from

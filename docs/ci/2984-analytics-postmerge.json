@@ -1,0 +1,49 @@
+{
+  "issue": 2984,
+  "pr": 2986,
+  "observed_at": "2026-11-20T22:04:09.585935+00:00",
+  "merge_sha": "040362591abbcb95d825311e5577bd27caa92b10",
+  "parents": [
+    "8cddaa7c48c97ce0092c3ea028519fc9d0ff6069",
+    "59f01f483c0d6ba69109396546bd5840d69c0bff"
+  ],
+  "tree": "8e89ddcf2797f105061e26f84e561995cb834ec2",
+  "reviewed_head": "59f01f483c0d6ba69109396546bd5840d69c0bff",
+  "expected_files": [
+    {
+      "path": ".github/workflows/README.md",
+      "reviewed_blob": "d0a1204aa37f84e24b01ed040caec720ffc696b0",
+      "merged_blob": "d0a1204aa37f84e24b01ed040caec720ffc696b0"
+    },
+    {
+      "path": ".github/workflows/analytics-ssr.yml",
+      "reviewed_blob": "3db5d06af81808e30aa078124a3e5b0d74b95c88",
+      "merged_blob": "3db5d06af81808e30aa078124a3e5b0d74b95c88"
+    },
+    {
+      "path": "docs/ci/2984-analytics-baseline.json",
+      "reviewed_blob": "e644387d6a761fa4c6843fd547424aefa7d8ebec",
+      "merged_blob": "e644387d6a761fa4c6843fd547424aefa7d8ebec"
+    },
+    {
+      "path": "scripts/ci/optimization.test.mjs",
+      "reviewed_blob": "b9643a6a0e921997830f196cecc1bb19ef7ec762",
+      "merged_blob": "b9643a6a0e921997830f196cecc1bb19ef7ec762"
+    }
+  ],
+  "unrelated_first_parent_blobs_preserved": 9471,
+  "worktree_clean": true,
+  "focused_test": {
+    "command": "node --test scripts/ci/optimization.test.mjs",
+    "source_sha": "040362591abbcb95d825311e5577bd27caa92b10",
+    "exit_code": 0,
+    "tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "duration_ms": 942.152761,
+    "evidence": "Executed directly by root after detached checkout; original tool result fafb55, no separate raw-log file captured. This record does not invent a log digest."
+  },
+  "acceptance_scope": "Merged workflow behavior and actual original regression; not staging or production acceptance."
+}

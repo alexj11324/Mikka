@@ -1,0 +1,4047 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-21T04:31:35.276625+00:00",
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "workItem": "SDLC-012",
+  "repository": "aspectly-labs/Mikka",
+  "pullRequest": "https://github.com/aspectly-labs/Mikka/pull/3009",
+  "branch": "feat/sdlc-2984-agent-kit-fixture",
+  "codeHead": "24fd353652cdaac5aec8337d9876815e8e26511b",
+  "codeTree": "5d4080fc53d896bdc8edaa37385c72e72a03ce2e",
+  "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+  "status": "Draft. Original focused and owning unit entries have actual source-bound results below. Complete pnpm check, integrated abuse-db, protected CI, GitGuardian, normal merge and exact-main verification are not claimed. The parent coordinates an atomic local-fixture batch. No evidence-only commit changes this code candidate.",
+  "original012Snapshot": {
+    "evidencePath": "docs/ci/2984-agent-kit-fixture.json",
+    "evidenceSha256": "312c3f38ef1871c7dbc66b5bd6674254da1f51f97fbe63793c6ef709ec82a405",
+    "historicalGreenCode": "bdec301935a3ad2b07e14e7a24d03adcd16d5434",
+    "historicalReview": "https://github.com/aspectly-labs/Mikka/pull/3009#pullrequestreview-6002621578",
+    "boundary": "The original file and review retain their historical source binding; neither covers the expanded candidate by assertion."
+  },
+  "problem": "Eight adjacent unit fixtures reach real committed live writers with unobserved fake PG/Drizzle executors when an ordinary local builtin gateway is configured. CI-level Cloud previously concealed that branch. Original product commit guards are correct and remain unchanged.",
+  "repair": {
+    "scope": "11 existing test/support files; no product code, workflow, command, dependency, assertion removal, timeout or gate change. No new repository test framework.",
+    "transactional": "Attach the existing observeCommitEffects to each fake physical client, expose that exact client as Drizzle session.client, and return actual native BEGIN/COMMIT/ROLLBACK command tags. The existing fake transaction calls the callback between native begin/commit and rolls back on rejection. Added checks prove response scheduling is absent before COMMIT.",
+    "autocommit": "The original worker-tail query and claim failure update expose their actual observed executor. The claim offline fixture separates its autocommitted writer from the original checked-out read transaction; the actual credential failure case proves registration.",
+    "scheduler": "Reuse existing tests/support/live-runtime.ts for synthetic Community builtin env and module-level capture of original server-runtime.after. Real live writers, real observer, afterJob context handling and native failure boundary stay intact. Captured callbacks are never executed or counted as delivered notifications.",
+    "ownLiveRuntimeBodyUnchanged": true,
+    "ownLiveRuntimeBodySha256": "cff554f4adbde0f5e30f2fc7068b3c44f4d9cd743fc01c65105300e54db37774",
+    "ownLiveRuntimeScope": "The original real-PG live-runtime owner function body is byte-for-byte identical to main59b, but the module blob changed. Old #3010 runtime proof is not relabeled as identical input; the batch must run its original complete abuse-db command."
+  },
+  "audit": {
+    "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+    "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+    "scope": {
+      "rootScriptCount": 109,
+      "explicitTestFileArguments": 1091,
+      "directReferenceCandidates": 125,
+      "firstDiscovery": 69,
+      "broadenedLiveWriterReferences": 56,
+      "confirmedAdditionalFixtures": 8,
+      "wholeCheckExecutedByThisAudit": false,
+      "method": "Existing root script closure and actual source call boundaries. Type/mock/read/source/real-PG references are not failures. This is a one-time direct-reference investigation, not a complete transitive or all-environment proof. Original focused RED runs were selected only after concrete unobserved executor calls were established. No assertions, runtime guard, source or timeout was modified.",
+      "actualOwnerSnapshot": "adjacent-open-heads.json: 56 open PRs at captured timestamp; original 53 head/base unchanged, plus 3008/3009/3010. Later root-created 3011 is own integration and not counted as a new external Owner scan."
+    },
+    "dispositionCounts": {
+      "real_pg": 10,
+      "already_fixed_012": 1,
+      "mocked_boundary": 69,
+      "observed_fixture": 5,
+      "confirmed_red": 8,
+      "explicit_isolation": 2,
+      "read_or_source": 21,
+      "type_only": 9
+    },
+    "dispositions": [
+      {
+        "path": "lib/active-agents.test.ts",
+        "disposition": "real_pg",
+        "reason": "Pure active-agent readers precede a real db/device-session fixture; no unobserved fake writer reaches notifications.",
+        "blob": "27ecc4e7675c517b5e072fcf58518f57207ba3c8",
+        "scripts": [
+          "test:active-agents"
+        ],
+        "directWriterReferences": [
+          "lib/device-session.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/main-compat.test.ts",
+        "disposition": "already_fixed_012",
+        "reason": "Original queue fake now uses observeCommitEffects, command-tagged BEGIN/COMMIT/ROLLBACK and explicit captured builtin gateway. See original 012 receipts; not re-executed by this audit.",
+        "blob": "c6c67a21ac391a05eae748cf3e00ed0f2518d5c6",
+        "scripts": [
+          "test:agent-kit-compat"
+        ],
+        "directWriterReferences": [
+          "lib/computer/claim.ts",
+          "lib/computer/queue-run.ts",
+          "lib/db/commit-effects.ts",
+          "lib/device-session.ts",
+          "lib/run-leases.ts",
+          "lib/run-publications.ts",
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": false
+      },
+      {
+        "path": "lib/agent-tool-approval/http-errors.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Approval store mutations are explicitly mocked; actual suite owns HTTP error mapping.",
+        "blob": "2eed1156284c41d276a267e415fd33eed71eafb5",
+        "scripts": [
+          "test:agent-kit-compat"
+        ],
+        "directWriterReferences": [
+          "lib/agent-tool-approval/store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/live-eval-disabled.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Subscription runtime is a module stub; live-eval-disabled contract never invokes a PG writer.",
+        "blob": "76b6ee1d07b944b22d82c328e3d8b91362b54b67",
+        "scripts": [
+          "test:agent-kit-model"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/live-eval-eve.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Subscription runtime is a stub and Eve evaluation adapters are synthetic; no actual subscription persistence.",
+        "blob": "f395b3e5a46fb87f9984546df46c6283305cbdea",
+        "scripts": [
+          "test:agent-kit-model"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/startup-metadata.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Subscription runtime module is stubbed; startup metadata fixture does not execute its mutation methods.",
+        "blob": "8c2e3af0bb86f0db1b57eabb5dbf559590f958ee",
+        "scripts": [
+          "test:agent-kit-model"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/disabled-entry.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Disabled entry uses an explicit subscription runtime stub.",
+        "blob": "2e0a1bd2bf48be3a144dbf02ffb8dab9ea2c2143",
+        "scripts": [
+          "test:agent-kit-model"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/defaults-consumers.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Default consumer fixture stubs subscription runtime.",
+        "blob": "7ee4c94b94fc5225c6395714de4ff993b6e93d1e",
+        "scripts": [
+          "test:agent-kit-model"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/operations/write-preparation.test.ts",
+        "disposition": "observed_fixture",
+        "reason": "Real observeCommitEffects with native command tags; original deferred write preparation and rollback tests retain their contract.",
+        "blob": "3e7178d7d19e89bd5bc50fb377ce1613f0e1f51e",
+        "scripts": [
+          "test:approved-writes"
+        ],
+        "directWriterReferences": [
+          "lib/db/commit-effects.ts",
+          "lib/operations/write-transaction.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/support/thread-machine-fake.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "thread-machines module is mocked; verifies the existing fake provider helper rather than running real writer.",
+        "blob": "dd699c6d535fbab72f8e4a9c61efcfc3ef25cffd",
+        "scripts": [
+          "test:cloud-limits"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-worker-logs.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "saveWorkerTail with asError directly calls runListChanged on an unobserved fake query; original tail case reproduced.",
+        "blob": "9662013180a6d5271a0fd16bce937a70b04df9ee",
+        "scripts": [
+          "test:cloud-limits"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts",
+          "lib/cloud-computer/thread-worker-logs.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-question-recovery.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "Real ensureThreadMachine receives fake pool/client without observer; successful finish and cleanup live writes fail. Original six-case file reproduced.",
+        "blob": "40d70f367e05580a7fc2aa16903a3c52ae8a59ab",
+        "scripts": [
+          "test:cloud-limits"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/cloud-computer/retained-deliverable.test.ts",
+        "disposition": "explicit_isolation",
+        "reason": "Existing fixture intentionally supplies an incomplete explicit gateway override and restores it, with comments assigning live commit proof to PG suites. Preserve that scope, do not count absent observer as defect.",
+        "blob": "445be6ea5292a07d27272678185c582ba465b003",
+        "scripts": [
+          "test:cloud-limits"
+        ],
+        "directWriterReferences": [
+          "lib/factory/store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/computer/bootstrap-broker.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Imports workerCommand string builder and reads thread-machines source for original publish expression; no DB writer is executed.",
+        "blob": "5937582492ff4a5e1d5ba8e3fa82eb7a5b8221e9",
+        "scripts": [
+          "test:cloud-limits"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts",
+          "lib/cloud-computer/thread-worker-logs.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Startup fixture explicitly substitutes queueCloudRun/sendOwnedRunMessage and machine persistence; direct writer references are mock targets.",
+        "blob": "50903c9e5b3920661a24ac3a683ee9800ec112e5",
+        "scripts": [
+          "test:coordinator-events"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts",
+          "lib/computer/queue-run.ts",
+          "lib/computer/store.ts",
+          "lib/run-control.ts",
+          "lib/run-leases.ts",
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/thread-dispatch.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Real dispatch orchestrator uses stub sendOwnedRunMessage/requestRunStop and synthetic dispatch callbacks; fake client only owns orchestration locks.",
+        "blob": "82f14684c1f5d679d88412f08fa2cbf5425df413",
+        "scripts": [
+          "test:coordinator-events"
+        ],
+        "directWriterReferences": [
+          "lib/run-control.ts",
+          "lib/thread-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/wake-context.test.ts",
+        "disposition": "observed_fixture",
+        "reason": "Real observer and request scope verify deferred coordinator work after native COMMIT and released writer.",
+        "blob": "76cfabdc752203511b1c794a9aa7be120f961bb3",
+        "scripts": [
+          "test:coordinator-events"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/wake-after-commit.ts",
+          "lib/db/commit-effects.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/credential-masking.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "Only coordinatorSessionChanged is stubbed; real legacy appendStoredMessages still reaches botChatChanged on unobserved fake Drizzle tx. Original two-case file reproduced.",
+        "blob": "a04512a4e7b35e44f17e04d2c7b02c9f4171d7f8",
+        "scripts": [
+          "test:coordinator-events"
+        ],
+        "directWriterReferences": [
+          "lib/live/coordinator-session.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/chat-projection-version.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Read-only chat projection fixture rejects all coordinator-session/chat/wake mutation callbacks via explicit unused stubs.",
+        "blob": "1a300516f3e61edfc14e6511e1f932d441356a19",
+        "scripts": [
+          "test:coordinator-stream"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/wake-after-commit.ts",
+          "lib/live/chats.ts",
+          "lib/live/coordinator-session.ts",
+          "lib/workflow-wake.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/cloud-computer/credential-reviews.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Subscription authorization and runtime/provider boundary are explicit mocks.",
+        "blob": "498d584698ed2761b192432177e17aa11578c98d",
+        "scripts": [
+          "test:credentials"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/device-gateway-notify.test.ts",
+        "disposition": "observed_fixture",
+        "reason": "Original observeCommitEffects and command-tagged clients test post-COMMIT coalescing and rollback; gateway transport is already an owned synthetic boundary.",
+        "blob": "366afef76df6d18cb0b82dc6a0e1b35b7b424147",
+        "scripts": [
+          "test:device-gateway"
+        ],
+        "directWriterReferences": [
+          "lib/coding-workspace/review-sessions.ts",
+          "lib/db/commit-effects.ts",
+          "lib/device-gateway-notify.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/db/commit-effects.test.ts",
+        "disposition": "observed_fixture",
+        "reason": "Native commit observer primary regression owns transaction, savepoint, rollback, failed COMMIT and callback-query proof.",
+        "blob": "818660f7d819009fd739296e79145a1f5f37d4b8",
+        "scripts": [
+          "test:device-gateway"
+        ],
+        "directWriterReferences": [
+          "lib/db/commit-effects.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/agent-profile-target.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Agent profile selection stubs subscription authorization and cloud readiness; no subscription writer executed.",
+        "blob": "60f17a7b6735fe8cb67d841092a4f08441c12f6d",
+        "scripts": [
+          "test:execution-rules"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/model-order-plan.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Pure dispatch planning; the one resolver fixture explicitly stubs personal policy/subscription reads.",
+        "blob": "1817373b3ede03f557d0bbade814cb0c1588bdd2",
+        "scripts": [
+          "test:execution-rules"
+        ],
+        "directWriterReferences": [
+          "lib/personal-policy.ts",
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/model-order-context.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Read-only model order context explicitly throws for every live/run-control/due-timer side effect.",
+        "blob": "51c39bb3387a65b572a52268701d734397123790",
+        "scripts": [
+          "test:execution-rules"
+        ],
+        "directWriterReferences": [
+          "lib/device-gateway-notify.ts",
+          "lib/due-timer.ts",
+          "lib/live/lists.ts",
+          "lib/live/panels.ts",
+          "lib/model-api-key-runs.ts",
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/model-order-allowance.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Allowance fixture uses explicit subscription runtime/provider-health stubs.",
+        "blob": "15ba85f5336fe1a8ae74a788a6ced1d4255b0015",
+        "scripts": [
+          "test:execution-rules"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/computer/native-run-binding.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Native binding fixture stubs subscription runtime; only binding checks/read queries execute.",
+        "blob": "c420de7f458cfbf2b45b226542d8d234ad1e505c",
+        "scripts": [
+          "test:execution-rules"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Read-only personal-policy fixture asserts every notification/side effect is forbidden.",
+        "blob": "bda914308890df031569a01e89ed9485101a1aa6",
+        "scripts": [
+          "test:execution-rules"
+        ],
+        "directWriterReferences": [
+          "lib/db/commit-effects.ts",
+          "lib/device-gateway-notify.ts",
+          "lib/due-timer.ts",
+          "lib/live/lists.ts",
+          "lib/live/panels.ts",
+          "lib/personal-policy.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/http-list.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Only imports pure redactFactoryCheckText from writer module; factory HTTP store is a fake interface.",
+        "blob": "04419c27ff577dca3e3f285ac1a86695ed975be0",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/factory/checks.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/postgres.test.ts",
+        "disposition": "real_pg",
+        "reason": "Factory postgres uses real Pool and observePoolCommits; it owns the builtin gateway lifecycle.",
+        "blob": "3d672858531e7d1be3963dad38e486ce09b8bbf9",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/db/commit-effects.ts",
+          "lib/factory/store.ts",
+          "lib/run-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/checks.test.ts",
+        "disposition": "real_pg",
+        "reason": "Factory check DB fixture uses real Pool; notification writer uses the native pool/client path, not a plain fake executor.",
+        "blob": "167ce45212d68630634b16be8c2af0dc280f790a",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/wake-after-commit.ts",
+          "lib/factory/checks.ts",
+          "lib/factory/store.ts",
+          "lib/run-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/approval.test.ts",
+        "disposition": "real_pg",
+        "reason": "Factory approval uses real observed pools including reconnected pool.",
+        "blob": "e914082378aa7958d75b28697476afcdfbdd8ae5",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/db/commit-effects.ts",
+          "lib/factory/store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/monitor-cycle.test.ts",
+        "disposition": "real_pg",
+        "reason": "Monitor cycle executes real Pool fixture, not unobserved fake PG.",
+        "blob": "13dfc75cb56ff0814da45f3d75b8f8a1ce21ef0f",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/factory/store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/monitor.test.ts",
+        "disposition": "real_pg",
+        "reason": "Factory monitor observes original/reconnected real pools and closes builtin runtime.",
+        "blob": "e3b809f4754ca32683d5348fa21af0463baad11f",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/wake-after-commit.ts",
+          "lib/db/commit-effects.ts",
+          "lib/factory/checks.ts",
+          "lib/factory/store.ts",
+          "lib/run-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/monitor-dispatch.test.ts",
+        "disposition": "real_pg",
+        "reason": "Monitor dispatch observes original and other real pools and closes runtime.",
+        "blob": "13ab868ea4fc9771964e898ad14f15d3fc8b7ef7",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/wake-after-commit.ts",
+          "lib/db/commit-effects.ts",
+          "lib/factory/store.ts",
+          "lib/run-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/questions/postgres.test.ts",
+        "disposition": "real_pg",
+        "reason": "Factory question fixture helper observes each real pool and closes runtime.",
+        "blob": "6df3e267c0c05a08274d0fd42c03092a063ead69",
+        "scripts": [
+          "test:factory"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/wake-after-commit.ts",
+          "lib/db/commit-effects.ts",
+          "lib/factory/questions/retry.ts",
+          "lib/factory/questions/store.ts",
+          "lib/factory/store.ts",
+          "lib/run-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/check-observations.test.ts",
+        "disposition": "read_or_source",
+        "reason": "configureFactoryCheck/factoryRepairBrief only compose checked metadata and prompt writes; notifications in same module belong to separate createFactoryCheckClaim, not called by these cases.",
+        "blob": "a2c217c3453aedf1c19b449bd3c115ee0ca29710",
+        "scripts": [
+          "test:factory-check-recovery"
+        ],
+        "directWriterReferences": [
+          "lib/factory/checks.ts",
+          "lib/factory/store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/factory/request-epoch-replay.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Accepted request replay rejects stop/completion calls and stubs live Factory/run-control notification boundaries.",
+        "blob": "813af2196c3a65202e7d6d51c3d8ba6fc7375179",
+        "scripts": [
+          "test:factory-check-recovery"
+        ],
+        "directWriterReferences": [
+          "lib/device-gateway-notify.ts",
+          "lib/run-control.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "app/api/github/pull-request-status/route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "PR status route mocks documentLiveWorkspace lookup; no mutation notification invoked.",
+        "blob": "ea15ef8a0739fc8d629f87f327870b735088968d",
+        "scripts": [
+          "test:github"
+        ],
+        "directWriterReferences": [
+          "lib/live/panels.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/group-turns.test.ts",
+        "disposition": "real_pg",
+        "reason": "Group-turn integration cases use real isolated pools; pure routing cases inject callbacks without PG writers.",
+        "blob": "0c4575e317872dd0ba18a005392c02506bcb8da9",
+        "scripts": [
+          "test:group-turns"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/group-turns.ts",
+          "lib/group-conversations-store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/group-contribution.test.ts",
+        "disposition": "read_or_source",
+        "reason": "runGroupRounds receives synthetic behavior callbacks; catalogue fake client only supplies reads.",
+        "blob": "6f3f8e5bfb61cd94ef37eed2bc9e48542b1311cf",
+        "scripts": [
+          "test:group-turns"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator/group-turns.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/group-decision-consumer.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Group decision consumer uses mock language model and explicit usage/subscription transport stubs, not real PG writes.",
+        "blob": "2636c87590050929c1204b56a2bc385948790a03",
+        "scripts": [
+          "test:group-turns"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/group-conversations.test.ts",
+        "disposition": "real_pg",
+        "reason": "Group conversations use observed real pool; neverConnect fake only proves refusal before database access.",
+        "blob": "4616a6caf81b718f70811a3e759a33c137deef61",
+        "scripts": [
+          "test:groups"
+        ],
+        "directWriterReferences": [
+          "lib/db/commit-effects.ts",
+          "lib/group-conversations-store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/pending-account-binding.test.ts",
+        "disposition": "observed_fixture",
+        "reason": "Pending-account fake client is explicitly observed; native SELECT commands retain valid autocommit scope.",
+        "blob": "556fd851fb89fb69c15ff6238feaa02804e8fe33",
+        "scripts": [
+          "test:integrations"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator-event-store.ts",
+          "lib/db/commit-effects.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/issue-document-guard.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Document write authorization fixture explicitly substitutes documentChanged and documentLiveWorkspace with scope assertions.",
+        "blob": "2bc9be26c546e52f0686c51b1485a49ab553d322",
+        "scripts": [
+          "test:issues"
+        ],
+        "directWriterReferences": [
+          "lib/live/panels.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/issue-relation-guards.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Relation guard fixture explicitly mocks issueListChanged/issueRelationsChanged while preserving owner/relation SQL assertions.",
+        "blob": "c4154924395f268bb516c29003573e2473808dd4",
+        "scripts": [
+          "test:issues"
+        ],
+        "directWriterReferences": [
+          "lib/coding-workspace/review-sessions.ts",
+          "lib/live/issue-detail.ts",
+          "lib/live/lists.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/run-control.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "Plain Drizzle tx calls real send/stop run-control writers; no session.client/observer. Original ten-case file reproduced six failures.",
+        "blob": "170cb2978bbabe10c8dcd078bd32db77da11143c",
+        "scripts": [
+          "test:issues"
+        ],
+        "directWriterReferences": [
+          "lib/run-control.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/run-control-actions.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "Panels mock does not cover real runListChanged invoked by stopOwnedRun; fake transaction lacks observed session client. Original 23-case file reproduced one failure.",
+        "blob": "fd8ed8b1c21471cbc7ee636d639869ef8e0f984e",
+        "scripts": [
+          "test:issues",
+          "test:issues"
+        ],
+        "directWriterReferences": [
+          "lib/live/panels.ts",
+          "lib/thread-dispatch.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/mobile-thread-continue.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Mobile continuation substitutes run-quota writer methods.",
+        "blob": "fd30dae95c9978929d2aff546e20b3836f716f44",
+        "scripts": [
+          "test:mobile"
+        ],
+        "directWriterReferences": [
+          "lib/run-quota.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/personal-mailbox-producer.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "Actual queueCloudRun receives a fake client whose BEGIN/COMMIT return only rows and which has no observer; original cloud producer case fails.",
+        "blob": "f8a1690d18d6f956e1588d9d999300966c500e5f",
+        "scripts": [
+          "test:personal-mailbox-core"
+        ],
+        "directWriterReferences": [
+          "lib/computer/queue-run.ts",
+          "lib/run-admission-store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/personal-mailbox-retry-context.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "Actual reclaimLostRuns retry writer uses fake Drizzle transaction without observer; original file reproduced same live guard failure.",
+        "blob": "692ba8b08ce2650881caab375f61d5dc985277a0",
+        "scripts": [
+          "test:personal-mailbox-core"
+        ],
+        "directWriterReferences": [
+          "lib/coordinator-event-store.ts",
+          "lib/run-leases.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/run-completion-route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Completion route substitutes persistRunCompletion and dispatchCompletedIssue; actual transaction ownership covered elsewhere.",
+        "blob": "c5163c65cecfdbdb9914380b1744c2cfe2fb58c9",
+        "scripts": [
+          "test:run-publication"
+        ],
+        "directWriterReferences": [
+          "lib/run-completion.ts",
+          "lib/run-outcome-judge.ts",
+          "lib/run-publications.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/run-completion-effects.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Completion-effects fixture mocks review reconciliation and taskActivityChanged; no real notification persistence from those direct references.",
+        "blob": "1388dded26d998cd26daa11a45491a553cc911b1",
+        "scripts": [
+          "test:run-publication"
+        ],
+        "directWriterReferences": [
+          "lib/coding-workspace/review-sessions.ts",
+          "lib/factory/activity-live.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/run-end-hooks.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Run-end hooks are source-inspection assertions; no runtime fake PG writer.",
+        "blob": "86be8550b57e0aedbf0336ad3f1d860d9279c26b",
+        "scripts": [
+          "test:run-publication"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts",
+          "lib/run-leases.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "app/api/cron/run-recovery/route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Run recovery route mocks all referenced writer services and due-timer scheduling.",
+        "blob": "0d8b3e6402883991e1213032afc268fc6115d166",
+        "scripts": [
+          "test:run-recovery"
+        ],
+        "directWriterReferences": [
+          "lib/coding-workspace/review-sessions.ts",
+          "lib/device-session.ts",
+          "lib/due-timer.ts",
+          "lib/run-leases.ts",
+          "lib/run-outcome-judge.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "app/api/cron/subscriptions/route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Subscription cron route uses stub subscription-runtime service.",
+        "blob": "8fb5dc89d1e8635b0b087fa9721c42eb7aeb0745",
+        "scripts": [
+          "test:run-recovery"
+        ],
+        "directWriterReferences": [
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "app/api/cron/reconcile/route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Reconcile cron route mocks referenced due-timer API and service boundaries.",
+        "blob": "fcdb24d81eefa3e2693d35697e9325728e70d812",
+        "scripts": [
+          "test:run-recovery"
+        ],
+        "directWriterReferences": [
+          "lib/due-timer.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/edition.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Community HostedUsageStore has explicit metered:false and a throwing pool Proxy proving zero DB access; preserve community negative contract.",
+        "blob": "10ff37bc36cebe2514c752c974ae54015a25cafb",
+        "scripts": [
+          "test:runtime-config"
+        ],
+        "directWriterReferences": [
+          "lib/abuse/store.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "app/api/cron/schedules/route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Schedules cron route mocks sweepSchedules and armDueTimer.",
+        "blob": "a98053c7fb1f40c1b3cecf82ca8fdf2aef7fb3be",
+        "scripts": [
+          "test:schedules"
+        ],
+        "directWriterReferences": [
+          "lib/due-timer.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/schedules/runtime-arm.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Schedule arm fixture mocks committed store and armDueTimerSoon, not fake PG passed to real afterCommit.",
+        "blob": "c3d10ad0622da27a00ede014567f5993e586368c",
+        "scripts": [
+          "test:schedules"
+        ],
+        "directWriterReferences": [
+          "lib/due-timer.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/due-timer.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Direct armDueTimer with owned fake workflow transport; does not call armDueTimerAfterCommit or accept PG executor.",
+        "blob": "9bcb8b5a46fbd63d89305b6e80e21220a500a5d1",
+        "scripts": [
+          "test:schedules"
+        ],
+        "directWriterReferences": [
+          "lib/due-timer.ts",
+          "lib/workflow-wake.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "workflows/due-timer/current.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Due-timer workflow fixture supplies native workflow API doubles and service stubs; its timer ownership contract has no fake PG commit writer.",
+        "blob": "d418eb67f8d37493faa6a6079b4ba6df16b98564",
+        "scripts": [
+          "test:schedules"
+        ],
+        "directWriterReferences": [
+          "lib/due-timer.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/self-improvement/benchmark-claim.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Benchmark claim VM harness explicitly supplies runListChanged/runChanged and claim service doubles; retains original ordered scope assertions.",
+        "blob": "1f8673f35fb845b3f67976d8001c45ec7bd00850",
+        "scripts": [
+          "test:self-improvement-unit"
+        ],
+        "directWriterReferences": [
+          "lib/computer/claim.ts",
+          "lib/device-session.ts",
+          "lib/factory/questions/retry.ts",
+          "lib/live/lists.ts",
+          "lib/live/panels.ts",
+          "lib/personal-policy.ts",
+          "lib/run-leases.ts",
+          "lib/run-publications.ts",
+          "lib/subscription-runtime.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/audit/delivery-arm.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Audit delivery fixture explicitly records armDueTimerAfterCommit stub on same tx; no real commit guard invoked.",
+        "blob": "085269513a137d1e5234e45816c94127af15fff0",
+        "scripts": [
+          "test:settings-backend"
+        ],
+        "directWriterReferences": [
+          "lib/due-timer.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/run-credential-source.test.ts",
+        "disposition": "explicit_isolation",
+        "reason": "Existing run-credential-source fixture explicitly removes gateway auth inputs because live delivery is outside source-selection contract; retain existing documented boundary.",
+        "blob": "ba75c072ac80a60524fee903c18509ac51e1271f",
+        "scripts": [
+          "test:subscription-usability"
+        ],
+        "directWriterReferences": [
+          "lib/computer/queue-run.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "app/api/webhooks/github/route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "GitHub webhook route substitutes refreshPublishedPullRequest and related wake/schedule stores.",
+        "blob": "3761c318db02a02630b72591a76ef424185b55fa",
+        "scripts": [
+          "test:suggestions"
+        ],
+        "directWriterReferences": [
+          "lib/github/publication-webhook.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/cloud-computer/thread-machine-route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Thread-machine route replaces real thread-machines module with scoped service mocks.",
+        "blob": "8b3ee0523f346b225aaa8c3ed0d9b6bffafc2853",
+        "scripts": [
+          "test:unattended"
+        ],
+        "directWriterReferences": [
+          "lib/cloud-computer/thread-machines.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/workspace-settings-actions.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Workspace settings actions substitute stopRunsForPolicyChange and workspace mutation services.",
+        "blob": "7e4ff53214174b650af825db9e56973862f8cd8c",
+        "scripts": [
+          "test:workspace-settings"
+        ],
+        "directWriterReferences": [
+          "lib/run-policy-stop.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/operations/write-transaction.test.ts",
+        "disposition": "read_or_source",
+        "reason": "writeTransaction uses fake driver to verify lifecycle/fences/cancellation; operations do not register real commit effects. Existing query/COMMIT assertions remain.",
+        "blob": "c61a0059f3958bb5795cdec61dcae620d97c086c",
+        "scripts": [
+          "test:write-transactions"
+        ],
+        "directWriterReferences": [
+          "lib/operations/write-transaction.ts"
+        ],
+        "sameAsMain59b": true
+      },
+      {
+        "path": "apps/mobile/tests/eve-messages.test.mts",
+        "disposition": "read_or_source",
+        "reason": "Calls pure projectEveTurn rendering, not projectTurnState database writer.",
+        "blob": "6edf5f70d19959dcbac079105da524812f9c9b2c",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/coordinator/task-profile-submit.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "bc0911af061251b9a7793b261be75c3c1f656a8b",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/settings/model-order-settings.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "853924d9f92de5ec865ac12b4ef77cdf2fa94a59",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/settings/subscription-settings.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "f6598bf687c4cc35fc42e584eb78483e1fd23865",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/workspace/board-view-state.test.tsx",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "81a4ffd3a87593d2d2d517afb1bbe1e74a1a92b4",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/workspace/issue-board-saves.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "5936933bef54caf29418cac89b57037e211a8bbb",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/workspace/issue-relations.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "cdfd52ca9b1d81ee887139189882547f79675523",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "components/workspace/issue-workspace-settings.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "3440d80e4f63f0029c25f272357b83666f3553ec",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "hooks/use-bot-tasks.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "9e5eb7dec8b431f2d164d93a91e62da1c08b3da6",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "hooks/use-task-view-page.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "f4f4bb09d76cf148f33517bc95730cbfc85d3956",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/action-error-team.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "1ab76f7a0d3d3131ef627a6e96e8b2493dce9ae9",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-execution-model.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "a2312badec59eb4ee64d2abb16b5ab32616f9a7f",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/message-safety-compat.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "50b2c0f69a7c4b0bb266bb2ffe0ca7de403e0507",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/agent-kit/registry-compat.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Native subscription compatibility uses nativeRun reads; mutation-only ownerSettingsChanged paths not invoked.",
+        "blob": "b23b54eb158346fe5f164e04278946e8588776e5",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/bot-model-selection.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "712c7fa4199c80b866c88ababce23173eb81699c",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coding-workspace/diff/feedback.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "523bb3d6bedacd66a2900059e14bcb0e279101db",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/conversation-reads-route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "7b184a39ccd7cf5a48648bccee56e610dd2b29ce",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator-submission.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "6f1d4064500c0fb21d226de9c008c4cf78c2682c",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/chat-poll.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "9dc8a137b13bb3aa6c3b32d609423fe25514c8f8",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/judgment-integration.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "acded85236df69334231a1ae16962e22734a24aa",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/message-safety-handler.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "d541ee9dcb4febfbd8f2d9f49eebf1fe11a8e1b0",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/message-safety-ingress.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "2f90579553d58c088f3e8e69cdc3559c2027e31f",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/native-retirement.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "e821b808a3a79767e8e0ae93b6587fb5ab6199fa",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/prompt-context-concurrency.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "ea1d78398b46769d09b13b133d02715d4e9325aa",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/coordinator/prompt-preferences.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Actual store calls only loadProductPromptContext/loadConversation; memory/preference presentation fixture does not execute append/edit writer.",
+        "blob": "21d34f3e26870868d760888626dbc033b472756b",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/document-sync.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "70eb2bda1e37b90ca2905b4877d208be7141f195",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/eve/channel-auth.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "87753137495a99b53298df8ef5114e131dc07f05",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/eve/projection.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Exercises pure projectEveTurn and stoppedTurnDisplay stream reader, not projectTurnState mutation.",
+        "blob": "454ab142c2e35eb1e6487381e6cfd47e48e4b49b",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/eve/runtime.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "d6ab8e70ec4e8009939af7659bb342543295e78f",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/github/catalogue-budget.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Service.model uses injected synthetic worker/repository; refresh/disconnect/expiry state mutation methods are not called.",
+        "blob": "efc4f241d2dc5c818e87e717af651688fea523a2",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/github/desktop-token-authority.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "9e1eefdcff9b8d6e0cd3a0dee41a0d9acc5b577c",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/issue-document-seed.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Issue seed contract reads writer source, no database writer invocation.",
+        "blob": "6788dcb184fed818db873ae76d770f6eb56aac01",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/linear-sync/kill-switch.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "0ad218db8e1c20f5b9a45bfc96afc309b0a8b18e",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/mobile-threads-presence.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "c057b7fdd48330cb4d99000e85a7541a13efa980",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/model-gateway/gateway.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "handleModelGateway receives a synthetic dependency object; native defaultDependencies refused(pool) writer is not used.",
+        "blob": "914c53c7167aae6c04c95be64aa21ec719fd7c07",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/personal-mailbox-worker-entry.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "1b1438d08a2653afc42b640665ece5f7648f1ac7",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/project-map/sources.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "67198bb1c1649a427777af090daf83d0f09b16e6",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "lib/subscription-model-snapshot.test.ts",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "6f285b8bb2f01f619e9207dcb3ad98bbb35c4c57",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/entity-ui-policy.test.mjs",
+        "disposition": "read_or_source",
+        "reason": "Policy validator consumes synthetic/source strings; module paths are input text, not imports.",
+        "blob": "c22a8e25489fcee950ebd962c72ccb16371ec95a",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/issue-readonly-dom.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "7b72af8573ed528656eeee2c9962592f8981dd29",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/issue-team-control-dom.test.mjs",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "8acaee027bf3b8259ead30db7ef2b0361da45f0a",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/issue-team-intent-dom.test.mjs",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "6664735257590a90149f5636d2592deaeef0f73e",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/project-team-control.test.mjs",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "aeaed930a1e1aef98f947f6c5f2a4fc6e3d72dca",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/project-team-create-recovery.test.mjs",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "a647594ec99973da40a4b8f9b0f34354c7e8bf03",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/task-detail-frame.test.tsx",
+        "disposition": "type_only",
+        "reason": "Writer module reference is a TypeScript type import only; no runtime writer executes.",
+        "blob": "2ff7d6b1cd642031dc85faf71dc3f4654786b8ba",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "scripts/task-detail-live.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "28210ab35d25fe5eb1c33b01a7456c86448ce9f5",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/claim-response.test.ts",
+        "disposition": "confirmed_red",
+        "reason": "The actual credential-preparation-failure claim path autocommits its failed row through the offline loader plain fake db, then route.ts:531 calls real runListChanged and refuses the unobserved executor. Original 51-case file reproduced one failure; the separate Profile rejection case passed and does not itself schedule live invalidation.",
+        "blob": "8011dc503b78cfb1738d707dcd7b2fedd01d3d40",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/issue-scope-action-auth.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Original pure loader supplies null authentication; all cases reject before task/workspace writes.",
+        "blob": "9695a768db6403bd08c9482d14bd1a88fc6f8c59",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/legacy-scope-action.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Original legacy scope loader proves owner/untargeted-promotion refusal before any write or dispatch.",
+        "blob": "f962bf35cae5cd84e395ee4a100cbb6f0cd58259",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/mobile-chat-retry.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "140f5477d513387f979021c236f3f1de8b3f3fda",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/mvp/subscription.test.ts",
+        "disposition": "read_or_source",
+        "reason": "Original MVP subscription fixture supplies synthetic worker and fake repository to Service.model; no owner-settings mutation path called.",
+        "blob": "17dfc48ebee055b8b66795751b703543b3a8a08f",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/native-coordinator-tool-scope.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "c233a531a8f1e24172932845e0f105f46efaeb8a",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/run-decision-route.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "ab379f7a141789b8950ee8107048272b71ead177",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/settings-backend-routes.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "c3c8769c6f0b7254d690b1b80813b564068e9fc6",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/thread-question-wake-actions.test.ts",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "f98aa90306d6c26990009349fd7d68191141a747",
+        "sameAsMain59b": true
+      },
+      {
+        "path": "tests/use-coordinator-submit.test.tsx",
+        "disposition": "mocked_boundary",
+        "reason": "Referenced mutation service/action is explicitly mocked in this UI, route or orchestration fixture; no actual notification writer receives its fake DB at that boundary.",
+        "blob": "c2b304089155651186b70e30a8dcc95d354171f8",
+        "sameAsMain59b": true
+      }
+    ],
+    "rawAudit": {
+      "path": "research/agent-kit-fixture-2984/2984-adjacent-commit-fixtures-audit.json",
+      "sha256": "fab5cbb1cf942c5247f02968c3319cda0ff4ad864dc2598a6b35739f1dd9c92f",
+      "bytes": 91505
+    },
+    "descriptionCorrection": {
+      "recordedAt": "2026-11-21T04:24:06.632758+00:00",
+      "priorSha256": "8b221323a739de178fc77b346ba89a64a1e95e03972561b78532ccc5f88df48f",
+      "priorFile": "2984-adjacent-commit-fixtures-audit-before-claim-description.json",
+      "scope": "Correct one claim-response cause description by rereading the unchanged original stdout and exact route source. Original inputs, 125 dispositions, eight RED receipts, commands, counts and hashes are unchanged.",
+      "previousDescription": "Actual claim route updates failed Profile row through old plain fake db in its offline loader; real runListChanged refuses. Original 51-case file reproduced one failure."
+    }
+  },
+  "ownerRefresh": {
+    "capturedAt": "2026-11-21T04:26:15.421Z",
+    "openPRCount": 58,
+    "unchangedHeadAndBase": 55,
+    "changedOrNew": [
+      {
+        "pr": 3012,
+        "head": "bd0a4fabb367406609ca30c87870d25ac10bf75b",
+        "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "fileEntries": 2,
+        "matches": [],
+        "rawPath": "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/adjacent-fresh-pr-3012-files.json"
+      },
+      {
+        "pr": 3011,
+        "head": "304e124c2f1a56a8d88a15c9b8bbed53b02953bc",
+        "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "fileEntries": 7,
+        "matches": [],
+        "rawPath": "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/adjacent-fresh-pr-3011-files.json"
+      },
+      {
+        "pr": 3009,
+        "head": "24fd353652cdaac5aec8337d9876815e8e26511b",
+        "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "fileEntries": 12,
+        "matches": [
+          "lib/cloud-computer/thread-question-recovery.test.ts",
+          "lib/cloud-computer/thread-worker-logs.test.ts",
+          "lib/coordinator/credential-masking.test.ts",
+          "lib/personal-mailbox-producer.test.ts",
+          "lib/personal-mailbox-retry-context.test.ts",
+          "lib/run-control-actions.test.ts",
+          "lib/run-control.test.ts",
+          "tests/claim-response.test.ts",
+          "tests/fixtures/claim-response-runtime.mjs",
+          "tests/support/live-runtime.ts"
+        ],
+        "rawPath": "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/adjacent-fresh-pr-3009-files.json"
+      }
+    ],
+    "raw": {
+      "path": "research/agent-kit-fixture-2984/adjacent-final-owner-refresh.json",
+      "sha256": "f95f767b7fa31a2d41fbf59b398403a57d91ce45eaab622dda4987ce6e3efbc6",
+      "bytes": 22964
+    },
+    "boundary": "Only changed/new heads fetched files. Original 53 Owner head/base pairs unchanged, and own 3008/3010 unchanged. 3011 integration and 3012 DB selection are own #2984 work, not conflicting Owner repairs.",
+    "existingOverlapEvidence": [
+      "adjacent-candidate-owners.json",
+      "adjacent-more-candidate-owners.json",
+      "adjacent-claim-owners.json",
+      "adjacent-credential-mask-owners.json"
+    ]
+  },
+  "codeInputs": {
+    "lib/agent-kit/main-compat.test.ts": {
+      "blob": "0e6c922cec5a1c69548c521ca23dfbb9b77d2925",
+      "sha256": "bf0e3493930e1e56f23c2a0124c3b2a53d24948b0456e795dd0c7efcd2f8861e"
+    },
+    "lib/cloud-computer/thread-question-recovery.test.ts": {
+      "blob": "9ba49badd64715ac09dd1eed93cef067e3e4881d",
+      "sha256": "6f5c62a8870ec4fbb51ab119defc1982623c0ea313f4b6a2629dda87381dd708"
+    },
+    "lib/cloud-computer/thread-worker-logs.test.ts": {
+      "blob": "d3ec72a7d828d7acd4050dd82b0b890eec3350ed",
+      "sha256": "fa1d7026db63515371a738e7617d50f5c1c8b360e63b6024c27f3b075be428dd"
+    },
+    "lib/coordinator/credential-masking.test.ts": {
+      "blob": "018663d09e51d15c6e5cabd88e2d1f8c98429688",
+      "sha256": "79caa21dabd36ba83ef358a0a5ab079f1a838de38e4924469ac8c0cd83ea9caf"
+    },
+    "lib/personal-mailbox-producer.test.ts": {
+      "blob": "ec9ac6be529ff4c165e2095ddad8e779360b69a2",
+      "sha256": "ce2e52297189b13ec6d839b6baff7cae6d0c680af70ce6433e11ede22603d035"
+    },
+    "lib/personal-mailbox-retry-context.test.ts": {
+      "blob": "8f7b49fc9286cfecaa9fd0105fa7888dfd8846e5",
+      "sha256": "e9ee72c50eb206e780d3f991977795914623b4ea696c2c0761f8ebdb6dd2f174"
+    },
+    "lib/run-control-actions.test.ts": {
+      "blob": "1d4ee8b94edf32a1a85787dd778c0a64a7467243",
+      "sha256": "2303c9d4bcbfa9ddb2563bec26f54afe30f4160b2866c929267bb679d1740bd7"
+    },
+    "lib/run-control.test.ts": {
+      "blob": "8fcb9c60fa65b78c36b2f9594c793bd507a65292",
+      "sha256": "7a25345d904cb10a2869c12bea336d6bb2e68be68cb3a615bcfc8ada1341ef58"
+    },
+    "tests/claim-response.test.ts": {
+      "blob": "b9fc0928c765dfd8bba71e01717bde6f5dbbd44b",
+      "sha256": "a560c2fc287a6c52a91af850d39c75bbb90048a616c07df5b5acc541096cdfd9"
+    },
+    "tests/fixtures/claim-response-runtime.mjs": {
+      "blob": "cf1ca50dc1fa886db75c9714dba53d43c97b14de",
+      "sha256": "8c2465381cc1c95046d9d5a886f0ae9e341a9a5ed5f98f8d5c858a04224b830c"
+    },
+    "tests/support/live-runtime.ts": {
+      "blob": "82caa96dc120f1e10e3dff7d361bcf75a1a9816b",
+      "sha256": "58b7b31eb8fff4ba0da74ec27f57edcb3e8befe52ebee13fdccfd7db36fc5bd1"
+    }
+  },
+  "preservedProductAndEntryBlobs": {
+    "lib/db/commit-effects.ts": "ac1702b18e5daeaa816ce728c639d425e38cb5ba",
+    "lib/db/commit-effects.test.ts": "818660f7d819009fd739296e79145a1f5f37d4b8",
+    "lib/background.ts": "7f33e1c45020cdbd1572c19726128e9dcde4e472",
+    "lib/server-runtime/server.ts": "a83b0c966a63db3ff253bc5a17ce50dd58276772",
+    "lib/live/scope.ts": "ad11944179110564d37459f88318c87a946bc987",
+    "lib/live/lists.ts": "3a278590aefd985260056ed781ca5f8eed3261b5",
+    "lib/live/panels.ts": "5ffda8d9ea1ff0fc06df8d52bb22b5b4af3f13c7",
+    "lib/live/notify.ts": "6948f0014dbee3d19d6165e5c053e9dfb6d80e2f",
+    "lib/builtin-gateway/config.ts": "6305b4023a5d7dcc22fee92555267b556579ee98",
+    "lib/run-control.ts": "9b62e2e1d42b2e5e07808aafa189fc23bde336bb",
+    "lib/computer/queue-run.ts": "591b17686fed3dbaeb6ab637c9750984d4dd52af",
+    "lib/cloud-computer/thread-machines.ts": "7d67d7c45b963930e296ed0e0ea58a8476e5f120",
+    "lib/cloud-computer/thread-worker-logs.ts": "362a9645db2a4120893fdd41dfb97da13b4047bc",
+    "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts": "030dcc54a3fe179b97b6defe73b5be13fa027de5",
+    "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+    "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+    "scripts/credential-diagnostics-offline.mjs": "71e69f7c25e2869b7db0a8e3262187d9dd261881",
+    "scripts/server-test.mjs": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+    "tests/support/server-only.mjs": "0824d2931a1c6c67b1f34c3a7ce94fa5ad217fd4"
+  },
+  "actualBeforeAfter": [
+    {
+      "label": "run-control",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-run-control-red/receipt.json",
+        "sha256": "66af0c90828f1a924cc178abeb026e085bf8874980d8dd985573fa9e661d9aca",
+        "bytes": 3563,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:53:16.631753+00:00",
+          "command": [
+            "node",
+            "--import",
+            "tsx",
+            "--experimental-test-module-mocks",
+            "--test",
+            "lib/run-control.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "390580df0cd08d206355e6d5d0cb15118bb10a1c190b1aea7261445eec1bc7b8",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:53:18.232239+00:00",
+          "seconds": 1.5163104830025986,
+          "exitCode": 1,
+          "stdoutSha256": "e5fef00a0172dd52ca8bc852df51640556b5eb47168348ea650e6aa20b7b1a29",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 10",
+            "ℹ suites 0",
+            "ℹ pass 4",
+            "ℹ fail 6",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 1426.786182"
+          ],
+          "guardErrorOccurrences": 6,
+          "filesCount": 10
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-run-control-green-v2/receipt.json",
+        "sha256": "2377aff4d9a7c841ec6d6e2e497096f03113834dc6b104308243e1c6a0638f00",
+        "bytes": 4791,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:01.523422+00:00",
+          "command": [
+            "node",
+            "--import",
+            "tsx",
+            "--experimental-test-module-mocks",
+            "--test",
+            "lib/run-control.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "76fd22dd71599c3de52ef652bc4bfa39d66d0a99623a1209c79c3545bcac7cfa",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:19:03.084127+00:00",
+          "seconds": 1.452264933999686,
+          "exitCode": 0,
+          "stdoutSha256": "a2cf66688732eae08132dcfc221823ddce41fc080d50163be87872cdbb400300",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 10",
+            "ℹ suites 0",
+            "ℹ pass 10",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 1375.126855"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 14
+        }
+      },
+      "binding": {
+        "label": "run-control",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-run-control-green-v2/receipt.json",
+        "receiptSha256": "2377aff4d9a7c841ec6d6e2e497096f03113834dc6b104308243e1c6a0638f00",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 1.452264933999686,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 10",
+          "ℹ suites 0",
+          "ℹ pass 10",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 1375.126855"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    },
+    {
+      "label": "worker-tail",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-worker-tail-red/receipt.json",
+        "sha256": "7bdb486557af13b7ff99a02fb50d23e705ad21242c6928a151f264ced3d0c744",
+        "bytes": 3936,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:53:35.266102+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./scripts/server-test.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "--test-name-pattern=^the tail is saved masked with the machine; as an error only where the run has none$",
+            "lib/cloud-computer/thread-worker-logs.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "acd3d82af6132ebdcc933c3fdf4c66db7c712849c5fcc7d51ba7e2c28e3d47f8",
+          "status": "completed",
+          "selection": "One existing tail-persistence case selected for read-only diagnostic; not a full file or CI gate result; original assertions unchanged",
+          "completedAt": "2026-11-21T03:53:36.333215+00:00",
+          "seconds": 1.0003221500010113,
+          "exitCode": 1,
+          "stdoutSha256": "c56a17ff829c1aec6ab01073436bc06b609a2333ceed94d6ed07eeb55d3c28ae",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 1",
+            "ℹ suites 0",
+            "ℹ pass 0",
+            "ℹ fail 1",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 937.585014"
+          ],
+          "guardErrorOccurrences": 1,
+          "filesCount": 10
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-worker-tail-green-v2/receipt.json",
+        "sha256": "8bd5e4eee59cd2c28003355d318bcd54f442bae2771a0438670869aebc11a467",
+        "bytes": 5020,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:07.560468+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./scripts/server-test.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/cloud-computer/thread-worker-logs.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "492ff268295dd4dfe7fd4144ce4afde54d3ba7af8ed4fc685d5e0b09befae3be",
+          "status": "completed",
+          "selection": "Original complete worker-log test file under original package loader flags; not entire package gate",
+          "completedAt": "2026-11-21T04:19:10.176050+00:00",
+          "seconds": 2.5028801379994547,
+          "exitCode": 0,
+          "stdoutSha256": "bf034fdc1d6141254f653e45fc21101f6f24f7856380afcbd3b907f066d9abee",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 16",
+            "ℹ suites 0",
+            "ℹ pass 16",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2378.803398"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 14
+        }
+      },
+      "binding": {
+        "label": "worker-tail",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-worker-tail-green-v2/receipt.json",
+        "receiptSha256": "8bd5e4eee59cd2c28003355d318bcd54f442bae2771a0438670869aebc11a467",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 2.5028801379994547,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 16",
+          "ℹ suites 0",
+          "ℹ pass 16",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 2378.803398"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    },
+    {
+      "label": "question-recovery",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-question-recovery-red/receipt.json",
+        "sha256": "5edbb921ac76461abe7683c44fca6dafece80d779aa1578704b5988d998b8878",
+        "bytes": 4095,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:55:34.797306+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./scripts/server-test.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/cloud-computer/thread-question-recovery.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "6b752f31ff66699f80d813471df45fc2793351c135a5788b90f6c0ecf54cf050",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:55:36.794694+00:00",
+          "seconds": 1.926325590997294,
+          "exitCode": 1,
+          "stdoutSha256": "b152961a6604068cfc5ada7921677fd8c4fb6d9f4cb17373debc2d83a6fda2f3",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 6",
+            "ℹ suites 0",
+            "ℹ pass 1",
+            "ℹ fail 5",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 1870.63939"
+          ],
+          "guardErrorOccurrences": 5,
+          "filesCount": 12
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-question-recovery-green-v2/receipt.json",
+        "sha256": "efd902c1e6d2841c97281f04264f7e5e96f5780f54c1dd128b88d4dbecb7262c",
+        "bytes": 5325,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:01.523423+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./scripts/server-test.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/cloud-computer/thread-question-recovery.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "d215362e8406a3779e0b5cd35fbdc95be73d46fb59cab996f05fe781f3748f6c",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:19:03.384441+00:00",
+          "seconds": 1.7478461080027046,
+          "exitCode": 0,
+          "stdoutSha256": "ac5044db7b6481baf28f0b4a468bf2d9f6e82877ca5b4396b43989d10911fc14",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 6",
+            "ℹ suites 0",
+            "ℹ pass 6",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 1674.189605"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 16
+        }
+      },
+      "binding": {
+        "label": "question-recovery",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-question-recovery-green-v2/receipt.json",
+        "receiptSha256": "efd902c1e6d2841c97281f04264f7e5e96f5780f54c1dd128b88d4dbecb7262c",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 1.7478461080027046,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 6",
+          "ℹ suites 0",
+          "ℹ pass 6",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 1674.189605"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    },
+    {
+      "label": "run-control-actions",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-run-control-actions-red/receipt.json",
+        "sha256": "92afe7a4e4a3bc68ee3df27e72f8dde27b7a28ddcf5dad6cd28e1b4f7cd473e4",
+        "bytes": 4071,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:55:40.275644+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/run-control-actions.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "c012e9ff09f57ef182640956bd2e944fab71b8adde5b7f0dc1f4fca6e67e7a3e",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:55:42.925701+00:00",
+          "seconds": 2.5688524219985993,
+          "exitCode": 1,
+          "stdoutSha256": "4d645e6c1889d2bbe7ed9f4b8ffdd8422d5a4d7bfd154bf27ef40a803f78ccf7",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 23",
+            "ℹ suites 0",
+            "ℹ pass 22",
+            "ℹ fail 1",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2526.122674"
+          ],
+          "guardErrorOccurrences": 1,
+          "filesCount": 12
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-run-control-actions-green-v2/receipt.json",
+        "sha256": "c828fc5bc05e54672444ea6238a26b5d7e9debe14e2d1a3438c8bc9f9391947a",
+        "bytes": 5299,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:07.561579+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/run-control-actions.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "eeab2fc4d72e4a00ac1524473fcdc26a49ee95a5479bff2df82eb59df4c94eea",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:19:11.388871+00:00",
+          "seconds": 3.6899839310026437,
+          "exitCode": 0,
+          "stdoutSha256": "f28cd82072a7f13d127a06fc1cc728d5f8e5b0c5caceeedb7c742d82e005222b",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 23",
+            "ℹ suites 0",
+            "ℹ pass 23",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 3569.891192"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 16
+        }
+      },
+      "binding": {
+        "label": "run-control-actions",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-run-control-actions-green-v2/receipt.json",
+        "receiptSha256": "c828fc5bc05e54672444ea6238a26b5d7e9debe14e2d1a3438c8bc9f9391947a",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 3.6899839310026437,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 23",
+          "ℹ suites 0",
+          "ℹ pass 23",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 3569.891192"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    },
+    {
+      "label": "mailbox-producer",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-mailbox-producer-red/receipt.json",
+        "sha256": "8a59ebcb357fc609becf3e25a8b30ca6b0642998dc561d95f6da38182044e988",
+        "bytes": 4080,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:55:40.268592+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/personal-mailbox-producer.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "003aa9143aed2b267183e73e6ed2500bda71e4bc6eb7ccad7d83cdfd5f06c15a",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:55:42.789823+00:00",
+          "seconds": 2.435956174002058,
+          "exitCode": 1,
+          "stdoutSha256": "b0475c2df811687fb3be67dfa46f828316f9884aee357636f5c88739766fe043",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 2",
+            "ℹ suites 0",
+            "ℹ pass 1",
+            "ℹ fail 1",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2398.147254"
+          ],
+          "guardErrorOccurrences": 1,
+          "filesCount": 12
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-mailbox-producer-green-v2/receipt.json",
+        "sha256": "8211018fb3ad11d5ca6867c57ab26d10233c688a9564e37f9a56ffcae65b3cb3",
+        "bytes": 5309,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:07.560797+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/personal-mailbox-producer.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "eca8a9b59e22ef2bae8aeb31a7c116b27709ca97c83123873a17297c5831289c",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:19:11.205439+00:00",
+          "seconds": 3.5193447359997663,
+          "exitCode": 0,
+          "stdoutSha256": "9477152fc6ad69b5c8fa055dda9b5aef7ed0086498b9b16822a58533e0825b5f",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 2",
+            "ℹ suites 0",
+            "ℹ pass 2",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 3407.645748"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 16
+        }
+      },
+      "binding": {
+        "label": "mailbox-producer",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-mailbox-producer-green-v2/receipt.json",
+        "receiptSha256": "8211018fb3ad11d5ca6867c57ab26d10233c688a9564e37f9a56ffcae65b3cb3",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 3.5193447359997663,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 2",
+          "ℹ suites 0",
+          "ℹ pass 2",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 3407.645748"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    },
+    {
+      "label": "mailbox-retry",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-mailbox-retry-red/receipt.json",
+        "sha256": "905b75d1c98236babf9c2272277f8fedf57bcec3783e531b864faee096db12e3",
+        "bytes": 4091,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:55:40.270791+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/personal-mailbox-retry-context.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "0dbbb9bd9ef67506afa324792f779c18f5e6263438914e8719cd8014b45eb0b7",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:55:42.745715+00:00",
+          "seconds": 2.3918504450011824,
+          "exitCode": 1,
+          "stdoutSha256": "d9a76f4c9132439b97b7a1ae28b7bc6ee856844ab06c6a6ebf3a8d9dc703346b",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 2",
+            "ℹ suites 0",
+            "ℹ pass 1",
+            "ℹ fail 1",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2350.814459"
+          ],
+          "guardErrorOccurrences": 1,
+          "filesCount": 12
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-mailbox-retry-green-v2/receipt.json",
+        "sha256": "fa533111a32d21e8fc3f402bacb58ea81b60debdab331b0956d26697554f888d",
+        "bytes": 5318,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:15.852847+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/personal-mailbox-retry-context.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "56bf0ccc42539fed014aa4330821127670caab935a6590a3768de558a6f4612a",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:19:18.529108+00:00",
+          "seconds": 2.578613786998176,
+          "exitCode": 0,
+          "stdoutSha256": "7410db456a03bf28f3642745da35264ea3a8d645bdeff132aa1705420d6ecde4",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 2",
+            "ℹ suites 0",
+            "ℹ pass 2",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2518.086549"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 16
+        }
+      },
+      "binding": {
+        "label": "mailbox-retry",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-mailbox-retry-green-v2/receipt.json",
+        "receiptSha256": "fa533111a32d21e8fc3f402bacb58ea81b60debdab331b0956d26697554f888d",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 2.578613786998176,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 2",
+          "ℹ suites 0",
+          "ℹ pass 2",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 2518.086549"
+        ],
+        "workingInputsStillIdentical": false,
+        "sourceDifferences": [
+          {
+            "path": "lib/personal-mailbox-retry-context.test.ts",
+            "executedBlob": "28f43eb49f5b7643bdd6e23f912a10a9adb3a869",
+            "currentBlob": "8f7b49fc9286cfecaa9fd0105fa7888dfd8846e5"
+          }
+        ]
+      }
+    },
+    {
+      "label": "claim-response",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-claim-response-red/receipt.json",
+        "sha256": "51505d4c0524f100b3633f8a74965fc96ae745116f84c58032b0357d80b0e7ce",
+        "bytes": 3945,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:57:48.174407+00:00",
+          "command": [
+            "node",
+            "--import",
+            "./scripts/credential-diagnostics-offline.mjs",
+            "--import",
+            "./tests/fixtures/claim-response-runtime.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/claim-response.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "6a80b0929f960e05141a45ed524dbc495fdb477ff29248b72b4ad157dc0d6d69",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:57:50.881879+00:00",
+          "seconds": 2.629255032999936,
+          "exitCode": 1,
+          "stdoutSha256": "25363820e38d53ed121eacd8c4f7366cc350acb6bd48a70e60ff547d6b2190e3",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 51",
+            "ℹ suites 0",
+            "ℹ pass 50",
+            "ℹ fail 1",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2590.566538"
+          ],
+          "guardErrorOccurrences": 1,
+          "filesCount": 11
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-claim-response-green-v3/receipt.json",
+        "sha256": "1994cd2b4ccb285419f1f85efa0292a3377724e011532b99774d496b5e6ddd8b",
+        "bytes": 5174,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "78f5ed8b1d81e6f86a190763553bbcf501b7de14",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:21:13.342959+00:00",
+          "command": [
+            "node",
+            "--import",
+            "./scripts/credential-diagnostics-offline.mjs",
+            "--import",
+            "./tests/fixtures/claim-response-runtime.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/claim-response.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "17466935410ae0c16e28de7125c4cee2b58a7903df966a6b9cbb37dfbdc0923c",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:21:16.033235+00:00",
+          "seconds": 2.604274772998906,
+          "exitCode": 0,
+          "stdoutSha256": "05e783596c268c98f523b5df690d1400ceb60e98e185c2083d05ad27a61c3e10",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "78f5ed8b1d81e6f86a190763553bbcf501b7de14",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 51",
+            "ℹ suites 0",
+            "ℹ pass 51",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2539.588924"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 15
+        }
+      },
+      "binding": {
+        "label": "claim-response",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-claim-response-green-v3/receipt.json",
+        "receiptSha256": "1994cd2b4ccb285419f1f85efa0292a3377724e011532b99774d496b5e6ddd8b",
+        "executedTree": "78f5ed8b1d81e6f86a190763553bbcf501b7de14",
+        "seconds": 2.604274772998906,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 51",
+          "ℹ suites 0",
+          "ℹ pass 51",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 2539.588924"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    },
+    {
+      "label": "credential-mask",
+      "before": {
+        "path": "research/agent-kit-fixture-2984/adjacent-credential-mask-red/receipt.json",
+        "sha256": "d19de7556d41051ee179ed99d08fb1ef39736d8aabdbd0eb08998120772d9066",
+        "bytes": 3258,
+        "receipt": {
+          "source": "44dc61e20dd21a4109fcfcc89c33ee89727898fe",
+          "tree": "1ae5c2eeb06d62b515ced6060389163bb83d17b4",
+          "startedAt": "2026-11-21T03:58:56.144449+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/coordinator/credential-masking.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "absent; default Community",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "32bbb63b73db52d44c37919243939c2e350274603c778c06be3ec0e9f9166191",
+          "status": "completed",
+          "completedAt": "2026-11-21T03:58:57.917825+00:00",
+          "seconds": 1.7041507819994877,
+          "exitCode": 1,
+          "stdoutSha256": "cff32996c2db4889464d5ec94c43adccb6b651faea5dc1dfb39c297efa010efc",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": true,
+          "summaryLines": [
+            "ℹ tests 2",
+            "ℹ suites 0",
+            "ℹ pass 1",
+            "ℹ fail 1",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 1642.693363"
+          ],
+          "guardErrorOccurrences": 1,
+          "filesCount": 8
+        }
+      },
+      "after": {
+        "path": "research/agent-kit-fixture-2984/adjacent-credential-mask-green-v2/receipt.json",
+        "sha256": "979608dd0bc9c8edfd859e766e59d775be652f406fadd367a9aec13b5f803981",
+        "bytes": 4486,
+        "receipt": {
+          "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+          "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+          "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+          "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+          "startedAt": "2026-11-21T04:19:15.857430+00:00",
+          "command": [
+            "node",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "lib/coordinator/credential-masking.test.ts"
+          ],
+          "node": "v24.22.3",
+          "environment": {
+            "inherited": "toolchain/locale/home and native sandbox guards only",
+            "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+            "ci": "absent",
+            "betterAuthUrl": "http://127.0.0.1:3000",
+            "betterAuthSecret": "ephemeral synthetic value, not recorded",
+            "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+            "requireDb": "1",
+            "localAccounts": "1",
+            "providerCredentialsInherited": false
+          },
+          "callerSha256": "a7ca77752ff998db93df64d65104661e406ca720fa46ee6587b038ed98617fa1",
+          "status": "completed",
+          "completedAt": "2026-11-21T04:19:18.116235+00:00",
+          "seconds": 2.1841466190016945,
+          "exitCode": 0,
+          "stdoutSha256": "7c49fbc68944239ae3ccd74d364871c933bfaf0f62c660c102d8e7a668b2e1bb",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "endingClean": false,
+          "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+          "trackedInputsUnchanged": true,
+          "summaryLines": [
+            "ℹ tests 2",
+            "ℹ suites 0",
+            "ℹ pass 2",
+            "ℹ fail 0",
+            "ℹ cancelled 0",
+            "ℹ skipped 0",
+            "ℹ todo 0",
+            "ℹ duration_ms 2107.535144"
+          ],
+          "guardErrorOccurrences": 0,
+          "filesCount": 12
+        }
+      },
+      "binding": {
+        "label": "credential-mask",
+        "receipt": "research/agent-kit-fixture-2984/adjacent-credential-mask-green-v2/receipt.json",
+        "receiptSha256": "979608dd0bc9c8edfd859e766e59d775be652f406fadd367a9aec13b5f803981",
+        "executedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "seconds": 2.1841466190016945,
+        "exit": 0,
+        "summary": [
+          "ℹ tests 2",
+          "ℹ suites 0",
+          "ℹ pass 2",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 2107.535144"
+        ],
+        "workingInputsStillIdentical": true,
+        "sourceDifferences": []
+      }
+    }
+  ],
+  "inputReuseBoundary": "These are genuine pre-commit staged executions; file-level equality is reuse, not a new execution on the later commit. mailbox-retry subsequently removes one unused before import; its complete original owning package is actually rerun on exact code HEAD.",
+  "originalOwningEntries": {
+    "firstAttempt": {
+      "path": "research/agent-kit-fixture-2984/adjacent-original-entries/receipt.json",
+      "sha256": "ada46136df0bb66df44554851cf867e1859ebdee7f24855796d822de1720d33d",
+      "bytes": 9000,
+      "receipt": {
+        "head": "24fd353652cdaac5aec8337d9876815e8e26511b",
+        "tree": "5d4080fc53d896bdc8edaa37385c72e72a03ce2e",
+        "sourceState": "Exact clean remote code checkpoint",
+        "command": [
+          "pnpm",
+          "local:check",
+          "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "--test=test:agent-kit-compat",
+          "--test=test:issues",
+          "--test=test:cloud-limits",
+          "--test=test:personal-mailbox-core",
+          "--test=test:coordinator-events"
+        ],
+        "node": "v24.22.3",
+        "selectedScripts": [
+          "test:agent-kit-compat",
+          "test:issues",
+          "test:cloud-limits",
+          "test:personal-mailbox-core",
+          "test:coordinator-events"
+        ],
+        "scopePolicyReusedThrough": "test:issues invokes its complete existing test:scope-policy script",
+        "environment": {
+          "edition": "caller Cloud; the changed unit fixtures explicitly select synthetic Community builtin gateway",
+          "providerCredentialsInherited": false,
+          "database": "unstarted loopback port 1; original test-owned mocks/fakes only",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "betterAuthSecret": "ephemeral synthetic, not recorded",
+          "ci": "absent"
+        },
+        "startedAt": "2026-11-21T04:23:30.765807+00:00",
+        "status": "completed",
+        "callerSha256": "1fad63b2ad05897723ca84af0f5e36d7502e78e6ef307696ef2b037756fae7de",
+        "completedAt": "2026-11-21T04:25:27.739852+00:00",
+        "seconds": 116.97385980699983,
+        "exitCode": 1,
+        "stdoutSha256": "0612a46e73b35c3621a80f9c1b0f839f28c39e24abd18c087c91363823a2ee85",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingHead": "24fd353652cdaac5aec8337d9876815e8e26511b",
+        "endingClean": true,
+        "guardErrorOccurrences": 0,
+        "inputFilesCount": 11
+      },
+      "localFirstRecord": {
+        "path": "research/agent-kit-fixture-2984/adjacent-original-entries/local-first-record.json",
+        "sha256": "b110c3fb9feba66a0eb500ff0f91763a809ad2b5b2538faa0be926ba1c14b4e5",
+        "bytes": 4052,
+        "receipt": {
+          "version": 1,
+          "sha": "24fd353652cdaac5aec8337d9876815e8e26511b",
+          "identity": "6e20f6a528c13890326c634f087b9fa25fa865bcc336a976fa04c8b30bae03d6",
+          "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "clean": true,
+          "checks": [
+            {
+              "script": "test:agent-kit-compat",
+              "exitCode": 0,
+              "durationMs": 9602
+            },
+            {
+              "script": "test:issues",
+              "exitCode": 0,
+              "durationMs": 54315
+            },
+            {
+              "script": "test:cloud-limits",
+              "exitCode": 0,
+              "durationMs": 6528
+            },
+            {
+              "script": "test:personal-mailbox-core",
+              "exitCode": 0,
+              "durationMs": 6373
+            },
+            {
+              "script": "test:coordinator-events",
+              "exitCode": 1,
+              "durationMs": 29371
+            }
+          ],
+          "acceptance": null,
+          "waiver": null,
+          "ready": false,
+          "observedAt": "2026-11-21T04:25:27.652Z"
+        }
+      },
+      "nativeLegs": [
+        {
+          "owningScript": "test:agent-kit-compat",
+          "packageHeader": "test:agent-kit-compat",
+          "summaryStartLine": 169,
+          "tests": 59,
+          "suites": 0,
+          "pass": 59,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 3183.330131
+        },
+        {
+          "owningScript": "test:agent-kit-compat",
+          "packageHeader": "test:agent-kit-model",
+          "summaryStartLine": 461,
+          "tests": 168,
+          "suites": 0,
+          "pass": 168,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 5577.866715
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:issues",
+          "summaryStartLine": 880,
+          "tests": 357,
+          "suites": 2,
+          "pass": 357,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 16011.103198
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:issues",
+          "summaryStartLine": 944,
+          "tests": 47,
+          "suites": 0,
+          "pass": 47,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 2872.890435
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:issues",
+          "summaryStartLine": 978,
+          "tests": 23,
+          "suites": 0,
+          "pass": 23,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 2413.954825
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-policy",
+          "summaryStartLine": 992,
+          "tests": 2,
+          "suites": 0,
+          "pass": 2,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 216.690645
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-policy",
+          "summaryStartLine": 1004,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 2164.259104
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-policy",
+          "summaryStartLine": 1014,
+          "tests": 2,
+          "suites": 0,
+          "pass": 2,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1782.990971
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-policy",
+          "summaryStartLine": 1025,
+          "tests": 3,
+          "suites": 0,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 869.682458
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-policy",
+          "summaryStartLine": 1341,
+          "tests": 51,
+          "suites": 0,
+          "pass": 51,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 2624.377007
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-policy",
+          "summaryStartLine": 1353,
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1449.754435
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-acceptance-guard",
+          "summaryStartLine": 1421,
+          "tests": 53,
+          "suites": 0,
+          "pass": 53,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 14457.345704
+        },
+        {
+          "owningScript": "test:issues",
+          "packageHeader": "test:scope-acceptance-guard",
+          "summaryStartLine": 1448,
+          "tests": 13,
+          "suites": 0,
+          "pass": 13,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 8097.563918
+        },
+        {
+          "owningScript": "test:cloud-limits",
+          "packageHeader": "test:cloud-limits",
+          "summaryStartLine": 1664,
+          "tests": 112,
+          "suites": 0,
+          "pass": 112,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 5126.017989
+        },
+        {
+          "owningScript": "test:cloud-limits",
+          "packageHeader": "test:cloud-limits",
+          "summaryStartLine": 1683,
+          "tests": 11,
+          "suites": 0,
+          "pass": 11,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 578.839178
+        },
+        {
+          "owningScript": "test:personal-mailbox-core",
+          "packageHeader": "test:personal-mailbox-core",
+          "summaryStartLine": 1827,
+          "tests": 105,
+          "suites": 0,
+          "pass": 105,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 4500.146328
+        },
+        {
+          "owningScript": "test:personal-mailbox-core",
+          "packageHeader": "test:personal-mailbox-core",
+          "summaryStartLine": 1836,
+          "tests": 1,
+          "suites": 0,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1525.52131
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-events",
+          "summaryStartLine": 1859,
+          "tests": 11,
+          "suites": 0,
+          "pass": 11,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 335.255681
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-events",
+          "summaryStartLine": 2040,
+          "tests": 173,
+          "suites": 0,
+          "pass": 173,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1991.421392
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-events",
+          "summaryStartLine": 2406,
+          "tests": 130,
+          "suites": 0,
+          "pass": 130,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 7404.056258
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 2443,
+          "tests": 25,
+          "suites": 0,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1254.099014
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 2466,
+          "tests": 8,
+          "suites": 0,
+          "pass": 8,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 2566.26996
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 2477,
+          "tests": 3,
+          "suites": 0,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 300.169464
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 2506,
+          "tests": 21,
+          "suites": 0,
+          "pass": 21,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 284.781101
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 2520,
+          "tests": 3,
+          "suites": 0,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 555.910819
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-stream",
+          "summaryStartLine": 2568,
+          "tests": 30,
+          "suites": 0,
+          "pass": 15,
+          "fail": 15,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 12732.656563
+        }
+      ]
+    },
+    "affectedEntryAfterCallerCorrection": {
+      "path": "research/agent-kit-fixture-2984/adjacent-coordinator-https/receipt.json",
+      "sha256": "5fa00844b9d42ed564bd3016538340fb2de5848199a550d4e968f9a32599110b",
+      "bytes": 5633,
+      "receipt": {
+        "head": "24fd353652cdaac5aec8337d9876815e8e26511b",
+        "tree": "5d4080fc53d896bdc8edaa37385c72e72a03ce2e",
+        "sourceState": "Exact clean remote code checkpoint",
+        "command": [
+          "pnpm",
+          "local:check",
+          "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "--test=test:coordinator-events"
+        ],
+        "node": "v24.22.3",
+        "selectedScripts": [
+          "test:coordinator-events"
+        ],
+        "callerCorrection": "Cloud with CI absent requires an HTTPS origin. The original 5-script attempt used HTTP and correctly failed auth initialization in the final rendering suite; source, guards, assertions and flags are unchanged. Only the affected original coordinator entry is rerun.",
+        "environment": {
+          "edition": "caller Cloud; the changed unit fixtures explicitly select synthetic Community builtin gateway",
+          "providerCredentialsInherited": false,
+          "database": "unstarted loopback port 1; original test-owned mocks/fakes only",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "betterAuthUrl": "https://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic, not recorded",
+          "ci": "absent"
+        },
+        "startedAt": "2026-11-21T04:27:31.415903+00:00",
+        "status": "completed",
+        "callerSha256": "101f99f4cacb885540345baab05776ed4c7f168f5082c8b00dd3b33fc17efbf1",
+        "completedAt": "2026-11-21T04:28:25.888282+00:00",
+        "seconds": 54.47218589299882,
+        "exitCode": 0,
+        "stdoutSha256": "c349d1ec1e5b65630ecb9371bd92b30ed43808dec2f3134517317594fee93c5b",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingHead": "24fd353652cdaac5aec8337d9876815e8e26511b",
+        "endingClean": true,
+        "guardErrorOccurrences": 0,
+        "inputFilesCount": 11
+      },
+      "nativeLegs": [
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-events",
+          "summaryStartLine": 20,
+          "tests": 11,
+          "suites": 0,
+          "pass": 11,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 486.184278
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-events",
+          "summaryStartLine": 201,
+          "tests": 173,
+          "suites": 0,
+          "pass": 173,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1342.683371
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-events",
+          "summaryStartLine": 567,
+          "tests": 130,
+          "suites": 0,
+          "pass": 130,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 10056.25182
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 604,
+          "tests": 25,
+          "suites": 0,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 1037.680966
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 627,
+          "tests": 8,
+          "suites": 0,
+          "pass": 8,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 3101.206294
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 638,
+          "tests": 3,
+          "suites": 0,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 258.233403
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 667,
+          "tests": 21,
+          "suites": 0,
+          "pass": 21,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 139.429898
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:personal-message-safety",
+          "summaryStartLine": 681,
+          "tests": 3,
+          "suites": 0,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 801.06301
+        },
+        {
+          "owningScript": "test:coordinator-events",
+          "packageHeader": "test:coordinator-stream",
+          "summaryStartLine": 747,
+          "tests": 30,
+          "suites": 0,
+          "pass": 30,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 24824.148237
+        }
+      ],
+      "localFirstRecord": {
+        "path": "research/agent-kit-fixture-2984/adjacent-coordinator-https/local-first-record.json",
+        "sha256": "c32f343f5e38149563a1e7d7a94a4cb87a76a7c575030cda3e07fa6a80af66a0",
+        "bytes": 3660,
+        "receipt": {
+          "version": 1,
+          "sha": "24fd353652cdaac5aec8337d9876815e8e26511b",
+          "identity": "6e20f6a528c13890326c634f087b9fa25fa865bcc336a976fa04c8b30bae03d6",
+          "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "clean": true,
+          "checks": [
+            {
+              "script": "test:coordinator-events",
+              "exitCode": 0,
+              "durationMs": 43717
+            }
+          ],
+          "acceptance": null,
+          "waiver": null,
+          "ready": false,
+          "observedAt": "2026-11-21T04:28:25.820Z"
+        }
+      }
+    },
+    "interpretation": "The first invocation has FOUR successful owning scripts and ONE failed coordinator script, and keeps exit 1. The final render leg correctly rejected the temporary caller Cloud+HTTP+CI-absent combination. Only that original coordinator owning entry was rerun using a valid synthetic HTTPS origin, with no CI flag, product change or relaxed origin guard. All its native legs then passed. These distinct environments and invocations are not merged into a fictional successful full-check run.",
+    "caseCounts": "Native per-leg counters are retained; overlapping nested scripts and the factory-flag repeat are not added into a unique test count. No skipped case is counted as passed.",
+    "beforeReady": "Neither local:check record asserts ready, product acceptance or a waiver. No full pnpm check result is fabricated."
+  },
+  "rootTypecheck": {
+    "path": "research/agent-kit-fixture-2984/adjacent-root-typecheck/receipt.json",
+    "sha256": "5b706eb237e8e63e6b04eb3cc6a0f6b081554405defeef8aa3bc2031a22c93ce",
+    "bytes": 815,
+    "receipt": {
+      "head": "24fd353652cdaac5aec8337d9876815e8e26511b",
+      "tree": "5d4080fc53d896bdc8edaa37385c72e72a03ce2e",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsrs",
+        "--noEmit"
+      ],
+      "scope": "Unmodified first command of original typecheck script; its root tsconfig includes changed TS fixtures. Not the API/frontend typecheck legs or full pnpm check.",
+      "startedAt": "2026-11-21T04:28:17.815331+00:00",
+      "status": "completed",
+      "callerSha256": "77795322928b0a07f974c014703133552f57f8d7738af415d65e26690dca7a88",
+      "completedAt": "2026-11-21T04:28:27.887448+00:00",
+      "seconds": 10.071912243001861,
+      "exitCode": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "endingClean": true
+    }
+  },
+  "lint": {
+    "path": "research/agent-kit-fixture-2984/adjacent-lint-final/receipt.json",
+    "sha256": "9a7ab436099f279b6dfef3b76d65c5caa0f189c1658cd91179823d9023f8394b",
+    "bytes": 3237,
+    "receipt": {
+      "source": "24fd353652cdaac5aec8337d9876815e8e26511b",
+      "executedTree": "5d4080fc53d896bdc8edaa37385c72e72a03ce2e",
+      "sourceState": "clean exact remote code checkpoint",
+      "command": [
+        "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/toolchain/bin/pnpm",
+        "exec",
+        "oxlint",
+        "lib/agent-kit/main-compat.test.ts",
+        "lib/cloud-computer/thread-question-recovery.test.ts",
+        "lib/cloud-computer/thread-worker-logs.test.ts",
+        "lib/coordinator/credential-masking.test.ts",
+        "lib/personal-mailbox-producer.test.ts",
+        "lib/personal-mailbox-retry-context.test.ts",
+        "lib/run-control-actions.test.ts",
+        "lib/run-control.test.ts",
+        "tests/claim-response.test.ts",
+        "tests/fixtures/claim-response-runtime.mjs",
+        "tests/support/live-runtime.ts"
+      ],
+      "startedAt": "2026-11-21T04:23:56.274671+00:00",
+      "seconds": 0.7275936770020053,
+      "exitCode": 0,
+      "files": {
+        "lib/agent-kit/main-compat.test.ts": {
+          "blob": "0e6c922cec5a1c69548c521ca23dfbb9b77d2925",
+          "sha256": "bf0e3493930e1e56f23c2a0124c3b2a53d24948b0456e795dd0c7efcd2f8861e"
+        },
+        "lib/cloud-computer/thread-question-recovery.test.ts": {
+          "blob": "9ba49badd64715ac09dd1eed93cef067e3e4881d",
+          "sha256": "6f5c62a8870ec4fbb51ab119defc1982623c0ea313f4b6a2629dda87381dd708"
+        },
+        "lib/cloud-computer/thread-worker-logs.test.ts": {
+          "blob": "d3ec72a7d828d7acd4050dd82b0b890eec3350ed",
+          "sha256": "fa1d7026db63515371a738e7617d50f5c1c8b360e63b6024c27f3b075be428dd"
+        },
+        "lib/coordinator/credential-masking.test.ts": {
+          "blob": "018663d09e51d15c6e5cabd88e2d1f8c98429688",
+          "sha256": "79caa21dabd36ba83ef358a0a5ab079f1a838de38e4924469ac8c0cd83ea9caf"
+        },
+        "lib/personal-mailbox-producer.test.ts": {
+          "blob": "ec9ac6be529ff4c165e2095ddad8e779360b69a2",
+          "sha256": "ce2e52297189b13ec6d839b6baff7cae6d0c680af70ce6433e11ede22603d035"
+        },
+        "lib/personal-mailbox-retry-context.test.ts": {
+          "blob": "8f7b49fc9286cfecaa9fd0105fa7888dfd8846e5",
+          "sha256": "e9ee72c50eb206e780d3f991977795914623b4ea696c2c0761f8ebdb6dd2f174"
+        },
+        "lib/run-control-actions.test.ts": {
+          "blob": "1d4ee8b94edf32a1a85787dd778c0a64a7467243",
+          "sha256": "2303c9d4bcbfa9ddb2563bec26f54afe30f4160b2866c929267bb679d1740bd7"
+        },
+        "lib/run-control.test.ts": {
+          "blob": "8fcb9c60fa65b78c36b2f9594c793bd507a65292",
+          "sha256": "7a25345d904cb10a2869c12bea336d6bb2e68be68cb3a615bcfc8ada1341ef58"
+        },
+        "tests/claim-response.test.ts": {
+          "blob": "b9fc0928c765dfd8bba71e01717bde6f5dbbd44b",
+          "sha256": "a560c2fc287a6c52a91af850d39c75bbb90048a616c07df5b5acc541096cdfd9"
+        },
+        "tests/fixtures/claim-response-runtime.mjs": {
+          "blob": "cf1ca50dc1fa886db75c9714dba53d43c97b14de",
+          "sha256": "8c2465381cc1c95046d9d5a886f0ae9e341a9a5ed5f98f8d5c858a04224b830c"
+        },
+        "tests/support/live-runtime.ts": {
+          "blob": "82caa96dc120f1e10e3dff7d361bcf75a1a9816b",
+          "sha256": "58b7b31eb8fff4ba0da74ec27f57edcb3e8befe52ebee13fdccfd7db36fc5bd1"
+        }
+      },
+      "stdoutSha256": "2205fbc447c9ba09dfa79b02c09a979f7062076b5fd4d12d4bd2b4321a243d8a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "environmentRestorationDiagnostic": {
+    "path": "research/agent-kit-fixture-2984/adjacent-restoration-diagnostic/receipt.json",
+    "sha256": "f285db66a8cba592fa95842f09fccdfcbf805020d0f6f774e8943fecaf27485f",
+    "bytes": 889,
+    "receipt": {
+      "source": "24fd353652cdaac5aec8337d9876815e8e26511b",
+      "tree": "5d4080fc53d896bdc8edaa37385c72e72a03ce2e",
+      "scope": "One-off native hook/loader diagnostic after the original fixture failures; not a new repository test or product delivery proof",
+      "helperBlob": "82caa96dc120f1e10e3dff7d361bcf75a1a9816b",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--experimental-test-module-mocks",
+        "--test",
+        "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/diagnose-fixture-restoration.mjs"
+      ],
+      "startedAt": "2026-11-21T04:29:11.045777+00:00",
+      "seconds": 0.4133305850009492,
+      "exitCode": 0,
+      "scriptSha256": "fdc8be718bc2be685099b7ebcfa2397f97a36d58ebaafccc408b6776a1b92f1e",
+      "stdoutSha256": "d3dbeee0038f6227ae0476af601e5c849f11a5e2d6c536d53cf34ff1796f6da6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "intermediateFailuresAndDiagnostics": [
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-explicit-gateway-red/receipt.json",
+      "sha256": "2c3d3629bbf5c36ea96e0cf9724abc39c493e7b8473713fba68213ebed16a6ee",
+      "bytes": 3849,
+      "receipt": {
+        "source": "f2c391542b323eee8a8b05620cc4f601c1b5e475",
+        "tree": "c8748da13a882915e42b49e3cda47b7af5847fe2",
+        "startedAt": "2026-11-21T04:06:19.505430+00:00",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--experimental-test-module-mocks",
+          "--test",
+          "lib/run-control.test.ts"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; existing support helper explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "e646939d471df0a39763e244af0d7527bfe0eaed389e48b14c0dd8e818d05d55",
+        "status": "completed",
+        "completedAt": "2026-11-21T04:06:21.210903+00:00",
+        "seconds": 1.6131996370022534,
+        "exitCode": 0,
+        "stdoutSha256": "969e1cf95f8b27006873e56a3a64e6df0c24de22ae6620ad71624c84888dffa3",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingClean": true,
+        "summaryLines": [
+          "ℹ tests 10",
+          "ℹ suites 0",
+          "ℹ pass 10",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 1533.590155"
+        ],
+        "guardErrorOccurrences": 0,
+        "filesCount": 11
+      },
+      "interpretation": "f2 helper installation restored its environment before test bodies. The 10/10 output is not accepted as the claimed gateway regression.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-explicit-gateway-red/stdout.log",
+          "sha256": "969e1cf95f8b27006873e56a3a64e6df0c24de22ae6620ad71624c84888dffa3",
+          "bytes": 1293
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-explicit-gateway-red/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-hook-installation-diagnostic/receipt.json",
+      "sha256": "cfaa72ff072f6a12c2ade735fa4c5cac1f7cbc7b68a2a152ddf4b77e64c846af",
+      "bytes": 3912,
+      "receipt": {
+        "source": "f2c391542b323eee8a8b05620cc4f601c1b5e475",
+        "tree": "c8748da13a882915e42b49e3cda47b7af5847fe2",
+        "startedAt": "2026-11-21T04:07:29.175635+00:00",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--experimental-test-module-mocks",
+          "--test",
+          "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/diagnose-fixture-hook.mjs"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; existing support helper explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "6252b350ec0ffc1cf90c75533b0b792a9d2a0750edd960b230fcca7ff11ec452",
+        "status": "completed",
+        "completedAt": "2026-11-21T04:07:29.527875+00:00",
+        "seconds": 0.2579294450006273,
+        "exitCode": 1,
+        "stdoutSha256": "2772dcd52734028cb11f9580f4c118af48121c9a0179c9995dedb7e835b9b159",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingClean": true,
+        "summaryLines": [
+          "ℹ tests 1",
+          "ℹ suites 0",
+          "ℹ pass 0",
+          "ℹ fail 1",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 193.603199"
+        ],
+        "guardErrorOccurrences": 0,
+        "filesCount": 11
+      },
+      "interpretation": "Actual one-case native diagnostic: builtin inside before then Cloud/no gateway in test body. Failed environment installation, not a product regression.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-hook-installation-diagnostic/stdout.log",
+          "sha256": "2772dcd52734028cb11f9580f4c118af48121c9a0179c9995dedb7e835b9b159",
+          "bytes": 1424
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-hook-installation-diagnostic/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-installed-gateway-red/receipt.json",
+      "sha256": "4433f1bb90c4f03b2c9b2f0895aecb05307a93da92d9e948076de363dd7c27be",
+      "bytes": 3979,
+      "receipt": {
+        "source": "f2c391542b323eee8a8b05620cc4f601c1b5e475",
+        "tree": "c8748da13a882915e42b49e3cda47b7af5847fe2",
+        "startedAt": "2026-11-21T04:08:15.366338+00:00",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--experimental-test-module-mocks",
+          "--test",
+          "lib/run-control.test.ts"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; existing support helper explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "dcc5729e38c0bbf61f2818fb3867f14507dc99875290dabd512b1a74c717b180",
+        "status": "completed",
+        "sourceState": "Tracked modified tree after fixing module-level hook registration; exact file hashes below; not yet committed",
+        "completedAt": "2026-11-21T04:08:16.964420+00:00",
+        "seconds": 1.5180649120011367,
+        "exitCode": 1,
+        "stdoutSha256": "559da46532d6ac873f6599d7fd3c4f053bd32f9d42c3120ef14523c3292f36c0",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingClean": false,
+        "summaryLines": [
+          "ℹ tests 10",
+          "ℹ suites 0",
+          "ℹ pass 4",
+          "ℹ fail 6",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 1444.018252"
+        ],
+        "guardErrorOccurrences": 6,
+        "filesCount": 11
+      },
+      "interpretation": "Corrected module-level environment hooks: explicit caller Cloud now reaches the real builtin boundary and reproduces six original guard failures before observer repairs.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-installed-gateway-red/stdout.log",
+          "sha256": "559da46532d6ac873f6599d7fd3c4f053bd32f9d42c3120ef14523c3292f36c0",
+          "bytes": 7922
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-installed-gateway-red/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-scheduler-binding-diagnostic/receipt.json",
+      "sha256": "9ef6e5bf9301559e5849ef8bc6f3706c5a9a28ea494d6c6e26baa1135a7da445",
+      "bytes": 692,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "helperBlob": "75b56b603b43755349d84faf7d649a217f09956a",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--experimental-test-module-mocks",
+          "--test",
+          "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/diagnose-scheduler-capture.mjs"
+        ],
+        "startedAt": "2026-11-21T04:17:55.284295+00:00",
+        "seconds": 0.2658930639991013,
+        "exitCode": 1,
+        "scriptSha256": "9f916844a702f332733fed541bf01291611ed71d2b04bad7e1496c28332ff1f8",
+        "stdoutSha256": "7c2dcb76733b94cc0fc7b57caaee7a25b0b68fdd4e66e911d3dbc5d9bc49e08e",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "interpretation": "Old dynamic-before/cache:true response mock did not capture even the next before hook: API_REQUEST_SCOPE_REQUIRED. No claim that this was merely a late counter.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-scheduler-binding-diagnostic/stdout.log",
+          "sha256": "7c2dcb76733b94cc0fc7b57caaee7a25b0b68fdd4e66e911d3dbc5d9bc49e08e",
+          "bytes": 1136
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-scheduler-binding-diagnostic/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-scheduler-module-scope-diagnostic/receipt.json",
+      "sha256": "9b6d285b64ddc734852282a9a9536317a95af839d131cf53881f71b26be8af9a",
+      "bytes": 755,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "sourceState": "modified helper; source blob authoritative",
+        "helperBlob": "82caa96dc120f1e10e3dff7d361bcf75a1a9816b",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--experimental-test-module-mocks",
+          "--test",
+          "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/diagnose-scheduler-capture.mjs"
+        ],
+        "startedAt": "2026-11-21T04:18:23.209292+00:00",
+        "seconds": 0.6951436060007836,
+        "exitCode": 0,
+        "scriptSha256": "9f916844a702f332733fed541bf01291611ed71d2b04bad7e1496c28332ff1f8",
+        "stdoutSha256": "8d43209f7e2c47fbce8a5f2cdef9d5f78e676d93fedaeb61ab7a4580e44b38bb",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "interpretation": "Original bdec static namespace plus module-level mock pattern captures the real afterJob boundary without executing callback; no runtime guard mocked.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-scheduler-module-scope-diagnostic/stdout.log",
+          "sha256": "8d43209f7e2c47fbce8a5f2cdef9d5f78e676d93fedaeb61ab7a4580e44b38bb",
+          "bytes": 637
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-scheduler-module-scope-diagnostic/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-run-control-green/receipt.json",
+      "sha256": "4f1c3ac60cc9895c91282acce7ffa31a42271e316fea803f6041a529e7f0a5e2",
+      "bytes": 3508,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+        "executedWorkingTree": "605384d4f5b74955804b1c26d0b7488ce2a4f7c8",
+        "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+        "startedAt": "2026-11-21T04:13:00.967346+00:00",
+        "command": [
+          "node",
+          "--import",
+          "tsx",
+          "--experimental-test-module-mocks",
+          "--test",
+          "lib/run-control.test.ts"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "7285eca6236ef14e68329522585f201c6ff842eeb920f0e6693fc3465efd431b",
+        "status": "running",
+        "filesCount": 11
+      },
+      "interpretation": "First observer candidate output has 10 tests/9 pass/1 fail. Native test completed, but the temporary receipt caller raced git write-tree and exited before writing completion. Receipt remains running; no exit/time fabricated from it.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-run-control-green/stdout.log",
+          "sha256": "bd986b796caaf86879490768ef704510f7fdd47c04cd0713fb19eaef682f8cf1",
+          "bytes": 3543
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-run-control-green/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-question-recovery-green/receipt.json",
+      "sha256": "e832033d590390f1997e39606aa46cfa5789ae292e5127bdc52e7fe8e3a18768",
+      "bytes": 4479,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+        "executedWorkingTree": "605384d4f5b74955804b1c26d0b7488ce2a4f7c8",
+        "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+        "startedAt": "2026-11-21T04:13:00.936989+00:00",
+        "command": [
+          "node",
+          "--experimental-test-module-mocks",
+          "--import",
+          "./scripts/server-test.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "lib/cloud-computer/thread-question-recovery.test.ts"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "fe617b892fc62aa5df50317dbb145d082b07b3a959a162bed36d95d006533a92",
+        "status": "completed",
+        "completedAt": "2026-11-21T04:13:02.884369+00:00",
+        "seconds": 1.8543558400015172,
+        "exitCode": 1,
+        "stdoutSha256": "7a3cb5b819b38c83f4923dc284c0a9ec3d1fd02253932e6d93a57ba9d56f1c76",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingClean": false,
+        "endingExecutedTree": "605384d4f5b74955804b1c26d0b7488ce2a4f7c8",
+        "trackedInputsUnchanged": true,
+        "summaryLines": [
+          "ℹ tests 6",
+          "ℹ suites 0",
+          "ℹ pass 5",
+          "ℹ fail 1",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 1791.081828"
+        ],
+        "guardErrorOccurrences": 0,
+        "filesCount": 12
+      },
+      "interpretation": "First observer candidate six tests/five pass/one fail; added scheduler assertion exposed genuine fallback to loopback instead of capture.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-question-recovery-green/stdout.log",
+          "sha256": "7a3cb5b819b38c83f4923dc284c0a9ec3d1fd02253932e6d93a57ba9d56f1c76",
+          "bytes": 13269
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-question-recovery-green/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-worker-tail-green/receipt.json",
+      "sha256": "1928cee4db466678488e0f406a4d24733a2610616528d66091ea25bbbfc41120",
+      "bytes": 4390,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+        "executedWorkingTree": "605384d4f5b74955804b1c26d0b7488ce2a4f7c8",
+        "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+        "startedAt": "2026-11-21T04:13:00.945681+00:00",
+        "command": [
+          "node",
+          "--experimental-test-module-mocks",
+          "--import",
+          "./scripts/server-test.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "lib/cloud-computer/thread-worker-logs.test.ts"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "2be168276f5ccda3eb51ad9b16fafeb3d83d525526ff50bf495bfff696cf9b8b",
+        "status": "completed",
+        "selection": "Original complete worker-log test file under original package loader flags; not entire package gate",
+        "completedAt": "2026-11-21T04:13:02.871631+00:00",
+        "seconds": 1.8452489570008765,
+        "exitCode": 0,
+        "stdoutSha256": "bfc45f35c26f7bae8fb46ee5241e39bef1fd77091f8ae74b90e46e553cbae7b2",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingClean": false,
+        "endingExecutedTree": "605384d4f5b74955804b1c26d0b7488ce2a4f7c8",
+        "trackedInputsUnchanged": true,
+        "summaryLines": [
+          "ℹ tests 16",
+          "ℹ suites 0",
+          "ℹ pass 16",
+          "ℹ fail 0",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 1783.89593"
+        ],
+        "guardErrorOccurrences": 0,
+        "filesCount": 11
+      },
+      "interpretation": "First observer candidate full worker file actually passed 16/16; later shared-helper input changed, so this is historical only.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-worker-tail-green/stdout.log",
+          "sha256": "bfc45f35c26f7bae8fb46ee5241e39bef1fd77091f8ae74b90e46e553cbae7b2",
+          "bytes": 17784
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-worker-tail-green/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-claim-response-green-v2/receipt.json",
+      "sha256": "9b2fa6107af9b0b2b1959687bf3e347e15396469357fb9ba039a8aa2b9adbd8b",
+      "bytes": 5175,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "tree": "964201cc773b2c8396f38ebf03edf1d5f5cec077",
+        "executedWorkingTree": "524e35977988ee0428870cbda0715de78d335253",
+        "sourceState": "Tracked staged candidate on 320, all modified file content represented by executedWorkingTree; not a clean-head or fullcheck receipt",
+        "startedAt": "2026-11-21T04:19:15.857770+00:00",
+        "command": [
+          "node",
+          "--import",
+          "./scripts/credential-diagnostics-offline.mjs",
+          "--import",
+          "./tests/fixtures/claim-response-runtime.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "tests/claim-response.test.ts"
+        ],
+        "node": "v24.22.3",
+        "environment": {
+          "inherited": "toolchain/locale/home and native sandbox guards only",
+          "edition": "caller Cloud; unit fixture explicitly selects synthetic Community builtin gateway",
+          "ci": "absent",
+          "betterAuthUrl": "http://127.0.0.1:3000",
+          "betterAuthSecret": "ephemeral synthetic value, not recorded",
+          "database": "unstarted loopback port 1, isolated *_e2e names; original test owns database mocks, no real DB required",
+          "requireDb": "1",
+          "localAccounts": "1",
+          "providerCredentialsInherited": false
+        },
+        "callerSha256": "894714be7187d9fafbb71d37eaa7218ede873c9a57dff1daace463b3e630c1a8",
+        "status": "completed",
+        "completedAt": "2026-11-21T04:19:18.988289+00:00",
+        "seconds": 3.0369098679984745,
+        "exitCode": 1,
+        "stdoutSha256": "fc6a4c8762071ea0a121a97d1269cb71f9e1c1e79e16a80c9e576293c8bed671",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "endingClean": false,
+        "endingExecutedTree": "524e35977988ee0428870cbda0715de78d335253",
+        "trackedInputsUnchanged": true,
+        "summaryLines": [
+          "ℹ tests 51",
+          "ℹ suites 0",
+          "ℹ pass 50",
+          "ℹ fail 1",
+          "ℹ cancelled 0",
+          "ℹ skipped 0",
+          "ℹ todo 0",
+          "ℹ duration_ms 2974.036893"
+        ],
+        "guardErrorOccurrences": 0,
+        "filesCount": 15
+      },
+      "interpretation": "51 tests/50 pass/one fail caused by our new assertion mistakenly placed in the separate Profile-rejection case. Original route has no live call there. Moved only that added assertion to the original failing credential-preparation path; product and original assertions unchanged.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-claim-response-green-v2/stdout.log",
+          "sha256": "fc6a4c8762071ea0a121a97d1269cb71f9e1c1e79e16a80c9e576293c8bed671",
+          "bytes": 97739
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-claim-response-green-v2/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-claim-gateway-diagnostic/receipt.json",
+      "sha256": "bf80e140fcf5c965408e80bfb4dc104edbf0c94d48e4848814cc7844f6af660a",
+      "bytes": 852,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "sourceState": "modified claim loader; input blob authoritative",
+        "fixtureBlob": "cf1ca50dc1fa886db75c9714dba53d43c97b14de",
+        "command": [
+          "node",
+          "--import",
+          "./scripts/credential-diagnostics-offline.mjs",
+          "--import",
+          "./tests/fixtures/claim-response-runtime.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/diagnose-claim-gateway.mjs"
+        ],
+        "startedAt": "2026-11-21T04:20:02.074524+00:00",
+        "seconds": 0.8871504179987824,
+        "exitCode": 0,
+        "scriptSha256": "5ed480a5d261889f73d96f8a2b5abd0f1b7b20b9cc99665632425564945549fd",
+        "stdoutSha256": "ec0c4fa027e604c701b59697ea8075444c8e591357e642dcbb53b11471fca396",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "interpretation": "The unchanged JS preload selected Community/builtin correctly; excludes environment loss as the claim assertion failure cause.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-claim-gateway-diagnostic/stdout.log",
+          "sha256": "ec0c4fa027e604c701b59697ea8075444c8e591357e642dcbb53b11471fca396",
+          "bytes": 243
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-claim-gateway-diagnostic/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-claim-scheduler-diagnostic/receipt.json",
+      "sha256": "f950afa16f9b8c751404e03e7e7f8a2aa5b31569f052929cd97960e07ca20561",
+      "bytes": 854,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "sourceState": "modified claim loader; input blob authoritative",
+        "fixtureBlob": "cf1ca50dc1fa886db75c9714dba53d43c97b14de",
+        "command": [
+          "node",
+          "--import",
+          "./scripts/credential-diagnostics-offline.mjs",
+          "--import",
+          "./tests/fixtures/claim-response-runtime.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "/workspace/scratch/b55cdf575d56/research/agent-kit-fixture-2984/diagnose-claim-scheduler.mjs"
+        ],
+        "startedAt": "2026-11-21T04:20:17.937032+00:00",
+        "seconds": 1.2673013549974712,
+        "exitCode": 0,
+        "scriptSha256": "2acae0b092607819eaa9b21f455461d6438bd65c85e68615ab3a763955ba3095",
+        "stdoutSha256": "2efebd9f0f551506c0b00187d77510bc3d5cbe801ddd19085d78fe441fe556fd",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "interpretation": "The existing JS loader captures direct response after and real afterJob, with no callback execution.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-claim-scheduler-diagnostic/stdout.log",
+          "sha256": "2efebd9f0f551506c0b00187d77510bc3d5cbe801ddd19085d78fe441fe556fd",
+          "bytes": 239
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-claim-scheduler-diagnostic/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "research/agent-kit-fixture-2984/adjacent-lint/receipt.json",
+      "sha256": "ca10ff49b26d2431749c064e066d15c1bce20ee2c565314c2403124f46c69cb9",
+      "bytes": 3232,
+      "receipt": {
+        "source": "320b72d4e3bd3592c07b969fa6af6ac9cf817822",
+        "executedTree": "78f5ed8b1d81e6f86a190763553bbcf501b7de14",
+        "sourceState": "staged candidate before commit",
+        "command": [
+          "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/toolchain/bin/pnpm",
+          "exec",
+          "oxlint",
+          "lib/agent-kit/main-compat.test.ts",
+          "lib/cloud-computer/thread-question-recovery.test.ts",
+          "lib/cloud-computer/thread-worker-logs.test.ts",
+          "lib/coordinator/credential-masking.test.ts",
+          "lib/personal-mailbox-producer.test.ts",
+          "lib/personal-mailbox-retry-context.test.ts",
+          "lib/run-control-actions.test.ts",
+          "lib/run-control.test.ts",
+          "tests/claim-response.test.ts",
+          "tests/fixtures/claim-response-runtime.mjs",
+          "tests/support/live-runtime.ts"
+        ],
+        "startedAt": "2026-11-21T04:21:49.929126+00:00",
+        "seconds": 0.664682045000518,
+        "exitCode": 0,
+        "stdoutSha256": "2b3ee9e3e1b18a814398ca53b39f2166d4ab3ada604e59c812d73626816a567c",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "filesCount": 11
+      },
+      "interpretation": "Initial expanded lint exited zero with one unused before import warning; the unused import was removed before code commit and final lint passed with zero warnings.",
+      "existingLogs": [
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-lint/stdout.log",
+          "sha256": "2b3ee9e3e1b18a814398ca53b39f2166d4ab3ada604e59c812d73626816a567c",
+          "bytes": 515
+        },
+        {
+          "path": "research/agent-kit-fixture-2984/adjacent-lint/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "additionalConfirmedBrokenFixtures": 8,
+    "directReferenceDispositions": 125,
+    "focusedAfterNaturalFullFiles": 8,
+    "firstOwningInvocation": {
+      "scripts": 5,
+      "succeeded": 4,
+      "failed": 1,
+      "exitCode": 1
+    },
+    "correctedAffectedOwningInvocation": {
+      "scripts": 1,
+      "succeeded": 1,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "observedE2EJourneys": 0,
+    "observedReleaseRuns": 0,
+    "beforeAfterTimingClaim": null
+  },
+  "boundaries": [
+    "All actual logs and raw receipts are retained, including helper installation, scheduler capture, misplaced new claim assertion, lint warning and HTTP-origin caller failures. No rerun without a concrete changed cause is counted.",
+    "The focused default-Community REDs and caller-Cloud GREENs are explicit test conditions, not a randomized or fleet-wide failure rate. Worker-tail RED selected one existing case; its GREEN is the full original file.",
+    "The 125 references are a one-time direct-call audit, not complete transitive proof for every repository or environment.",
+    "Root tsrs --noEmit is only the original root typecheck leg; API/frontend typecheck and complete check remain separate.",
+    "No real PG/model/provider/VM/production work is performed by these unit checks. Synthetic loopback origins and unstarted *_e2e DSNs do not prove network or live delivery.",
+    "No secret, private UI source, protected Cloud source or customer data is included.",
+    "Normal merge and exact-main verification remain the parent-owned delivery steps; protected CI and the missing GitGuardian receipt are not waived."
+  ],
+  "fullLocalSnapshot": {
+    "path": "research/agent-kit-fixture-2984/2984-agent-kit-fixture-expanded-full-local.json",
+    "bytes": 265418,
+    "sha256": "8e3ec5505a132b39b6a4dce539a7cb2771ce636cc5508cd319344e6d1d881546",
+    "boundary": "Includes full original raw receipt payloads and repeated input maps; compact public summary retains exact raw hashes, sources, commands, denominators and paths without duplicating every input map."
+  }
+}

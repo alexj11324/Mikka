@@ -1,0 +1,351 @@
+{
+  "schema": "sdlc-2984-local-modes-v1",
+  "finding": "SDLC-015",
+  "repository": "aspectly-labs/Mikka",
+  "repositoryId": 1427517699,
+  "issue": 2984,
+  "pr": 3023,
+  "branch": "feat/sdlc-2984-local-modes",
+  "capturedAt": "2026-11-21T05:05:00.108371+00:00",
+  "status": "Draft; focused code and real local-plan mode regressions verified; full local gate, independent review, protected CI, merge and postmerge remain incomplete",
+  "rootCause": "The existing local adapter read only Git name/status, overwrote earlier per-path changes, and fabricated regular 100644 modes before calling the existing selector. This suppressed the selector mode/type full-validation reason and omitted mode metadata from local evidence identity.",
+  "ownership": {
+    "originalEntryOwner": "Merged #3001 / #2997",
+    "sameRootOpenRepairFound": false,
+    "initialAudit": {
+      "openPulls": 60,
+      "fileEntries": 2715,
+      "evidence": {
+        "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/owner-audit.json",
+        "sha256": "608fa806b48f56c53249c05f13995996819565424ce4a36b860879b10d768114",
+        "bytes": 44607
+      }
+    },
+    "refresh": {
+      "inventory": {
+        "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/open-pr-heads-after-3023.json",
+        "sha256": "7ec53075d1093a9c96cca0765e41b11b67e62cdcdb09fc612ddad2975b4e994d",
+        "bytes": 20286
+      },
+      "openPulls": 64,
+      "externalPullsExcludingThisPR": 63,
+      "externalFileEntries": 2727,
+      "changedExternalPulls": [
+        {
+          "pr": 3022,
+          "head": "9f21a38b1dada8ca6e71dc7d6c6d13df93f4989e",
+          "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "fileCount": 5,
+          "paths": [
+            "components/auth-form.tsx",
+            "components/auth/turnstile.test.tsx",
+            "components/blocks/auth-19/components/sign-in-card.tsx",
+            "messages/en.json",
+            "messages/zh-CN.json"
+          ],
+          "raw": {
+            "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/fresh-pr-3022-files.json",
+            "sha256": "22edb52361bfb497b0a00a60381f3ae5a9c26c8ed3e48791ba26166bab8c99ab"
+          }
+        },
+        {
+          "pr": 3021,
+          "head": "cd96c25bb248d5bf102680d3936f065e586a94bb",
+          "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "fileCount": 5,
+          "paths": [
+            "cloudflare/legacy-orvilo-redirect/src/index.mjs",
+            "cloudflare/legacy-orvilo-redirect/src/index.test.mjs",
+            "cloudflare/legacy-orvilo-redirect/wrangler.jsonc",
+            "package.json",
+            "scripts/ci/tasks.json"
+          ],
+          "raw": {
+            "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/fresh-pr-3021-files.json",
+            "sha256": "e6b2d28993f65bdb6df072bc32ef8dd2fbbfccea6741ba29284b97c056010d2a"
+          }
+        },
+        {
+          "pr": 3020,
+          "head": "061b27c2595eb8716ab8c46fe58d96f46013c310",
+          "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "fileCount": 2,
+          "paths": [
+            "lib/device-session.db.test.ts",
+            "lib/device-session.ts"
+          ],
+          "raw": {
+            "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/fresh-pr-3020-files.json",
+            "sha256": "8b23bef4f249ff2da1120511c044e2c88a773d75e48ac88b77db5e353b16c028"
+          }
+        },
+        {
+          "pr": 3014,
+          "head": "7095ce1971701477f649a0c73a4d030d781f69cd",
+          "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+          "fileCount": 2,
+          "paths": [
+            "lib/computer/store.db.test.ts",
+            "lib/computer/store.ts"
+          ],
+          "raw": {
+            "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/fresh-pr-3014-files.json",
+            "sha256": "c3cce7989049c1d07fd171440c3278c8ae5974a0ad2ce90d0231dfab7ee7f9ca"
+          }
+        }
+      ],
+      "unchangedHeadBaseSnapshotsReused": true
+    },
+    "onlyOldOverlap": "#3007 carries the three original #3001 local-first files through normal main integration; their blobs equal current main exactly. #2997 latest comments retain broader workflow/Ready limitations, not a mode-specific implementation."
+  },
+  "source": {
+    "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+    "head": "c32d27e7bcde11c57c19d0b1713a827ad77a170e",
+    "tree": "8717eb09112ed51a2457487de188ca5084598fdb",
+    "parent": "bd5c53d24b671a07e9f5cdcd1d8610ba665d1f91",
+    "changedFiles": [
+      "scripts/dev/local-preflight.mjs",
+      "scripts/dev/local-preflight.test.mjs"
+    ],
+    "blobs": {
+      "scripts/dev/local-preflight.mjs": "1a30acbc5aa05d00b8dd1df7544593eb9b4bab47",
+      "scripts/dev/local-preflight.test.mjs": "3c49eb7433741b9ffdddfa5a6e5e057d77170aa4",
+      "scripts/ci/select.mjs": "97d68a4dede98586bfc3ad3f756444693a41a27a",
+      "scripts/ci/select.test.mjs": "0111893b6201db0a793b0c48622055ed7111f7fa",
+      "scripts/ci/graph.mjs": "640c97ef1327ba7e8b2ada4ba397b507b9fb382a",
+      "scripts/run-db-tests.mjs": "b282c0f05b5dbc94181c6260df85914f045e1934",
+      "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061"
+    }
+  },
+  "implementation": {
+    "adapterOnly": true,
+    "nativeTrackedMetadata": "git diff --raw --no-abbrev --no-renames -z across committed, index and worktree changes; preserve native status, old/new modes and old/new object IDs",
+    "untrackedMetadata": "lstat without following targets; regular owner-execute bit and symlink type, unknown types retain a nonregular null mode for the original selector",
+    "multipleLayers": "Keep every distinct native row; do not let later regular edits conceal earlier mode/type/deletion rows. Deduplicate display paths separately.",
+    "evidenceIdentity": "Existing identity hashes the full metadata snapshot; no second receipt format or validator introduced",
+    "selectorChanged": false,
+    "gateThresholdsChanged": false
+  },
+  "beforeAfter": {
+    "sampleDenominator": 2,
+    "incorrectLocalFullClassificationsBefore": 2,
+    "incorrectLocalFullClassificationsAfter": 0,
+    "cases": [
+      {
+        "case": "unstaged-executable",
+        "nativeGitChanges": [
+          {
+            "file": "messages/en.json",
+            "status": "M",
+            "mode": "100755",
+            "oldMode": "100644"
+          }
+        ],
+        "before": {
+          "localFull": false,
+          "originalSelectorFull": true,
+          "localDbSuites": 79,
+          "originalSelectorDbSuites": 87,
+          "localReasons": [],
+          "originalReasons": [
+            "deletion, rename or non-regular/mode-changing file"
+          ]
+        },
+        "after": {
+          "localFull": true,
+          "originalSelectorFull": true,
+          "localDbSuites": 87,
+          "originalSelectorDbSuites": 87,
+          "localReasons": [
+            "deletion, rename or non-regular/mode-changing file"
+          ],
+          "originalReasons": [
+            "deletion, rename or non-regular/mode-changing file"
+          ]
+        }
+      },
+      {
+        "case": "staged-new-symlink",
+        "nativeGitChanges": [
+          {
+            "file": "messages/sdlc015-mode-fixture.json",
+            "status": "A",
+            "mode": "120000",
+            "oldMode": "000000"
+          }
+        ],
+        "before": {
+          "localFull": false,
+          "originalSelectorFull": true,
+          "localDbSuites": 0,
+          "originalSelectorDbSuites": 87,
+          "localReasons": [],
+          "originalReasons": [
+            "deletion, rename or non-regular/mode-changing file"
+          ]
+        },
+        "after": {
+          "localFull": true,
+          "originalSelectorFull": true,
+          "localDbSuites": 87,
+          "originalSelectorDbSuites": 87,
+          "localReasons": [
+            "deletion, rename or non-regular/mode-changing file"
+          ],
+          "originalReasons": [
+            "deletion, rename or non-regular/mode-changing file"
+          ]
+        }
+      }
+    ],
+    "beforeSource": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+    "afterSource": "c32d27e7bcde11c57c19d0b1713a827ad77a170e",
+    "before": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/before/counterexamples.json",
+      "sha256": "6b55984ca07e98a7f87837d6a2fe68d4aba6f45f91aacf282045c72647e220cb",
+      "bytes": 23361
+    },
+    "after": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/after/counterexamples.json",
+      "sha256": "36dd2b15001b6d2ff67ded3ccd7456bba0f04191d3cf5bb0381d3f57d913f8b2",
+      "bytes": 24495
+    },
+    "diffBaseBoundary": "Before probe used unchanged main as its own diff base; after probe used exact fixed HEAD as its own diff base. The only measured changes were executable mode or the staged symlink; committed tooling changes did not supply a GLOBAL reason. Each comparison used the actual original selector and full graph for that version.",
+    "timingBoundary": "No CI speedup or production latency claim. Diagnostic durations are not performance baselines."
+  },
+  "tests": {
+    "red": {
+      "source": "bd5c53d24b671a07e9f5cdcd1d8610ba665d1f91",
+      "tree": "98837380adebc94249c06277f3986b80e2f12db2",
+      "command": [
+        "node",
+        "--test",
+        "scripts/dev/local-preflight.test.mjs"
+      ],
+      "startedAt": "2026-11-21T04:56:45.881968+00:00",
+      "node": "v24.22.3",
+      "sourceBlobs": {
+        "scripts/dev/local-preflight.mjs": "4a43cda342d42a289d07106fd496a7bd9f80c66f",
+        "scripts/dev/local-preflight.test.mjs": "3c49eb7433741b9ffdddfa5a6e5e057d77170aa4"
+      },
+      "exit": 1,
+      "counts": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 9,
+        "fail": 4,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "wallSeconds": 0.7232400840002811,
+      "finishedAt": "2026-11-21T04:56:46.620853+00:00",
+      "endingHead": "bd5c53d24b671a07e9f5cdcd1d8610ba665d1f91",
+      "endingStatus": "",
+      "stdoutSha256": "aa2e00f2cf29067fdc83ebbbeec97a9e72b602591529a1408c05c7180df08fe3",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "redReceipt": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/red/receipt.json",
+      "sha256": "1a3be9ddb36f8718b946cb52ef11f085d54540eccff68dbc3baf256275b4f243",
+      "bytes": 960
+    },
+    "green": {
+      "source": "c32d27e7bcde11c57c19d0b1713a827ad77a170e",
+      "tree": "8717eb09112ed51a2457487de188ca5084598fdb",
+      "command": [
+        "node",
+        "--test",
+        "scripts/dev/local-preflight.test.mjs",
+        "scripts/ci/select.test.mjs"
+      ],
+      "startedAt": "2026-11-21T05:00:46.482710+00:00",
+      "node": "v24.22.3",
+      "sourceBlobs": {
+        "scripts/dev/local-preflight.mjs": "1a30acbc5aa05d00b8dd1df7544593eb9b4bab47",
+        "scripts/dev/local-preflight.test.mjs": "3c49eb7433741b9ffdddfa5a6e5e057d77170aa4",
+        "scripts/ci/select.mjs": "97d68a4dede98586bfc3ad3f756444693a41a27a",
+        "scripts/ci/select.test.mjs": "0111893b6201db0a793b0c48622055ed7111f7fa",
+        "scripts/ci/graph.mjs": "640c97ef1327ba7e8b2ada4ba397b507b9fb382a",
+        "scripts/run-db-tests.mjs": "b282c0f05b5dbc94181c6260df85914f045e1934",
+        "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061"
+      },
+      "exit": 0,
+      "counts": {
+        "tests": 42,
+        "suites": 0,
+        "pass": 42,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "wallSeconds": 12.799240488002397,
+      "finishedAt": "2026-11-21T05:00:59.303468+00:00",
+      "endingHead": "c32d27e7bcde11c57c19d0b1713a827ad77a170e",
+      "endingStatus": "",
+      "stdoutSha256": "e70aa06b0795cb26f7a0ac9979f50132ff826172a4d28e6ac82b28ca7907c025",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "greenReceipt": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/green/receipt.json",
+      "sha256": "8b0d8481903fac161ed0305348f8c0d5c0a1f0198c83bce141d195ef89b1d1ef",
+      "bytes": 1360
+    },
+    "greenDenominator": "42 tests = the unchanged 13-case local suite from the RED checkpoint plus the existing 29-case selector contract suite; no separate 13-only GREEN run is claimed.",
+    "lint": {
+      "source": "c32d27e7bcde11c57c19d0b1713a827ad77a170e",
+      "tree": "8717eb09112ed51a2457487de188ca5084598fdb",
+      "version": "Version: 1.89.0",
+      "command": [
+        "/workspace/scratch/b55cdf575d56/Mikka-local-modes/node_modules/.bin/oxlint",
+        "--deny-warnings",
+        "scripts/dev/local-preflight.mjs",
+        "scripts/dev/local-preflight.test.mjs"
+      ],
+      "exit": 0,
+      "wallSeconds": 0.27600127999903634,
+      "capturedAt": "2026-11-21T05:03:56.537927+00:00",
+      "endingStatus": "",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lintReceipt": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/green/lint.json",
+      "sha256": "5740052dead69eb6728ebc9fc2e3d63bb9b39b2262fb25adc8e9c98e3be40642",
+      "bytes": 649
+    },
+    "frozenOfflineDependencies": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/before/install-receipt.json",
+      "sha256": "626ba059c0883e795ba656273a5fe5c0d93c1df6fe0e4768cf259362b409d91c",
+      "bytes": 893
+    }
+  },
+  "retainedFailures": {
+    "temporaryWrapper": {
+      "path": "/workspace/scratch/b55cdf575d56/research/local-modes-2984/before/orchestration-failure.json",
+      "sha256": "8dcf5020a3ba53e7835a3dfb4cdef62ff6ff33d7882b81c4622e15b5228c6c58",
+      "bytes": 1942
+    },
+    "boundary": "The first diagnostic harness exited 1 because Python constructed a NUL-containing Node argument; original selector never started. The successful first local-plan output was reused, and only unstarted comparison work plus the distinct second case ran after correcting this temporary argument. Product code was not changed to resolve the wrapper error."
+  },
+  "preservedGuards": [
+    "Existing selector remains the sole source of mode/type, global, unknown-file, unresolved-import, deletion/rename and frozen-policy full decisions.",
+    "Required CI, DB inventory, source/security tasks and original acceptance rules unchanged.",
+    "Clean committed source, base verification, newline rejection, known-script argument-array invocation, failed check rejection, acceptance/waiver and exact-source Ready identity remain.",
+    "No environment spoofing, test/assertion weakening, new timeout, force-exit, skip, model/provider request, deployment or paid resource."
+  ],
+  "remaining": [
+    "Independent exact-head Spec/Standards review.",
+    "Original complete local pnpm check / local-ready qualification before Ready; previously proven main fixture failures are corrected separately in #3011, not copied into this change.",
+    "Actual protected CI, reviewed normal merge commit and exact postmerge validation."
+  ],
+  "endState": {
+    "head": "c32d27e7bcde11c57c19d0b1713a827ad77a170e",
+    "tree": "8717eb09112ed51a2457487de188ca5084598fdb",
+    "trackedStatus": "",
+    "temporaryModeAndIndexFixturesRestored": true,
+    "remoteReady": false,
+    "merged": false
+  }
+}

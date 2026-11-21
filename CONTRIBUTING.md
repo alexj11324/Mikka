@@ -17,6 +17,10 @@ Use this guide to prepare, verify and submit changes to Mikka.
 - Branch from `main` and keep each pull request to one change. How work moves
   from a branch to `main` (local first, hot reload, ownership and merging, numbers,
   E2B dev templates) is in [`docs/dev-workflow.md`](docs/dev-workflow.md).
+  Independently verifiable changes merge when their own checks and release
+  window permit. Batch only genuine atomic dependencies; an existing epic's
+  explicitly approved batch rules still apply. See the
+  [delivery decision](docs/design/decisions/2026-11-20-1640-sdlc-delivery.md).
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
   or `ci`.
@@ -32,15 +36,16 @@ Use this guide to prepare, verify and submit changes to Mikka.
   end. Nobody pushes to `main` directly. The assigned agent opens a pull
   request from a branch and merges it itself with a merge commit (no squash,
   no rebase) once CI is green on the latest head and the PR is mergeable.
-  After the merge the same agent watches the production deployment and, only
-  when the change needs it, accepts it in production
-  ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). CI evaluates GitHub's
+  After the merge the same agent verifies the exact merge SHA and records its
+  regression and CI evidence. The release owner under #1954 stages and promotes
+  verified artifacts; serving-version acceptance follows
+  [`docs/dev-workflow.md`](docs/dev-workflow.md) § 5. CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not
-  require rebasing a still-mergeable PR; a real conflict must be resolved and
-  the updated candidate reverified. The GitHub branch protection setting
-  "Require branches to be up to date before merging" must be disabled for
-  this loose-check policy; the workflow alone cannot change that setting.
+  require rebasing a still-mergeable PR. Read the effective branch protection
+  and merge `main` normally into the PR when protection requires it, a conflict
+  needs resolving or a relevant landed change needs integration verification.
+  Reverify the updated candidate and preserve the existing protection settings.
   See "How changes are tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
 - Focus is stale-while-revalidate: only data past its freshness threshold
@@ -155,8 +160,10 @@ search and SSH checks may also defer while drafting. Mark a PR **Ready for
 review** only after local red→green, affected build and actual flow acceptance
 are recorded: the `ready_for_review` event runs all applicable selected
 protected checks on the same code SHA without a meaningless new commit.
-Every real selected acceptance still must pass before Merge, including
-exact-source production release gates.
+Every applicable PR check must pass on the current head before merge.
+Exact-version post-merge verification and protected staging and production
+admission follow § 5 of the development workflow, with the existing release
+owner and source-bound receipts.
 
 ### Before asking Alex: look at how leading products do it
 
@@ -209,12 +216,15 @@ Cloud machines use versioned Mikka templates derived from E2B's official
 are preinstalled under `/opt/mikka`. Add files, never delete or overwrite an
 original official CLI, Node/npm or system file
 ([decision 2026-11-03-1430, clarified in #1505](docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
-A worker change on `main` runs `.github/workflows/e2b-official-runtime.yml`.
-The release requires unchanged original-file checksums and real Claude Code
-and Codex subscription executions on the exact candidates before making them
-public or selecting them in production. Keep the previous templates and the
-paired configuration for rollback. The historical `e2b-template.yml` is now the
-reusable candidate builder; it cannot publish production configuration.
+A worker change on `main` runs the offline input checks in
+`.github/workflows/e2b-official-runtime.yml`; publication starts from an eligible
+Cloudflare serving observation or an authorized dispatch. The release requires
+original-file conservation and build-time readiness on the exact candidates.
+E2B uses the user's own key, so publication has no live subscription gate
+([#2789](https://github.com/alexj11324/Mikka/pull/2789)). Retain published templates
+and their immutable release reports for the release owner's rollback.
+`e2b-template.yml` is the reusable candidate builder; production selection
+belongs to the existing private Cloudflare deployment.
 See [the release workflow](.github/workflows/README.md#cloud-worker-template-release)
 and [`docs/dev-workflow.md`](docs/dev-workflow.md) § 7.
 

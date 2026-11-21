@@ -2,8 +2,8 @@
 
 Standing rules for how work moves from a branch to `main`. Decision:
 [`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md);
-ownership as Alex set it on 2026-11-03, with batch merging updated on
-2026-11-05 (§ 5).
+ownership as Alex set it on 2026-11-03, with dependency-based delivery under
+[#2984](https://github.com/alexj11324/Mikka/issues/2984) (§ 5).
 Use `AGENTS.md` and the accepted decision hierarchy when another document
 disagrees, then update the lower-priority document.
 
@@ -52,6 +52,8 @@ pnpm local:mark-ready --pr=1234                 # verifies exact HEAD and calls 
 ```
 
 This is not a new test registry: `local:plan` reads `scripts/ci/graph.mjs` and `scripts/ci/select.mjs`. When the graph conservatively requires global checks, the developer must **choose and execute an actual focused test** for the changed behavior; full trusted CI remains later. `local:ready` records successful tests and a real product acceptance command or existing local acceptance report under the ignored `.cache/dev-local/local-first/<HEAD>.json`. The report is not uploaded automatically and is **not** a cryptographic attestation; include the source SHA, commands, exits and applicable acceptance link/summary in the PR. For docs-only or tool-only work with no product behavior change use a substantive `--no-product-change='docs: reason'` or `tooling: reason` and preserve actual related test evidence where required. Do not claim a skipped check was run.
+
+The existing [CONTRIBUTING Before Ready requirement](../CONTRIBUTING.md) to pass the full `pnpm check` still applies. `local:ready` records the chosen scripts; a focused script does not waive that requirement. Where applicable, `pnpm local:ready --test=check` runs and records that same full command in one invocation, with the original product-acceptance or substantive no-product-change argument, so the full check need not be repeated solely to create the Ready record.
 
 The **Ready for review** handoff requires a **clean commit** and invalidates evidence if the source diff or base identity changes. GitHub UI/CLI may still allow a human to mark Ready without it; the owning Agent must use this supported handoff, and the remote CI remains the final independent protection. If CI reveals a locally reproducible failure, return to the local red→green loop rather than repeatedly dispatching Actions. CI/staging remain necessary for protected provider, OAuth, registry, migration and release gates outside the local environment.
 
@@ -149,7 +151,9 @@ loopback `*_e2e` database) is described in
 
 Alex set the ownership rules on 2026-11-03
 ([`2026-11-03-2359`](design/decisions/2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md)).
-Batch merging follows Alex's 2026-11-05 update in `AGENTS.md`.
+The [SDLC delivery decision](design/decisions/2026-11-20-1640-sdlc-delivery.md)
+defines the default for new work. Already approved epic-specific batch rules,
+including #2891 and #2956, remain in force for those owners.
 They replace the coordinator-merges rule, the push-fixes-to-main rule and the
 old module owners (backend was Codex's).
 
@@ -164,26 +168,30 @@ old module owners (backend was Codex's).
    machines and paid resources to the actual need and stop each one as soon
    as its step is done.
 2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
-   PR from a branch based on `main`. Each original PR changes one thing;
-   ready PRs are integrated as a batch under rule 3.
+   PR from a branch based on `main`. Each PR contains one independently
+   verifiable and deliverable change; true atomic dependencies follow rule 3.
 3. **The owner merges.** Each PR is merged by its owner, the agent that
    leads its issue (Alex, 2026-11-05). A Pro owner always has the right to
    merge its own PRs on its own: when CI is green on the latest head and the
    PR is mergeable, it merges, without waiting for or handing the PR to
-   anyone. When the owner has two or more of its own PRs ready, it combines
-   their branches into one `batch/<date>-<n>` branch, resolves conflicts once
-   and runs CI on the final batch head, then merges the batch PR with a merge
-   commit so the original PRs are recorded as merged. Each original issue
-   keeps its owner and production acceptance criteria. A single ready PR may
-   be squash-merged. A UI change merges only after the owner has reviewed its
+   anyone. Merge an independently valid change as soon as its own proof and
+   release window permit; the number of ready PRs is not a dependency.
+   Batch only changes that must land atomically, and state why each member
+   cannot safely ship alone. Merge those branches normally into the batch,
+   resolve conflicts once and verify the final batch head. Every merge uses
+   a normal merge commit: no squash, rebase, force push or direct main push.
+   Each issue retains its owner and acceptance criteria. Existing approved
+   epic batches keep their original rules. A UI change merges only after the owner has reviewed its
    screenshots and attached them to the PR.
    A change to auth, signup, privilege or credentials says so in the PR.
 4. **Stacked PRs** merge in order. After a base merges, retarget the next PR
    to `main`.
-   Do not merge `main` into a PR only to keep it current: branch protection
-   does not require an up-to-date branch, and each merge reruns the full CI.
-   Merge `main` in when there is a conflict, or when a change that just landed
-   touches the same code and the PR must be checked against it.
+   Do not merge `main` into a PR mechanically: each new candidate reruns its
+   applicable CI. Read the effective branch protection; its settings cannot
+   be inferred from workflow YAML or a permission-denied administration API.
+   Merge `main` normally when protection requires it, there is a conflict,
+   or a relevant landed change requires integration verification. Do not
+   weaken protection to avoid that work.
 5. **After the merge** the PR owner verifies the merge SHA, records the
    post-merge regression and links its CI. For an official hosted change,
    link the merged public source and the pinned UI Overlay when applicable to
@@ -215,15 +223,49 @@ old module owners (backend was Codex's).
 8. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
 
+### Reuse exact proof and diagnose failures
+
+Keep a recovery branch and Draft PR while implementing. Mark it Ready for review when
+the source, focused regression and review are ready; this activates the
+existing deferred checks without an empty commit. Drafts run the required
+aggregators, which fail closed while expensive selected jobs wait for Ready;
+external GitGuardian remains active. Update the owning issue's existing
+progress record with the exact
+head, original run/attempt/job, result and next action. A queue entry or an old
+head's green check is not new acceptance.
+
+For a failed run, preserve the original error and first classify product code,
+test expectation, fixture/database state or environment failure. Reproduce the
+failure with fixed source and inputs, fix its owner, and verify that same case.
+Do not rerun a test until it happens to pass. When only an infrastructure job
+failed and source, toolchain and relevant inputs are unchanged, use GitHub's
+native failed-job or single-job rerun only when the workflow's runbook permits
+it and its prerequisite artifacts and external state still exist. For example,
+E2B's finalizer removes failed private candidates, so its
+[existing recovery procedure](../.github/workflows/README.md#cloud-worker-template-release)
+requires a complete replacement candidate run. Preserve successful jobs' original run
+and attempt identities. A code, dependency, fixture or environment change
+invalidates affected proof and requires the applicable checks again.
+
+Use the [existing timing collector](ci/test-ownership.md#measure-before-choosing-faster-infrastructure)
+for queue, execution and attempt measurements. Report sample denominators,
+failed/cancelled samples and unavailable timestamps explicitly. Ready-to-merge
+time starts at the recorded transition for that PR, not an inferred commit;
+merge-to-acceptance ends only at a successful receipt for that exact version.
+Code merge, image build, staging acceptance and production acceptance are
+separate outcomes. An external release dependency does not hold unrelated
+safe changes out of main.
+
 Before any merge, verify the affected API/CLI flow and required CI checks.
 UI changes also need screenshots of a production build of the official UI
 (`pnpm build:app`, `pnpm start`, with `mikka-hosted-ui`) in a cloud Linux or Docker sandbox, against its
 own isolated PostgreSQL database (`mikka_e2e`). Isolated screenshot harnesses
 use their leased owner/peer fixtures ([`test-accounts.md`](test-accounts.md)).
 Shared-team and external-service acceptance follows the shared SMOKE account
-contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no Vercel Preview: every build
-runs on GitHub Actions, and only `main` deploys, to production
-([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
+contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no
+automatic Vercel Preview. Local acceptance builds are separate from official
+GitHub Actions artifacts, automatic staging and protected production promotion;
+follow the [current build and release contract](operations/build-source-of-truth.md).
 
 ## 6. Rule IDs and migrations
 
@@ -268,13 +310,14 @@ intact: adding files is allowed; deleting or overwriting originals is not
 
 A worker change on `main` is reported by `e2b-official-runtime.yml`. When the
 Cloudflare deployment workflow's serving-release observation shows that commit
-as current main, the same workflow runs the release by itself through the
-reusable `e2b-template.yml` candidate builder. The build checks every protected original
-file's hash, type, mode, owner and link before and after installation. Both
-Claude Code and Codex must complete real subscription executions on those
-candidates before public publication and production selection. Credentials
-arrive through normal device enrollment and owner/run-bound subscription
-leases; templates contain no identity or credential.
+as current main, the workflow applies its input checks before entering the
+release through the reusable `e2b-template.yml` candidate builder. A push alone
+builds no candidate. The build checks every protected original file's hash,
+type, mode, owner and link before and after installation. Publication requires
+the template to build, both official CLIs to start and the execution fence to
+open. E2B uses the user's own key, so no live subscription run precedes template
+publication ([#2789](https://github.com/alexj11324/Mikka/pull/2789)). Templates
+contain no identity or credential.
 The final E2B boot has a separate, recorded check for only the provider-owned
 runtime fields established by the official-only control experiment; see the
 decision's exact-path policy. A fresh verification VM is destroyed before
@@ -284,21 +327,31 @@ manifest and resolver. A retained VM receives that manifest with its staged
 worker release; activating or rolling back the worker selects the matching
 manifest without rebuilding its repository or session.
 
-The publication uses Web deploy's production queue and exact-source checks.
-Each build gets a unique name; retain old templates and save the previous
-paired configuration in `MIKKA_CLOUD_RUNTIME_PREVIOUS`. For rollback, use the
-normal rollback PR and release gates to restore matching application and worker
-code, using that retained configuration as the previous known-good target;
-the old source receipt cannot bypass the exact-main check. Do not change
-template aliases or Vercel production variables by hand. A failed candidate
-gate leaves production on its existing templates. The single configuration
-upsert is checked by per-variable readback; a partial write requires repair
-and revalidation and never replaces a valid previous configuration. See the
+Publication uses the existing `e2b-official-runtime-release` concurrency group,
+with the source bound to the Cloudflare serving receipt. Initial automatic
+runtime selection requires the observed source to be current main and the
+workflow's recorded source. Subsequent gates recheck that same served commit
+and its membership in main's history; later merges do not replace its bytes or
+invalidate publication ([#2699](https://github.com/alexj11324/Mikka/pull/2699)).
+An authorized manual dispatch on main can publish an earlier still-served
+commit after the same receipt and history checks. Respect any release window
+explicitly declared by the #1752/#1954 owner; an offline push run does not
+itself open a publication window. See the source and recovery contract in the
 [release workflow](../.github/workflows/README.md#cloud-worker-template-release).
-An always-run finalizer kills this attempt's labelled test instances and deletes
-its exact private candidates after any failure, with readback and cleanup
-receipts. Public and previous images remain. Rerun the full workflow after a
-failed release so the removed candidates are rebuilt.
+
+Each build gets unique candidates. Publication verifies their original source,
+run, attempt and report digests, then retains the complete immutable release
+report for the existing private Cloudflare API deployment. Publishing template
+IDs does not select them in production. The #1954 release owner promotes the
+matched application and worker artifacts and retains previous templates and
+release receipts for rollback. Use that existing rollback procedure and a
+normal rollback PR when code changes; preserve its source and admission gates.
+Do not change template aliases or production configuration by hand.
+
+The release finalizer closes this attempt's labelled instances and removes its
+exact private candidates, verifying cleanup and recording a receipt. Public
+and previous images remain. Rerun the full workflow after a failed candidate
+release so the removed candidates are rebuilt.
 
 ## 8. Reaching a local service from outside
 

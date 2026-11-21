@@ -1,0 +1,4659 @@
+{
+  "issue": "https://github.com/alexj11324/Mikka/issues/2984",
+  "kind": "Measured before-state and owned-fix evidence, not completion claim",
+  "snapshot_at": "2026-11-20T21:30:31.494Z",
+  "methods": {
+    "sample_design": "Purposive five-head public CI sample spanning four owner epics plus a recently merged flow PR; not a random sample or whole-project percentile estimate.",
+    "public_prs": [
+      2963,
+      2898,
+      2917,
+      2958,
+      2905
+    ],
+    "epics": {
+      "2898": 2897,
+      "2905": 2897,
+      "2917": 2912,
+      "2958": 2956,
+      "2963": 2891
+    },
+    "feedback_definition": "Time from earliest workflow created_at for the exact sampled head to completion of the first job with substantive source/protocol/kernel/browser/unit assertions. Excludes classification-only jobs, summary-only jobs, skipped/cancelled jobs, and the Browser gate echo. Does not claim push-to-feedback latency or E2E completion.",
+    "queue_definition": "Per-job started_at minus created_at; dependency time before job creation is separate and not runner queue. Initial workflow queue is first executed job start minus attempt created_at. Parallel job queues are never summed and labelled wall time.",
+    "execution_definition": "Completed job completed_at minus started_at. Runner-seconds are a sum of executed jobs; workflow wall is last job completion minus attempt created_at. Step durations are contained in job duration, not added again.",
+    "ready_definition": "Last ready_for_review event before merge, or a lower bound until observed_at for still-open PRs. PR updated_at, created_at, commit timestamps, or inferred draft transitions are not substituted if event is absent. Three merged PRs were inspected across the three repos: two have explicit Ready events; Cloud #413 has none. Two still-open Ready PRs and two never-Ready Draft PRs are separately right-censored.",
+    "unknowns": [
+      "All-attempt API authorization complete only for selected samples, not historical fleet-wide.",
+      "PR push receipt time not supplied; Git commit date is recorded separately, never presented as push latency.",
+      "No staging or production pass can be inferred from CI or skipped consumer workflow.",
+      "Private repository local artifacts and public workflow executions have different inputs; no cross-source reuse presumed."
+    ],
+    "capture_window": {
+      "start": "2026-11-20T21:30:31.494Z",
+      "end": "2026-11-20T21:33:00.972Z"
+    },
+    "tested_source_definition": "Actions run.head_sha binds the PR head. Default PR checkout tests GitHub's synthetic merge commit; both Source checks and first substantive feedback checkout SHAs were read from git log -1 --format=%H in the original job logs for every sampled head (10 jobs). A later current merge_commit_sha is not substituted for a historical candidate."
+  },
+  "scope": [
+    {
+      "repository": "alexj11324/Mikka",
+      "main_sha": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "main_source": "https://api.github.com/repos/alexj11324/Mikka/branches/main",
+      "open_prs": 59,
+      "draft_prs": 29,
+      "ready_prs": 30,
+      "workflow_files": 54,
+      "job_templates": 113,
+      "scope": "Public integration CI, native source/build/release wiring, timing tools, shared test facilities and engineering documentation."
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "main_verified": true,
+      "main_version_details": "Original private repository / private evidence only",
+      "open_prs": 27,
+      "draft_prs": 21,
+      "ready_prs": 6,
+      "workflow_files": 0,
+      "scope": "Paired official UI source and owner acceptance evidence inspected. Do not introduce an independent public copy or a second build provenance path.",
+      "exclusions": "Product chat refactoring and its paired private PRs remain #2912-owned; no private source/version bytes copied into this public baseline.",
+      "sample_pr_urls": [
+        "https://github.com/alexj11324/mikka-hosted-ui/pull/254",
+        "https://github.com/alexj11324/mikka-hosted-ui/pull/257"
+      ]
+    },
+    {
+      "repository": "alexj11324/mikka-cloud",
+      "main_verified": true,
+      "main_version_details": "Original private repository / private evidence only",
+      "open_prs": 6,
+      "draft_prs": 4,
+      "ready_prs": 2,
+      "workflow_files": 14,
+      "job_templates": 24,
+      "workflow_event_counts": {
+        "workflow_dispatch": 12,
+        "push": 6,
+        "schedule": 1,
+        "issue_comment": 1,
+        "pull_request": 0
+      },
+      "scope": "Existing private operations/preflight, provider workflows, trusted receipts and ownership boundaries inspected.",
+      "exclusions": "Production deployment, live migrations/customer data, private source delivery and operations identities remain existing release/operations owners. No duplicate publisher, credential path or private implementation is copied.",
+      "sample_pr_urls": [
+        "https://github.com/alexj11324/mikka-cloud/pull/413",
+        "https://github.com/alexj11324/mikka-cloud/pull/418"
+      ]
+    }
+  ],
+  "denominators": {
+    "public_head_samples": 5,
+    "owner_epics": 4,
+    "public_workflow_runs": 51,
+    "public_jobs": 210,
+    "primary_CI_runs": 5,
+    "primary_CI_job_records": 113,
+    "primary_CI_executed_jobs": 101,
+    "primary_CI_skipped_jobs": 12,
+    "read_checkout_log_jobs": 10,
+    "branch_history_runs": 241,
+    "branch_history_pages": 4,
+    "failed_run_sample": 13,
+    "failed_run_root_cause_groups": 5,
+    "merged_PR_lifecycle_inspected": 3,
+    "merged_PR_lifecycle_with_observed_ready": 2,
+    "open_ready_PR_censored": 2,
+    "never_ready_Draft_PR_inspected": 2,
+    "private_exact_head_PR_samples": 3,
+    "private_exact_head_Actions_runs": 0,
+    "staging_receipts_digest_verified": 4,
+    "staging_receipts_accepted": 0,
+    "merge_linked_staging_rejections": 2,
+    "actual_production_acceptances_observed": 0
+  },
+  "public_head_samples": [
+    {
+      "pr": 2963,
+      "epic": 2891,
+      "head_sha": "16bee4e27102642db36e9916c0e453f5145824ab",
+      "pr_url": "https://github.com/alexj11324/Mikka/pull/2963",
+      "first_workflow_created_at": "2026-11-20T20:08:26Z",
+      "workflow_run_count": 11,
+      "total_job_count": 44,
+      "feedback": {
+        "run_id": 44808625868,
+        "attempt": 1,
+        "job_id": 136539083293,
+        "name": "Real ingress kernel boundaries",
+        "kind": "executed tests",
+        "created_at": "2026-11-20T20:08:26Z",
+        "started_at": "2026-11-20T20:11:18Z",
+        "completed_at": "2026-11-20T20:12:21Z",
+        "seconds_from_first_workflow": 235,
+        "job_queue_seconds": 172,
+        "job_execution_seconds": 63,
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44808625868/job/136539083293",
+        "actual_validation_steps": [
+          {
+            "number": 5,
+            "name": "Verify all IPv4 and IPv6 ingress cases on the real kernel",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:11:45Z",
+            "completed_at": "2026-11-20T20:12:18Z"
+          }
+        ],
+        "validation_examples": [],
+        "evidence": {
+          "kernel_cases": 12,
+          "kernel_cases_passed": 12,
+          "ok": true,
+          "qualification": "Actual IPv4 and IPv6 kernel ingress tests, including allowed roundtrip and denied non-root access."
+        }
+      },
+      "ci": {
+        "run_id": 44808626178,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44808626178",
+        "created_at": "2026-11-20T20:08:26Z",
+        "conclusion": "success",
+        "total_jobs": 22,
+        "executed_jobs": 20,
+        "skipped_jobs": 2,
+        "first_started_at": "2026-11-20T20:22:13Z",
+        "last_completed_at": "2026-11-20T21:27:45Z",
+        "wall_seconds": 4759,
+        "initial_queue_seconds": 827,
+        "execution_span_seconds": 3932,
+        "runner_seconds": 6056,
+        "job_queue_seconds": [
+          825,
+          1012,
+          1319,
+          849,
+          888,
+          1111,
+          2694,
+          2487,
+          2709,
+          1510,
+          2193,
+          2960,
+          2896,
+          3086,
+          3085,
+          588,
+          828,
+          623,
+          167,
+          264
+        ],
+        "jobs": [
+          {
+            "id": 136539094856,
+            "name": "changes / Changed files",
+            "created_at": "2026-11-20T20:08:28Z",
+            "started_at": "2026-11-20T20:22:13Z",
+            "completed_at": "2026-11-20T20:23:12Z",
+            "queue_seconds": 825,
+            "execution_seconds": 59,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546816628,
+            "name": "Source checks",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:40:05Z",
+            "completed_at": "2026-11-20T20:44:03Z",
+            "queue_seconds": 1012,
+            "execution_seconds": 238,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546816669,
+            "name": "Daemon checks",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:45:12Z",
+            "completed_at": "2026-11-20T20:49:16Z",
+            "queue_seconds": 1319,
+            "execution_seconds": 244,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546816754,
+            "name": "Core unit checks (Node 22)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:37:22Z",
+            "completed_at": "2026-11-20T20:46:39Z",
+            "queue_seconds": 849,
+            "execution_seconds": 557,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546816849,
+            "name": "Integration unit checks",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:38:01Z",
+            "completed_at": "2026-11-20T20:45:03Z",
+            "queue_seconds": 888,
+            "execution_seconds": 422,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546816912,
+            "name": "Core unit checks",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:41:44Z",
+            "completed_at": "2026-11-20T20:50:09Z",
+            "queue_seconds": 1111,
+            "execution_seconds": 505,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817175,
+            "name": "Integration unit checks (Node 22)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:08:07Z",
+            "completed_at": "2026-11-20T21:16:20Z",
+            "queue_seconds": 2694,
+            "execution_seconds": 493,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817232,
+            "name": "Database checks (4/4) (Node 22)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:04:40Z",
+            "completed_at": "2026-11-20T21:10:59Z",
+            "queue_seconds": 2487,
+            "execution_seconds": 379,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817260,
+            "name": "Database checks (1/4) (Node 22)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:08:22Z",
+            "completed_at": "2026-11-20T21:13:16Z",
+            "queue_seconds": 2709,
+            "execution_seconds": 294,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817268,
+            "name": "Database checks (1/4)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:48:23Z",
+            "completed_at": "2026-11-20T20:53:11Z",
+            "queue_seconds": 1510,
+            "execution_seconds": 288,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817270,
+            "name": "Database checks (3/4) (Node 22)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:59:46Z",
+            "completed_at": "2026-11-20T21:07:00Z",
+            "queue_seconds": 2193,
+            "execution_seconds": 434,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817298,
+            "name": "Database checks (2/4) (Node 22)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:12:33Z",
+            "completed_at": "2026-11-20T21:19:03Z",
+            "queue_seconds": 2960,
+            "execution_seconds": 390,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817344,
+            "name": "Database checks (2/4)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:11:29Z",
+            "completed_at": "2026-11-20T21:16:55Z",
+            "queue_seconds": 2896,
+            "execution_seconds": 326,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817425,
+            "name": "Database checks (3/4)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:14:39Z",
+            "completed_at": "2026-11-20T21:19:59Z",
+            "queue_seconds": 3086,
+            "execution_seconds": 320,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546817435,
+            "name": "Database checks (4/4)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T21:14:38Z",
+            "completed_at": "2026-11-20T21:23:11Z",
+            "queue_seconds": 3085,
+            "execution_seconds": 513,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546818429,
+            "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:33:01Z",
+            "completed_at": "2026-11-20T20:35:19Z",
+            "queue_seconds": 588,
+            "execution_seconds": 138,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546819254,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "created_at": "2026-11-20T20:23:13Z",
+            "started_at": "2026-11-20T20:37:01Z",
+            "completed_at": "2026-11-20T20:44:13Z",
+            "queue_seconds": 828,
+            "execution_seconds": 432,
+            "conclusion": "success"
+          },
+          {
+            "id": 136557604380,
+            "name": "analytics-checks / analytics-ssr",
+            "created_at": "2026-11-20T20:44:13Z",
+            "started_at": "2026-11-20T20:54:36Z",
+            "completed_at": "2026-11-20T20:54:40Z",
+            "queue_seconds": 623,
+            "execution_seconds": 4,
+            "conclusion": "success"
+          },
+          {
+            "id": 136574079060,
+            "name": "UI policy (strict)",
+            "created_at": "2026-11-20T21:16:20Z",
+            "started_at": "2026-11-20T21:19:07Z",
+            "completed_at": "2026-11-20T21:19:17Z",
+            "queue_seconds": 167,
+            "execution_seconds": 10,
+            "conclusion": "success"
+          },
+          {
+            "id": 136577622034,
+            "name": "Production build and browser interactions",
+            "created_at": "2026-11-20T21:23:11Z",
+            "started_at": "2026-11-20T21:27:35Z",
+            "completed_at": "2026-11-20T21:27:45Z",
+            "queue_seconds": 264,
+            "execution_seconds": 10,
+            "conclusion": "success"
+          }
+        ]
+      },
+      "tested_checkout_shas": [
+        {
+          "role": "CI source checks",
+          "job_id": 136546816628,
+          "sha": "dc5c2e8d695610bae17d0f773f0c1a8aaf532c7f",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        },
+        {
+          "role": "first substantive feedback",
+          "job_id": 136539083293,
+          "sha": "dc5c2e8d695610bae17d0f773f0c1a8aaf532c7f",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        }
+      ]
+    },
+    {
+      "pr": 2898,
+      "epic": 2897,
+      "head_sha": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+      "pr_url": "https://github.com/alexj11324/Mikka/pull/2898",
+      "first_workflow_created_at": "2026-11-20T20:00:45Z",
+      "workflow_run_count": 13,
+      "total_job_count": 45,
+      "feedback": {
+        "run_id": 44807427231,
+        "attempt": 1,
+        "job_id": 136534980755,
+        "name": "test",
+        "kind": "executed tests",
+        "created_at": "2026-11-20T20:00:46Z",
+        "started_at": "2026-11-20T20:09:47Z",
+        "completed_at": "2026-11-20T20:10:08Z",
+        "seconds_from_first_workflow": 563,
+        "job_queue_seconds": 541,
+        "job_execution_seconds": 21,
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44807427231/job/136534980755",
+        "actual_validation_steps": [
+          {
+            "number": 5,
+            "name": "Run node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:09:58Z",
+            "completed_at": "2026-11-20T20:10:02Z"
+          },
+          {
+            "number": 6,
+            "name": "Run python3 scripts/e2b/build-template.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:10:02Z",
+            "completed_at": "2026-11-20T20:10:04Z"
+          },
+          {
+            "number": 7,
+            "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:10:04Z",
+            "completed_at": "2026-11-20T20:10:04Z"
+          },
+          {
+            "number": 8,
+            "name": "Run python3 scripts/e2b/official-files.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:10:04Z",
+            "completed_at": "2026-11-20T20:10:05Z"
+          },
+          {
+            "number": 9,
+            "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:10:05Z",
+            "completed_at": "2026-11-20T20:10:05Z"
+          },
+          {
+            "number": 10,
+            "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:10:05Z",
+            "completed_at": "2026-11-20T20:10:05Z"
+          }
+        ],
+        "validation_examples": [
+          "retains closed worker-claim phases and marks unavailable runtime proof honestly",
+          "prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries",
+          "bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries"
+        ],
+        "evidence": {
+          "node_test_block": {
+            "tests": 204,
+            "passed": 204,
+            "failed": 0
+          },
+          "qualification": "Real offline release/dispatch/receipt contract tests; Python gate tests also ran in the same job."
+        }
+      },
+      "ci": {
+        "run_id": 44807428185,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44807428185",
+        "created_at": "2026-11-20T20:00:46Z",
+        "conclusion": "success",
+        "total_jobs": 22,
+        "executed_jobs": 20,
+        "skipped_jobs": 2,
+        "first_started_at": "2026-11-20T20:11:18Z",
+        "last_completed_at": "2026-11-20T21:15:21Z",
+        "wall_seconds": 4475,
+        "initial_queue_seconds": 632,
+        "execution_span_seconds": 3843,
+        "runner_seconds": 5958,
+        "job_queue_seconds": [
+          632,
+          746,
+          1272,
+          1071,
+          1036,
+          1151,
+          1042,
+          1235,
+          1696,
+          1391,
+          1327,
+          1692,
+          1379,
+          1492,
+          1406,
+          903,
+          830,
+          962,
+          1651,
+          1620
+        ],
+        "jobs": [
+          {
+            "id": 136534984655,
+            "name": "changes / Changed files",
+            "created_at": "2026-11-20T20:00:46Z",
+            "started_at": "2026-11-20T20:11:18Z",
+            "completed_at": "2026-11-20T20:12:20Z",
+            "queue_seconds": 632,
+            "execution_seconds": 62,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133336,
+            "name": "Daemon checks",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:24:47Z",
+            "completed_at": "2026-11-20T20:28:12Z",
+            "queue_seconds": 746,
+            "execution_seconds": 205,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133340,
+            "name": "Core unit checks",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:33:33Z",
+            "completed_at": "2026-11-20T20:41:53Z",
+            "queue_seconds": 1272,
+            "execution_seconds": 500,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133347,
+            "name": "Source checks",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:30:12Z",
+            "completed_at": "2026-11-20T20:34:37Z",
+            "queue_seconds": 1071,
+            "execution_seconds": 265,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133420,
+            "name": "Integration unit checks (Node 22)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:29:37Z",
+            "completed_at": "2026-11-20T20:37:12Z",
+            "queue_seconds": 1036,
+            "execution_seconds": 455,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133485,
+            "name": "Integration unit checks",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:31:32Z",
+            "completed_at": "2026-11-20T20:38:51Z",
+            "queue_seconds": 1151,
+            "execution_seconds": 439,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133514,
+            "name": "Core unit checks (Node 22)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:29:43Z",
+            "completed_at": "2026-11-20T20:40:31Z",
+            "queue_seconds": 1042,
+            "execution_seconds": 648,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133701,
+            "name": "Database checks (3/4)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:32:56Z",
+            "completed_at": "2026-11-20T20:37:13Z",
+            "queue_seconds": 1235,
+            "execution_seconds": 257,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133789,
+            "name": "Database checks (1/4)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:40:37Z",
+            "completed_at": "2026-11-20T20:45:30Z",
+            "queue_seconds": 1696,
+            "execution_seconds": 293,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133843,
+            "name": "Database checks (1/4) (Node 22)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:35:32Z",
+            "completed_at": "2026-11-20T20:39:34Z",
+            "queue_seconds": 1391,
+            "execution_seconds": 242,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133871,
+            "name": "Database checks (4/4)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:34:28Z",
+            "completed_at": "2026-11-20T20:42:03Z",
+            "queue_seconds": 1327,
+            "execution_seconds": 455,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133877,
+            "name": "Database checks (2/4)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:40:33Z",
+            "completed_at": "2026-11-20T20:46:51Z",
+            "queue_seconds": 1692,
+            "execution_seconds": 378,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133891,
+            "name": "Database checks (2/4) (Node 22)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:35:20Z",
+            "completed_at": "2026-11-20T20:41:13Z",
+            "queue_seconds": 1379,
+            "execution_seconds": 353,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133903,
+            "name": "Database checks (3/4) (Node 22)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:37:13Z",
+            "completed_at": "2026-11-20T20:43:39Z",
+            "queue_seconds": 1492,
+            "execution_seconds": 386,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541133949,
+            "name": "Database checks (4/4) (Node 22)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:35:47Z",
+            "completed_at": "2026-11-20T20:44:12Z",
+            "queue_seconds": 1406,
+            "execution_seconds": 505,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541134448,
+            "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:27:24Z",
+            "completed_at": "2026-11-20T20:29:38Z",
+            "queue_seconds": 903,
+            "execution_seconds": 134,
+            "conclusion": "success"
+          },
+          {
+            "id": 136541135379,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "created_at": "2026-11-20T20:12:21Z",
+            "started_at": "2026-11-20T20:26:11Z",
+            "completed_at": "2026-11-20T20:32:06Z",
+            "queue_seconds": 830,
+            "execution_seconds": 355,
+            "conclusion": "success"
+          },
+          {
+            "id": 136551433962,
+            "name": "analytics-checks / analytics-ssr",
+            "created_at": "2026-11-20T20:32:07Z",
+            "started_at": "2026-11-20T20:48:09Z",
+            "completed_at": "2026-11-20T20:48:13Z",
+            "queue_seconds": 962,
+            "execution_seconds": 4,
+            "conclusion": "success"
+          },
+          {
+            "id": 136558944406,
+            "name": "Production build and browser interactions",
+            "created_at": "2026-11-20T20:46:51Z",
+            "started_at": "2026-11-20T21:14:22Z",
+            "completed_at": "2026-11-20T21:14:36Z",
+            "queue_seconds": 1651,
+            "execution_seconds": 14,
+            "conclusion": "success"
+          },
+          {
+            "id": 136559630935,
+            "name": "UI policy (strict)",
+            "created_at": "2026-11-20T20:48:13Z",
+            "started_at": "2026-11-20T21:15:13Z",
+            "completed_at": "2026-11-20T21:15:21Z",
+            "queue_seconds": 1620,
+            "execution_seconds": 8,
+            "conclusion": "success"
+          }
+        ]
+      },
+      "tested_checkout_shas": [
+        {
+          "role": "CI source checks",
+          "job_id": 136541133347,
+          "sha": "1b7cf802de112d79efb4d93296d39462cb1b375c",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        },
+        {
+          "role": "first substantive feedback",
+          "job_id": 136534980755,
+          "sha": "1b7cf802de112d79efb4d93296d39462cb1b375c",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        }
+      ]
+    },
+    {
+      "pr": 2917,
+      "epic": 2912,
+      "head_sha": "0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+      "pr_url": "https://github.com/alexj11324/Mikka/pull/2917",
+      "first_workflow_created_at": "2026-11-20T19:11:29Z",
+      "workflow_run_count": 4,
+      "total_job_count": 31,
+      "feedback": {
+        "run_id": 44799819215,
+        "attempt": 1,
+        "job_id": 136508730071,
+        "name": "source",
+        "kind": "source and provenance assertions",
+        "created_at": "2026-11-20T19:11:30Z",
+        "started_at": "2026-11-20T19:13:38Z",
+        "completed_at": "2026-11-20T19:14:00Z",
+        "seconds_from_first_workflow": 151,
+        "job_queue_seconds": 128,
+        "job_execution_seconds": 22,
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44799819215/job/136508730071",
+        "actual_validation_steps": [
+          {
+            "number": 4,
+            "name": "Verify public API and runtime provenance without credentials",
+            "conclusion": "success",
+            "started_at": "2026-11-20T19:13:46Z",
+            "completed_at": "2026-11-20T19:13:58Z"
+          }
+        ],
+        "validation_examples": [
+          "registry reuse verifies raw manifest bytes and only treats HTTP 404 as a cache miss",
+          "a successful service survives a sibling failure, but missing provenance or a skipped gate cannot become a cache hit",
+          "the checked-in service entries cover their current transitive repository imports"
+        ],
+        "evidence": {
+          "node_test_block": {
+            "tests": 73,
+            "passed": 73,
+            "failed": 0
+          },
+          "qualification": "Real Node test suite at the source/provenance boundary, not a source-identity-only or planning job."
+        }
+      },
+      "ci": {
+        "run_id": 44799819020,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44799819020",
+        "created_at": "2026-11-20T19:11:29Z",
+        "conclusion": "success",
+        "total_jobs": 22,
+        "executed_jobs": 20,
+        "skipped_jobs": 2,
+        "first_started_at": "2026-11-20T19:12:28Z",
+        "last_completed_at": "2026-11-20T19:48:14Z",
+        "wall_seconds": 2205,
+        "initial_queue_seconds": 59,
+        "execution_span_seconds": 2146,
+        "runner_seconds": 5887,
+        "job_queue_seconds": [
+          37,
+          207,
+          1116,
+          263,
+          524,
+          257,
+          1059,
+          388,
+          660,
+          662,
+          393,
+          388,
+          479,
+          796,
+          828,
+          185,
+          99,
+          485,
+          641,
+          635
+        ],
+        "jobs": [
+          {
+            "id": 136508924789,
+            "name": "changes / Changed files",
+            "created_at": "2026-11-20T19:11:51Z",
+            "started_at": "2026-11-20T19:12:28Z",
+            "completed_at": "2026-11-20T19:13:19Z",
+            "queue_seconds": 37,
+            "execution_seconds": 51,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711259,
+            "name": "Integration unit checks (Node 22)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:16:46Z",
+            "completed_at": "2026-11-20T19:24:37Z",
+            "queue_seconds": 207,
+            "execution_seconds": 471,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711293,
+            "name": "Daemon checks",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:31:55Z",
+            "completed_at": "2026-11-20T19:35:57Z",
+            "queue_seconds": 1116,
+            "execution_seconds": 242,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711323,
+            "name": "Integration unit checks",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:17:42Z",
+            "completed_at": "2026-11-20T19:24:20Z",
+            "queue_seconds": 263,
+            "execution_seconds": 398,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711336,
+            "name": "Source checks",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:22:03Z",
+            "completed_at": "2026-11-20T19:26:45Z",
+            "queue_seconds": 524,
+            "execution_seconds": 282,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711370,
+            "name": "Core unit checks",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:17:36Z",
+            "completed_at": "2026-11-20T19:27:23Z",
+            "queue_seconds": 257,
+            "execution_seconds": 587,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711372,
+            "name": "Core unit checks (Node 22)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:30:58Z",
+            "completed_at": "2026-11-20T19:37:28Z",
+            "queue_seconds": 1059,
+            "execution_seconds": 390,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711485,
+            "name": "Database checks (2/4)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:19:47Z",
+            "completed_at": "2026-11-20T19:25:15Z",
+            "queue_seconds": 388,
+            "execution_seconds": 328,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711516,
+            "name": "Database checks (1/4) (Node 22)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:24:19Z",
+            "completed_at": "2026-11-20T19:28:58Z",
+            "queue_seconds": 660,
+            "execution_seconds": 279,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711533,
+            "name": "Database checks (2/4) (Node 22)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:24:21Z",
+            "completed_at": "2026-11-20T19:30:12Z",
+            "queue_seconds": 662,
+            "execution_seconds": 351,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711571,
+            "name": "Database checks (3/4) (Node 22)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:19:52Z",
+            "completed_at": "2026-11-20T19:26:07Z",
+            "queue_seconds": 393,
+            "execution_seconds": 375,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711588,
+            "name": "Database checks (4/4)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:19:47Z",
+            "completed_at": "2026-11-20T19:28:35Z",
+            "queue_seconds": 388,
+            "execution_seconds": 528,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711593,
+            "name": "Database checks (1/4)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:21:18Z",
+            "completed_at": "2026-11-20T19:25:59Z",
+            "queue_seconds": 479,
+            "execution_seconds": 281,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711659,
+            "name": "Database checks (3/4)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:26:35Z",
+            "completed_at": "2026-11-20T19:31:22Z",
+            "queue_seconds": 796,
+            "execution_seconds": 287,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509711684,
+            "name": "Database checks (4/4) (Node 22)",
+            "created_at": "2026-11-20T19:13:19Z",
+            "started_at": "2026-11-20T19:27:07Z",
+            "completed_at": "2026-11-20T19:34:31Z",
+            "queue_seconds": 828,
+            "execution_seconds": 444,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509712031,
+            "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+            "created_at": "2026-11-20T19:13:20Z",
+            "started_at": "2026-11-20T19:16:25Z",
+            "completed_at": "2026-11-20T19:18:18Z",
+            "queue_seconds": 185,
+            "execution_seconds": 113,
+            "conclusion": "success"
+          },
+          {
+            "id": 136509712717,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "created_at": "2026-11-20T19:13:20Z",
+            "started_at": "2026-11-20T19:14:59Z",
+            "completed_at": "2026-11-20T19:22:35Z",
+            "queue_seconds": 99,
+            "execution_seconds": 456,
+            "conclusion": "success"
+          },
+          {
+            "id": 136514627881,
+            "name": "analytics-checks / analytics-ssr",
+            "created_at": "2026-11-20T19:22:35Z",
+            "started_at": "2026-11-20T19:30:40Z",
+            "completed_at": "2026-11-20T19:30:44Z",
+            "queue_seconds": 485,
+            "execution_seconds": 4,
+            "conclusion": "success"
+          },
+          {
+            "id": 136521027846,
+            "name": "Production build and browser interactions",
+            "created_at": "2026-11-20T19:34:31Z",
+            "started_at": "2026-11-20T19:45:12Z",
+            "completed_at": "2026-11-20T19:45:22Z",
+            "queue_seconds": 641,
+            "execution_seconds": 10,
+            "conclusion": "success"
+          },
+          {
+            "id": 136522632589,
+            "name": "UI policy (strict)",
+            "created_at": "2026-11-20T19:37:29Z",
+            "started_at": "2026-11-20T19:48:04Z",
+            "completed_at": "2026-11-20T19:48:14Z",
+            "queue_seconds": 635,
+            "execution_seconds": 10,
+            "conclusion": "success"
+          }
+        ]
+      },
+      "tested_checkout_shas": [
+        {
+          "role": "CI source checks",
+          "job_id": 136509711336,
+          "sha": "5de14e21458b3f02cbf80c45f82050c9cc4228ce",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        },
+        {
+          "role": "first substantive feedback",
+          "job_id": 136508730071,
+          "sha": "5de14e21458b3f02cbf80c45f82050c9cc4228ce",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        }
+      ]
+    },
+    {
+      "pr": 2958,
+      "epic": 2956,
+      "head_sha": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "pr_url": "https://github.com/alexj11324/Mikka/pull/2958",
+      "first_workflow_created_at": "2026-11-20T19:54:30Z",
+      "workflow_run_count": 12,
+      "total_job_count": 43,
+      "feedback": {
+        "run_id": 44806487707,
+        "attempt": 1,
+        "job_id": 136531732160,
+        "name": "runtime",
+        "kind": "executed tests",
+        "created_at": "2026-11-20T19:54:31Z",
+        "started_at": "2026-11-20T20:00:56Z",
+        "completed_at": "2026-11-20T20:02:57Z",
+        "seconds_from_first_workflow": 507,
+        "job_queue_seconds": 385,
+        "job_execution_seconds": 121,
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44806487707/job/136531732160",
+        "actual_validation_steps": [
+          {
+            "number": 6,
+            "name": "Visual model, scoped policy and network contracts",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:01:56Z",
+            "completed_at": "2026-11-20T20:02:13Z"
+          },
+          {
+            "number": 8,
+            "name": "Real Chromium observation, action, replay and credential guards",
+            "conclusion": "success",
+            "started_at": "2026-11-20T20:02:45Z",
+            "completed_at": "2026-11-20T20:02:55Z"
+          }
+        ],
+        "validation_examples": [
+          "the thread machine route refuses a desktop view and issues no grant",
+          "runtime refresh retains the same-origin request boundary",
+          "deny stays enforced: a workspace computer deny, or an explicit workspace deny for the effect"
+        ],
+        "evidence": {
+          "qualification": "Actual scoped-policy/network tests followed by real Chromium observation/action/replay/credential guards; no product chat E2E claim."
+        }
+      },
+      "ci": {
+        "run_id": 44806487898,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44806487898",
+        "created_at": "2026-11-20T19:54:30Z",
+        "conclusion": "success",
+        "total_jobs": 22,
+        "executed_jobs": 20,
+        "skipped_jobs": 2,
+        "first_started_at": "2026-11-20T20:03:29Z",
+        "last_completed_at": "2026-11-20T20:59:02Z",
+        "wall_seconds": 3872,
+        "initial_queue_seconds": 539,
+        "execution_span_seconds": 3333,
+        "runner_seconds": 6030,
+        "job_queue_seconds": [
+          514,
+          908,
+          704,
+          462,
+          857,
+          1064,
+          1129,
+          1287,
+          897,
+          1514,
+          1109,
+          1556,
+          1683,
+          1560,
+          1903,
+          795,
+          696,
+          584,
+          654,
+          658
+        ],
+        "jobs": [
+          {
+            "id": 136531939962,
+            "name": "changes / Changed files",
+            "created_at": "2026-11-20T19:54:55Z",
+            "started_at": "2026-11-20T20:03:29Z",
+            "completed_at": "2026-11-20T20:04:25Z",
+            "queue_seconds": 514,
+            "execution_seconds": 56,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941588,
+            "name": "Core unit checks",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:19:33Z",
+            "completed_at": "2026-11-20T20:27:13Z",
+            "queue_seconds": 908,
+            "execution_seconds": 460,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941596,
+            "name": "Daemon checks",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:16:09Z",
+            "completed_at": "2026-11-20T20:20:35Z",
+            "queue_seconds": 704,
+            "execution_seconds": 266,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941618,
+            "name": "Source checks",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:12:07Z",
+            "completed_at": "2026-11-20T20:15:37Z",
+            "queue_seconds": 462,
+            "execution_seconds": 210,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941643,
+            "name": "Integration unit checks (Node 22)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:18:42Z",
+            "completed_at": "2026-11-20T20:26:02Z",
+            "queue_seconds": 857,
+            "execution_seconds": 440,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941773,
+            "name": "Integration unit checks",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:22:09Z",
+            "completed_at": "2026-11-20T20:28:19Z",
+            "queue_seconds": 1064,
+            "execution_seconds": 370,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941803,
+            "name": "Database checks (2/4)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:23:14Z",
+            "completed_at": "2026-11-20T20:29:05Z",
+            "queue_seconds": 1129,
+            "execution_seconds": 351,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941813,
+            "name": "Database checks (1/4) (Node 22)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:25:52Z",
+            "completed_at": "2026-11-20T20:31:04Z",
+            "queue_seconds": 1287,
+            "execution_seconds": 312,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941824,
+            "name": "Database checks (3/4) (Node 22)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:19:22Z",
+            "completed_at": "2026-11-20T20:25:39Z",
+            "queue_seconds": 897,
+            "execution_seconds": 377,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941865,
+            "name": "Database checks (3/4)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:29:39Z",
+            "completed_at": "2026-11-20T20:34:35Z",
+            "queue_seconds": 1514,
+            "execution_seconds": 296,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941889,
+            "name": "Database checks (4/4)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:22:54Z",
+            "completed_at": "2026-11-20T20:30:13Z",
+            "queue_seconds": 1109,
+            "execution_seconds": 439,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941908,
+            "name": "Database checks (4/4) (Node 22)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:30:21Z",
+            "completed_at": "2026-11-20T20:39:55Z",
+            "queue_seconds": 1556,
+            "execution_seconds": 574,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941928,
+            "name": "Database checks (1/4)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:32:28Z",
+            "completed_at": "2026-11-20T20:36:03Z",
+            "queue_seconds": 1683,
+            "execution_seconds": 215,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536941939,
+            "name": "Database checks (2/4) (Node 22)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:30:25Z",
+            "completed_at": "2026-11-20T20:37:11Z",
+            "queue_seconds": 1560,
+            "execution_seconds": 406,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536942059,
+            "name": "Core unit checks (Node 22)",
+            "created_at": "2026-11-20T20:04:25Z",
+            "started_at": "2026-11-20T20:36:08Z",
+            "completed_at": "2026-11-20T20:47:54Z",
+            "queue_seconds": 1903,
+            "execution_seconds": 706,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536942660,
+            "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+            "created_at": "2026-11-20T20:04:26Z",
+            "started_at": "2026-11-20T20:17:41Z",
+            "completed_at": "2026-11-20T20:19:24Z",
+            "queue_seconds": 795,
+            "execution_seconds": 103,
+            "conclusion": "success"
+          },
+          {
+            "id": 136536943779,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "created_at": "2026-11-20T20:04:26Z",
+            "started_at": "2026-11-20T20:16:02Z",
+            "completed_at": "2026-11-20T20:23:09Z",
+            "queue_seconds": 696,
+            "execution_seconds": 427,
+            "conclusion": "success"
+          },
+          {
+            "id": 136546783894,
+            "name": "analytics-checks / analytics-ssr",
+            "created_at": "2026-11-20T20:23:09Z",
+            "started_at": "2026-11-20T20:32:53Z",
+            "completed_at": "2026-11-20T20:32:56Z",
+            "queue_seconds": 584,
+            "execution_seconds": 3,
+            "conclusion": "success"
+          },
+          {
+            "id": 136555424967,
+            "name": "Production build and browser interactions",
+            "created_at": "2026-11-20T20:39:55Z",
+            "started_at": "2026-11-20T20:50:49Z",
+            "completed_at": "2026-11-20T20:50:59Z",
+            "queue_seconds": 654,
+            "execution_seconds": 10,
+            "conclusion": "success"
+          },
+          {
+            "id": 136559473381,
+            "name": "UI policy (strict)",
+            "created_at": "2026-11-20T20:47:55Z",
+            "started_at": "2026-11-20T20:58:53Z",
+            "completed_at": "2026-11-20T20:59:02Z",
+            "queue_seconds": 658,
+            "execution_seconds": 9,
+            "conclusion": "success"
+          }
+        ]
+      },
+      "tested_checkout_shas": [
+        {
+          "role": "CI source checks",
+          "job_id": 136536941618,
+          "sha": "f1626b50383731a0947bc72e36d0dd06888bae14",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        },
+        {
+          "role": "first substantive feedback",
+          "job_id": 136531732160,
+          "sha": "f1626b50383731a0947bc72e36d0dd06888bae14",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        }
+      ]
+    },
+    {
+      "pr": 2905,
+      "epic": 2897,
+      "head_sha": "312d307ca8b11d2b9383eae984fd13305852c147",
+      "pr_url": "https://github.com/alexj11324/Mikka/pull/2905",
+      "first_workflow_created_at": "2026-11-20T16:05:11Z",
+      "workflow_run_count": 11,
+      "total_job_count": 47,
+      "feedback": {
+        "run_id": 44769779067,
+        "attempt": 1,
+        "job_id": 136404000083,
+        "name": "test",
+        "kind": "executed tests",
+        "created_at": "2026-11-20T16:05:12Z",
+        "started_at": "2026-11-20T16:05:15Z",
+        "completed_at": "2026-11-20T16:05:35Z",
+        "seconds_from_first_workflow": 24,
+        "job_queue_seconds": 3,
+        "job_execution_seconds": 20,
+        "conclusion": "success",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44769779067/job/136404000083",
+        "actual_validation_steps": [
+          {
+            "number": 5,
+            "name": "Run node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+            "conclusion": "success",
+            "started_at": "2026-11-20T16:05:25Z",
+            "completed_at": "2026-11-20T16:05:30Z"
+          },
+          {
+            "number": 6,
+            "name": "Run python3 scripts/e2b/build-template.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T16:05:30Z",
+            "completed_at": "2026-11-20T16:05:31Z"
+          },
+          {
+            "number": 7,
+            "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T16:05:31Z",
+            "completed_at": "2026-11-20T16:05:31Z"
+          },
+          {
+            "number": 8,
+            "name": "Run python3 scripts/e2b/official-files.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T16:05:31Z",
+            "completed_at": "2026-11-20T16:05:31Z"
+          },
+          {
+            "number": 9,
+            "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T16:05:31Z",
+            "completed_at": "2026-11-20T16:05:32Z"
+          },
+          {
+            "number": 10,
+            "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+            "conclusion": "success",
+            "started_at": "2026-11-20T16:05:32Z",
+            "completed_at": "2026-11-20T16:05:32Z"
+          }
+        ],
+        "validation_examples": [
+          "retains closed worker-claim phases and marks unavailable runtime proof honestly",
+          "prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries",
+          "bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries"
+        ],
+        "evidence": {
+          "node_test_block": {
+            "tests": 204,
+            "passed": 204,
+            "failed": 0
+          },
+          "qualification": "Real offline release/dispatch/receipt contract tests; Python gate tests also ran in the same job."
+        }
+      },
+      "ci": {
+        "run_id": 44769778347,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/44769778347",
+        "created_at": "2026-11-20T16:05:11Z",
+        "conclusion": "success",
+        "total_jobs": 25,
+        "executed_jobs": 21,
+        "skipped_jobs": 4,
+        "first_started_at": "2026-11-20T16:05:16Z",
+        "last_completed_at": "2026-11-20T16:31:23Z",
+        "wall_seconds": 1572,
+        "initial_queue_seconds": 5,
+        "execution_span_seconds": 1567,
+        "runner_seconds": 7545,
+        "job_queue_seconds": [
+          3,
+          2,
+          2,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          59,
+          161,
+          2,
+          120,
+          2,
+          170,
+          139,
+          117,
+          2,
+          2,
+          79
+        ],
+        "jobs": [
+          {
+            "id": 136404005727,
+            "name": "changes / Changed files",
+            "created_at": "2026-11-20T16:05:13Z",
+            "started_at": "2026-11-20T16:05:16Z",
+            "completed_at": "2026-11-20T16:06:19Z",
+            "queue_seconds": 3,
+            "execution_seconds": 63,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680483,
+            "name": "Integration unit checks",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:13:56Z",
+            "queue_seconds": 2,
+            "execution_seconds": 455,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680507,
+            "name": "Integration unit checks (Node 22)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:14:32Z",
+            "queue_seconds": 2,
+            "execution_seconds": 491,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680546,
+            "name": "Source checks",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:20Z",
+            "completed_at": "2026-11-20T16:09:51Z",
+            "queue_seconds": 1,
+            "execution_seconds": 211,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680585,
+            "name": "Daemon checks",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:10:35Z",
+            "queue_seconds": 2,
+            "execution_seconds": 254,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680673,
+            "name": "Core unit checks",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:15:12Z",
+            "queue_seconds": 2,
+            "execution_seconds": 531,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680698,
+            "name": "Core unit checks (Node 22)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:17:18Z",
+            "queue_seconds": 2,
+            "execution_seconds": 657,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680756,
+            "name": "Database checks (1/4) (Node 22)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:11:51Z",
+            "queue_seconds": 2,
+            "execution_seconds": 330,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680779,
+            "name": "Database checks (3/4)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:10:37Z",
+            "queue_seconds": 2,
+            "execution_seconds": 256,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680795,
+            "name": "Database checks (2/4)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:11:48Z",
+            "queue_seconds": 2,
+            "execution_seconds": 327,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680806,
+            "name": "Database checks (3/4) (Node 22)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:07:18Z",
+            "completed_at": "2026-11-20T16:13:39Z",
+            "queue_seconds": 59,
+            "execution_seconds": 381,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680816,
+            "name": "Database checks (4/4)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:09:00Z",
+            "completed_at": "2026-11-20T16:17:47Z",
+            "queue_seconds": 161,
+            "execution_seconds": 527,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680823,
+            "name": "Database checks (2/4) (Node 22)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:13:18Z",
+            "queue_seconds": 2,
+            "execution_seconds": 417,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680847,
+            "name": "Database checks (4/4) (Node 22)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:08:19Z",
+            "completed_at": "2026-11-20T16:16:33Z",
+            "queue_seconds": 120,
+            "execution_seconds": 494,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404680876,
+            "name": "Database checks (1/4)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:06:21Z",
+            "completed_at": "2026-11-20T16:11:30Z",
+            "queue_seconds": 2,
+            "execution_seconds": 309,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404681542,
+            "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:09:09Z",
+            "completed_at": "2026-11-20T16:11:30Z",
+            "queue_seconds": 170,
+            "execution_seconds": 141,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404682378,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:08:38Z",
+            "completed_at": "2026-11-20T16:14:58Z",
+            "queue_seconds": 139,
+            "execution_seconds": 380,
+            "conclusion": "success"
+          },
+          {
+            "id": 136404682403,
+            "name": "image-checks / image",
+            "created_at": "2026-11-20T16:06:19Z",
+            "started_at": "2026-11-20T16:08:16Z",
+            "completed_at": "2026-11-20T16:29:55Z",
+            "queue_seconds": 117,
+            "execution_seconds": 1299,
+            "conclusion": "success"
+          },
+          {
+            "id": 136409850557,
+            "name": "analytics-checks / analytics-ssr",
+            "created_at": "2026-11-20T16:14:59Z",
+            "started_at": "2026-11-20T16:15:01Z",
+            "completed_at": "2026-11-20T16:15:04Z",
+            "queue_seconds": 2,
+            "execution_seconds": 3,
+            "conclusion": "success"
+          },
+          {
+            "id": 136411570801,
+            "name": "Production build and browser interactions",
+            "created_at": "2026-11-20T16:17:47Z",
+            "started_at": "2026-11-20T16:17:49Z",
+            "completed_at": "2026-11-20T16:17:59Z",
+            "queue_seconds": 2,
+            "execution_seconds": 10,
+            "conclusion": "success"
+          },
+          {
+            "id": 136418731604,
+            "name": "UI policy (strict)",
+            "created_at": "2026-11-20T16:29:55Z",
+            "started_at": "2026-11-20T16:31:14Z",
+            "completed_at": "2026-11-20T16:31:23Z",
+            "queue_seconds": 79,
+            "execution_seconds": 9,
+            "conclusion": "success"
+          }
+        ]
+      },
+      "tested_checkout_shas": [
+        {
+          "role": "CI source checks",
+          "job_id": 136404680546,
+          "sha": "1b47ed999c1054dcd9bc95b9c2f7128c707f24a2",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        },
+        {
+          "role": "first substantive feedback",
+          "job_id": 136404000083,
+          "sha": "1b47ed999c1054dcd9bc95b9c2f7128c707f24a2",
+          "node_versions": [
+            "v24.22.3"
+          ]
+        }
+      ]
+    }
+  ],
+  "aggregation_only_waits": [
+    {
+      "pr": 2963,
+      "gate_jobs": [
+        {
+          "id": 136557604380,
+          "name": "analytics-checks / analytics-ssr",
+          "queue_seconds": 623,
+          "execution_seconds": 4
+        },
+        {
+          "id": 136574079060,
+          "name": "UI policy (strict)",
+          "queue_seconds": 167,
+          "execution_seconds": 10
+        },
+        {
+          "id": 136577622034,
+          "name": "Production build and browser interactions",
+          "queue_seconds": 264,
+          "execution_seconds": 10
+        }
+      ]
+    },
+    {
+      "pr": 2898,
+      "gate_jobs": [
+        {
+          "id": 136551433962,
+          "name": "analytics-checks / analytics-ssr",
+          "queue_seconds": 962,
+          "execution_seconds": 4
+        },
+        {
+          "id": 136558944406,
+          "name": "Production build and browser interactions",
+          "queue_seconds": 1651,
+          "execution_seconds": 14
+        },
+        {
+          "id": 136559630935,
+          "name": "UI policy (strict)",
+          "queue_seconds": 1620,
+          "execution_seconds": 8
+        }
+      ]
+    },
+    {
+      "pr": 2917,
+      "gate_jobs": [
+        {
+          "id": 136514627881,
+          "name": "analytics-checks / analytics-ssr",
+          "queue_seconds": 485,
+          "execution_seconds": 4
+        },
+        {
+          "id": 136521027846,
+          "name": "Production build and browser interactions",
+          "queue_seconds": 641,
+          "execution_seconds": 10
+        },
+        {
+          "id": 136522632589,
+          "name": "UI policy (strict)",
+          "queue_seconds": 635,
+          "execution_seconds": 10
+        }
+      ]
+    },
+    {
+      "pr": 2958,
+      "gate_jobs": [
+        {
+          "id": 136546783894,
+          "name": "analytics-checks / analytics-ssr",
+          "queue_seconds": 584,
+          "execution_seconds": 3
+        },
+        {
+          "id": 136555424967,
+          "name": "Production build and browser interactions",
+          "queue_seconds": 654,
+          "execution_seconds": 10
+        },
+        {
+          "id": 136559473381,
+          "name": "UI policy (strict)",
+          "queue_seconds": 658,
+          "execution_seconds": 9
+        }
+      ]
+    },
+    {
+      "pr": 2905,
+      "gate_jobs": [
+        {
+          "id": 136409850557,
+          "name": "analytics-checks / analytics-ssr",
+          "queue_seconds": 2,
+          "execution_seconds": 3
+        },
+        {
+          "id": 136411570801,
+          "name": "Production build and browser interactions",
+          "queue_seconds": 2,
+          "execution_seconds": 10
+        },
+        {
+          "id": 136418731604,
+          "name": "UI policy (strict)",
+          "queue_seconds": 79,
+          "execution_seconds": 9
+        }
+      ]
+    }
+  ],
+  "workflow_necessity_assessment": [
+    {
+      "file": "analytics-ssr.yml",
+      "name": "Analytics SSR",
+      "events": [
+        "workflow_call",
+        "workflow_dispatch"
+      ],
+      "job_templates": 3,
+      "decision": "remove_duplicate_allocation",
+      "reason": "One real selected SSR job was followed by a runner used only to summarize its result; native job result and the existing protected parent enforce the same requirement. #2986 removes the extra allocation.",
+      "owner": "#2984 / #2986",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/analytics-ssr.yml"
+    },
+    {
+      "file": "app-icon.yml",
+      "name": "App icon",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/app-icon.yml"
+    },
+    {
+      "file": "browser-gate.yml",
+      "name": "Browser gate",
+      "events": [
+        "pull_request"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Required legacy check name is a documented echo-only placeholder; keep until an authorized branch-protection migration. It is explicitly excluded from useful test feedback and E2E proof.",
+      "owner": "Repository protection owner / decision 2026-11-01-1520",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/browser-gate.yml"
+    },
+    {
+      "file": "ci-dependencies.yml",
+      "name": "Warm CI dependencies",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Native Actions dependency caching is already installed with lock/environment/profile/path keyed inputs and main-only writes; warm install work is not a substitute for acceptance.",
+      "owner": "CI dependency owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/ci-dependencies.yml"
+    },
+    {
+      "file": "ci-selection.yml",
+      "name": "Trusted CI selection",
+      "events": [
+        "workflow_call"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "One trusted immutable-base selection, with current native reusable callers consuming the parent selection. Fork/untrusted candidate code cannot supply its own selector.",
+      "owner": "CI policy owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/ci-selection.yml"
+    },
+    {
+      "file": "cloud-computer.yml",
+      "name": "Cloud computer backend",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Retain each existing self-contained domain and manual-dispatch check. Measured cross-workflow typecheck repetition does not establish identical inputs: CI Source checks use Ubuntu22.04, domain runs use Ubuntu26.04, and the sampled #2898 jobs also differ in Node24 patch. No supported same-input equivalence has been proved; no static-matrix intent is invented.",
+      "owner": "Existing domain owners; #2984 necessity assessment",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloud-computer.yml"
+    },
+    {
+      "file": "cloud-services-ci.yml",
+      "name": "Cloud Services qualification",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloud-services-ci.yml"
+    },
+    {
+      "file": "cloudflare-api-image.yml",
+      "name": "Cloudflare API image",
+      "events": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 6,
+      "decision": "retain",
+      "reason": "#2897 already owns content-addressed six-service build/reuse, offline PR provenance and protected official publication. PR merge candidates and official main publication are different trust/input boundaries.",
+      "owner": "#2897 / #1953",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloudflare-api-image.yml"
+    },
+    {
+      "file": "cloudflare-app-deploy.yml",
+      "name": "Cloudflare application deployment",
+      "events": [
+        "workflow_run",
+        "workflow_dispatch"
+      ],
+      "job_templates": 6,
+      "decision": "retain",
+      "reason": "Existing official manifest consumer and staging migration admission. Producer identity and consumer live deployment authorization are separate trust boundaries, not duplicate checks. Do not add another publisher.",
+      "owner": "#2897 / #1954",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloudflare-app-deploy.yml"
+    },
+    {
+      "file": "cloudflare-eve-image.yml",
+      "name": "Cloudflare Eve image",
+      "events": [
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Credential-free PR runtime/image/CLI qualification precedes protected official producer publication. Different source/trust contexts cannot blindly reuse a PR result as an official release.",
+      "owner": "#2897 / runtime owners",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloudflare-eve-image.yml"
+    },
+    {
+      "file": "cloudflare-litellm-image.yml",
+      "name": "Cloudflare LiteLLM runtime",
+      "events": [
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Credential-free PR runtime/image/CLI qualification precedes protected official producer publication. Different source/trust contexts cannot blindly reuse a PR result as an official release.",
+      "owner": "#2897 / runtime owners",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloudflare-litellm-image.yml"
+    },
+    {
+      "file": "cloudflare-task-sandbox.yml",
+      "name": "Cloudflare task workspace",
+      "events": [
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Credential-free PR runtime/image/CLI qualification precedes protected official producer publication. Different source/trust contexts cannot blindly reuse a PR result as an official release.",
+      "owner": "#2897 / runtime owners",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloudflare-task-sandbox.yml"
+    },
+    {
+      "file": "cloudflare-world-deploy.yml",
+      "name": "Cloudflare World deployment",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/cloudflare-world-deploy.yml"
+    },
+    {
+      "file": "coding-workspace-acceptance.yml",
+      "name": "Coding Workspace Files acceptance",
+      "events": [
+        "workflow_run"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Version-bound deployed/runtime acceptance triggered by another workflow or deployment, not interchangeable with PR compilation. Preserve the established owner and receipt.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/coding-workspace-acceptance.yml"
+    },
+    {
+      "file": "coding-workspace-review.yml",
+      "name": "Coding workspace review data plane",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/coding-workspace-review.yml"
+    },
+    {
+      "file": "credential-vault.yml",
+      "name": "Credential vault backend",
+      "events": [
+        "push",
+        "pull_request"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Retain each existing self-contained domain and manual-dispatch check. Measured cross-workflow typecheck repetition does not establish identical inputs: CI Source checks use Ubuntu22.04, domain runs use Ubuntu26.04, and the sampled #2898 jobs also differ in Node24 patch. No supported same-input equivalence has been proved; no static-matrix intent is invented.",
+      "owner": "Existing domain owners; #2984 necessity assessment",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/credential-vault.yml"
+    },
+    {
+      "file": "desktop-release.yml",
+      "name": "Desktop release",
+      "events": [
+        "workflow_run",
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/desktop-release.yml"
+    },
+    {
+      "file": "desktop.yml",
+      "name": "Desktop shell",
+      "events": [
+        "workflow_call",
+        "workflow_dispatch"
+      ],
+      "job_templates": 3,
+      "decision": "retain",
+      "reason": "Existing reusable/manual Desktop compilation and Electron acceptance; platform-dependent outputs are not equivalent to a web-only source check.",
+      "owner": "Desktop owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/desktop.yml"
+    },
+    {
+      "file": "device-gateway.yml",
+      "name": "Device gateway",
+      "events": [
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/device-gateway.yml"
+    },
+    {
+      "file": "e2b-byos.yml",
+      "name": "E2B subscription custody",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/e2b-byos.yml"
+    },
+    {
+      "file": "e2b-official-runtime.yml",
+      "name": "E2B additive runtime release",
+      "events": [
+        "workflow_run",
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 4,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/e2b-official-runtime.yml"
+    },
+    {
+      "file": "e2b-runtime-release.yml",
+      "name": "E2B serialized runtime publication",
+      "events": [
+        "workflow_call"
+      ],
+      "job_templates": 6,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/e2b-runtime-release.yml"
+    },
+    {
+      "file": "e2b-template.yml",
+      "name": "E2B additive template candidates",
+      "events": [
+        "workflow_call"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/e2b-template.yml"
+    },
+    {
+      "file": "engineering-sandbox.yml",
+      "name": "Cloudflare engineering sandbox",
+      "events": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 3,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/engineering-sandbox.yml"
+    },
+    {
+      "file": "factory-visual-evidence-acceptance.yml",
+      "name": "Factory visual evidence production acceptance",
+      "events": [
+        "workflow_run",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Version-bound deployed/runtime acceptance triggered by another workflow or deployment, not interchangeable with PR compilation. Preserve the established owner and receipt.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/factory-visual-evidence-acceptance.yml"
+    },
+    {
+      "file": "issue1415-deployed-production.yml",
+      "name": "Issue 1415 deployed production acceptance",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/issue1415-deployed-production.yml"
+    },
+    {
+      "file": "issue1415-managed-inspection.yml",
+      "name": "Issue 1415 managed history inspection",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/issue1415-managed-inspection.yml"
+    },
+    {
+      "file": "issues-1515-1517-cleanup.yml",
+      "name": "Issues 1515-1517 production cleanup",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/issues-1515-1517-cleanup.yml"
+    },
+    {
+      "file": "issues-1515-1517-diagnostics.yml",
+      "name": "Issues 1515-1517 read-only diagnostics",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/issues-1515-1517-diagnostics.yml"
+    },
+    {
+      "file": "issues-1516-welcome-acceptance.yml",
+      "name": "Issue 1516 real welcome acceptance",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/issues-1516-welcome-acceptance.yml"
+    },
+    {
+      "file": "local-device-node22.yml",
+      "name": "Node.js compatibility",
+      "events": [
+        "pull_request",
+        "merge_group",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Actual app/Eve compilation, startup, daemon and installer on two supported Node majors; these inputs differ from source-only or one-major results.",
+      "owner": "Node compatibility owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/local-device-node22.yml"
+    },
+    {
+      "file": "marketing-build.yml",
+      "name": "Build marketing for Cloudflare",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/marketing-build.yml"
+    },
+    {
+      "file": "mobile-native.yml",
+      "name": "Mobile native release",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/mobile-native.yml"
+    },
+    {
+      "file": "mobile-screenshots.yml",
+      "name": "Mobile App Store screenshots",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/mobile-screenshots.yml"
+    },
+    {
+      "file": "mobile-update.yml",
+      "name": "Mobile OTA update",
+      "events": [
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/mobile-update.yml"
+    },
+    {
+      "file": "model-provider-fallback-acceptance.yml",
+      "name": "Issue 1225 model provider acceptance",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/model-provider-fallback-acceptance.yml"
+    },
+    {
+      "file": "production-readiness.yml",
+      "name": "Production owner readiness",
+      "events": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/production-readiness.yml"
+    },
+    {
+      "file": "production-smoke.yml",
+      "name": "Production smoke",
+      "events": [
+        "schedule",
+        "deployment_status",
+        "workflow_dispatch"
+      ],
+      "job_templates": 5,
+      "decision": "retain",
+      "reason": "Version-bound deployed/runtime acceptance triggered by another workflow or deployment, not interchangeable with PR compilation. Preserve the established owner and receipt.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/production-smoke.yml"
+    },
+    {
+      "file": "project-decisions-acceptance.yml",
+      "name": "Project decisions production acceptance",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/project-decisions-acceptance.yml"
+    },
+    {
+      "file": "publish-daemon.yml",
+      "name": "Publish daemon",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Existing native platform publication or reusable coordinator, with source/serving-receipt/credential and cleanup ownership. Some cleanup destroys candidates, so rerun-failed-jobs is not universally valid. No production action was performed.",
+      "owner": "#1953 / #1954 / platform release owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/publish-daemon.yml"
+    },
+    {
+      "file": "read-cache-production.yml",
+      "name": "Read cache production acceptance",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/read-cache-production.yml"
+    },
+    {
+      "file": "read-cache.yml",
+      "name": "Read cache API acceptance",
+      "events": [
+        "pull_request"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/read-cache.yml"
+    },
+    {
+      "file": "run-trace-acceptance.yml",
+      "name": "Run trace production acceptance",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "job_templates": 3,
+      "decision": "retain",
+      "reason": "Manual acceptance/diagnostic/maintenance workflow; it does not automatically allocate a PR runner in this sample. No evidence supports removing the owner's distinct capability.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/run-trace-acceptance.yml"
+    },
+    {
+      "file": "self-hosted-production.yml",
+      "name": "Mikka cloud core compatibility",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/self-hosted-production.yml"
+    },
+    {
+      "file": "site-search.yml",
+      "name": "Site search read contract",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "remove_duplicate_same_job_typecheck",
+      "reason": "Within the same existing site-search job, an explicit typecheck is followed by the original pnpm build, whose unchanged build entry performs a second full typecheck. #2993 removes the first redundant invocation while retaining the build's complete typecheck, both PostgreSQL databases and real HTTP acceptance. Separate cross-workflow environments still retain their own checks.",
+      "owner": "#2984 / #2993",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/site-search.yml",
+      "repair_pr": "https://github.com/alexj11324/Mikka/pull/2993",
+      "repair_head": "b1b03bb1ad2d915e8a9e384e5118e1eef6f8010e",
+      "before_evidence": {
+        "sample_count": 1,
+        "run_id": 44806487915,
+        "attempt": 1,
+        "job_id": 136531732826,
+        "typecheck_command_started_at": [
+          "2026-11-20T20:07:11.4789225Z",
+          "2026-11-20T20:11:46.4290528Z"
+        ],
+        "receipt": "docs/ci/2984-site-search-checks.json"
+      },
+      "after_status": "Exact-head CI run44823370556/1 started/queued; no completed after or merge measurement claimed in baseline."
+    },
+    {
+      "file": "ssh-device-backend.yml",
+      "name": "SSH device backend",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/ssh-device-backend.yml"
+    },
+    {
+      "file": "subagents.yml",
+      "name": "Subagents and thread backend",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Retain each existing self-contained domain and manual-dispatch check. Measured cross-workflow typecheck repetition does not establish identical inputs: CI Source checks use Ubuntu22.04, domain runs use Ubuntu26.04, and the sampled #2898 jobs also differ in Node24 patch. No supported same-input equivalence has been proved; no static-matrix intent is invented.",
+      "owner": "Existing domain owners; #2984 necessity assessment",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/subagents.yml"
+    },
+    {
+      "file": "suggestions-cron.yml",
+      "name": "Minute Worker",
+      "events": [
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/suggestions-cron.yml"
+    },
+    {
+      "file": "task-attachment-production.yml",
+      "name": "Task attachment production acceptance",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/task-attachment-production.yml"
+    },
+    {
+      "file": "task-secret-acceptance.yml",
+      "name": "Task Secret scoped external acceptance",
+      "events": [
+        "workflow_run",
+        "workflow_dispatch"
+      ],
+      "job_templates": 3,
+      "decision": "retain",
+      "reason": "Version-bound deployed/runtime acceptance triggered by another workflow or deployment, not interchangeable with PR compilation. Preserve the established owner and receipt.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/task-secret-acceptance.yml"
+    },
+    {
+      "file": "thread-lifecycle-acceptance.yml",
+      "name": "Task VM question-resume evidence",
+      "events": [
+        "workflow_run"
+      ],
+      "job_templates": 2,
+      "decision": "retain",
+      "reason": "Version-bound deployed/runtime acceptance triggered by another workflow or deployment, not interchangeable with PR compilation. Preserve the established owner and receipt.",
+      "owner": "Original acceptance/operations owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/thread-lifecycle-acceptance.yml"
+    },
+    {
+      "file": "ui-policy.yml",
+      "name": "CI",
+      "events": [
+        "push",
+        "pull_request",
+        "merge_group",
+        "workflow_dispatch",
+        "schedule"
+      ],
+      "job_templates": 11,
+      "decision": "retain",
+      "reason": "Protected source/unit/PG17 gate. Node22/24 are distinct runtime inputs; selected DB shards are disjoint. Native PR/merge_group/main triggers test different integration versions. Retain stable aggregate checks and exact-main postmerge verification.",
+      "owner": "CI policy owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/ui-policy.yml"
+    },
+    {
+      "file": "unattended-sandbox.yml",
+      "name": "Unattended sandbox acceptance",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Scoped existing product/acceptance workflow; its event and environment differ from the aggregate source/unit checks. No equivalent same-input result was established.",
+      "owner": "Existing product/workflow owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/unattended-sandbox.yml"
+    },
+    {
+      "file": "workspace-governance-acceptance.yml",
+      "name": "Workspace governance acceptance",
+      "events": [
+        "workflow_call",
+        "push"
+      ],
+      "job_templates": 1,
+      "decision": "retain",
+      "reason": "Already centralized as a selected reusable PR job plus independent exact-main acceptance; preserve required parent's failure propagation.",
+      "owner": "Governance owner",
+      "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/workspace-governance-acceptance.yml"
+    }
+  ],
+  "public_open_PR_inventory": [
+    {
+      "number": 2991,
+      "url": "https://github.com/alexj11324/Mikka/pull/2991",
+      "title": "Release native Eve sends and LiteLLM billing attribution",
+      "head_sha": "4ceead8ab7687b31d44902071abdc6fb1f5afb14",
+      "branch": "batch/2026-11-20-3",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T21:24:21Z",
+      "updated_at": "2026-11-20T21:24:21Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2989,
+      "url": "https://github.com/alexj11324/Mikka/pull/2989",
+      "title": "Run private Cloudflare operations through a protected public entry",
+      "head_sha": "86f4bae9816ba5fa11019bef8036be5b3b52c037",
+      "branch": "codex/public-cloudflare-operations",
+      "base": "batch/2026-11-20-2",
+      "draft": true,
+      "created_at": "2026-11-20T21:23:12Z",
+      "updated_at": "2026-11-20T21:24:10Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2988,
+      "url": "https://github.com/alexj11324/Mikka/pull/2988",
+      "title": "fix(ci): measure retry queue and execution within the actual attempt (#2984)",
+      "head_sha": "6e69c12b35b56f6bbf6de9ffbe2981a6af9b4ef6",
+      "branch": "feat/sdlc-2984-attempt-timings",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T21:20:57Z",
+      "updated_at": "2026-11-20T21:29:38Z",
+      "scope": "#2984 repair",
+      "disposition": "Owned by this SDLC effort"
+    },
+    {
+      "number": 2987,
+      "url": "https://github.com/alexj11324/Mikka/pull/2987",
+      "title": "fix(dev): refresh local migrations through the existing ledger (#2984)",
+      "head_sha": "3c286d7340c39e4897c28efd95a52ccae67528fb",
+      "branch": "feat/sdlc-2984-bootstrap-migrations",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T21:20:44Z",
+      "updated_at": "2026-11-20T21:27:34Z",
+      "scope": "#2984 repair",
+      "disposition": "Owned by this SDLC effort"
+    },
+    {
+      "number": 2986,
+      "url": "https://github.com/alexj11324/Mikka/pull/2986",
+      "title": "ci: shorten SDLC feedback while preserving required checks (#2984)",
+      "head_sha": "6ddca26218289e8b9fd516d460495e81da3554f3",
+      "branch": "feat/sdlc-2984-ci-feedback",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T21:13:32Z",
+      "updated_at": "2026-11-20T21:24:32Z",
+      "scope": "#2984 repair",
+      "disposition": "Owned by this SDLC effort"
+    },
+    {
+      "number": 2985,
+      "url": "https://github.com/alexj11324/Mikka/pull/2985",
+      "title": "fix(billing): bind native hosted usage to LiteLLM calls",
+      "head_sha": "b8ae9d3db39d1edfbcf72dc760281d944f7fa8f0",
+      "branch": "codex/2869-hosted-call-attribution",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T21:07:45Z",
+      "updated_at": "2026-11-20T21:07:45Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2983,
+      "url": "https://github.com/alexj11324/Mikka/pull/2983",
+      "title": "Retire legacy Coordinator sends and use native Eve",
+      "head_sha": "5a38b43d03c4fed9e1f7d70b3b18ee1896f2d32e",
+      "branch": "codex/2869-eve-only-submit",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T20:30:17Z",
+      "updated_at": "2026-11-20T20:30:17Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2982,
+      "url": "https://github.com/alexj11324/Mikka/pull/2982",
+      "title": "Ignore abandoned holds in hosted model readiness",
+      "head_sha": "6ff65c4b08f6e9687288e64a7865420d3bd042fa",
+      "branch": "codex/2869-hosted-stale-holds",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T20:24:08Z",
+      "updated_at": "2026-11-20T20:53:38Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2981,
+      "url": "https://github.com/alexj11324/Mikka/pull/2981",
+      "title": "Keep releases working through the private GitHub organization move",
+      "head_sha": "854ee17df637b2f5f2c4941034cfb065ad95c381",
+      "branch": "batch/2026-11-20-2",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T20:24:04Z",
+      "updated_at": "2026-11-20T21:06:08Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2978,
+      "url": "https://github.com/alexj11324/Mikka/pull/2978",
+      "title": "Prepare native publishers for the GitHub organization transfer",
+      "head_sha": "0633b43e6149749e62503e6537997b480131ab23",
+      "branch": "codex/prepare-github-organization-native",
+      "base": "codex/prepare-github-organization-release",
+      "draft": false,
+      "created_at": "2026-11-20T19:44:24Z",
+      "updated_at": "2026-11-20T19:44:39Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2977,
+      "url": "https://github.com/alexj11324/Mikka/pull/2977",
+      "title": "feat(settings): P9 personal keyboard shortcuts and row search contract",
+      "head_sha": "8b8e5d8b465e3b1dcfbab39a3022897986fc6878",
+      "branch": "feat/be-settings-p9-shortcuts",
+      "base": "feat/be-settings-p1-registry",
+      "draft": false,
+      "created_at": "2026-11-20T19:40:54Z",
+      "updated_at": "2026-11-20T20:15:52Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2976,
+      "url": "https://github.com/alexj11324/Mikka/pull/2976",
+      "title": "Preserve protected releases during the GitHub organization transfer",
+      "head_sha": "2091af9d04f63da3d8d78b9a487c802fe647b426",
+      "branch": "codex/prepare-github-organization-release",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T19:39:41Z",
+      "updated_at": "2026-11-20T19:40:03Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2975,
+      "url": "https://github.com/alexj11324/Mikka/pull/2975",
+      "title": "fix(marketing): use scoped App access across website repository transfer",
+      "head_sha": "e601ee9642e56e8328083f6ed7c108410cdc8d0a",
+      "branch": "codex/marketing-repository-transfer",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T19:26:33Z",
+      "updated_at": "2026-11-20T19:47:26Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2974,
+      "url": "https://github.com/alexj11324/Mikka/pull/2974",
+      "title": "feat(settings): P3 workspace instructions and sharing defaults",
+      "head_sha": "6c84f2c92bc546a2c57b150c1dd7f760b643d16f",
+      "branch": "feat/be-settings-p3-instructions",
+      "base": "feat/be-settings-p1-registry",
+      "draft": false,
+      "created_at": "2026-11-20T19:25:59Z",
+      "updated_at": "2026-11-20T20:55:35Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2973,
+      "url": "https://github.com/alexj11324/Mikka/pull/2973",
+      "title": "feat(settings): P5 Git defaults and workspace automatic review configuration",
+      "head_sha": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "branch": "feat/be-settings-p5-review",
+      "base": "feat/be-settings-p1-registry",
+      "draft": false,
+      "created_at": "2026-11-20T19:21:28Z",
+      "updated_at": "2026-11-20T20:55:41Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2972,
+      "url": "https://github.com/alexj11324/Mikka/pull/2972",
+      "title": "test: import and sanitize existing agent stream exports (#2885)",
+      "head_sha": "10c610cb5afcb58f7087a0e1214f9b6766737440",
+      "branch": "feat/accept-2885-recorded-replay",
+      "base": "feat/accept-2884-fake-litellm",
+      "draft": true,
+      "created_at": "2026-11-20T19:18:32Z",
+      "updated_at": "2026-11-20T19:45:30Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2971,
+      "url": "https://github.com/alexj11324/Mikka/pull/2971",
+      "title": "Reject unreviewed private runner workflows before qualification",
+      "head_sha": "6c31de2a1599e61aa31d5d7aca154be8116aa67c",
+      "branch": "codex/private-runner-placement-policy",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T19:16:50Z",
+      "updated_at": "2026-11-20T19:16:50Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2970,
+      "url": "https://github.com/alexj11324/Mikka/pull/2970",
+      "title": "docs: add independent acceptance runner and checker workflow",
+      "head_sha": "ea3f7db450299bd1531e3bb5cba7bffa37a192f4",
+      "branch": "feat/accept-2889-runner-checker",
+      "base": "feat/accept-2888-pr-gate",
+      "draft": true,
+      "created_at": "2026-11-20T19:12:23Z",
+      "updated_at": "2026-11-20T19:44:03Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2969,
+      "url": "https://github.com/alexj11324/Mikka/pull/2969",
+      "title": "feat: add isolated local UI fixtures and reproducible screenshots (#2887)",
+      "head_sha": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+      "branch": "feat/accept-2887-ui-fixtures",
+      "base": "feat/accept-2886-http-fakes",
+      "draft": true,
+      "created_at": "2026-11-20T19:11:46Z",
+      "updated_at": "2026-11-20T20:06:02Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2968,
+      "url": "https://github.com/alexj11324/Mikka/pull/2968",
+      "title": "feat(settings): P2 inherited thread behavior and concurrency limits",
+      "head_sha": "80ddaa5ede4fa05642396911c6aa25c389f540a0",
+      "branch": "feat/be-settings-p2-threads",
+      "base": "feat/be-settings-p1-registry",
+      "draft": false,
+      "created_at": "2026-11-20T19:11:07Z",
+      "updated_at": "2026-11-20T20:02:46Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2967,
+      "url": "https://github.com/alexj11324/Mikka/pull/2967",
+      "title": "feat(settings): P6 workspace task label entities and references",
+      "head_sha": "491483c7d8d1a1774a10f5166fb483d888840365",
+      "branch": "feat/be-settings-p6-labels",
+      "base": "feat/be-settings-p1-registry",
+      "draft": false,
+      "created_at": "2026-11-20T19:08:41Z",
+      "updated_at": "2026-11-20T20:25:45Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2966,
+      "url": "https://github.com/alexj11324/Mikka/pull/2966",
+      "title": "feat: internal acceptance flags and offline nightly journeys (#2890)",
+      "head_sha": "e00ba1707805457803d8265a2b05336a6303d2d9",
+      "branch": "feat/accept-2890-internal-nightly",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T19:05:22Z",
+      "updated_at": "2026-11-20T20:00:43Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2965,
+      "url": "https://github.com/alexj11324/Mikka/pull/2965",
+      "title": "test: exercise external clients through HTTP fakes (#2886)",
+      "head_sha": "94c6d2c7074d4d986131ec298700fbb35e1bcc08",
+      "branch": "feat/accept-2886-http-fakes",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T19:04:38Z",
+      "updated_at": "2026-11-20T20:08:20Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2964,
+      "url": "https://github.com/alexj11324/Mikka/pull/2964",
+      "title": "ci: require deterministic PR acceptance declarations (#2888)",
+      "head_sha": "316fce4a8ed210f4db179dac3a92daa543c0d4dd",
+      "branch": "feat/accept-2888-pr-gate",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T19:03:22Z",
+      "updated_at": "2026-11-20T19:44:03Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2963,
+      "url": "https://github.com/alexj11324/Mikka/pull/2963",
+      "title": "test: unify scripted model acceptance at LiteLLM boundary (#2884)",
+      "head_sha": "16bee4e27102642db36e9916c0e453f5145824ab",
+      "branch": "feat/accept-2884-fake-litellm",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T19:03:09Z",
+      "updated_at": "2026-11-20T20:08:20Z",
+      "scope": "existing owner #2891",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2962,
+      "url": "https://github.com/alexj11324/Mikka/pull/2962",
+      "title": "feat(settings): P8 device detail, checkpoints and workspace activity (#2956)",
+      "head_sha": "3879fe1d386bea6480ad4d829dcb4853abe950b2",
+      "branch": "feat/be-settings-p8-device-activity",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T19:01:41Z",
+      "updated_at": "2026-11-20T20:48:36Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2961,
+      "url": "https://github.com/alexj11324/Mikka/pull/2961",
+      "title": "设置页按稿对齐，并让能生效的偏好真正生效",
+      "head_sha": "c9633a15bf69dd570007415722806db6eaffb7c2",
+      "branch": "cursor/settings-ui-a-registry-3a1f",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T18:59:53Z",
+      "updated_at": "2026-11-20T21:28:07Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2960,
+      "url": "https://github.com/alexj11324/Mikka/pull/2960",
+      "title": "feat(security): P7 organization DNS, two-factor policy and scoped invites (#2956)",
+      "head_sha": "cb0396c75ec3e2e4d6eac9e21453c0a524b7b0cd",
+      "branch": "feat/be-settings-p7-security",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T18:54:26Z",
+      "updated_at": "2026-11-20T20:07:20Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2959,
+      "url": "https://github.com/alexj11324/Mikka/pull/2959",
+      "title": "feat(mcp): P4 connection state, tools, environments and native OAuth (#2956)",
+      "head_sha": "181c19e525af32481832836d57c3228aeb503d4d",
+      "branch": "feat/be-settings-p4-mcp",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T18:54:24Z",
+      "updated_at": "2026-11-20T20:12:20Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2958,
+      "url": "https://github.com/alexj11324/Mikka/pull/2958",
+      "title": "feat(settings): P1 registry, typed settings and workspace inheritance (#2956)",
+      "head_sha": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "branch": "feat/be-settings-p1-registry",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T18:52:52Z",
+      "updated_at": "2026-11-20T20:02:45Z",
+      "scope": "existing owner #2956",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2946,
+      "url": "https://github.com/alexj11324/Mikka/pull/2946",
+      "title": "refactor(chat): unify the model picker without visual changes (#2916)",
+      "head_sha": "4525fdbcf3f0af509dda23ae40fb905b3e8c68c9",
+      "branch": "feat/chat-2916-model-picker",
+      "base": "feat/chat-2915-composer-controls",
+      "draft": true,
+      "created_at": "2026-11-20T16:51:53Z",
+      "updated_at": "2026-11-20T18:16:26Z",
+      "scope": "existing owner #2912",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2920,
+      "url": "https://github.com/alexj11324/Mikka/pull/2920",
+      "title": "docs(rules): R-61 names 开始工作 as the task bar's one action",
+      "head_sha": "9bd78d7e1d3349667363f9485994ad2f12cb488a",
+      "branch": "claude/r-61-names-as",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T15:52:21Z",
+      "updated_at": "2026-11-20T15:52:21Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2919,
+      "url": "https://github.com/alexj11324/Mikka/pull/2919",
+      "title": "refactor(chat): share composer state and caller controls (#2915)",
+      "head_sha": "074e022308ff0ec01206bf6903618d82d7eccaa8",
+      "branch": "feat/chat-2915-composer-controls",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T15:44:56Z",
+      "updated_at": "2026-11-20T18:16:25Z",
+      "scope": "existing owner #2912",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2918,
+      "url": "https://github.com/alexj11324/Mikka/pull/2918",
+      "title": "refactor(chat): route messages through the chat-message slot (#2914)",
+      "head_sha": "2f076bb3fc72e361cb8d55126278753cd9aec756",
+      "branch": "feat/chat-2914-message-slot",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T15:44:53Z",
+      "updated_at": "2026-11-20T18:52:43Z",
+      "scope": "existing owner #2912",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2917,
+      "url": "https://github.com/alexj11324/Mikka/pull/2917",
+      "title": "refactor(chat): share ThreadScreen across chat hosts (#2913)",
+      "head_sha": "0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+      "branch": "feat/chat-2913-thread-screen",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-20T15:44:22Z",
+      "updated_at": "2026-11-20T19:11:27Z",
+      "scope": "existing owner #2912",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2908,
+      "url": "https://github.com/alexj11324/Mikka/pull/2908",
+      "title": "Document the Task runtime image with OCI metadata",
+      "head_sha": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+      "branch": "chore/deploy-task-image-metadata",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T14:34:35Z",
+      "updated_at": "2026-11-20T15:08:25Z",
+      "scope": "existing owner #2897",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2898,
+      "url": "https://github.com/alexj11324/Mikka/pull/2898",
+      "title": "fix(deploy): preserve client and migration compatibility (#2896)",
+      "head_sha": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+      "branch": "feat/deploy-2896-compatibility",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T12:16:05Z",
+      "updated_at": "2026-11-20T20:01:34Z",
+      "scope": "existing owner #2897",
+      "disposition": "Retain original owner and existing batch; independent system root only"
+    },
+    {
+      "number": 2892,
+      "url": "https://github.com/alexj11324/Mikka/pull/2892",
+      "title": "修复 LiteLLM 冷启动时的线程标题超时",
+      "head_sha": "4f6443fe41cf97bfc860cd8c979e3e460a55d8ff",
+      "branch": "codex/2869-title-cold-start",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T11:55:30Z",
+      "updated_at": "2026-11-20T14:21:17Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2882,
+      "url": "https://github.com/alexj11324/Mikka/pull/2882",
+      "title": "feat: hide memory behind the mikka-memory PostHog flag",
+      "head_sha": "80c19f5f01c197dc1f8b546a23b3b98fca4f394c",
+      "branch": "feat/hide-memory-flag",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T06:01:25Z",
+      "updated_at": "2026-11-20T06:01:25Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2878,
+      "url": "https://github.com/alexj11324/Mikka/pull/2878",
+      "title": "feat: Agent Profile colours are chromatic only",
+      "head_sha": "76965522a887c417dacdbf3e1f0a58d565114116",
+      "branch": "feat/profile-colors-chromatic",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T05:38:55Z",
+      "updated_at": "2026-11-20T05:38:55Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2868,
+      "url": "https://github.com/alexj11324/Mikka/pull/2868",
+      "title": "feat: generate conversation titles the way Codex does",
+      "head_sha": "b27baf409df36c35a34202c52be10f60fff582b6",
+      "branch": "feat/codex-thread-titles",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T05:03:18Z",
+      "updated_at": "2026-11-20T05:17:52Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2867,
+      "url": "https://github.com/alexj11324/Mikka/pull/2867",
+      "title": "docs: record Capy alignment decisions",
+      "head_sha": "325d6b0e5cefcb83fd8a5972c9b0ceeb3726c83a",
+      "branch": "docs/capy-alignment-decisions",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-20T04:46:23Z",
+      "updated_at": "2026-11-20T05:03:25Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2863,
+      "url": "https://github.com/alexj11324/Mikka/pull/2863",
+      "title": "Align settings navigation and authorized MCP execution with Capy",
+      "head_sha": "8ba37459795e75fbfcaf94154a9a1e14d10bf85a",
+      "branch": "codex/capy-settings-alignment",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-19T22:26:45Z",
+      "updated_at": "2026-11-19T22:26:45Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2839,
+      "url": "https://github.com/alexj11324/Mikka/pull/2839",
+      "title": "chore(skills): vendor Anthropic's frontend-design skill",
+      "head_sha": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+      "branch": "chore/vendor-frontend-design-skill",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-19T02:04:02Z",
+      "updated_at": "2026-11-19T02:04:02Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2825,
+      "url": "https://github.com/alexj11324/Mikka/pull/2825",
+      "title": "fix: continue migrating idle status polling to push",
+      "head_sha": "dbe28eba7834ae05f8cd192a046b3dee894a09c7",
+      "branch": "fix/issue-2820-event-push",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-18T12:54:15Z",
+      "updated_at": "2026-11-19T15:45:59Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2821,
+      "url": "https://github.com/alexj11324/Mikka/pull/2821",
+      "title": "chore: clean up retired Vercel deployment paths",
+      "head_sha": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+      "branch": "chore/cloudflare-vercel-cleanup-20261118",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-18T03:39:15Z",
+      "updated_at": "2026-11-18T14:53:37Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2819,
+      "url": "https://github.com/alexj11324/Mikka/pull/2819",
+      "title": "fix(settings): clarify model setup and fallback prerequisites",
+      "head_sha": "40e6653d9a731a2a6f249f9b5310e9d76d66ad14",
+      "branch": "fix/settings-capy",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-18T03:29:43Z",
+      "updated_at": "2026-11-18T03:29:43Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2774,
+      "url": "https://github.com/alexj11324/Mikka/pull/2774",
+      "title": "Return the stored Organization Files volume when archiving or unarchiving",
+      "head_sha": "c115a64109ba0c61c93626f5e5828ec037196d91",
+      "branch": "feat/2060-organization-archive-files",
+      "base": "main",
+      "draft": false,
+      "created_at": "2026-11-17T07:18:40Z",
+      "updated_at": "2026-11-19T17:51:09Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2633,
+      "url": "https://github.com/alexj11324/Mikka/pull/2633",
+      "title": "refactor: backport the shared Eve host signer to the pinned Cloud line (G-054)",
+      "head_sha": "8e070a0ccb65ce9dbac33bdc16c4fee40fc8ca2c",
+      "branch": "g/2506-backport-eve-explicit-key",
+      "base": "g/2506-pinned-cloud-base",
+      "draft": false,
+      "created_at": "2026-11-16T09:39:32Z",
+      "updated_at": "2026-11-16T09:54:19Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2561,
+      "url": "https://github.com/alexj11324/Mikka/pull/2561",
+      "title": "feat: paginate issue activity history",
+      "head_sha": "427bd30d2adf4a00c616cef95368a4ae12281209",
+      "branch": "capy-activity-cursor-latest",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-15T06:20:03Z",
+      "updated_at": "2026-11-15T09:29:22Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2414,
+      "url": "https://github.com/alexj11324/Mikka/pull/2414",
+      "title": "i18n: refine Issue timeline copy",
+      "head_sha": "7338ecee053dab47f476ebcb3b5cc4b75143be76",
+      "branch": "feat/issue-timeline-capy-copy",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-14T05:22:13Z",
+      "updated_at": "2026-11-14T13:09:21Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 2400,
+      "url": "https://github.com/alexj11324/Mikka/pull/2400",
+      "title": "feat(desktop): restore saved tabs and navigation",
+      "head_sha": "3ab4f5b2c3c8fa43819b03d82bf28bc595108d51",
+      "branch": "feat/desktop-new-window",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-14T02:56:38Z",
+      "updated_at": "2026-11-14T03:41:20Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1924,
+      "url": "https://github.com/alexj11324/Mikka/pull/1924",
+      "title": "feat(workspaces): task-workspace slot for creation context and fixed ownership (#1659 P0) — resolved onto main",
+      "head_sha": "c695966c91c4642141da74ff22d5d112deb8d856",
+      "branch": "mikk41/1661-retarget",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-11T10:32:11Z",
+      "updated_at": "2026-11-11T11:14:15Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1859,
+      "url": "https://github.com/alexj11324/Mikka/pull/1859",
+      "title": "test(collaboration): integrated PG and native credential acceptance (#1849; CI only)",
+      "head_sha": "9cf3e166def4de9012da07f26d1fed6c31278f2f",
+      "branch": "test/1849-integrated-security",
+      "base": "acceptance/1849-integrated-base",
+      "draft": true,
+      "created_at": "2026-11-10T03:30:52Z",
+      "updated_at": "2026-11-10T04:29:31Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1857,
+      "url": "https://github.com/alexj11324/Mikka/pull/1857",
+      "title": "feat: retain source attribution and record real signup conversions",
+      "head_sha": "5a0fbc0e140a963012682469e2741a77ec638aab",
+      "branch": "feat/1855-acquisition-registration",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-10T02:02:36Z",
+      "updated_at": "2026-11-11T18:39:13Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1853,
+      "url": "https://github.com/alexj11324/Mikka/pull/1853",
+      "title": "feat(connections): personal subscriptions and organization model policy (#1849, batch 3)",
+      "head_sha": "672de2559817192f1024f723fa480d23877b775d",
+      "branch": "feat/1849-personal-connections",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-10T01:10:02Z",
+      "updated_at": "2026-11-10T02:47:50Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1754,
+      "url": "https://github.com/alexj11324/Mikka/pull/1754",
+      "title": "Code review D: open the browser column beside the review page (#1732 R10b)",
+      "head_sha": "73a617986af401554cf7235028e5e7042b0a7f99",
+      "branch": "feat/code-review-d-public",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-08T16:52:50Z",
+      "updated_at": "2026-11-10T20:33:29Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1746,
+      "url": "https://github.com/alexj11324/Mikka/pull/1746",
+      "title": "[needs TestFlight build] Mobile chat: 添加到对话 in the iOS edit menu",
+      "head_sha": "80b483d52c332b4991eaddfd14103429de008fe0",
+      "branch": "feat/ios-edit-menu-quote",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-08T14:37:04Z",
+      "updated_at": "2026-11-08T18:02:01Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    },
+    {
+      "number": 1559,
+      "url": "https://github.com/alexj11324/Mikka/pull/1559",
+      "title": "docs(design): 自托管照 LobeHub 来——Mikka 云服务设计（等 Alex 审，先不合）",
+      "head_sha": "804e0571a6d20c62e0be4c19c75d52444067de93",
+      "branch": "design/self-hosting-cloud-services",
+      "base": "main",
+      "draft": true,
+      "created_at": "2026-11-06T23:20:38Z",
+      "updated_at": "2026-11-06T23:23:43Z",
+      "scope": "separate existing product/governance work",
+      "disposition": "Read for workflow overlap; no takeover or indiscriminate stale-PR merge"
+    }
+  ],
+  "existing_owner_batches": [
+    {
+      "issue": 2891,
+      "prs": [
+        {
+          "pr": 2972,
+          "branch": "feat/accept-2885-recorded-replay",
+          "base": "feat/accept-2884-fake-litellm",
+          "head_sha": "10c610cb5afcb58f7087a0e1214f9b6766737440",
+          "draft": true
+        },
+        {
+          "pr": 2970,
+          "branch": "feat/accept-2889-runner-checker",
+          "base": "feat/accept-2888-pr-gate",
+          "head_sha": "ea3f7db450299bd1531e3bb5cba7bffa37a192f4",
+          "draft": true
+        },
+        {
+          "pr": 2969,
+          "branch": "feat/accept-2887-ui-fixtures",
+          "base": "feat/accept-2886-http-fakes",
+          "head_sha": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+          "draft": true
+        },
+        {
+          "pr": 2966,
+          "branch": "feat/accept-2890-internal-nightly",
+          "base": "main",
+          "head_sha": "e00ba1707805457803d8265a2b05336a6303d2d9",
+          "draft": true
+        },
+        {
+          "pr": 2965,
+          "branch": "feat/accept-2886-http-fakes",
+          "base": "main",
+          "head_sha": "94c6d2c7074d4d986131ec298700fbb35e1bcc08",
+          "draft": true
+        },
+        {
+          "pr": 2964,
+          "branch": "feat/accept-2888-pr-gate",
+          "base": "main",
+          "head_sha": "316fce4a8ed210f4db179dac3a92daa543c0d4dd",
+          "draft": true
+        },
+        {
+          "pr": 2963,
+          "branch": "feat/accept-2884-fake-litellm",
+          "base": "main",
+          "head_sha": "16bee4e27102642db36e9916c0e453f5145824ab",
+          "draft": true
+        }
+      ],
+      "disposition": "Original owner batch rules remain. Seven Draft PRs include three explicit stacked dependency edges; real recorded sources/local-loop and acceptance are not complete."
+    },
+    {
+      "issue": 2912,
+      "prs": [
+        {
+          "pr": 2946,
+          "branch": "feat/chat-2916-model-picker",
+          "base": "feat/chat-2915-composer-controls",
+          "head_sha": "4525fdbcf3f0af509dda23ae40fb905b3e8c68c9",
+          "draft": true
+        },
+        {
+          "pr": 2919,
+          "branch": "feat/chat-2915-composer-controls",
+          "base": "main",
+          "head_sha": "074e022308ff0ec01206bf6903618d82d7eccaa8",
+          "draft": true
+        },
+        {
+          "pr": 2918,
+          "branch": "feat/chat-2914-message-slot",
+          "base": "main",
+          "head_sha": "2f076bb3fc72e361cb8d55126278753cd9aec756",
+          "draft": true
+        },
+        {
+          "pr": 2917,
+          "branch": "feat/chat-2913-thread-screen",
+          "base": "main",
+          "head_sha": "0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+          "draft": true
+        }
+      ],
+      "private_counterpart_prs": [
+        254,
+        255,
+        256,
+        258
+      ],
+      "disposition": "Original owner retains public+hosted paired-source integration and official build. Current #2913 full cold E2E is 2/3; other three retain 0/3, and private full suites still have two failures. CI and pixel proof do not justify merge."
+    },
+    {
+      "issue": 2956,
+      "prs": [
+        {
+          "pr": 2977,
+          "branch": "feat/be-settings-p9-shortcuts",
+          "base": "feat/be-settings-p1-registry",
+          "head_sha": "8b8e5d8b465e3b1dcfbab39a3022897986fc6878",
+          "draft": false
+        },
+        {
+          "pr": 2974,
+          "branch": "feat/be-settings-p3-instructions",
+          "base": "feat/be-settings-p1-registry",
+          "head_sha": "6c84f2c92bc546a2c57b150c1dd7f760b643d16f",
+          "draft": false
+        },
+        {
+          "pr": 2973,
+          "branch": "feat/be-settings-p5-review",
+          "base": "feat/be-settings-p1-registry",
+          "head_sha": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+          "draft": false
+        },
+        {
+          "pr": 2968,
+          "branch": "feat/be-settings-p2-threads",
+          "base": "feat/be-settings-p1-registry",
+          "head_sha": "80ddaa5ede4fa05642396911c6aa25c389f540a0",
+          "draft": false
+        },
+        {
+          "pr": 2967,
+          "branch": "feat/be-settings-p6-labels",
+          "base": "feat/be-settings-p1-registry",
+          "head_sha": "491483c7d8d1a1774a10f5166fb483d888840365",
+          "draft": false
+        },
+        {
+          "pr": 2962,
+          "branch": "feat/be-settings-p8-device-activity",
+          "base": "main",
+          "head_sha": "3879fe1d386bea6480ad4d829dcb4853abe950b2",
+          "draft": false
+        },
+        {
+          "pr": 2960,
+          "branch": "feat/be-settings-p7-security",
+          "base": "main",
+          "head_sha": "cb0396c75ec3e2e4d6eac9e21453c0a524b7b0cd",
+          "draft": false
+        },
+        {
+          "pr": 2959,
+          "branch": "feat/be-settings-p4-mcp",
+          "base": "main",
+          "head_sha": "181c19e525af32481832836d57c3228aeb503d4d",
+          "draft": false
+        },
+        {
+          "pr": 2958,
+          "branch": "feat/be-settings-p1-registry",
+          "base": "main",
+          "head_sha": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+          "draft": false
+        }
+      ],
+      "disposition": "Keep existing nine-part batch policy. Five PRs explicitly target P1; independent P4/P7/P8 still have owner-defined integration or external feature obligations. Generic later policy may minimize future batches, not rewrite this running batch."
+    },
+    {
+      "issue": 2897,
+      "prs": [
+        {
+          "pr": 2908,
+          "branch": "chore/deploy-task-image-metadata",
+          "base": "main",
+          "head_sha": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+          "draft": false
+        },
+        {
+          "pr": 2898,
+          "branch": "feat/deploy-2896-compatibility",
+          "base": "main",
+          "head_sha": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+          "draft": false
+        }
+      ],
+      "disposition": "#2898 has passing Actions at sampled head but failed external GitGuardian. #2908 intentionally waits for actual staging admission instead of causing another unproductive publication."
+    }
+  ],
+  "branch_history_summary": {
+    "conclusions": {
+      "skipped": 62,
+      "success": 130,
+      "cancelled": 36,
+      "failure": 13
+    },
+    "branches": [
+      {
+        "pr": 2963,
+        "branch": "feat/accept-2884-fake-litellm",
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?branch=feat%2Faccept-2884-fake-litellm&per_page=100",
+        "total_count": 78,
+        "fetched": 78,
+        "pages": 1,
+        "first_created_at": "2026-11-20T19:03:13Z",
+        "last_created_at": "2026-11-20T20:08:26Z",
+        "conclusions": {
+          "skipped": 22,
+          "success": 24,
+          "cancelled": 27,
+          "failure": 5
+        },
+        "latest_attempts_above_one": []
+      },
+      {
+        "pr": 2898,
+        "branch": "feat/deploy-2896-compatibility",
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?branch=feat%2Fdeploy-2896-compatibility&per_page=100",
+        "total_count": 88,
+        "fetched": 88,
+        "pages": 1,
+        "first_created_at": "2026-11-20T12:16:09Z",
+        "last_created_at": "2026-11-20T20:00:46Z",
+        "conclusions": {
+          "success": 50,
+          "skipped": 30,
+          "failure": 4,
+          "cancelled": 4
+        },
+        "latest_attempts_above_one": []
+      },
+      {
+        "pr": 2917,
+        "branch": "feat/chat-2913-thread-screen",
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?branch=feat%2Fchat-2913-thread-screen&per_page=100",
+        "total_count": 22,
+        "fetched": 22,
+        "pages": 1,
+        "first_created_at": "2026-11-20T15:44:26Z",
+        "last_created_at": "2026-11-20T19:11:29Z",
+        "conclusions": {
+          "success": 19,
+          "cancelled": 2,
+          "failure": 1
+        },
+        "latest_attempts_above_one": []
+      },
+      {
+        "pr": 2958,
+        "branch": "feat/be-settings-p1-registry",
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?branch=feat%2Fbe-settings-p1-registry&per_page=100",
+        "total_count": 53,
+        "fetched": 53,
+        "pages": 1,
+        "first_created_at": "2026-11-20T18:52:56Z",
+        "last_created_at": "2026-11-20T19:54:30Z",
+        "conclusions": {
+          "success": 37,
+          "cancelled": 3,
+          "failure": 3,
+          "skipped": 10
+        },
+        "latest_attempts_above_one": []
+      }
+    ],
+    "limitations": "One latest state per workflow run. Cancelled runs are not successes and may contain partial failures; the 13 failure-run cases are a bounded diagnostic sample, not a fleet defect rate or all historical job failures."
+  },
+  "failed_run_cases": [
+    {
+      "run_id": 44802232914,
+      "attempt": 1,
+      "workflow": "Cloudflare API image",
+      "head_sha": "e4c6a59eceaf6da7054f63ee0a8dc62921a7a9d3",
+      "created_at": "2026-11-20T19:27:03Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44802232914",
+      "classification": {
+        "category": "release input closure",
+        "cause": "New dev-local imports referenced tests/fakes/litellm.mjs without complete declared service build inputs",
+        "owner": "#2891 / #2963",
+        "current_evidence": "Head 16bee4e27102642db36e9916c0e453f5145824ab: source job136539083304 in run44808625724/1 success",
+        "action": "Keep source input closure guard; original owner repaired declaration on its PR."
+      },
+      "jobs": [
+        {
+          "id": 136517035776,
+          "name": "source",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:27:04Z",
+          "started_at": "2026-11-20T19:37:30Z",
+          "completed_at": "2026-11-20T19:37:59Z",
+          "failed_steps": [
+            {
+              "number": 4,
+              "name": "Verify public API and runtime provenance without credentials",
+              "started_at": "2026-11-20T19:37:47Z",
+              "completed_at": "2026-11-20T19:37:57Z"
+            }
+          ],
+          "tested_checkout_sha": "61195d9876da4dc70596be5824054f4b430abf04"
+        }
+      ]
+    },
+    {
+      "run_id": 44801467607,
+      "attempt": 1,
+      "workflow": "Cloudflare API image",
+      "head_sha": "9384992a56913fbcdf5647de7f941017e2a9b87c",
+      "created_at": "2026-11-20T19:22:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44801467607",
+      "classification": {
+        "category": "release input closure",
+        "cause": "New dev-local imports referenced tests/fakes/litellm.mjs without complete declared service build inputs",
+        "owner": "#2891 / #2963",
+        "current_evidence": "Head 16bee4e27102642db36e9916c0e453f5145824ab: source job136539083304 in run44808625724/1 success",
+        "action": "Keep source input closure guard; original owner repaired declaration on its PR."
+      },
+      "jobs": [
+        {
+          "id": 136514406897,
+          "name": "source",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:22:10Z",
+          "started_at": "2026-11-20T19:36:45Z",
+          "completed_at": "2026-11-20T19:37:13Z",
+          "failed_steps": [
+            {
+              "number": 4,
+              "name": "Verify public API and runtime provenance without credentials",
+              "started_at": "2026-11-20T19:37:02Z",
+              "completed_at": "2026-11-20T19:37:11Z"
+            }
+          ],
+          "tested_checkout_sha": "d9c713dcd0761423aa146cad1f562146af86c6d5"
+        }
+      ]
+    },
+    {
+      "run_id": 44800124796,
+      "attempt": 1,
+      "workflow": "Cloudflare API image",
+      "head_sha": "1a46ef4156e4d318b62951bf9cd1a01036fbd489",
+      "created_at": "2026-11-20T19:13:27Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44800124796",
+      "classification": {
+        "category": "release input closure",
+        "cause": "New dev-local imports referenced tests/fakes/litellm.mjs without complete declared service build inputs",
+        "owner": "#2891 / #2963",
+        "current_evidence": "Head 16bee4e27102642db36e9916c0e453f5145824ab: source job136539083304 in run44808625724/1 success",
+        "action": "Keep source input closure guard; original owner repaired declaration on its PR."
+      },
+      "jobs": [
+        {
+          "id": 136509785391,
+          "name": "source",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:13:28Z",
+          "started_at": "2026-11-20T19:17:11Z",
+          "completed_at": "2026-11-20T19:17:34Z",
+          "failed_steps": [
+            {
+              "number": 4,
+              "name": "Verify public API and runtime provenance without credentials",
+              "started_at": "2026-11-20T19:17:18Z",
+              "completed_at": "2026-11-20T19:17:33Z"
+            }
+          ],
+          "tested_checkout_sha": "4ae9a10681b866cc2e1aa8e9a395ebc24e458cc7"
+        }
+      ]
+    },
+    {
+      "run_id": 44799833406,
+      "attempt": 1,
+      "workflow": "Cloudflare API image",
+      "head_sha": "6a8d471c2893ea645217b7dfd4e631a5724a301b",
+      "created_at": "2026-11-20T19:11:35Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44799833406",
+      "classification": {
+        "category": "release input closure",
+        "cause": "New dev-local imports referenced tests/fakes/litellm.mjs without complete declared service build inputs",
+        "owner": "#2891 / #2963",
+        "current_evidence": "Head 16bee4e27102642db36e9916c0e453f5145824ab: source job136539083304 in run44808625724/1 success",
+        "action": "Keep source input closure guard; original owner repaired declaration on its PR."
+      },
+      "jobs": [
+        {
+          "id": 136508778400,
+          "name": "source",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:11:35Z",
+          "started_at": "2026-11-20T19:11:48Z",
+          "completed_at": "2026-11-20T19:12:12Z",
+          "failed_steps": [
+            {
+              "number": 4,
+              "name": "Verify public API and runtime provenance without credentials",
+              "started_at": "2026-11-20T19:11:56Z",
+              "completed_at": "2026-11-20T19:12:10Z"
+            }
+          ],
+          "tested_checkout_sha": "097ea2754665178105c8d3104fcc038ef19a8266"
+        }
+      ]
+    },
+    {
+      "run_id": 44799075545,
+      "attempt": 1,
+      "workflow": "Cloudflare API image",
+      "head_sha": "0b948fc3e8ab3f6939c880714eaa799e902f291b",
+      "created_at": "2026-11-20T19:06:47Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44799075545",
+      "classification": {
+        "category": "release input closure",
+        "cause": "New dev-local imports referenced tests/fakes/litellm.mjs without complete declared service build inputs",
+        "owner": "#2891 / #2963",
+        "current_evidence": "Head 16bee4e27102642db36e9916c0e453f5145824ab: source job136539083304 in run44808625724/1 success",
+        "action": "Keep source input closure guard; original owner repaired declaration on its PR."
+      },
+      "jobs": [
+        {
+          "id": 136506182362,
+          "name": "source",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:06:48Z",
+          "started_at": "2026-11-20T19:07:50Z",
+          "completed_at": "2026-11-20T19:08:15Z",
+          "failed_steps": [
+            {
+              "number": 4,
+              "name": "Verify public API and runtime provenance without credentials",
+              "started_at": "2026-11-20T19:08:00Z",
+              "completed_at": "2026-11-20T19:08:13Z"
+            }
+          ],
+          "tested_checkout_sha": "c3eb43834c23cb2a0009d94264b94e993803a7e0"
+        }
+      ]
+    },
+    {
+      "run_id": 44743386492,
+      "attempt": 1,
+      "workflow": "CI",
+      "head_sha": "c3ca7e5e34dcd1322ece40bb88b9420291c57832",
+      "created_at": "2026-11-20T13:20:03Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44743386492",
+      "classification": {
+        "category": "lint scope",
+        "cause": "Archived release fixture files produced oxlint unused-variable warnings under deny-warnings",
+        "owner": "#2897 / #2898",
+        "current_evidence": "Current sampled head 08a3f37bc0624b927326e4ac13b432f3ca9a10af source checks success",
+        "action": "Original owner fix; no repeat modification. External GitGuardian still fails separately."
+      },
+      "jobs": [
+        {
+          "id": 136313911804,
+          "name": "Source checks",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T13:23:04Z",
+          "started_at": "2026-11-20T13:26:50Z",
+          "completed_at": "2026-11-20T13:30:45Z",
+          "failed_steps": [
+            {
+              "number": 8,
+              "name": "Run pnpm lint:code",
+              "started_at": "2026-11-20T13:27:53Z",
+              "completed_at": "2026-11-20T13:27:54Z"
+            }
+          ],
+          "tested_checkout_sha": "3a03cb6ec4fea394e761b16094e26c2e530fa0f2"
+        },
+        {
+          "id": 136325290683,
+          "name": "UI policy (strict)",
+          "propagated_aggregate": true,
+          "created_at": "2026-11-20T13:45:43Z",
+          "started_at": "2026-11-20T13:45:45Z",
+          "completed_at": "2026-11-20T13:45:53Z",
+          "failed_steps": [
+            {
+              "number": 2,
+              "name": "Require every selected source, unit and daemon job",
+              "started_at": "2026-11-20T13:45:46Z",
+              "completed_at": "2026-11-20T13:45:46Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 44741959549,
+      "attempt": 1,
+      "workflow": "Node.js compatibility",
+      "head_sha": "4a596f7a979db85e63d506f7c390982f80eb2510",
+      "created_at": "2026-11-20T13:10:20Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44741959549",
+      "classification": {
+        "category": "outdated test expectation",
+        "cause": "registration-login expected headers omitted new x-mikka-api-version:1; actual transport added it",
+        "owner": "#2897 / #2898",
+        "current_evidence": "Current sampled head Node22/24 compatibility run44807427141/1 success",
+        "action": "Preserve version-header validation; original owner reconciled assertion."
+      },
+      "jobs": [
+        {
+          "id": 136307571805,
+          "name": "App, Eve and local device (Node 24)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T13:10:21Z",
+          "started_at": "2026-11-20T13:10:35Z",
+          "completed_at": "2026-11-20T13:19:34Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Daemon and installer on the selected Node runtime",
+              "started_at": "2026-11-20T13:17:00Z",
+              "completed_at": "2026-11-20T13:19:32Z"
+            }
+          ],
+          "tested_checkout_sha": "8d12e2cbc56dc33464c44dd65500646a020eaab0"
+        },
+        {
+          "id": 136307572289,
+          "name": "App, Eve and local device (Node 22)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T13:10:21Z",
+          "started_at": "2026-11-20T13:10:26Z",
+          "completed_at": "2026-11-20T13:17:44Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Daemon and installer on the selected Node runtime",
+              "started_at": "2026-11-20T13:15:25Z",
+              "completed_at": "2026-11-20T13:17:40Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 44739316704,
+      "attempt": 1,
+      "workflow": "Node.js compatibility",
+      "head_sha": "4ea41162d18c1af1d9b25d69d0d54d7c4e999383",
+      "created_at": "2026-11-20T12:51:43Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44739316704",
+      "classification": {
+        "category": "outdated test expectation",
+        "cause": "registration-login expected headers omitted new x-mikka-api-version:1; actual transport added it",
+        "owner": "#2897 / #2898",
+        "current_evidence": "Current sampled head Node22/24 compatibility run44807427141/1 success",
+        "action": "Preserve version-header validation; original owner reconciled assertion."
+      },
+      "jobs": [
+        {
+          "id": 136298623433,
+          "name": "App, Eve and local device (Node 22)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T12:51:44Z",
+          "started_at": "2026-11-20T12:51:57Z",
+          "completed_at": "2026-11-20T13:00:19Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Daemon and installer on the selected Node runtime",
+              "started_at": "2026-11-20T12:57:47Z",
+              "completed_at": "2026-11-20T13:00:17Z"
+            }
+          ],
+          "tested_checkout_sha": "19144e510253802d2ebf0386a9700cab20a989ef"
+        },
+        {
+          "id": 136298623683,
+          "name": "App, Eve and local device (Node 24)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T12:51:44Z",
+          "started_at": "2026-11-20T12:54:15Z",
+          "completed_at": "2026-11-20T13:03:30Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Daemon and installer on the selected Node runtime",
+              "started_at": "2026-11-20T13:01:00Z",
+              "completed_at": "2026-11-20T13:03:28Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 44737048225,
+      "attempt": 1,
+      "workflow": "Node.js compatibility",
+      "head_sha": "41104397a15db68bdcd6d70c579646fc2aa092a6",
+      "created_at": "2026-11-20T12:35:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44737048225",
+      "classification": {
+        "category": "outdated test expectation",
+        "cause": "registration-login expected headers omitted new x-mikka-api-version:1; actual transport added it",
+        "owner": "#2897 / #2898",
+        "current_evidence": "Current sampled head Node22/24 compatibility run44807427141/1 success",
+        "action": "Preserve version-header validation; original owner reconciled assertion."
+      },
+      "jobs": [
+        {
+          "id": 136290945070,
+          "name": "App, Eve and local device (Node 22)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T12:35:27Z",
+          "started_at": "2026-11-20T12:35:29Z",
+          "completed_at": "2026-11-20T12:44:28Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Daemon and installer on the selected Node runtime",
+              "started_at": "2026-11-20T12:41:48Z",
+              "completed_at": "2026-11-20T12:44:24Z"
+            }
+          ],
+          "tested_checkout_sha": "dbafed84788acc78168a27dbff2951ff32790be7"
+        },
+        {
+          "id": 136290945365,
+          "name": "App, Eve and local device (Node 24)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T12:35:27Z",
+          "started_at": "2026-11-20T12:35:29Z",
+          "completed_at": "2026-11-20T12:44:34Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Daemon and installer on the selected Node runtime",
+              "started_at": "2026-11-20T12:41:56Z",
+              "completed_at": "2026-11-20T12:44:30Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 44779806817,
+      "attempt": 1,
+      "workflow": "CI",
+      "head_sha": "dde987ea1efc2ea9f9f1158210fdb0c2b03050e6",
+      "created_at": "2026-11-20T17:05:05Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44779806817",
+      "classification": {
+        "category": "outdated slot test fixture",
+        "cause": "Idle request-budget mock rendered entries but did not implement the new transcript contract, hiding expected group-chat text",
+        "owner": "#2912 / #2917",
+        "fix_commit": "3da820ec50520920e3322ec7b2fcfd0411fba49f",
+        "fix_url": "https://github.com/alexj11324/Mikka/commit/3da820ec50520920e3322ec7b2fcfd0411fba49f",
+        "current_evidence": "run44799819020/1 success at 0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+        "action": "Original fixture mounts real ThreadTranscript; expected title and idle budget unchanged. Distinct from remaining real E2E C1 failure."
+      },
+      "jobs": [
+        {
+          "id": 136440836194,
+          "name": "Core unit checks",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T17:07:56Z",
+          "started_at": "2026-11-20T17:10:05Z",
+          "completed_at": "2026-11-20T17:14:03Z",
+          "failed_steps": [
+            {
+              "number": 5,
+              "name": "Run selected core tasks through Nx Core",
+              "started_at": "2026-11-20T17:11:03Z",
+              "completed_at": "2026-11-20T17:14:00Z"
+            }
+          ],
+          "tested_checkout_sha": "81f34c693cc204e38cae23040ccb9261c8bd3919"
+        },
+        {
+          "id": 136440836380,
+          "name": "Core unit checks (Node 22)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T17:07:56Z",
+          "started_at": "2026-11-20T17:11:11Z",
+          "completed_at": "2026-11-20T17:16:34Z",
+          "failed_steps": [
+            {
+              "number": 5,
+              "name": "Run selected core tasks through Nx Core",
+              "started_at": "2026-11-20T17:12:14Z",
+              "completed_at": "2026-11-20T17:16:31Z"
+            }
+          ]
+        },
+        {
+          "id": 136445804627,
+          "name": "UI policy (strict)",
+          "propagated_aggregate": true,
+          "created_at": "2026-11-20T17:16:34Z",
+          "started_at": "2026-11-20T17:17:51Z",
+          "completed_at": "2026-11-20T17:18:02Z",
+          "failed_steps": [
+            {
+              "number": 2,
+              "name": "Require every selected source, unit and daemon job",
+              "started_at": "2026-11-20T17:17:53Z",
+              "completed_at": "2026-11-20T17:17:53Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 44799448367,
+      "attempt": 1,
+      "workflow": "Read cache API acceptance",
+      "head_sha": "6f7fc652f6a7872c62b0dabf82c9ba860588e6f3",
+      "created_at": "2026-11-20T19:09:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44799448367",
+      "classification": {
+        "category": "authored module build failure",
+        "cause": "Dynamic import of the full settings store in the legacy preference writer broke Eve's single authored-module-map bundle contract; owner replaced it with a statically linked small writer module.",
+        "owner": "#2956 / #2958",
+        "current_evidence": "Latest sampled head b18c324643b6a42553b8fddf30b82e2c19b65616 has all sampled applicable Actions success",
+        "action": "Original owner fixed its source/build path; one build defect produced failures in three workflows, not three independent product defects.",
+        "fix_commit": "804c24d4b6acff7e011976df798c55695f6442f5",
+        "fix_url": "https://github.com/alexj11324/Mikka/commit/804c24d4b6acff7e011976df798c55695f6442f5",
+        "owner_evidence_url": "https://github.com/alexj11324/Mikka/issues/2956#issuecomment-7048516168"
+      },
+      "jobs": [
+        {
+          "id": 136507465346,
+          "name": "Read cache API and CLI",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:09:10Z",
+          "started_at": "2026-11-20T19:11:57Z",
+          "completed_at": "2026-11-20T19:13:40Z",
+          "failed_steps": [
+            {
+              "number": 9,
+              "name": "Build this isolated application for production-mode acceptance",
+              "started_at": "2026-11-20T19:13:26Z",
+              "completed_at": "2026-11-20T19:13:35Z"
+            }
+          ],
+          "tested_checkout_sha": "b0a5ad3636ec9fcecb9512d4ac8bb05b5ee88ed0"
+        }
+      ]
+    },
+    {
+      "run_id": 44799448735,
+      "attempt": 1,
+      "workflow": "Site search read contract",
+      "head_sha": "6f7fc652f6a7872c62b0dabf82c9ba860588e6f3",
+      "created_at": "2026-11-20T19:09:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44799448735",
+      "classification": {
+        "category": "authored module build failure",
+        "cause": "Dynamic import of the full settings store in the legacy preference writer broke Eve's single authored-module-map bundle contract; owner replaced it with a statically linked small writer module.",
+        "owner": "#2956 / #2958",
+        "current_evidence": "Latest sampled head b18c324643b6a42553b8fddf30b82e2c19b65616 has all sampled applicable Actions success",
+        "action": "Original owner fixed its source/build path; one build defect produced failures in three workflows, not three independent product defects.",
+        "fix_commit": "804c24d4b6acff7e011976df798c55695f6442f5",
+        "fix_url": "https://github.com/alexj11324/Mikka/commit/804c24d4b6acff7e011976df798c55695f6442f5",
+        "owner_evidence_url": "https://github.com/alexj11324/Mikka/issues/2956#issuecomment-7048516168"
+      },
+      "jobs": [
+        {
+          "id": 136507466612,
+          "name": "site-search",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:09:10Z",
+          "started_at": "2026-11-20T19:10:07Z",
+          "completed_at": "2026-11-20T19:13:55Z",
+          "failed_steps": [
+            {
+              "number": 11,
+              "name": "Run pnpm build",
+              "started_at": "2026-11-20T19:13:43Z",
+              "completed_at": "2026-11-20T19:13:52Z"
+            },
+            {
+              "number": 13,
+              "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+              "started_at": "2026-11-20T19:13:52Z",
+              "completed_at": "2026-11-20T19:13:52Z"
+            }
+          ],
+          "tested_checkout_sha": "b0a5ad3636ec9fcecb9512d4ac8bb05b5ee88ed0"
+        }
+      ]
+    },
+    {
+      "run_id": 44798866030,
+      "attempt": 1,
+      "workflow": "Node.js compatibility",
+      "head_sha": "6f7fc652f6a7872c62b0dabf82c9ba860588e6f3",
+      "created_at": "2026-11-20T19:05:26Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44798866030",
+      "classification": {
+        "category": "authored module build failure",
+        "cause": "Dynamic import of the full settings store in the legacy preference writer broke Eve's single authored-module-map bundle contract; owner replaced it with a statically linked small writer module.",
+        "owner": "#2956 / #2958",
+        "current_evidence": "Latest sampled head b18c324643b6a42553b8fddf30b82e2c19b65616 has all sampled applicable Actions success",
+        "action": "Original owner fixed its source/build path; one build defect produced failures in three workflows, not three independent product defects.",
+        "fix_commit": "804c24d4b6acff7e011976df798c55695f6442f5",
+        "fix_url": "https://github.com/alexj11324/Mikka/commit/804c24d4b6acff7e011976df798c55695f6442f5",
+        "owner_evidence_url": "https://github.com/alexj11324/Mikka/issues/2956#issuecomment-7048516168"
+      },
+      "jobs": [
+        {
+          "id": 136505446866,
+          "name": "App, Eve and local device (Node 24)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:05:27Z",
+          "started_at": "2026-11-20T19:09:47Z",
+          "completed_at": "2026-11-20T19:11:21Z",
+          "failed_steps": [
+            {
+              "number": 8,
+              "name": "Build actual app and Eve on the selected Node runtime",
+              "started_at": "2026-11-20T19:11:11Z",
+              "completed_at": "2026-11-20T19:11:17Z"
+            }
+          ],
+          "tested_checkout_sha": "b0a5ad3636ec9fcecb9512d4ac8bb05b5ee88ed0"
+        },
+        {
+          "id": 136505447639,
+          "name": "App, Eve and local device (Node 22)",
+          "propagated_aggregate": false,
+          "created_at": "2026-11-20T19:05:27Z",
+          "started_at": "2026-11-20T19:11:36Z",
+          "completed_at": "2026-11-20T19:13:05Z",
+          "failed_steps": [
+            {
+              "number": 8,
+              "name": "Build actual app and Eve on the selected Node runtime",
+              "started_at": "2026-11-20T19:12:54Z",
+              "completed_at": "2026-11-20T19:13:00Z"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "PR_lifecycle": [
+    {
+      "repo": "Mikka",
+      "pr": 2905,
+      "created_at": "2026-11-20T14:27:52Z",
+      "merged_at": "2026-11-20T16:32:32Z",
+      "head_sha": "312d307ca8b11d2b9383eae984fd13305852c147",
+      "merge_sha": "b6e8f0c80dd09e2845fa0083c02ec2dda8809bf9",
+      "ready_event": {
+        "id": 36780376423,
+        "created_at": "2026-11-20T14:51:07Z"
+      },
+      "ready_to_merge_seconds": 6085,
+      "created_to_merge_seconds": 7480,
+      "timeline_url": "https://api.github.com/repos/alexj11324/Mikka/issues/2905/timeline?per_page=100&page=1",
+      "timeline_count": 48
+    },
+    {
+      "repo": "mikka-hosted-ui",
+      "pr": 257,
+      "created_at": "2026-11-20T16:26:40Z",
+      "merged_at": "2026-11-20T17:23:33Z",
+      "ready_event": {
+        "id": 36792497922,
+        "created_at": "2026-11-20T16:58:53Z"
+      },
+      "ready_to_merge_seconds": 1480,
+      "created_to_merge_seconds": 3413,
+      "timeline_url": "https://api.github.com/repos/alexj11324/mikka-hosted-ui/issues/257/timeline?per_page=100&page=1",
+      "timeline_count": 7,
+      "version_details": "Retained in the original private repository and private snapshot; not copied here."
+    },
+    {
+      "repo": "mikka-cloud",
+      "pr": 413,
+      "created_at": "2026-11-20T19:44:29Z",
+      "merged_at": "2026-11-20T20:26:46Z",
+      "ready_event": null,
+      "ready_to_merge_seconds": null,
+      "created_to_merge_seconds": 2537,
+      "timeline_url": "https://api.github.com/repos/alexj11324/mikka-cloud/issues/413/timeline?per_page=100&page=1",
+      "timeline_count": 8,
+      "version_details": "Retained in the original private repository and private snapshot; not copied here."
+    },
+    {
+      "repo": "Mikka",
+      "pr": 2963,
+      "draft": true,
+      "head_sha": "16bee4e27102642db36e9916c0e453f5145824ab",
+      "base": "main",
+      "created_at": "2026-11-20T19:03:09Z",
+      "observed_at": "2026-11-20T21:30:31.494Z",
+      "ready_event": null,
+      "ready_wait_seconds": null,
+      "censored": true,
+      "ready_to_merge_seconds": null,
+      "timeline_count": 29,
+      "timeline_url": "https://api.github.com/repos/alexj11324/Mikka/issues/2963/timeline?per_page=100&page=1"
+    },
+    {
+      "repo": "Mikka",
+      "pr": 2898,
+      "draft": false,
+      "head_sha": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+      "base": "main",
+      "created_at": "2026-11-20T12:16:05Z",
+      "observed_at": "2026-11-20T21:30:31.494Z",
+      "ready_event": {
+        "id": 36776734246,
+        "created_at": "2026-11-20T14:11:58Z"
+      },
+      "ready_wait_seconds": 26313,
+      "censored": true,
+      "ready_to_merge_seconds": null,
+      "timeline_count": 13,
+      "timeline_url": "https://api.github.com/repos/alexj11324/Mikka/issues/2898/timeline?per_page=100&page=1"
+    },
+    {
+      "repo": "Mikka",
+      "pr": 2917,
+      "draft": true,
+      "head_sha": "0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+      "base": "main",
+      "created_at": "2026-11-20T15:44:22Z",
+      "observed_at": "2026-11-20T21:30:31.494Z",
+      "ready_event": null,
+      "ready_wait_seconds": null,
+      "censored": true,
+      "ready_to_merge_seconds": null,
+      "timeline_count": 14,
+      "timeline_url": "https://api.github.com/repos/alexj11324/Mikka/issues/2917/timeline?per_page=100&page=1"
+    },
+    {
+      "repo": "Mikka",
+      "pr": 2958,
+      "draft": false,
+      "head_sha": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "base": "main",
+      "created_at": "2026-11-20T18:52:52Z",
+      "observed_at": "2026-11-20T21:30:31.494Z",
+      "ready_event": {
+        "id": 36803396444,
+        "created_at": "2026-11-20T19:09:05Z"
+      },
+      "ready_wait_seconds": 8486,
+      "censored": true,
+      "ready_to_merge_seconds": null,
+      "timeline_count": 12,
+      "timeline_url": "https://api.github.com/repos/alexj11324/Mikka/issues/2958/timeline?per_page=100&page=1"
+    }
+  ],
+  "external_blocked_check": {
+    "id": 136535041749,
+    "name": "GitGuardian Security Checks",
+    "conclusion": "failure",
+    "completed_at": "2026-11-20T20:00:56Z",
+    "details_url": "https://dashboard.gitguardian.com",
+    "head_sha": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+    "repository": "alexj11324/Mikka",
+    "pr": 2898
+  },
+  "private_action_observations": [
+    {
+      "repo": "mikka-hosted-ui",
+      "pr": 254,
+      "action_runs": 0,
+      "checks": [
+        {
+          "id": 136568267911,
+          "name": "GitGuardian Security Checks",
+          "status": "completed",
+          "conclusion": "success",
+          "app": "gitguardian"
+        }
+      ]
+    },
+    {
+      "repo": "mikka-hosted-ui",
+      "pr": 257,
+      "action_runs": 0,
+      "checks": [
+        {
+          "id": 136428966488,
+          "name": "GitGuardian Security Checks",
+          "status": "completed",
+          "conclusion": "success",
+          "app": "gitguardian"
+        }
+      ]
+    },
+    {
+      "repo": "mikka-cloud",
+      "pr": 413,
+      "action_runs": 0,
+      "checks": [
+        {
+          "id": 136545923113,
+          "name": "GitGuardian Security Checks",
+          "status": "completed",
+          "conclusion": "success",
+          "app": "gitguardian"
+        }
+      ]
+    }
+  ],
+  "staging_receipts": [
+    {
+      "run_id": 44792601779,
+      "attempt": 1,
+      "source_sha": "9a5d673edb210e3e04e322bf846a5ea9e7ee92be",
+      "workflow_event": "workflow_run",
+      "created_at": "2026-11-20T18:25:22Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44792601779",
+      "producer": {
+        "runId": "44791185503",
+        "runAttempt": "2",
+        "artifactId": "14656468815"
+      },
+      "artifact": {
+        "id": 14657631159,
+        "name": "deploy-pipeline-44792601779-1",
+        "sha256": "sha256:c800884cafa95e38bf379dccf1af217de4371802aa4197224836f6275e24349c",
+        "download_sha256_verified": true,
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44792601779/artifacts?per_page=100"
+      },
+      "summary": {
+        "target": "staging",
+        "status": "failed",
+        "admission": "rejected",
+        "sourceCommit": "9a5d673edb210e3e04e322bf846a5ea9e7ee92be",
+        "failedStep": "migration-identity",
+        "failureCode": "migration_execution_changed",
+        "productionPromoted": false
+      },
+      "pipeline_job": {
+        "id": 136483869936,
+        "created_at": "2026-11-20T18:25:23Z",
+        "started_at": "2026-11-20T18:25:27Z",
+        "completed_at": "2026-11-20T18:28:00Z",
+        "queue_seconds": 4,
+        "execution_seconds": 153,
+        "conclusion": "failure"
+      },
+      "admission_feedback": {
+        "step": 15,
+        "name": "Verify migration admission before preparing the product",
+        "started_at": "2026-11-20T18:27:45Z",
+        "completed_at": "2026-11-20T18:27:55Z",
+        "conclusion": "failure",
+        "seconds_from_workflow_created": 153
+      },
+      "record_job": {
+        "id": 136485285571,
+        "conclusion": "success",
+        "created_at": "2026-11-20T18:28:00Z",
+        "started_at": "2026-11-20T18:28:02Z",
+        "completed_at": "2026-11-20T18:28:17Z",
+        "queue_seconds": 2
+      },
+      "merge": null,
+      "merge_to_staging_acceptance_seconds": null,
+      "merge_to_production_acceptance_seconds": null
+    },
+    {
+      "run_id": 44796136548,
+      "attempt": 1,
+      "source_sha": "679022e02d24c445bcf23235e1e68ff757830d84",
+      "workflow_event": "workflow_run",
+      "created_at": "2026-11-20T18:47:48Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44796136548",
+      "producer": {
+        "runId": "44795615996",
+        "runAttempt": "1",
+        "artifactId": "14657498731"
+      },
+      "artifact": {
+        "id": 14659670584,
+        "name": "deploy-pipeline-44796136548-1",
+        "sha256": "sha256:3364fd8d317c0d093ddb0044424587317d01910cfc9ef4c9295e2cd5deef2cbe",
+        "download_sha256_verified": true,
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44796136548/artifacts?per_page=100"
+      },
+      "summary": {
+        "target": "staging",
+        "status": "failed",
+        "admission": "rejected",
+        "sourceCommit": "679022e02d24c445bcf23235e1e68ff757830d84",
+        "failedStep": "migration-identity",
+        "failureCode": "migration_execution_changed",
+        "productionPromoted": false
+      },
+      "pipeline_job": {
+        "id": 136496037035,
+        "created_at": "2026-11-20T18:47:49Z",
+        "started_at": "2026-11-20T18:47:53Z",
+        "completed_at": "2026-11-20T18:50:08Z",
+        "queue_seconds": 4,
+        "execution_seconds": 135,
+        "conclusion": "failure"
+      },
+      "admission_feedback": {
+        "step": 15,
+        "name": "Verify migration admission before preparing the product",
+        "started_at": "2026-11-20T18:49:56Z",
+        "completed_at": "2026-11-20T18:50:05Z",
+        "conclusion": "failure",
+        "seconds_from_workflow_created": 137
+      },
+      "record_job": {
+        "id": 136497265748,
+        "conclusion": "success",
+        "created_at": "2026-11-20T18:50:08Z",
+        "started_at": "2026-11-20T18:50:10Z",
+        "completed_at": "2026-11-20T18:50:31Z",
+        "queue_seconds": 2
+      },
+      "merge": {
+        "pr": 2955,
+        "sha": "679022e02d24c445bcf23235e1e68ff757830d84",
+        "merged_at": "2026-11-20T18:44:27Z",
+        "merge_to_admission_rejection_seconds": 338
+      },
+      "merge_to_staging_acceptance_seconds": null,
+      "merge_to_production_acceptance_seconds": null
+    },
+    {
+      "run_id": 44799896300,
+      "attempt": 1,
+      "source_sha": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "workflow_event": "workflow_run",
+      "created_at": "2026-11-20T19:11:58Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44799896300",
+      "producer": {
+        "runId": "44798376633",
+        "runAttempt": "1",
+        "artifactId": "14660716763"
+      },
+      "artifact": {
+        "id": 14660628081,
+        "name": "deploy-pipeline-44799896300-1",
+        "sha256": "sha256:cdf4b982f1f3a83ac68d713e47abfcff45e8c06bd2b69f4ad88326a542a7e426",
+        "download_sha256_verified": true,
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44799896300/artifacts?per_page=100"
+      },
+      "summary": {
+        "target": "staging",
+        "status": "failed",
+        "admission": "rejected",
+        "sourceCommit": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+        "failedStep": "migration-identity",
+        "failureCode": "migration_execution_changed",
+        "productionPromoted": false
+      },
+      "pipeline_job": {
+        "id": 136508995188,
+        "created_at": "2026-11-20T19:11:59Z",
+        "started_at": "2026-11-20T19:15:53Z",
+        "completed_at": "2026-11-20T19:19:07Z",
+        "queue_seconds": 234,
+        "execution_seconds": 194,
+        "conclusion": "failure"
+      },
+      "admission_feedback": {
+        "step": 15,
+        "name": "Verify migration admission before preparing the product",
+        "started_at": "2026-11-20T19:18:51Z",
+        "completed_at": "2026-11-20T19:19:02Z",
+        "conclusion": "failure",
+        "seconds_from_workflow_created": 424
+      },
+      "record_job": {
+        "id": 136512789996,
+        "conclusion": "success",
+        "created_at": "2026-11-20T19:19:07Z",
+        "started_at": "2026-11-20T19:26:08Z",
+        "completed_at": "2026-11-20T19:26:27Z",
+        "queue_seconds": 421
+      },
+      "merge": {
+        "pr": 2907,
+        "sha": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+        "merged_at": "2026-11-20T19:02:15Z",
+        "merge_to_admission_rejection_seconds": 1007
+      },
+      "merge_to_staging_acceptance_seconds": null,
+      "merge_to_production_acceptance_seconds": null
+    },
+    {
+      "run_id": 44810593322,
+      "attempt": 1,
+      "source_sha": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "workflow_event": "workflow_run",
+      "created_at": "2026-11-20T20:21:19Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44810593322",
+      "producer": {
+        "runId": "44798376633",
+        "runAttempt": "2",
+        "artifactId": "14664614345"
+      },
+      "artifact": {
+        "id": 14668321847,
+        "name": "deploy-pipeline-44810593322-1",
+        "sha256": "sha256:840c04edae2acbe3958452c058c6691b160580581dd8295e748a0b0cabea8700",
+        "download_sha256_verified": true,
+        "source_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44810593322/artifacts?per_page=100"
+      },
+      "summary": {
+        "target": "staging",
+        "status": "failed",
+        "admission": "rejected",
+        "sourceCommit": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+        "failedStep": "migration-identity",
+        "failureCode": "migration_execution_changed",
+        "productionPromoted": false
+      },
+      "pipeline_job": {
+        "id": 136545823302,
+        "created_at": "2026-11-20T20:21:20Z",
+        "started_at": "2026-11-20T20:32:58Z",
+        "completed_at": "2026-11-20T20:36:01Z",
+        "queue_seconds": 698,
+        "execution_seconds": 183,
+        "conclusion": "failure"
+      },
+      "admission_feedback": {
+        "step": 15,
+        "name": "Verify migration admission before preparing the product",
+        "started_at": "2026-11-20T20:35:43Z",
+        "completed_at": "2026-11-20T20:35:54Z",
+        "conclusion": "failure",
+        "seconds_from_workflow_created": 875
+      },
+      "record_job": {
+        "id": 136553448733,
+        "conclusion": "success",
+        "created_at": "2026-11-20T20:36:01Z",
+        "started_at": "2026-11-20T20:50:32Z",
+        "completed_at": "2026-11-20T20:50:47Z",
+        "queue_seconds": 871
+      },
+      "merge": null,
+      "merge_to_staging_acceptance_seconds": null,
+      "merge_to_production_acceptance_seconds": null
+    }
+  ],
+  "attempt_timing_counterexamples": {
+    "before_source": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+    "after_source": "6e69c12b35b56f6bbf6de9ffbe2981a6af9b4ef6",
+    "scope": "Recorded run accounting only; no runtime speedup claimed",
+    "sample_count": 2,
+    "records": [
+      {
+        "run_id": 44798376633,
+        "attempt": 2,
+        "head_sha": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+        "sources": {
+          "repository": "alexj11324/Mikka",
+          "captured_at": "2026-11-20T21:18:34.215Z",
+          "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44798376633",
+          "attempt_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44798376633/attempts/2",
+          "jobs_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44798376633/attempts/2/jobs?per_page=100&page=1"
+        },
+        "before": {
+          "first_queue_seconds": 2640,
+          "wall_seconds": 4737,
+          "runner_seconds": 221,
+          "run_lifetime_seconds": null,
+          "retained_job_count": null,
+          "negative_job_queues": []
+        },
+        "after": {
+          "first_queue_seconds": 514,
+          "wall_seconds": 2611,
+          "runner_seconds": 221,
+          "run_lifetime_seconds": 4737,
+          "retained_job_count": 0,
+          "negative_job_queues": []
+        }
+      },
+      {
+        "run_id": 44791185503,
+        "attempt": 2,
+        "head_sha": "9a5d673edb210e3e04e322bf846a5ea9e7ee92be",
+        "sources": {
+          "repository": "alexj11324/Mikka",
+          "captured_at": "2026-11-20T21:18:34.215Z",
+          "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44791185503",
+          "attempt_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44791185503/attempts/2",
+          "jobs_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44791185503/attempts/2/jobs?per_page=100&page=1"
+        },
+        "before": {
+          "first_queue_seconds": 3,
+          "wall_seconds": 539,
+          "runner_seconds": 193,
+          "run_lifetime_seconds": null,
+          "retained_job_count": null,
+          "negative_job_queues": [
+            {
+              "id": 136482292335,
+              "queue_seconds": -367
+            }
+          ]
+        },
+        "after": {
+          "first_queue_seconds": 5,
+          "wall_seconds": 177,
+          "runner_seconds": 165,
+          "run_lifetime_seconds": 539,
+          "retained_job_count": 1,
+          "negative_job_queues": []
+        }
+      }
+    ]
+  },
+  "owner_sources": [
+    {
+      "id": 2891,
+      "url": "https://github.com/alexj11324/Mikka/issues/2891#issuecomment-7047967999",
+      "comment_id": 7047967999
+    },
+    {
+      "id": 2897,
+      "url": "https://github.com/alexj11324/Mikka/issues/2897#issuecomment-7039242684",
+      "comment_id": 7039242684
+    },
+    {
+      "id": 2912,
+      "url": "https://github.com/alexj11324/Mikka/issues/2912#issuecomment-7043823550",
+      "comment_id": 7043823550
+    },
+    {
+      "id": 2956,
+      "url": "https://github.com/alexj11324/Mikka/issues/2956#issuecomment-7047958484",
+      "comment_id": 7047958484
+    }
+  ],
+  "known_source_ownership": {
+    "analytics_summary": "#2986 owns removal; full real tests and protected parent retained.",
+    "attempt_timings": "#2988 owns original collector/summary correction, no new verifier.",
+    "migration_execution": "#2897/#1954 own actual migration and deployment. #2984 adds earlier read-only comparison only.",
+    "test_fixture": "#2891 owns fake/local-loop; #2912 owns chat product. #2984 repairs generic fixtures/bootstrap, not their product implementation.",
+    "site_search_typecheck": "#2993 owns only the duplicate same-job typecheck; domain tests and build checks retained."
+  },
+  "completion_limits": [
+    "No production or staging acceptance is inferred from CI, a successful record job, an artifact, or a skipped workflow.",
+    "Current sample Actions success does not imply all required checks: #2898 has a separate failed GitGuardian check.",
+    "The source-contract first-feedback sample for #2917 is 73 real tests; it is not product chat E2E.",
+    "No before/after end-to-end speedup is inferred from queue sums or the accounting correction.",
+    "Post-merge and after-fix measurements belong in the final #2984 result at their exact source, not retroactively in historical baseline."
+  ],
+  "necessity_review_completed_at": "2026-11-20T21:52:23.947Z"
+}

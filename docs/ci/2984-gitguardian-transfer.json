@@ -1,0 +1,693 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "preparedAt": "2026-11-21T00:46:58Z",
+  "scope": "Read-only GitGuardian applicability, native receipt coverage and transfer ownership. No integration/protection/token/scan/release mutation.",
+  "conclusion": {
+    "public": "Current written policy explicitly preserves the existing GitGuardian requirement. Missing current-head check runs/suites are an external integration or evidence gap, not success and not an exemption derived from three visible Actions protection contexts.",
+    "private": "The current private AGENTS files do not name a new GitGuardian required status. Hosted UI inherits public security guards. Existing native GitGuardian checks are independently verified in both private repositories; newer Cloud heads lack them. Preserve that existing protection and require its repository/App owner to resolve the gap; do not invent a new status check or transplant an older head's success.",
+    "rootCause": "Unknown. Native evidence proves missing check creation on selected newer heads; it does not identify installation, repository selection, event delivery or provider configuration as the cause.",
+    "ownerDecision": "The repository/organization and existing GitGuardian App integration owner must verify destination coverage and native event/check delivery, restoring the existing exact-head check where required. The release source App and product App are different integrations; their migration receipts cannot establish GitGuardian readiness."
+  },
+  "policy": {
+    "publicMain": "ed905baee7482c43b29e8b15480ebbae160278c1",
+    "sources": [
+      {
+        "path": "AGENTS.md",
+        "lines": "25–27",
+        "url": "https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/AGENTS.md",
+        "finding": "The current Draft/Ready rule explicitly keeps GitGuardian unchanged."
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "lines": "146–153",
+        "url": "https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/CONTRIBUTING.md",
+        "finding": "External GitGuardian remains active while selected Draft jobs defer."
+      },
+      {
+        "path": ".github/workflows/README.md",
+        "lines": "25–28, 60–67",
+        "url": "https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/.github/workflows/README.md",
+        "finding": "GitGuardian Security Checks is named as a separate external required check; the four existing names must not silently be replaced."
+      },
+      {
+        "path": "docs/ci/incremental.md",
+        "lines": "108–115",
+        "url": "https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/docs/ci/incremental.md",
+        "finding": "The preserved required names include external GitGuardian."
+      }
+    ],
+    "latestExplicitIssue": {
+      "url": "https://github.com/aspectly-labs/Mikka/issues/2997",
+      "finding": "Its Draft/Ready change explicitly leaves external GitGuardian untouched; security and protected-check rules stay unchanged."
+    },
+    "userEpic": {
+      "url": "https://github.com/aspectly-labs/Mikka/issues/2984",
+      "finding": "Explicitly prohibits bypassing GitGuardian and weakening source/security checks."
+    },
+    "provenance": [
+      {
+        "sha": "656f3e2f1bbc740cbcc4c1fd2d956663d9d9af87",
+        "subject": "ci: validate PR merge candidates and retain main checks (#574)",
+        "date": "2026-10-30T22:39:10-04:00",
+        "fact": "Introduced the current workflow README's external required-check statement."
+      },
+      {
+        "sha": "719af8dde7b6592bf93b71f569f1adcc96abb899",
+        "subject": "ci: defer expensive draft checks while keeping required gates fail-closed (#2997)",
+        "date": "2026-11-20T17:56:36-05:00",
+        "fact": "Introduced the current AGENTS/CONTRIBUTING statements preserving GitGuardian."
+      }
+    ],
+    "decisionBoundary": "The reviewed November 1 browser-test decisions concern the browser gate/build policy and do not remove GitGuardian. No GitGuardian retirement, scope exemption or successful destination installation was found in the reviewed current transfer receipts."
+  },
+  "nativeProtection": [
+    {
+      "repository": "aspectly-labs/Mikka",
+      "branch": "main",
+      "protected": true,
+      "visibleRequiredStatusChecks": {
+        "enforcement_level": "non_admins",
+        "contexts": [
+          "UI policy (strict)",
+          "Production build and browser interactions",
+          "Browser tests (before merge)"
+        ],
+        "checks": [
+          {
+            "context": "UI policy (strict)",
+            "app_id": 15368
+          },
+          {
+            "context": "Production build and browser interactions",
+            "app_id": 15368
+          },
+          {
+            "context": "Browser tests (before merge)",
+            "app_id": 15368
+          }
+        ]
+      },
+      "fullProtectionRead": {
+        "status": 403,
+        "reason": "Resource not accessible by integration"
+      },
+      "rulesetsRead": {
+        "status": 200,
+        "rulesets": []
+      },
+      "branchUrl": "https://api.github.com/repos/aspectly-labs/Mikka/branches/main"
+    },
+    {
+      "repository": "aspectly-labs/mikka-hosted-ui",
+      "branch": "main",
+      "protected": false,
+      "visibleRequiredStatusChecks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      },
+      "fullProtectionRead": {
+        "status": 403,
+        "reason": "Resource not accessible by integration"
+      },
+      "rulesetsRead": {
+        "status": 403,
+        "reason": "Provider reports this private-repository feature is unavailable on the current plan; no upgrade or configuration change attempted."
+      },
+      "branchUrl": "https://api.github.com/repos/aspectly-labs/mikka-hosted-ui/branches/main"
+    },
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "branch": "main",
+      "protected": false,
+      "visibleRequiredStatusChecks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      },
+      "fullProtectionRead": {
+        "status": 403,
+        "reason": "Resource not accessible by integration"
+      },
+      "rulesetsRead": {
+        "status": 403,
+        "reason": "Provider reports this private-repository feature is unavailable on the current plan; no upgrade or configuration change attempted."
+      },
+      "branchUrl": "https://api.github.com/repos/aspectly-labs/mikka-cloud/branches/main"
+    }
+  ],
+  "publicSamples": [
+    {
+      "repository": "aspectly-labs/Mikka",
+      "pullRequest": 2986,
+      "head": "59f01f483c0d6ba69109396546bd5840d69c0bff",
+      "checkRuns": {
+        "total": 32,
+        "apps": [
+          "github-actions",
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136583210537,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T21:34:16Z",
+            "completedAt": "2026-11-20T21:34:17Z",
+            "updatedAt": null
+          }
+        ]
+      },
+      "checkSuites": {
+        "total": 13,
+        "apps": [
+          "cursor",
+          "claude",
+          "gitguardian",
+          "kiro-agent",
+          "devin-ai-integration",
+          "vercel",
+          "boxes-dev",
+          "cloudflare-workers-and-pages",
+          "github-actions"
+        ],
+        "gitguardian": [
+          {
+            "id": 121318440741,
+            "name": null,
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": "2026-11-20T21:34:13Z",
+            "startedAt": null,
+            "completedAt": null,
+            "updatedAt": "2026-11-20T21:34:17Z"
+          }
+        ]
+      },
+      "sourceUrls": [
+        "https://api.github.com/repos/aspectly-labs/Mikka/commits/59f01f483c0d6ba69109396546bd5840d69c0bff/check-runs?filter=all&per_page=100",
+        "https://api.github.com/repos/aspectly-labs/Mikka/commits/59f01f483c0d6ba69109396546bd5840d69c0bff/check-suites?per_page=100"
+      ]
+    },
+    {
+      "repository": "aspectly-labs/Mikka",
+      "pullRequest": 2994,
+      "head": "40571ce6c780d4044f3c664099e060c857085879",
+      "checkRuns": {
+        "total": 34,
+        "apps": [
+          "github-actions"
+        ],
+        "gitguardian": []
+      },
+      "checkSuites": {
+        "total": 8,
+        "apps": [
+          "cursor",
+          "claude",
+          "github-actions"
+        ],
+        "gitguardian": []
+      },
+      "statuses": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": [],
+        "combinedState": "pending"
+      },
+      "mergedAt": "2026-11-21T00:30:45Z",
+      "mergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+      "sourceUrls": [
+        "https://api.github.com/repos/aspectly-labs/Mikka/commits/40571ce6c780d4044f3c664099e060c857085879/check-runs?filter=all&per_page=100",
+        "https://api.github.com/repos/aspectly-labs/Mikka/commits/40571ce6c780d4044f3c664099e060c857085879/check-suites?per_page=100",
+        "https://api.github.com/repos/aspectly-labs/Mikka/commits/40571ce6c780d4044f3c664099e060c857085879/status?per_page=100"
+      ]
+    }
+  ],
+  "privateSamples": [
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "pullRequest": 418,
+      "versionLabel": "earlier head; exact SHA retained in private raw snapshot",
+      "checkRuns": {
+        "total": 1,
+        "apps": [
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136582941537,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T21:33:45Z",
+            "completedAt": "2026-11-20T21:33:46Z",
+            "updatedAt": null
+          }
+        ]
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "pullRequest": 418,
+      "versionLabel": "current head at observation; exact SHA retained in private raw snapshot",
+      "checkRuns": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": []
+      },
+      "checkSuites": {
+        "total": 2,
+        "apps": [
+          "cursor",
+          "claude"
+        ],
+        "gitguardian": []
+      },
+      "statuses": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": [],
+        "combinedState": "pending"
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "pullRequest": 427,
+      "versionLabel": "exact PR head retained privately",
+      "checkRuns": {
+        "total": 1,
+        "apps": [
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136633312437,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T23:22:04Z",
+            "completedAt": "2026-11-20T23:22:05Z",
+            "updatedAt": null
+          }
+        ]
+      },
+      "checkSuites": {
+        "total": 8,
+        "apps": [
+          "cursor",
+          "claude",
+          "gitguardian",
+          "kiro-agent",
+          "devin-ai-integration",
+          "vercel",
+          "boxes-dev",
+          "cloudflare-workers-and-pages"
+        ],
+        "gitguardian": [
+          {
+            "id": 121356894411,
+            "name": null,
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": "2026-11-20T23:22:00Z",
+            "startedAt": null,
+            "completedAt": null,
+            "updatedAt": "2026-11-20T23:22:05Z"
+          }
+        ]
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "pullRequest": 428,
+      "versionLabel": "exact PR head retained privately",
+      "checkRuns": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": []
+      },
+      "checkSuites": {
+        "total": 2,
+        "apps": [
+          "cursor",
+          "claude"
+        ],
+        "gitguardian": []
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "pullRequest": 433,
+      "versionLabel": "exact PR head retained privately",
+      "checkRuns": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": []
+      },
+      "checkSuites": {
+        "total": 2,
+        "apps": [
+          "cursor",
+          "claude"
+        ],
+        "gitguardian": []
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-cloud",
+      "pullRequest": 425,
+      "versionLabel": "exact PR head retained privately",
+      "checkRuns": {
+        "total": 1,
+        "apps": [
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136619623455,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T22:50:24Z",
+            "completedAt": "2026-11-20T22:50:25Z",
+            "updatedAt": null
+          }
+        ]
+      },
+      "checkSuites": {
+        "total": 8,
+        "apps": [
+          "cursor",
+          "claude",
+          "gitguardian",
+          "kiro-agent",
+          "devin-ai-integration",
+          "vercel",
+          "boxes-dev",
+          "cloudflare-workers-and-pages"
+        ],
+        "gitguardian": [
+          {
+            "id": 121346063709,
+            "name": null,
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": "2026-11-20T22:49:28Z",
+            "startedAt": null,
+            "completedAt": null,
+            "updatedAt": "2026-11-20T22:50:25Z"
+          }
+        ]
+      },
+      "statuses": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": [],
+        "combinedState": "pending"
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-hosted-ui",
+      "pullRequest": 259,
+      "versionLabel": "current exact head retained privately; successful historical scan does not establish behavior for a new post-transfer head",
+      "checkRuns": {
+        "total": 1,
+        "apps": [
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136634044982,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T23:23:49Z",
+            "completedAt": "2026-11-20T23:23:49Z",
+            "updatedAt": null
+          }
+        ]
+      },
+      "checkSuites": {
+        "total": 8,
+        "apps": [
+          "cursor",
+          "claude",
+          "gitguardian",
+          "kiro-agent",
+          "devin-ai-integration",
+          "vercel",
+          "boxes-dev",
+          "cloudflare-workers-and-pages"
+        ],
+        "gitguardian": [
+          {
+            "id": 121357427432,
+            "name": null,
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": "2026-11-20T23:23:40Z",
+            "startedAt": null,
+            "completedAt": null,
+            "updatedAt": "2026-11-20T23:23:49Z"
+          }
+        ]
+      },
+      "statuses": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": [],
+        "combinedState": "pending"
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-hosted-ui",
+      "pullRequest": 258,
+      "versionLabel": "current exact head retained privately; successful historical scan does not establish behavior for a new post-transfer head",
+      "checkRuns": {
+        "total": 1,
+        "apps": [
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136484582348,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T18:26:41Z",
+            "completedAt": "2026-11-20T18:26:43Z",
+            "updatedAt": null
+          }
+        ]
+      },
+      "checkSuites": {
+        "total": 8,
+        "apps": [
+          "cursor",
+          "claude",
+          "gitguardian",
+          "kiro-agent",
+          "devin-ai-integration",
+          "vercel",
+          "boxes-dev",
+          "cloudflare-workers-and-pages"
+        ],
+        "gitguardian": [
+          {
+            "id": 121241597667,
+            "name": null,
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": "2026-11-20T18:26:11Z",
+            "startedAt": null,
+            "completedAt": null,
+            "updatedAt": "2026-11-20T18:26:44Z"
+          }
+        ]
+      },
+      "statuses": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": [],
+        "combinedState": "pending"
+      }
+    },
+    {
+      "repository": "aspectly-labs/mikka-hosted-ui",
+      "pullRequest": 256,
+      "versionLabel": "current exact head retained privately; successful historical scan does not establish behavior for a new post-transfer head",
+      "checkRuns": {
+        "total": 1,
+        "apps": [
+          "gitguardian"
+        ],
+        "gitguardian": [
+          {
+            "id": 136473841678,
+            "name": "GitGuardian Security Checks",
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": null,
+            "startedAt": "2026-11-20T18:07:05Z",
+            "completedAt": "2026-11-20T18:07:13Z",
+            "updatedAt": null
+          }
+        ]
+      },
+      "checkSuites": {
+        "total": 8,
+        "apps": [
+          "cursor",
+          "claude",
+          "gitguardian",
+          "kiro-agent",
+          "devin-ai-integration",
+          "vercel",
+          "boxes-dev",
+          "cloudflare-workers-and-pages"
+        ],
+        "gitguardian": [
+          {
+            "id": 121233494584,
+            "name": null,
+            "app": "gitguardian",
+            "appId": 46505,
+            "status": "completed",
+            "conclusion": "success",
+            "createdAt": "2026-11-20T18:07:00Z",
+            "startedAt": null,
+            "completedAt": null,
+            "updatedAt": "2026-11-20T18:07:13Z"
+          }
+        ]
+      },
+      "statuses": {
+        "total": 0,
+        "apps": [],
+        "gitguardian": [],
+        "combinedState": "pending"
+      }
+    }
+  ],
+  "additionalPublicMainObservation": {
+    "head": "ed905baee7482c43b29e8b15480ebbae160278c1",
+    "checkSuites": {
+      "total": 48,
+      "apps": [
+        "cursor",
+        "claude",
+        "github-actions"
+      ],
+      "gitguardian": []
+    },
+    "interpretation": "Snapshot only; active Actions and workflow_run suites are not terminal acceptance. No GitGuardian suite is present in the complete returned 48-suite sample."
+  },
+  "ownershipReview": {
+    "publicIssueCommentCounts": {
+      "1953": 50,
+      "1954": 120
+    },
+    "privateIssue90CommentCount": 10,
+    "publicOpenPrCount": 54,
+    "transferPrs": [
+      {
+        "number": 2978,
+        "head": "0633b43e6149749e62503e6537997b480131ab23"
+      },
+      {
+        "number": 2981,
+        "head": "eebbed5dca0ddba5841ec43d0e870678a1f313f5"
+      },
+      {
+        "number": 2994,
+        "head": "40571ce6c780d4044f3c664099e060c857085879"
+      }
+    ],
+    "latestPublicTransferReceipt": "https://github.com/aspectly-labs/Mikka/issues/1954#issuecomment-7053373965",
+    "finding": "No reviewed receipt explicitly claims GitGuardian destination installation or restores its native checks. The named source App / OAuth / publisher changes are not the GitGuardian App (46505). Private scoped issue searches likewise supplied no such declaration.",
+    "separateKnownFailure": "Open public #2898 documents an existing GitGuardian finding on an older source. That finding and its approval restriction are distinct from missing current-head check creation; no token was read and no alternate identity was used."
+  },
+  "denominators": {
+    "publicPrHeadComparison": {
+      "before": 1,
+      "after": 1
+    },
+    "newerCloudHeadsWithoutGitGuardian": 3,
+    "earlierCloudHeadsWithGitGuardian": 3,
+    "hostedCurrentHeadsWithSuccessfulHistoricalGitGuardian": 3,
+    "newPostTransferHostedPushesObserved": 0,
+    "publicMainSnapshot": 1
+  },
+  "limitations": [
+    "Purposive source-bound samples, not a repository-wide rate estimate.",
+    "Each check-runs/suites page requested per_page=100 and returned total_count below 100; no missing pagination is inferred.",
+    "A combined status of pending with zero statuses is not a pending GitGuardian job.",
+    "Cursor/Claude queued suites are neither GitGuardian nor executed CI success.",
+    "Historical same-head hosted checks remain facts at their original timestamps; they do not prove future post-transfer check creation.",
+    "Full classic protection and private ruleset administration details are not readable through this connection.",
+    "No integration installation inventory, webhook delivery logs, GitGuardian account configuration, token or secret was accessed.",
+    "No rerequest, dispatch, alternate scan, extra release or merge was performed."
+  ],
+  "officialOwnerBoundary": {
+    "readAt": "2026-11-21T01:59:39.633Z",
+    "purpose": "Official authority boundary for restoring the existing GitGuardian integration/check; no new gate or runbook.",
+    "sources": [
+      {
+        "url": "https://docs.gitguardian.com/internal-monitoring/integrate-sources/vcs-integrations/github",
+        "title": "Integrate GitHub",
+        "claims": [
+          "GitGuardian Owner or Manager rights are needed to configure the integration.",
+          "The main GitGuardian App can be installed for the owner account or organization; an organization member may request installation from its owner.",
+          "Installation/repository access and the GitGuardian monitored perimeter are distinct: a repository can remain installed while monitoring is deselected."
+        ]
+      },
+      {
+        "url": "https://docs.github.com/en/apps/using-github-apps/reviewing-and-modifying-installed-github-apps",
+        "title": "Reviewing and modifying installed GitHub Apps",
+        "claims": [
+          "Organization owners can change repository access for an App installed on the organization.",
+          "Repository administrators can add their repositories to an existing App installation.",
+          "Configuration is account/organization scoped and may affect other repositories."
+        ]
+      }
+    ],
+    "observationBoundary": [
+      "These documents establish the legitimate owner/admin path only; they do not prove that the current installation is absent, misconfigured, suspended, or excluded from monitoring.",
+      "Current missing check runs/statuses remain an unverified existing security-check receipt; prior successful checks on different source versions are not current success.",
+      "No App settings, organization/repository permissions, credentials, rulesets, check suites or production state were modified."
+    ]
+  }
+}

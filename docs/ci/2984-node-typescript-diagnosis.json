@@ -1,0 +1,298 @@
+{
+  "schema": "mikka.sdlc2984.independent-full-gate-environment-diagnosis.v1",
+  "capturedAt": "2026-11-21T05:07:11.682663+00:00",
+  "pr": 3011,
+  "head": "219574cf8e13e0513bccd53eb1f6f0559e034af1",
+  "tree": "137607871f9ef890007eb953e520e219779232b9",
+  "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+  "qualification": "not passed; no final qualification review or Ready result",
+  "originalAttempt": {
+    "receipt": "research/local-fixtures-batch/small-check-2026-11-21T04-48-43.474Z/receipt.json",
+    "receiptSha256": "99504da5912ebf5d360a06e298aca905596cc0ccfe40e2afd4f2d210403574d2",
+    "native": {
+      "name": "processes/proc-1795236553878694519-181",
+      "pid": 19466,
+      "exitCode": 1,
+      "incomplete": false
+    },
+    "nativeFinal": {
+      "state": "exited",
+      "exitCode": 1
+    },
+    "status": "failed",
+    "node": "v22.22.1",
+    "pnpm": "10.34.3",
+    "wholeWallSeconds": 310.0476609230027,
+    "gateWallSeconds": 277.29171543600023,
+    "gateExit": 1,
+    "stdoutSha256": "981922163d2e120af5feea1f1b128fc0eeb14ed272286981eb04c613227eda5d",
+    "stderrSha256": "5c06ac82addf9693897bcad6c69ac3eda38ae38f63cd5886f5fc1e6676ec4683",
+    "rawLogHashesIndependentlyVerified": true,
+    "readyRecordProduced": false,
+    "individualExitResults": null,
+    "actualNativeSummaries": [
+      {
+        "script": "test:abuse",
+        "nativeSummaries": {
+          "tests": [
+            37
+          ],
+          "pass": [
+            37
+          ],
+          "fail": [
+            0
+          ],
+          "skipped": [
+            0
+          ],
+          "cancelled": [
+            0
+          ],
+          "todo": [
+            0
+          ]
+        },
+        "individualExitFromReadyRecord": null
+      },
+      {
+        "script": "test:agent-kit-compat",
+        "nativeSummaries": {
+          "tests": [
+            59
+          ],
+          "pass": [
+            59
+          ],
+          "fail": [
+            0
+          ],
+          "skipped": [
+            0
+          ],
+          "cancelled": [
+            0
+          ],
+          "todo": [
+            0
+          ]
+        },
+        "individualExitFromReadyRecord": null
+      },
+      {
+        "script": "test:agent-kit-model",
+        "nativeSummaries": {
+          "tests": [
+            168
+          ],
+          "pass": [
+            168
+          ],
+          "fail": [
+            0
+          ],
+          "skipped": [
+            0
+          ],
+          "cancelled": [
+            0
+          ],
+          "todo": [
+            0
+          ]
+        },
+        "individualExitFromReadyRecord": null
+      },
+      {
+        "script": "test:abuse-db",
+        "nativeSummaries": {
+          "tests": [
+            26,
+            5
+          ],
+          "pass": [
+            26,
+            5
+          ],
+          "fail": [
+            0,
+            0
+          ],
+          "skipped": [
+            0,
+            0
+          ],
+          "cancelled": [
+            0,
+            0
+          ],
+          "todo": [
+            0,
+            0
+          ]
+        },
+        "individualExitFromReadyRecord": null
+      }
+    ],
+    "cleanup": {
+      "postgresStopExit": 0,
+      "postgresStatusExit": 3,
+      "pidfilePresent": false,
+      "orderlyStopConfirmed": true
+    },
+    "cleanupRawLogHashesIndependentlyVerified": true,
+    "endingSourceClean": true,
+    "finalFreeDiskBytes": 137424896
+  },
+  "failure": {
+    "stage": "original check:agent-ui inside original check package",
+    "originalCommand": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
+    "code": "ERR_NO_TYPESCRIPT",
+    "literalMessage": "Node.js is not compiled with TypeScript support",
+    "stackStage": "Node ESM TypeScript translation -> stripTypeScriptModuleTypes -> assertTypeScript; no generated-prompt mismatch assertion",
+    "classification": "Specific execution-environment binary capability; not an observed regression in the reviewed fixture code",
+    "smallFeaturesQueriedDirectly": false,
+    "secondaryWarning": {
+      "present": true,
+      "literalSummary": "Native module cache copy failed and reported fallback to original location",
+      "classification": "Observed disk/cache warning, kept separately from fatal ERR_NO_TYPESCRIPT",
+      "oomEvidence": false
+    }
+  },
+  "repositoryAuthority": {
+    "nodeVersionFile": "24",
+    "enginesNode": ">=22",
+    "packageManager": "pnpm@10.34.3",
+    "supportedMajors": [
+      22,
+      24
+    ],
+    "defaultMajor": 24,
+    "supportDoesNotImplyEveryDistributorBuildHasTypeScript": true,
+    "unchangedBaseAndCandidateBlobs": {
+      "AGENTS.md": "87020332bce271573cde1641d2276b1467633e0d",
+      "docs/dev-workflow.md": "5c3635f626854baf09163876e1aae9218f56a3cd",
+      ".node-version": "a45fd52cc5891570d6299fab38643103c3955474",
+      "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+      "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+      "scripts/dev/bootstrap-local.sh": "046da669f395ae668fc30426c0f72ec3643ecddf",
+      "scripts/dev/local-preflight.mjs": "4a43cda342d42a289d07106fd496a7bd9f80c66f",
+      "scripts/generate-agent-ui-prompt.mjs": "0cbf655bf2cd3dd81835766df2981e1d8ca47875",
+      "lib/agent-ui-catalog.ts": "b0ee2cc680cc6b135778a169b188534ef86deb06",
+      "lib/coordinator/presentation-options.ts": "3e6953f1c75943d9c26346a7eff1bb8fbdad9cac",
+      "lib/agent-ui.spec.json": "9ce13cbcc342715fc73308d71999d8832e2cc4bd",
+      "lib/agent-system-prompt.json": "3606b4cf6d4e4e21194f825e372553978f391807",
+      "lib/coordinator-ui-prompt.json": "75de7d0dcf8abde7eb07a3055c30e97aa1886498"
+    },
+    "existingProvisioner": "scripts/dev/bootstrap-local.sh uses matching existing major/default24; official nodejs.org download plus SHASUMS when needed. Whole provisioner also creates/starts/migrates PG, so it was not executed as a Node-only diagnostic."
+  },
+  "actualMinimalHostRecheck": {
+    "receipt": "research/ci-validation/3011-node24-agent-ui-host/receipt.json",
+    "receiptSha256": "8788806341553cfee21693c38f477a1fa167bc8a87ccb43e2278647fc7d0d314",
+    "command": [
+      "pnpm",
+      "run",
+      "check:agent-ui"
+    ],
+    "originalScript": "node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs --check",
+    "source": "219574cf8e13e0513bccd53eb1f6f0559e034af1",
+    "tree": "137607871f9ef890007eb953e520e219779232b9",
+    "node": {
+      "execPath": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "version": "v24.22.3",
+      "arch": "x64",
+      "platform": "linux",
+      "features": {
+        "inspector": true,
+        "debug": false,
+        "uv": true,
+        "ipv6": true,
+        "tls_alpn": true,
+        "tls_sni": true,
+        "tls_ocsp": true,
+        "tls": true,
+        "openssl_is_boringssl": false,
+        "cached_builtins": true,
+        "require_module": true,
+        "quic": false,
+        "typescript": "strip"
+      },
+      "amaro": "1.1.11",
+      "nodeUseAmaro": true
+    },
+    "pnpm": "10.34.3",
+    "exitCode": 0,
+    "wallSeconds": 3.380461599001137,
+    "stdoutSha256": "14bdcbd8049d33c99aaaa4583e4421c613d21100253ae3adc0a6d4a770d9ec33",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "checkedComponentDefinitions": 121,
+    "endingClean": true,
+    "notFullGate": true,
+    "noRemoteExecution": true
+  },
+  "existingNode24Candidate": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bytes": 126951512,
+    "sha256": "acbe4b8d9153b841ed0697cbfc4f93e767386620edb745ab9358306c0a6f31aa",
+    "platform": "linux",
+    "architecture": "x64",
+    "interpreter": "/lib64/ld-linux-x86-64.so.2",
+    "observedFeature": "typescript=strip; node_use_amaro=true; amaro1.1.11",
+    "glibcRequiredVersions": [
+      "2.2.5",
+      "2.3",
+      "2.3.2",
+      "2.3.3",
+      "2.3.4",
+      "2.4",
+      "2.6",
+      "2.7",
+      "2.9",
+      "2.10",
+      "2.12",
+      "2.14",
+      "2.16",
+      "2.17",
+      "2.23",
+      "2.25",
+      "2.27",
+      "2.28"
+    ],
+    "glibcxxRequiredVersions": [
+      "3.4",
+      "3.4.9",
+      "3.4.11",
+      "3.4.14",
+      "3.4.15",
+      "3.4.17",
+      "3.4.18",
+      "3.4.19",
+      "3.4.20",
+      "3.4.21"
+    ],
+    "cxxabiRequiredVersions": [
+      "1.3",
+      "1.3.2",
+      "1.3.5",
+      "1.3.7",
+      "1.3.8",
+      "1.3.9",
+      "1.3.11"
+    ],
+    "hostLddAllDependenciesResolved": true,
+    "provenanceLimit": "Existing authorized platform runtime binary; no claim that an official upstream release checksum was newly verified. No binary was copied or installed by this reviewer."
+  },
+  "nextMinimalExecutionBasis": [
+    "Keep d30 development/browser work on its separately recorded Node22 pairing; do not retroactively rebind prior D receipts.",
+    "Use a verified supported Node24 process-local tool path in the task-owned full-gate checkout, leaving global Node and other Owner environments unchanged. Recheck native version, features.typescript, ldd and SHA on the actual target before use.",
+    "On that actual target run the unchanged pnpm run check:agent-ui once with pnpm10.34.3; this is the smallest original failing entry. Do not add tsx, remove --experimental-strip-types or regenerate product artifacts.",
+    "Only after concrete toolchain admission succeeds, run required original complete local-ready gate on exact committed source, recording this as a new environment attempt. Prior Small failure and host focused success remain separate; original successful DB summaries are not relabeled as Node24 full-gate evidence."
+  ],
+  "boundaries": [
+    "No remote SDK, database, browser, provider/model or deployment operation executed in this diagnosis.",
+    "No individual package exit fabricated from original aggregate exit; absent local-first record remains absent.",
+    "No OOM, Node22-wide incompatibility, product regression or full-check success inferred.",
+    "Original shared-helper abuse-db complete summaries26/26 and5/5 are genuine on219/Node22 with normal PG cleanup; final readiness remains false."
+  ]
+}

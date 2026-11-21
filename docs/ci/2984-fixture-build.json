@@ -1,0 +1,21 @@
+{
+  "source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+  "command": [
+    "node",
+    "scripts/build-application.mjs",
+    "--local-fixture"
+  ],
+  "startedAt": "2026-11-21T00:37:13.302974+00:00",
+  "finishedAt": "2026-11-21T00:41:56.993031+00:00",
+  "exitCode": 0,
+  "durationSeconds": 283.6900833689997,
+  "nativeTelemetryDisabled": true,
+  "providerCredentialsInherited": false,
+  "logSha256": "2fcfaca66df37817f7fb038253a402e0ec64da31b415bdfb5c41ee6cf2bf78e3",
+  "trackedStatus": "",
+  "manifestSha256": "d803d3084af1d0730762084031f707c00421002cc44390cd8cabd35ff3620e69",
+  "officialOverlayIdentity": "Pinned official private overlay; exact identity retained only in the original private build receipt.",
+  "denominator": 1,
+  "scope": "Complete original local-fixture build. Not a browser journey, current main build, runtime product acceptance or publication.",
+  "originalReceiptSha256": "8345c0852782078a371c2e718123faf3913d6a4aa9e384a8651951398ee35807"
+}

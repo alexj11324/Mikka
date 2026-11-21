@@ -1,0 +1,2237 @@
+{
+  "schema_version": 1,
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "scope": "B1 local error discovery: two fixed-source local replays plus one original Owner runtime acceptance receipt",
+  "captured_at": "2026-11-21T00:01:28.030391+00:00",
+  "repository": "aspectly-labs/Mikka",
+  "repository_id": 1427517699,
+  "previous_repository_name": "alexj11324/Mikka",
+  "environment": {
+    "node": "v24.22.3",
+    "typescript": "5.9.3",
+    "system": {
+      "system": "Linux",
+      "release": "6.18.57",
+      "machine": "x86_64"
+    }
+  },
+  "method": {
+    "local_duration": "Python time.perf_counter_ns over the actual child invocation, including Node startup; UTC start/end independently recorded. No failed-run retry for luck. Green is repeated exactly twice at identical source and input.",
+    "source_integrity": "Independent detached worktrees from existing Git objects. No tracked files, assertions or source are modified. Only ignored dependency symlinks and explicitly synthetic manifest inputs are prepared.",
+    "hashes": "SHA-256 of exact captured stdout/stderr bytes and declared input files; equal generated input before/after proves --check did not regenerate files.",
+    "historical_comparison": "Historical CI queue/execution and later local replay are separate observed samples; no fleet KPI, historical ordering or causal time savings is inferred.",
+    "denominators": {
+      "representative_issues": 3,
+      "independently_replayed_red_green_cases": 2,
+      "original_Owner_runtime_comment_cases": 1,
+      "complete_UI_API_DB_readback_rounds_in_current_replay": 0
+    }
+  },
+  "local_executions": [
+    {
+      "label": "routes-red-1",
+      "sha": "67199ca71bcc91537d3a515f6f67c235505878b5",
+      "tree": "fdf40d552fd6304f6cf9ca51c4718deec85f2a4b",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-routes-red",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "apps/api/scripts/generate-routes.mjs",
+        "--check"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC"
+      },
+      "started_at": "2026-11-20T23:51:05.950712+00:00",
+      "completed_at": "2026-11-20T23:51:06.615378+00:00",
+      "elapsed_seconds": 0.664650439,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "generate-routes: stale ({\"routes\":395,\"methods\":522}): apps/api/generated/routes.json, apps/api/generated/routes.ts. Run `node apps/api/scripts/generate-routes.mjs` and commit.\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "1166de12766c5f903bb21f7ebb9102abc371debad41f3ae570f0b638efff23a5",
+      "input_hashes_before": {
+        "apps/api/scripts/generate-routes.mjs": "816783cda7ed46d9ac523828385590c2fda7c084a6bcbd189df256da6cf03bc0",
+        "apps/api/generated/routes.json": "8d88e09dbc473f07690f95a39e2ec21da21f5f73d7062e31a16fb8ac6380325d",
+        "apps/api/generated/routes.ts": "3b37d0b0ac60dc527bb4a395c01cf95a9c773e1f1985d72a179abf45584a5324"
+      },
+      "input_hashes_after": {
+        "apps/api/scripts/generate-routes.mjs": "816783cda7ed46d9ac523828385590c2fda7c084a6bcbd189df256da6cf03bc0",
+        "apps/api/generated/routes.json": "8d88e09dbc473f07690f95a39e2ec21da21f5f73d7062e31a16fb8ac6380325d",
+        "apps/api/generated/routes.ts": "3b37d0b0ac60dc527bb4a395c01cf95a9c773e1f1985d72a179abf45584a5324"
+      },
+      "git_status_after": "",
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "routes-green-1",
+      "sha": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "tree": "d732a558344927079b67da025c5a0735fc48dfec",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-routes-green",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "apps/api/scripts/generate-routes.mjs",
+        "--check"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC"
+      },
+      "started_at": "2026-11-20T23:51:06.639474+00:00",
+      "completed_at": "2026-11-20T23:51:07.271136+00:00",
+      "elapsed_seconds": 0.631379609,
+      "exit_code": 0,
+      "stdout": "generate-routes: up to date ({\"routes\":395,\"methods\":522})\n",
+      "stderr": "",
+      "stdout_sha256": "0c03bcda50a17514b112984042a5a2a3c4ba138b77758620c672dcdc754f5003",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_hashes_before": {
+        "apps/api/scripts/generate-routes.mjs": "816783cda7ed46d9ac523828385590c2fda7c084a6bcbd189df256da6cf03bc0",
+        "apps/api/generated/routes.json": "1fcae6e786474d2a831a809c4a7ffddde7b2b044c9c33b2eb0028ba06626d713",
+        "apps/api/generated/routes.ts": "3e93b0f5f02fe415e630f27ea361932970e677aed87841aa77784e2dd7221947"
+      },
+      "input_hashes_after": {
+        "apps/api/scripts/generate-routes.mjs": "816783cda7ed46d9ac523828385590c2fda7c084a6bcbd189df256da6cf03bc0",
+        "apps/api/generated/routes.json": "1fcae6e786474d2a831a809c4a7ffddde7b2b044c9c33b2eb0028ba06626d713",
+        "apps/api/generated/routes.ts": "3e93b0f5f02fe415e630f27ea361932970e677aed87841aa77784e2dd7221947"
+      },
+      "git_status_after": "",
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "routes-green-2",
+      "sha": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "tree": "d732a558344927079b67da025c5a0735fc48dfec",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-routes-green",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "apps/api/scripts/generate-routes.mjs",
+        "--check"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC"
+      },
+      "started_at": "2026-11-20T23:51:07.457262+00:00",
+      "completed_at": "2026-11-20T23:51:08.171727+00:00",
+      "elapsed_seconds": 0.71444475,
+      "exit_code": 0,
+      "stdout": "generate-routes: up to date ({\"routes\":395,\"methods\":522})\n",
+      "stderr": "",
+      "stdout_sha256": "0c03bcda50a17514b112984042a5a2a3c4ba138b77758620c672dcdc754f5003",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_hashes_before": {
+        "apps/api/scripts/generate-routes.mjs": "816783cda7ed46d9ac523828385590c2fda7c084a6bcbd189df256da6cf03bc0",
+        "apps/api/generated/routes.json": "1fcae6e786474d2a831a809c4a7ffddde7b2b044c9c33b2eb0028ba06626d713",
+        "apps/api/generated/routes.ts": "3e93b0f5f02fe415e630f27ea361932970e677aed87841aa77784e2dd7221947"
+      },
+      "input_hashes_after": {
+        "apps/api/scripts/generate-routes.mjs": "816783cda7ed46d9ac523828385590c2fda7c084a6bcbd189df256da6cf03bc0",
+        "apps/api/generated/routes.json": "1fcae6e786474d2a831a809c4a7ffddde7b2b044c9c33b2eb0028ba06626d713",
+        "apps/api/generated/routes.ts": "3e93b0f5f02fe415e630f27ea361932970e677aed87841aa77784e2dd7221947"
+      },
+      "git_status_after": "",
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "preload-red-1",
+      "sha": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+      "tree": "cd83a6d88eabd5d494ca81532e82b266c2e9bd49",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/.output/eve",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--import",
+        "file:///workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/scripts/fixtures/preload.mjs",
+        "-e",
+        "console.log('fixture_preload_imported')"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC",
+        "NODE_ENV": "production",
+        "DATABASE_URL": "postgresql://127.0.0.1:5432/sdlc_e2e",
+        "MIKKA_FIXTURE_ORIGIN": "http://127.0.0.1:3100",
+        "MIKKA_FIXTURE_SERVICES": "http://127.0.0.1:3101",
+        "MIKKA_FIXTURE_GITHUB": "http://127.0.0.1:3102",
+        "MIKKA_LITELLM_URL": "http://127.0.0.1:3103"
+      },
+      "started_at": "2026-11-20T23:51:08.196894+00:00",
+      "completed_at": "2026-11-20T23:51:08.229005+00:00",
+      "elapsed_seconds": 0.032093036,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "node:internal/fs/promises:1345\n  return new FileHandle(await PromisePrototypeThen(\n                        ^\n\nError: ENOENT: no such file or directory, open '/workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/.output/eve/.output/mikka-build.json'\n    at async open (node:internal/fs/promises:1345:25)\n    at async readFile (node:internal/fs/promises:2003:14)\n    at async fixtureManifest (file:///workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/scripts/fixtures/guard.mjs:42:21)\n    at async file:///workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/scripts/fixtures/preload.mjs:4:36 {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'open',\n  path: '/workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/.output/eve/.output/mikka-build.json'\n}\n\nNode.js v24.22.3\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "3b856144f9e19e40cab94bd735e3eadcb0fb0357a8a68c570332eef3516fdfe6",
+      "input_hashes_before": {},
+      "input_hashes_after": {},
+      "git_status_after": "",
+      "synthetic_input": {
+        "path": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-red/.output/mikka-build.json",
+        "contents": {
+          "preset": "node-server",
+          "target": "local-fixture"
+        },
+        "sha256": "6a76e630a10dca7c7757d1532df973794bb0dac67b653b370db15f8fc8501b7b",
+        "is_actual_build": false
+      },
+      "source_hashes": {
+        "scripts/fixtures/preload.mjs": "19570201e1a00120bf91ca9280d7a9dffae9478193e7b0022429bc89969bc543",
+        "scripts/fixtures/guard.mjs": "8dd38f74c5968e8d642864cd406d7c59ba40f803450c2699beaff68acbd05818"
+      },
+      "tracked_source_modified": false,
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "fixture-suite-red",
+      "sha": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+      "tree": "cd83a6d88eabd5d494ca81532e82b266c2e9bd49",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-red",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--test",
+        "scripts/fixtures/guard.test.mjs",
+        "scripts/fixtures/proxy.test.mjs",
+        "scripts/fixtures/bundle-check.test.mjs"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC"
+      },
+      "started_at": "2026-11-20T23:51:08.341299+00:00",
+      "completed_at": "2026-11-20T23:51:08.574780+00:00",
+      "elapsed_seconds": 0.233460323,
+      "exit_code": 0,
+      "stdout": "✔ compiled output inspection rejects a fixture auth helper in either server or browser chunks (10.425253ms)\n✔ fixture auth refuses a release build even when NODE_ENV is development (1.249098ms)\n✔ fixture seeds refuse remote, non-disposable, mixed databases and deployed builds before any write (0.493502ms)\n✔ fixture login uses the normal password HTTP endpoint and only returns its cookie for the exact identity (49.11124ms)\n✔ fixture login rejects cross-site/foreign-host requests, unselected scenes and remote upstreams (10.989861ms)\n✔ fixture proxy preserves live upgrade bytes and protocol only for its exact browser origin (8.938647ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 201.31231\n",
+      "stderr": "",
+      "stdout_sha256": "517fc31713a15ed7436fb139e3b703b30005943e684f7db2ea3892ab204c386c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_hashes_before": {},
+      "input_hashes_after": {},
+      "git_status_after": "",
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "preload-green-1",
+      "sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "tree": "33348a5d313ee170a1ec6c898edabdbda4281473",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/.output/eve",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--import",
+        "file:///workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/scripts/fixtures/preload.mjs",
+        "-e",
+        "console.log('fixture_preload_imported')"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC",
+        "NODE_ENV": "production",
+        "DATABASE_URL": "postgresql://127.0.0.1:5432/sdlc_e2e",
+        "MIKKA_FIXTURE_ORIGIN": "http://127.0.0.1:3100",
+        "MIKKA_FIXTURE_SERVICES": "http://127.0.0.1:3101",
+        "MIKKA_FIXTURE_GITHUB": "http://127.0.0.1:3102",
+        "MIKKA_LITELLM_URL": "http://127.0.0.1:3103"
+      },
+      "started_at": "2026-11-20T23:51:08.599359+00:00",
+      "completed_at": "2026-11-20T23:51:08.635176+00:00",
+      "elapsed_seconds": 0.035802252,
+      "exit_code": 0,
+      "stdout": "fixture_preload_imported\n",
+      "stderr": "",
+      "stdout_sha256": "4acc82bf940381c6ea19681218cd870660d12fc81d4daf9235698cb9e7606f64",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_hashes_before": {},
+      "input_hashes_after": {},
+      "git_status_after": "",
+      "synthetic_input": {
+        "path": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/.output/mikka-build.json",
+        "contents": {
+          "preset": "node-server",
+          "target": "local-fixture"
+        },
+        "sha256": "6a76e630a10dca7c7757d1532df973794bb0dac67b653b370db15f8fc8501b7b",
+        "is_actual_build": false
+      },
+      "source_hashes": {
+        "scripts/fixtures/preload.mjs": "3a98e833a0485707183cda1c90cd2a6cbc16bdfebfcd5d067f47681a4710c2ce",
+        "scripts/fixtures/guard.mjs": "8dd38f74c5968e8d642864cd406d7c59ba40f803450c2699beaff68acbd05818"
+      },
+      "tracked_source_modified": false,
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "preload-green-2",
+      "sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "tree": "33348a5d313ee170a1ec6c898edabdbda4281473",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/.output/eve",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--import",
+        "file:///workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/scripts/fixtures/preload.mjs",
+        "-e",
+        "console.log('fixture_preload_imported')"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC",
+        "NODE_ENV": "production",
+        "DATABASE_URL": "postgresql://127.0.0.1:5432/sdlc_e2e",
+        "MIKKA_FIXTURE_ORIGIN": "http://127.0.0.1:3100",
+        "MIKKA_FIXTURE_SERVICES": "http://127.0.0.1:3101",
+        "MIKKA_FIXTURE_GITHUB": "http://127.0.0.1:3102",
+        "MIKKA_LITELLM_URL": "http://127.0.0.1:3103"
+      },
+      "started_at": "2026-11-20T23:51:08.863440+00:00",
+      "completed_at": "2026-11-20T23:51:08.898151+00:00",
+      "elapsed_seconds": 0.034687927,
+      "exit_code": 0,
+      "stdout": "fixture_preload_imported\n",
+      "stderr": "",
+      "stdout_sha256": "4acc82bf940381c6ea19681218cd870660d12fc81d4daf9235698cb9e7606f64",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_hashes_before": {},
+      "input_hashes_after": {},
+      "git_status_after": "",
+      "synthetic_input": {
+        "path": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green/.output/mikka-build.json",
+        "contents": {
+          "preset": "node-server",
+          "target": "local-fixture"
+        },
+        "sha256": "6a76e630a10dca7c7757d1532df973794bb0dac67b653b370db15f8fc8501b7b",
+        "is_actual_build": false
+      },
+      "source_hashes": {
+        "scripts/fixtures/preload.mjs": "3a98e833a0485707183cda1c90cd2a6cbc16bdfebfcd5d067f47681a4710c2ce",
+        "scripts/fixtures/guard.mjs": "8dd38f74c5968e8d642864cd406d7c59ba40f803450c2699beaff68acbd05818"
+      },
+      "tracked_source_modified": false,
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    },
+    {
+      "label": "fixture-suite-green",
+      "sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "tree": "33348a5d313ee170a1ec6c898edabdbda4281473",
+      "cwd": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--test",
+        "scripts/fixtures/guard.test.mjs",
+        "scripts/fixtures/proxy.test.mjs",
+        "scripts/fixtures/bundle-check.test.mjs"
+      ],
+      "environment": {
+        "LANG": "C.UTF-8",
+        "TZ": "UTC"
+      },
+      "started_at": "2026-11-20T23:51:08.943819+00:00",
+      "completed_at": "2026-11-20T23:51:09.165957+00:00",
+      "elapsed_seconds": 0.222118462,
+      "exit_code": 0,
+      "stdout": "✔ compiled output inspection rejects a fixture auth helper in either server or browser chunks (14.645322ms)\n✔ fixture auth refuses a release build even when NODE_ENV is development (1.313345ms)\n✔ fixture seeds refuse remote, non-disposable, mixed databases and deployed builds before any write (1.194386ms)\n✔ fixture preload guards the same build when packaged Eve changes cwd (124.790849ms)\n✔ fixture login uses the normal password HTTP endpoint and only returns its cookie for the exact identity (40.640731ms)\n✔ fixture login rejects cross-site/foreign-host requests, unselected scenes and remote upstreams (14.706819ms)\n✔ fixture proxy preserves live upgrade bytes and protocol only for its exact browser origin (8.284473ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 187.337391\n",
+      "stderr": "",
+      "stdout_sha256": "c2d7bbdfd8ae7b982e94f827a7f29d112eeab66eae48a466548ac00700a3571c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_hashes_before": {},
+      "input_hashes_after": {},
+      "git_status_after": "",
+      "path_resolution": "Node executable is explicit; inherited PATH was used only by the unchanged original fixture test suite."
+    }
+  ],
+  "routes_case": {
+    "pr": {
+      "number": 2973,
+      "head": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "state": "open",
+      "draft": false,
+      "merged_at": null
+    },
+    "first_remote_run": {
+      "id": 44811835977,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44811835977",
+      "head_sha": "67199ca71bcc91537d3a515f6f67c235505878b5",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-11-20T20:29:35Z",
+      "run_started_at": "2026-11-20T20:29:35Z",
+      "updated_at": "2026-11-20T20:45:27Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "first_remote_jobs": [
+      {
+        "id": 136550118390,
+        "name": "site-search",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T20:29:36Z",
+        "started_at": "2026-11-20T20:43:27Z",
+        "completed_at": "2026-11-20T20:45:26Z",
+        "steps": [
+          {
+            "number": 8,
+            "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T20:45:22Z",
+            "completed_at": "2026-11-20T20:45:23Z"
+          },
+          {
+            "number": 13,
+            "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T20:45:23Z",
+            "completed_at": "2026-11-20T20:45:23Z"
+          }
+        ]
+      }
+    ],
+    "first_remote_stale_stdout": "2026-11-20T20:45:23.0578911Z generate-routes: stale ({\"routes\":395,\"methods\":522}): apps/api/generated/routes.json, apps/api/generated/routes.ts. Run `node apps/api/scripts/generate-routes.mjs` and commit.",
+    "first_remote_tested_checkout": "fd1f0ed01d1fae0170c92c56b3ff2ff0b6c1aa91",
+    "first_remote_node": "v24.22.3",
+    "corrected_site_run": {
+      "id": 44815741395,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44815741395",
+      "head_sha": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-11-20T20:55:46Z",
+      "run_started_at": "2026-11-20T20:55:46Z",
+      "updated_at": "2026-11-20T21:13:16Z",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "corrected_site_jobs": [
+      {
+        "id": 136563464178,
+        "name": "site-search",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T20:55:47Z",
+        "started_at": "2026-11-20T21:03:41Z",
+        "completed_at": "2026-11-20T21:13:16Z",
+        "steps": [
+          {
+            "number": 8,
+            "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+            "conclusion": "success",
+            "started_at": "2026-11-20T21:05:39Z",
+            "completed_at": "2026-11-20T21:07:12Z"
+          }
+        ]
+      }
+    ],
+    "corrected_site_stdout": "2026-11-20T21:05:40.1940128Z generate-routes: up to date ({\"routes\":395,\"methods\":522})",
+    "corrected_source_stdout": "2026-11-20T21:21:12.6473392Z generate-routes: up to date ({\"routes\":395,\"methods\":522})",
+    "corrected_remote_tested_checkout": "6c0469bb6cd18aab77eaa68b19d777eed5068515",
+    "current_head_CI": {
+      "id": 44815741718,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44815741718",
+      "head_sha": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-11-20T20:55:46Z",
+      "run_started_at": "2026-11-20T20:55:46Z",
+      "updated_at": "2026-11-20T21:34:34Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "current_head_CI_jobs": [
+      {
+        "id": 136563471666,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T20:55:48Z",
+        "started_at": "2026-11-20T21:04:26Z",
+        "completed_at": "2026-11-20T21:05:30Z",
+        "steps": []
+      },
+      {
+        "id": 136568453526,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:07:00Z",
+        "completed_at": "2026-11-20T21:10:25Z",
+        "steps": []
+      },
+      {
+        "id": 136568453542,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:10:48Z",
+        "completed_at": "2026-11-20T21:16:28Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:11:49Z",
+            "completed_at": "2026-11-20T21:16:26Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453560,
+        "name": "Core unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:13:46Z",
+        "completed_at": "2026-11-20T21:20:48Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:14:58Z",
+            "completed_at": "2026-11-20T21:20:45Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453565,
+        "name": "Integration unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:16:29Z",
+        "completed_at": "2026-11-20T21:22:00Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:17:30Z",
+            "completed_at": "2026-11-20T21:21:57Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453583,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:22:11Z",
+        "completed_at": "2026-11-20T21:28:56Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:24:00Z",
+            "completed_at": "2026-11-20T21:28:47Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453625,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:19:43Z",
+        "completed_at": "2026-11-20T21:24:25Z",
+        "steps": [
+          {
+            "number": 9,
+            "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+            "conclusion": "success",
+            "started_at": "2026-11-20T21:21:11Z",
+            "completed_at": "2026-11-20T21:21:12Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453671,
+        "name": "Database checks (2/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:10:48Z",
+        "completed_at": "2026-11-20T21:17:09Z",
+        "steps": []
+      },
+      {
+        "id": 136568453731,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:24:15Z",
+        "completed_at": "2026-11-20T21:31:01Z",
+        "steps": []
+      },
+      {
+        "id": 136568453748,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:27:50Z",
+        "completed_at": "2026-11-20T21:33:10Z",
+        "steps": []
+      },
+      {
+        "id": 136568453838,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:24:34Z",
+        "completed_at": "2026-11-20T21:29:28Z",
+        "steps": [
+          {
+            "number": 15,
+            "name": "Required DB suites (temporary Postgres 17, no skips)",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:26:03Z",
+            "completed_at": "2026-11-20T21:29:25Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453886,
+        "name": "Database checks (3/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:25:56Z",
+        "completed_at": "2026-11-20T21:31:46Z",
+        "steps": [
+          {
+            "number": 15,
+            "name": "Required DB suites (temporary Postgres 17, no skips)",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:27:11Z",
+            "completed_at": "2026-11-20T21:31:42Z"
+          }
+        ]
+      },
+      {
+        "id": 136568453894,
+        "name": "Database checks (4/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:22:49Z",
+        "completed_at": "2026-11-20T21:28:16Z",
+        "steps": []
+      },
+      {
+        "id": 136568453896,
+        "name": "Database checks (1/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:24:22Z",
+        "completed_at": "2026-11-20T21:28:08Z",
+        "steps": []
+      },
+      {
+        "id": 136568453926,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:18:22Z",
+        "completed_at": "2026-11-20T21:25:33Z",
+        "steps": []
+      },
+      {
+        "id": 136568454327,
+        "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:10:33Z",
+        "completed_at": "2026-11-20T21:12:51Z",
+        "steps": []
+      },
+      {
+        "id": 136568454934,
+        "name": "analytics-checks / Analytics SSR (full)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:09:43Z",
+        "completed_at": "2026-11-20T21:17:36Z",
+        "steps": []
+      },
+      {
+        "id": 136568455825,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:05:31Z",
+        "completed_at": "2026-11-20T21:05:31Z",
+        "steps": []
+      },
+      {
+        "id": 136568456524,
+        "name": "analytics-checks / changes",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T21:05:31Z",
+        "started_at": "2026-11-20T21:05:31Z",
+        "completed_at": "2026-11-20T21:05:31Z",
+        "steps": []
+      },
+      {
+        "id": 136574714178,
+        "name": "analytics-checks / analytics-ssr",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T21:17:36Z",
+        "started_at": "2026-11-20T21:18:17Z",
+        "completed_at": "2026-11-20T21:18:19Z",
+        "steps": []
+      },
+      {
+        "id": 136580473248,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:28:56Z",
+        "started_at": "2026-11-20T21:29:56Z",
+        "completed_at": "2026-11-20T21:30:05Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected source, unit and daemon job",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:29:57Z",
+            "completed_at": "2026-11-20T21:29:57Z"
+          }
+        ]
+      },
+      {
+        "id": 136582636684,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T21:33:10Z",
+        "started_at": "2026-11-20T21:34:23Z",
+        "completed_at": "2026-11-20T21:34:34Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected database shard",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T21:34:24Z",
+            "completed_at": "2026-11-20T21:34:24Z"
+          }
+        ]
+      }
+    ],
+    "current_CI_distinct_failures": [
+      {
+        "job_id": 136568453542,
+        "first_observed": "2026-11-20T21:11:59.6204745Z",
+        "message": "SyntaxError: The requested module '@/lib/db' does not provide an export named 'db'",
+        "classification": "module mock/import contract; not generated routes"
+      },
+      {
+        "job_id": 136568453583,
+        "first_observed": "2026-11-20T21:27:17.6083900Z",
+        "message": "AssertionError: database pathname does not match /^\\/mikka_fixture_[a-f0-9]{32}$/",
+        "classification": "fixture assertion contract; not generated routes"
+      },
+      {
+        "job_id": 136568453838,
+        "first_observed": "2026-11-20T21:28:52.9680562Z",
+        "message": "a new owner request freezes a new Factory epoch without changing accepted history or waking the Bot",
+        "classification": "original test:bot-threads-db assertion failure; not generated routes"
+      }
+    ],
+    "measurement": {
+      "historical_remote_failure_samples": 1,
+      "first_error_timestamp_in_selected_run": "2026-11-20T20:45:23.0578911Z",
+      "workflow_created_to_first_error_seconds": 948.0578911,
+      "job_created_to_first_error_seconds": 947.0578911,
+      "job_queue_seconds": 831.0,
+      "job_start_to_first_error_seconds": 116.0578911,
+      "job_execution_seconds": 119.0,
+      "local_red_samples": 1,
+      "local_green_samples": 2,
+      "local_generated_input_bytes_unchanged": true,
+      "comparison_limit": "Retrospective replay of original fixed sources, after the Owner already repaired the generated files; not evidence the local run historically preceded CI or saved this many CI seconds."
+    },
+    "root_cause": "The original Owner changed source imported by generated API routes but did not regenerate its two committed source hashes. The fix commit changes only apps/api/generated/routes.json and routes.ts; the generator and its check remain unchanged.",
+    "current_head_CI_job_conclusions": {
+      "success": 12,
+      "failure": 8,
+      "skipped": 2
+    },
+    "merge_and_postmerge": {
+      "merged": false,
+      "merge_sha": null,
+      "reason": "Original #2956/P5 Owner and batch rules remain in force; the local source check and Site workflow pass do not make the still-failing full candidate CI mergeable."
+    }
+  },
+  "preload_case": {
+    "pr": {
+      "number": 2969,
+      "head": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "state": "open",
+      "draft": true,
+      "merged_at": null
+    },
+    "original_review": {
+      "id": 5999855363,
+      "commit_id": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+      "submitted_at": "2026-11-20T21:49:22Z",
+      "html_url": "https://github.com/aspectly-labs/Mikka/pull/2969#pullrequestreview-5999855363",
+      "body": "## #2984 D 复用验证：fixture preload 随 Eve 的 cwd 变化而读取错误清单\n\n绑定本 PR head `bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da`。这是 #2984 复用既有设施时发现的 #2887 实现缺陷，请原 Owner 在本 PR 追踪；#2984 没有改动本分支、断言或启动预算。\n\n### 实际失败及首因\n\n在现有 Cloud Linux、Node 24.22.3、PostgreSQL 17.11、固定官方 UI 构建的独立 loopback `*_e2e` 数据库上，原 `pnpm test:e2e:setup` exit 0；原 `startFixture({ scenario: 'automations' })` 于 2026-11-20 21:42:20–21:43:22 UTC 失败，浏览器尚未启动，UI 写入/读回完成 **0 轮**。失败是 `FIXTURE_APPLICATION_NOT_READY`，原 60,000 ms 预算未改。\n\n随后仅观察原子进程 stderr / 原 HTTP 请求（不替换响应、不修改返回值），于 21:45:18–21:46:20 UTC 确认：\n\n- 真实 upstream `/mikka/api/version` 持续返回 **HTTP 500**，不是连接建立缓慢。\n- 首个应用因果错误是 `EVE_SERVICE_EXITED`；Eve 的 stderr 为 `ENOENT`，试图打开 `<root>/.output/eve/.output/mikka-build.json`。\n- 两次运行都执行原 close 并正常停止本次 PostgreSQL，`postmaster.pid` 已不存在；无真实模型、Neon 或生产数据访问。\n\n### 源码因果链与最小复现\n\n1. `scripts/fixtures/start.mjs:57` 通过 `NODE_OPTIONS=--import <root>/scripts/fixtures/preload.mjs` 启动产品。\n2. `scripts/eve-service.mjs` 将 `...env` 传给 Eve，而 packaged Eve 的 cwd 是 `<root>/.output/eve`。\n3. `scripts/fixtures/preload.mjs:4` 用 `fixtureManifest(process.cwd())`，于是同一个预加载器在 Eve 进程寻找错误的 `.output/mikka-build.json`。\n\n在已完成原产物 finalization/package 检查的同一工作树，以下最小复现无需数据库或浏览器便实际 exit 1，报同一个 ENOENT：\n\n```sh\ncd .output/eve\nnode --import ../../scripts/fixtures/preload.mjs --input-type=module -e ''\n```\n\n最小复现输出 SHA-256：`a58a3d93cdd3f68d9e5e5a0e2639baf2fad6493bab331438f3465ea3314048f2`。完整启动诊断的子进程 stderr SHA-256：`cda5b8091e54dec20766ec1cc309ee42ba5a7b815b882dd8db95ab0bbd1982e7`。HTTP 500 body SHA-256：`39aaf076d37bdcf0bd0206deeb90af13ae7a26e4c52f2b71145f08bb02591b9c`。\n\n最新远端 `test/acceptance-runtime` `64b088d930744457ae2b18e4d45e91d9d9f290bc` 的 preload 仍使用该 cwd 解析；#2963 `16bee4e27102642db36e9916c0e453f5145824ab`、#2965 `94c6d2c7074d4d986131ec298700fbb35e1bcc08` 的在途集成没有消除这个来源定位问题。\n\n建议在原实现绑定真实 fixture 根目录，并增加 Eve 子进程 cwd 的回归，保持每个进程的 local-fixture 清单、数据库及 loopback 网络安全门。修复后应在原预算内通过完整启动，再做真实 UI→API→DB→新浏览器读回；不应通过复制一份清单到错误目录、去掉 preload 或延长 timeout 来掩盖此问题。"
+    },
+    "current_head_runs": [
+      {
+        "id": 44833174232,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174232",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T23:06:00Z",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 44833174357,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174357",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T23:00:37Z",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 44833174303,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174303",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T22:58:03Z",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 44833174212,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174212",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T22:58:09Z",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 44833174474,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174474",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T22:58:04Z",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 44833174269,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174269",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T22:58:04Z",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 44833174312,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174312",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:03Z",
+        "run_started_at": "2026-11-20T22:58:03Z",
+        "updated_at": "2026-11-20T22:58:03Z",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 44833174165,
+        "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44833174165",
+        "head_sha": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+        "event": "pull_request",
+        "run_attempt": 1,
+        "created_at": "2026-11-20T22:58:02Z",
+        "run_started_at": "2026-11-20T22:58:02Z",
+        "updated_at": "2026-11-20T23:00:51Z",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "current_head_CI_jobs": [
+      {
+        "id": 136622951515,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T22:58:03Z",
+        "started_at": "2026-11-20T22:58:10Z",
+        "completed_at": "2026-11-20T22:58:59Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run git fetch origin main --no-tags",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T22:58:28Z",
+            "completed_at": "2026-11-20T22:58:56Z"
+          }
+        ]
+      },
+      {
+        "id": 136623349629,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T23:00:04Z",
+        "completed_at": "2026-11-20T23:00:14Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected database shard",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T23:00:05Z",
+            "completed_at": "2026-11-20T23:00:05Z"
+          }
+        ]
+      },
+      {
+        "id": 136623349792,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T23:00:27Z",
+        "completed_at": "2026-11-20T23:00:37Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected source, unit and daemon job",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T23:00:28Z",
+            "completed_at": "2026-11-20T23:00:28Z"
+          }
+        ]
+      },
+      {
+        "id": 136623350206,
+        "name": "Core unit checks${{ (((matrix.node == '22') && ' (Node 22)') || '') }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623350504,
+        "name": "analytics-checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623350525,
+        "name": "workspace-governance-checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623350832,
+        "name": "Integration unit checks${{ (((matrix.node == '22') && ' (Node 22)') || '') }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623351025,
+        "name": "Database checks (${{ matrix.shard }})${{ (((matrix.node == '22') && ' (Node 22)') || '') }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623351171,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623351195,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      },
+      {
+        "id": 136623351675,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:59:00Z",
+        "started_at": "2026-11-20T22:59:00Z",
+        "completed_at": "2026-11-20T22:59:00Z",
+        "steps": []
+      }
+    ],
+    "measurement": {
+      "historical_complete_startup_rounds_attempted": 2,
+      "historical_complete_browser_rounds": 0,
+      "first_observed_failure_window_UTC": [
+        "2026-11-20T21:42:20Z",
+        "2026-11-20T21:43:22Z"
+      ],
+      "diagnostic_failure_window_UTC": [
+        "2026-11-20T21:45:18Z",
+        "2026-11-20T21:46:20Z"
+      ],
+      "first_exact_Eve_error_timestamp": null,
+      "original_startup_budget_ms": 60000,
+      "original_budget_changed": false,
+      "local_red_samples": 1,
+      "local_green_samples": 2,
+      "old_original_suite": {
+        "pass": 6,
+        "fail": 0,
+        "skip": 0
+      },
+      "new_original_suite": {
+        "pass": 7,
+        "fail": 0,
+        "skip": 0
+      }
+    },
+    "root_cause": "The real Eve child changes cwd to .output/eve. The inherited original preload resolved the manifest against process.cwd(), producing .output/eve/.output/mikka-build.json. Original Owner now resolves the fixture root from import.meta.url and adds the cwd/security regression.",
+    "scope": "Current runs execute the real unchanged preload in an atomic Node child with a deliberately synthetic local-fixture manifest. The URLs are parsed by the original guard and never contacted by this child. Original proxy suite uses its own temporary loopback HTTP/WebSocket fixture servers; it is not the product HTTP or Eve runtime.",
+    "current_head_CI_job_conclusions": {
+      "failure": 3,
+      "skipped": 8
+    },
+    "merge_and_postmerge": {
+      "merged": false,
+      "merge_sha": null,
+      "full_build_and_UI_API_DB_readback_verified_here": false,
+      "reason": "Original #2891/#2887 Owner retains Draft PR2969. Full actual build/startup/browser readback is not rerun by this focused source replay."
+    }
+  },
+  "eve_owner_case": {
+    "pr": {
+      "number": 2996,
+      "head": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+      "state": "closed",
+      "merged_at": "2026-11-20T23:10:57Z",
+      "merge_sha": "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33",
+      "body": "## Fix\n\nKeep the native Eve sessions.create contract after the old Mikka send entrypoint was retired. The existing bounded reader accepts zero bytes only on initial session creation, including an empty stream supplied by a proxy. A nonempty body still goes through the same JSON, size and captured-scope checks.\n\nProtected staging reached API/gateway pairing and authentication, then both first native session creates returned 400 before any inference. Reuse the existing malformed/oversized request check to cover the streamed zero-byte create.\n\n## Merge risk\n\nMedium. The fix is in the native ingress used by the official clients. It preserves normal authorization and sending, rejects malformed JSON and changes no stored data. Required CI covers the route regression. After merging, run only the existing deployed release acceptance for send, Stop, settlement and verification. The current production gateway remains on the prior serving release until cutover.\n\nTracks #2869.\n"
+    },
+    "original_owner_comment": {
+      "id": 7052767951,
+      "created_at": "2026-11-20T23:04:13Z",
+      "updated_at": "2026-11-20T23:04:13Z",
+      "url": "https://github.com/aspectly-labs/Mikka/pull/2996#issuecomment-7052767951",
+      "body": "Local acceptance passed on exact head `09e694c3bdd62a2ce5e271a075e9257845f69b0c` using an isolated Linux Node 24 application and PostgreSQL 17. The official Eve client created a session with zero HTTP request bytes. A normal native send streamed first text, and the exact Stop delivery was applied with a cancelled turn after 1.748 seconds. A second native request settled once against its exact short-lived local test grant, correlated to the request ID and session, for 13 synthetic microdollars. The model upstream in this local run was a loopback fixture.\n\nThe initial Node 24 database shard failed when the existing Factory activity HTTP harness tried to bind port 37531, which was already in use. Only the failed jobs and their dependent gate are being retried on the same commit.\n"
+    },
+    "first_remote_failure": {
+      "id": 44830107947,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44830107947",
+      "head_sha": "040362591abbcb95d825311e5577bd27caa92b10",
+      "event": "workflow_dispatch",
+      "run_attempt": 1,
+      "created_at": "2026-11-20T22:34:47Z",
+      "run_started_at": "2026-11-20T22:34:47Z",
+      "updated_at": "2026-11-20T22:43:00Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "first_remote_failure_jobs": [
+      {
+        "id": 136615328275,
+        "name": "deploy-application",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T22:40:48Z",
+        "started_at": "2026-11-20T22:40:53Z",
+        "completed_at": "2026-11-20T22:42:59Z",
+        "steps": [
+          {
+            "number": 18,
+            "name": "Deploy the reviewed public artifacts and verify the selected phase",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T22:42:08Z",
+            "completed_at": "2026-11-20T22:42:56Z"
+          }
+        ]
+      },
+      {
+        "id": 136615330059,
+        "name": "pipeline",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:40:49Z",
+        "started_at": "2026-11-20T22:40:49Z",
+        "completed_at": "2026-11-20T22:40:48Z",
+        "steps": []
+      },
+      {
+        "id": 136615330109,
+        "name": "pipeline-record",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:40:49Z",
+        "started_at": "2026-11-20T22:40:49Z",
+        "completed_at": "2026-11-20T22:40:48Z",
+        "steps": []
+      },
+      {
+        "id": 136615330270,
+        "name": "pipeline-production",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:40:49Z",
+        "started_at": "2026-11-20T22:40:49Z",
+        "completed_at": "2026-11-20T22:40:48Z",
+        "steps": []
+      },
+      {
+        "id": 136615331814,
+        "name": "pipeline-production-record",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:40:49Z",
+        "started_at": "2026-11-20T22:40:49Z",
+        "completed_at": "2026-11-20T22:40:48Z",
+        "steps": []
+      },
+      {
+        "id": 136616299367,
+        "name": "Serving release ${{ needs.deploy-application.outputs.serving-release }}",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:43:00Z",
+        "started_at": "2026-11-20T22:43:00Z",
+        "completed_at": "2026-11-20T22:42:59Z",
+        "steps": []
+      }
+    ],
+    "first_remote_error_code_line": "2026-11-20T22:42:56.2285027Z   code: 'EVE_STAGE_FIXTURES',",
+    "original_PR_CI": {
+      "id": 44831511577,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44831511577",
+      "head_sha": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+      "event": "pull_request",
+      "run_attempt": 2,
+      "created_at": "2026-11-20T22:45:18Z",
+      "run_started_at": "2026-11-20T23:03:53Z",
+      "updated_at": "2026-11-20T23:10:12Z",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "original_PR_CI_attempt1": {
+      "id": 44831511577,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44831511577",
+      "head_sha": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "created_at": "2026-11-20T22:45:18Z",
+      "run_started_at": "2026-11-20T22:45:18Z",
+      "updated_at": "2026-11-20T23:00:12Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "original_PR_CI_attempt1_jobs": [
+      {
+        "id": 136617331627,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:45:19Z",
+        "started_at": "2026-11-20T22:46:34Z",
+        "completed_at": "2026-11-20T22:47:26Z",
+        "steps": []
+      },
+      {
+        "id": 136618296565,
+        "name": "Integration unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:51Z",
+        "completed_at": "2026-11-20T22:55:03Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:48:57Z",
+            "completed_at": "2026-11-20T22:55:01Z"
+          }
+        ]
+      },
+      {
+        "id": 136618296577,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:05Z",
+        "completed_at": "2026-11-20T22:52:15Z",
+        "steps": []
+      },
+      {
+        "id": 136618296582,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:48Z",
+        "completed_at": "2026-11-20T22:51:24Z",
+        "steps": [
+          {
+            "number": 9,
+            "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:49:00Z",
+            "completed_at": "2026-11-20T22:49:00Z"
+          }
+        ]
+      },
+      {
+        "id": 136618296600,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:43Z",
+        "completed_at": "2026-11-20T22:53:51Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:48:46Z",
+            "completed_at": "2026-11-20T22:53:49Z"
+          }
+        ]
+      },
+      {
+        "id": 136618296605,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:53Z",
+        "completed_at": "2026-11-20T22:54:22Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:49:12Z",
+            "completed_at": "2026-11-20T22:54:18Z"
+          }
+        ]
+      },
+      {
+        "id": 136618296623,
+        "name": "Core unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:30Z",
+        "completed_at": "2026-11-20T22:59:02Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:49:27Z",
+            "completed_at": "2026-11-20T22:59:00Z"
+          }
+        ]
+      },
+      {
+        "id": 136618296654,
+        "name": "Database checks (2/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:09Z",
+        "completed_at": "2026-11-20T22:54:07Z",
+        "steps": []
+      },
+      {
+        "id": 136618296676,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:15Z",
+        "completed_at": "2026-11-20T22:52:13Z",
+        "steps": [
+          {
+            "number": 15,
+            "name": "Required DB suites (temporary Postgres 17, no skips)",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T22:49:25Z",
+            "completed_at": "2026-11-20T22:52:09Z"
+          }
+        ]
+      },
+      {
+        "id": 136618296720,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:19Z",
+        "completed_at": "2026-11-20T22:53:33Z",
+        "steps": []
+      },
+      {
+        "id": 136618296745,
+        "name": "Database checks (1/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:30Z",
+        "completed_at": "2026-11-20T22:54:05Z",
+        "steps": []
+      },
+      {
+        "id": 136618296805,
+        "name": "Database checks (4/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:50Z",
+        "completed_at": "2026-11-20T22:55:14Z",
+        "steps": []
+      },
+      {
+        "id": 136618296820,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:48:50Z",
+        "completed_at": "2026-11-20T22:53:07Z",
+        "steps": []
+      },
+      {
+        "id": 136618296881,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:49:01Z",
+        "completed_at": "2026-11-20T22:56:27Z",
+        "steps": []
+      },
+      {
+        "id": 136618296904,
+        "name": "Database checks (3/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:49:01Z",
+        "completed_at": "2026-11-20T22:57:34Z",
+        "steps": []
+      },
+      {
+        "id": 136618297045,
+        "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:37Z",
+        "completed_at": "2026-11-20T22:49:20Z",
+        "steps": []
+      },
+      {
+        "id": 136618298581,
+        "name": "analytics-checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:26Z",
+        "completed_at": "2026-11-20T22:47:26Z",
+        "steps": []
+      },
+      {
+        "id": 136618299313,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T22:47:26Z",
+        "started_at": "2026-11-20T22:47:26Z",
+        "completed_at": "2026-11-20T22:47:26Z",
+        "steps": []
+      },
+      {
+        "id": 136622753950,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T22:57:35Z",
+        "started_at": "2026-11-20T22:57:37Z",
+        "completed_at": "2026-11-20T22:57:57Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected database shard",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T22:57:41Z",
+            "completed_at": "2026-11-20T22:57:41Z"
+          }
+        ]
+      },
+      {
+        "id": 136623368173,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T22:59:03Z",
+        "started_at": "2026-11-20T23:00:03Z",
+        "completed_at": "2026-11-20T23:00:12Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected source, unit and daemon job",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:00:04Z",
+            "completed_at": "2026-11-20T23:00:04Z"
+          }
+        ]
+      }
+    ],
+    "original_PR_CI_attempt2": {
+      "id": 44831511577,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44831511577",
+      "head_sha": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+      "event": "pull_request",
+      "run_attempt": 2,
+      "created_at": "2026-11-20T23:03:54Z",
+      "run_started_at": "2026-11-20T23:03:53Z",
+      "updated_at": "2026-11-20T23:10:12Z",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "original_PR_CI_attempt2_jobs": [
+      {
+        "id": 136625530665,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T23:04:12Z",
+        "completed_at": "2026-11-20T23:09:47Z",
+        "steps": []
+      },
+      {
+        "id": 136625530720,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:47:48Z",
+        "completed_at": "2026-11-20T22:51:24Z",
+        "steps": [
+          {
+            "number": 9,
+            "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:49:00Z",
+            "completed_at": "2026-11-20T22:49:00Z"
+          }
+        ]
+      },
+      {
+        "id": 136625531597,
+        "name": "Integration unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:47:51Z",
+        "completed_at": "2026-11-20T22:55:03Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:48:57Z",
+            "completed_at": "2026-11-20T22:55:01Z"
+          }
+        ]
+      },
+      {
+        "id": 136625531659,
+        "name": "Database checks (4/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:48:50Z",
+        "completed_at": "2026-11-20T22:55:14Z",
+        "steps": []
+      },
+      {
+        "id": 136625531662,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:48:50Z",
+        "completed_at": "2026-11-20T22:53:07Z",
+        "steps": []
+      },
+      {
+        "id": 136625531726,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T23:00:03Z",
+        "completed_at": "2026-11-20T23:00:12Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected source, unit and daemon job",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:00:04Z",
+            "completed_at": "2026-11-20T23:00:04Z"
+          }
+        ]
+      },
+      {
+        "id": 136625531922,
+        "name": "Database checks (3/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:49:01Z",
+        "completed_at": "2026-11-20T22:57:34Z",
+        "steps": []
+      },
+      {
+        "id": 136625531943,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:47:53Z",
+        "completed_at": "2026-11-20T22:54:22Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:49:12Z",
+            "completed_at": "2026-11-20T22:54:18Z"
+          }
+        ]
+      },
+      {
+        "id": 136625532027,
+        "name": "workspace-governance-checks / Workspace governance HTTP (Item 11)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:47:37Z",
+        "completed_at": "2026-11-20T22:49:20Z",
+        "steps": []
+      },
+      {
+        "id": 136625532051,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:49:01Z",
+        "completed_at": "2026-11-20T22:56:27Z",
+        "steps": []
+      },
+      {
+        "id": 136625532094,
+        "name": "Database checks (2/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:03:55Z",
+        "started_at": "2026-11-20T22:48:09Z",
+        "completed_at": "2026-11-20T22:54:07Z",
+        "steps": []
+      },
+      {
+        "id": 136625571094,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:04:01Z",
+        "started_at": "2026-11-20T22:48:19Z",
+        "completed_at": "2026-11-20T22:53:33Z",
+        "steps": []
+      },
+      {
+        "id": 136625575680,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T23:04:01Z",
+        "started_at": "2026-11-20T23:04:01Z",
+        "completed_at": "2026-11-20T22:47:26Z",
+        "steps": []
+      },
+      {
+        "id": 136625579644,
+        "name": "analytics-checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T23:04:02Z",
+        "started_at": "2026-11-20T23:04:02Z",
+        "completed_at": "2026-11-20T23:03:55Z",
+        "steps": []
+      },
+      {
+        "id": 136625586233,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:04:03Z",
+        "started_at": "2026-11-20T22:48:05Z",
+        "completed_at": "2026-11-20T22:52:15Z",
+        "steps": []
+      },
+      {
+        "id": 136625597388,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:04:04Z",
+        "started_at": "2026-11-20T22:47:43Z",
+        "completed_at": "2026-11-20T22:53:51Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:48:46Z",
+            "completed_at": "2026-11-20T22:53:49Z"
+          }
+        ]
+      },
+      {
+        "id": 136625598284,
+        "name": "Core unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:04:04Z",
+        "started_at": "2026-11-20T22:48:30Z",
+        "completed_at": "2026-11-20T22:59:02Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T22:49:27Z",
+            "completed_at": "2026-11-20T22:59:00Z"
+          }
+        ]
+      },
+      {
+        "id": 136625599717,
+        "name": "Database checks (1/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:04:04Z",
+        "started_at": "2026-11-20T22:48:30Z",
+        "completed_at": "2026-11-20T22:54:05Z",
+        "steps": []
+      },
+      {
+        "id": 136625601876,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:04:05Z",
+        "started_at": "2026-11-20T22:46:34Z",
+        "completed_at": "2026-11-20T22:47:26Z",
+        "steps": []
+      },
+      {
+        "id": 136628066516,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:09:47Z",
+        "started_at": "2026-11-20T23:09:49Z",
+        "completed_at": "2026-11-20T23:10:11Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Require every selected database shard",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:09:52Z",
+            "completed_at": "2026-11-20T23:09:52Z"
+          }
+        ]
+      }
+    ],
+    "initial_CI_error": "2026-11-20T22:52:05.7782608Z [db-runner test:factory-activity-http-db stdout]     message: 'Port 37531 is already in use'",
+    "merge": {
+      "sha": "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33",
+      "tree": "90fc0f4d4287b5c1e14c119c692c907a9f48d625",
+      "parents": [
+        "bc8c5b3b7a0240c802f73e0170dc6a8854e072ff",
+        "09e694c3bdd62a2ce5e271a075e9257845f69b0c"
+      ],
+      "files": [
+        "lib/coordinator-submission.ts",
+        "lib/eve/channel-auth.test.ts",
+        "lib/eve/channel.ts"
+      ]
+    },
+    "timeline": [
+      {
+        "id": 36821343070,
+        "event": "merged",
+        "created_at": "2026-11-20T23:10:57Z",
+        "commit_id": "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33"
+      }
+    ],
+    "main_CI": {
+      "id": 44834869958,
+      "html_url": "https://github.com/aspectly-labs/Mikka/actions/runs/44834869958",
+      "head_sha": "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33",
+      "event": "push",
+      "run_attempt": 1,
+      "created_at": "2026-11-20T23:11:00Z",
+      "run_started_at": "2026-11-20T23:11:00Z",
+      "updated_at": "2026-11-20T23:22:34Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    "main_CI_jobs": [
+      {
+        "id": 136628592622,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:11:00Z",
+        "started_at": "2026-11-20T23:11:02Z",
+        "completed_at": "2026-11-20T23:12:02Z",
+        "steps": []
+      },
+      {
+        "id": 136629032193,
+        "name": "Integration unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:18:41Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:13:46Z",
+            "completed_at": "2026-11-20T23:18:37Z"
+          }
+        ]
+      },
+      {
+        "id": 136629032213,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:16:45Z",
+        "steps": []
+      },
+      {
+        "id": 136629032227,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:04Z",
+        "completed_at": "2026-11-20T23:15:01Z",
+        "steps": [
+          {
+            "number": 4,
+            "name": "Verify draft CI fail-closed and ready-for-review triggers",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T23:12:41Z",
+            "completed_at": "2026-11-20T23:12:41Z"
+          },
+          {
+            "number": 10,
+            "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:12:51Z",
+            "completed_at": "2026-11-20T23:12:51Z"
+          }
+        ]
+      },
+      {
+        "id": 136629032231,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:12:10Z",
+        "steps": []
+      },
+      {
+        "id": 136629032276,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:04Z",
+        "completed_at": "2026-11-20T23:19:57Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T23:13:14Z",
+            "completed_at": "2026-11-20T23:19:55Z"
+          }
+        ]
+      },
+      {
+        "id": 136629032286,
+        "name": "Core unit checks (Node 22)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:22:21Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected core tasks through Nx Core",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T23:13:22Z",
+            "completed_at": "2026-11-20T23:22:18Z"
+          }
+        ]
+      },
+      {
+        "id": 136629032311,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:04Z",
+        "completed_at": "2026-11-20T23:18:39Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Run selected integration tasks through Nx Core",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:13:11Z",
+            "completed_at": "2026-11-20T23:18:37Z"
+          }
+        ]
+      },
+      {
+        "id": 136629032530,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:17:01Z",
+        "steps": []
+      },
+      {
+        "id": 136629032532,
+        "name": "Database checks (3/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:19:29Z",
+        "steps": []
+      },
+      {
+        "id": 136629032536,
+        "name": "Database checks (1/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:05Z",
+        "completed_at": "2026-11-20T23:17:41Z",
+        "steps": []
+      },
+      {
+        "id": 136629032556,
+        "name": "Database checks (2/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:04Z",
+        "completed_at": "2026-11-20T23:17:59Z",
+        "steps": []
+      },
+      {
+        "id": 136629032565,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:18Z",
+        "completed_at": "2026-11-20T23:16:33Z",
+        "steps": []
+      },
+      {
+        "id": 136629032606,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:11Z",
+        "completed_at": "2026-11-20T23:16:32Z",
+        "steps": []
+      },
+      {
+        "id": 136629032658,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:16Z",
+        "completed_at": "2026-11-20T23:20:11Z",
+        "steps": []
+      },
+      {
+        "id": 136629032697,
+        "name": "Database checks (4/4) (Node 22)",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:17Z",
+        "completed_at": "2026-11-20T23:17:50Z",
+        "steps": []
+      },
+      {
+        "id": 136629033821,
+        "name": "workspace-governance-checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:03Z",
+        "completed_at": "2026-11-20T23:12:03Z",
+        "steps": []
+      },
+      {
+        "id": 136629034077,
+        "name": "analytics-checks",
+        "status": "completed",
+        "conclusion": "skipped",
+        "created_at": "2026-11-20T23:12:03Z",
+        "started_at": "2026-11-20T23:12:03Z",
+        "completed_at": "2026-11-20T23:12:03Z",
+        "steps": []
+      },
+      {
+        "id": 136632521358,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-11-20T23:20:11Z",
+        "started_at": "2026-11-20T23:20:13Z",
+        "completed_at": "2026-11-20T23:20:22Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Draft PR is not a validated merge candidate",
+            "conclusion": "skipped",
+            "started_at": "2026-11-20T23:20:14Z",
+            "completed_at": "2026-11-20T23:20:14Z"
+          },
+          {
+            "number": 3,
+            "name": "Require every selected database shard",
+            "conclusion": "success",
+            "started_at": "2026-11-20T23:20:14Z",
+            "completed_at": "2026-11-20T23:20:14Z"
+          }
+        ]
+      },
+      {
+        "id": 136633427869,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-20T23:22:21Z",
+        "started_at": "2026-11-20T23:22:23Z",
+        "completed_at": "2026-11-20T23:22:33Z",
+        "steps": [
+          {
+            "number": 2,
+            "name": "Draft PR is not a validated merge candidate",
+            "conclusion": "skipped",
+            "started_at": "2026-11-20T23:22:24Z",
+            "completed_at": "2026-11-20T23:22:24Z"
+          },
+          {
+            "number": 3,
+            "name": "Require every selected source, unit and daemon job",
+            "conclusion": "failure",
+            "started_at": "2026-11-20T23:22:24Z",
+            "completed_at": "2026-11-20T23:22:24Z"
+          }
+        ]
+      }
+    ],
+    "first_failure_binding_note": "The retrieved staging job emits EVE_STAGE_FIXTURES at 22:42:56.2285027Z. The original Owner PR describes zero-byte sessions.create returning HTTP400 before inference. The workflow head is not asserted to be the actual published application source; this report does not expose private release pins or manufacture a byte-level HTTP receipt.",
+    "local_owner_acceptance": {
+      "source": "09e694c3bdd62a2ce5e271a075e9257845f69b0c",
+      "reported_at": "2026-11-20T23:04:13Z",
+      "exact_execution_started_at": null,
+      "local_red_command": null,
+      "local_red_elapsed_seconds": null,
+      "green_command": null,
+      "environment": {
+        "os": "Linux",
+        "node_major": 24,
+        "postgres_major": 17,
+        "model_upstream": "loopback fixture"
+      },
+      "empty_HTTP_request_bytes": 0,
+      "first_native_text_reported": true,
+      "exact_Stop_cancelled_turn_seconds": 1.748,
+      "separate_native_request_settlement": {
+        "synthetic_microdollars": 13,
+        "settlements": 1,
+        "correlated_request_and_session": true
+      },
+      "independently_rerun_by_this_agent": false,
+      "evidence_level": "Original Owner-authored acceptance comment was freshly read; command, exact local RED duration and raw request/response logs are not supplied in that comment."
+    },
+    "PR_CI_job_conclusions_by_attempt": {
+      "1": {
+        "success": 16,
+        "failure": 2,
+        "skipped": 2
+      },
+      "2": {
+        "success": 18,
+        "skipped": 2
+      }
+    },
+    "postmerge_CI_job_conclusions": {
+      "success": 14,
+      "failure": 4,
+      "skipped": 2
+    },
+    "postmerge_CI_limit": "Exact merge9bbe main CI failed existing CI-policy/fixture assertions after accepted Draft policy integration; this is not evidence that the empty-body Eve fix regressed. Root is coordinating the independent integration repair. No full postmerge product acceptance is claimed here.",
+    "ready_to_merge_seconds": null,
+    "ready_to_merge_missing_reason": "The native timeline has a merged event but no ready_for_review event; elapsed Ready time is not estimated from creation."
+  },
+  "new_integration_finding": {
+    "owner_issue": 2997,
+    "owner_pr": 3001,
+    "current_owner_pr_head": "81748ec81cd207c4f2a2e7c83addea50a0794999",
+    "current_owner_changed_files": [
+      ".agents/skills/local-first/SKILL.md",
+      ".github/pull_request_template.md",
+      "AGENTS.md",
+      "CONTRIBUTING.md",
+      "docs/dev-workflow.md",
+      "package.json",
+      "scripts/cloudflare-native-oci.test.mjs",
+      "scripts/dev/local-preflight.mjs",
+      "scripts/dev/local-preflight.test.mjs",
+      "scripts/dev/mark-ready.mjs"
+    ],
+    "failures": [
+      {
+        "path": "scripts/ci-docs-only.test.mjs",
+        "line": 227,
+        "test_name": "blocking CI checks synthetic PR merge candidates once and preserves every main run",
+        "assertion": "assert.match(events, /on:\\n  push:\\n    branches: \\[main\\]\\n  pull_request:\\n  merge_group:/)",
+        "cause": "The text pattern assumes no pull_request types stanza."
+      },
+      {
+        "path": "scripts/ci/draft-ci-policy.test.mjs",
+        "line": 43,
+        "test_name": "local red-green before final CI stays documented",
+        "assertion": "assert.match(docs, /Ready for review/)",
+        "cause": "The literal phrase is absent from the merge's development guide; original Owner PR3001 adds it. Do not duplicate that documentation change."
+      },
+      {
+        "path": "scripts/ci/optimization.test.mjs",
+        "line": 97,
+        "test_name": "the protected parent requires success from selected Analytics work",
+        "assertion": "workflow('ui-policy').jobs['ui-policy'].steps[0]; Object.entries(gate.env)",
+        "cause": "The first step is now the Draft rejection; gate.env is undefined."
+      },
+      {
+        "path": "scripts/ci/select.test.mjs",
+        "line": 147,
+        "test_name": "the actual required gate scripts reject unselected failures and selected skips",
+        "assertion": "block.split('        run: |\\n')[1]; assert(run({}))",
+        "cause": "The parser now selects the first Draft rejection shell block rather than the required-check aggregation block."
+      }
+    ],
+    "owner_overlap": "PR3001 changes no files in these four test paths at the observed head; its dev-workflow addition already supplies Ready for review. Remaining test-fixture/source-integration repair is a candidate for root coordination, not a product regression claim.",
+    "original_owner_repair": {
+      "observed_at": "2026-11-21T00:01:26.946Z",
+      "pr": 2994,
+      "url": "https://github.com/aspectly-labs/Mikka/pull/2994",
+      "head": "40571ce6c780d4044f3c664099e060c857085879",
+      "state": "open",
+      "draft": false,
+      "merged_at": null,
+      "files": [
+        {
+          "path": "scripts/ci-docs-only.test.mjs",
+          "blob": "aea184d6e21cfef460fb73722adac3de47353143",
+          "patch": "@@ -224,7 +224,7 @@ test('a trusted stdin wrapper can import the paired classifier without running i\n test('blocking CI checks synthetic PR merge candidates once and preserves every main run', () => {\n   const source = readFileSync('.github/workflows/ui-policy.yml', 'utf8')\n   const events = source.split('\\npermissions:')[0]\n-  assert.match(events, /on:\\n  push:\\n    branches: \\[main\\]\\n  pull_request:\\n  merge_group:/)\n+  assert.match(events, /on:\\n  push:\\n    branches: \\[main\\]\\n  pull_request:\\n    types: \\[opened, reopened, synchronize, ready_for_review, converted_to_draft\\]\\n  merge_group:/)\n   assert.doesNotMatch(events, /branches-ignore:/)\n   assert.doesNotMatch(source, /github\\.event\\.pull_request\\.head\\.repo\\.full_name != github\\.repository/)\n   assert.match(source, /name: UI policy \\(strict\\)/)"
+        },
+        {
+          "path": "scripts/ci/optimization.test.mjs",
+          "blob": "3e7d1620004385f6bbe71acd47093227bac246ba",
+          "patch": "@@ -86,7 +86,7 @@ test('Analytics reports its real build and browser result without a second queue\n })\n \n test('the protected parent requires success from selected Analytics work', () => {\n-  const gate = workflow('ui-policy').jobs['ui-policy'].steps[0]\n+  const gate = workflow('ui-policy').jobs['ui-policy'].steps.find(step => step.name === 'Require every selected source, unit and daemon job')\n   for (const result of ['success', 'failure', 'cancelled', 'skipped']) {\n     const context = { github: { event_name: 'pull_request' }, needs: {\n       changes: { result: 'success', outputs: { core: 'false', integration: 'false', source: 'false', daemon: 'false', analytics: 'true', db: 'false' } },"
+        },
+        {
+          "path": "scripts/ci/select.test.mjs",
+          "blob": "0111893b6201db0a793b0c48622055ed7111f7fa",
+          "patch": "@@ -4,6 +4,8 @@ import { execFileSync, spawnSync } from 'node:child_process'\n import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'\n import { tmpdir } from 'node:os'\n import { join } from 'node:path'\n+import { runInNewContext } from 'node:vm'\n+import yaml from 'js-yaml'\n import { select, diffRange, area } from './select.mjs'\n import { buildGraph, dbId, sourceId, strictCommand } from './graph.mjs'\n import { selectScripts, shardScripts } from '../run-db-tests.mjs'\n@@ -123,12 +125,17 @@ test('every heavy consumer uses the same trusted triage and required names remai\n   assert.equal(area('apps/mobile/lib/theme.ts'),'mobile')\n })\n \n-test('the actual required gate scripts reject unselected failures and selected skips', () => {\n-  const workflow = readFileSync('.github/workflows/ui-policy.yml','utf8')\n+test('the actual required gate scripts reject drafts, unselected failures and selected skips', () => {\n+  const workflow = yaml.load(readFileSync('.github/workflows/ui-policy.yml','utf8'))\n   const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'ANALYTICS', 'GOVERNANCE']\n   for (const job of ['ui-policy','browser-tests']) {\n-    const block = workflow.split(`\\n  ${job}:\\n`)[1].split(/\\n  [a-z][a-z-]*:\\n/)[0]\n-    const script = block.split('        run: |\\n')[1].split('      - uses:')[0].split('\\n').map(line => line.slice(10)).join('\\n')\n+    const steps = workflow.jobs[job].steps\n+    const draftGate = steps.find(step => step.name === 'Draft PR is not a validated merge candidate')\n+    for (const draft of [true, false]) {\n+      assert.equal(runInNewContext(draftGate.if, { github: { event_name: 'pull_request', event: { pull_request: { draft } } } }), draft)\n+      if (draft) assert.equal(spawnSync('bash', ['-e', '-c', draftGate.run], { env: { PATH: process.env.PATH, GITHUB_STEP_SUMMARY: '/dev/null' } }).status, 1)\n+    }\n+    const script = steps.find(step => step.name?.startsWith('Require every selected ')).run\n     const run = overrides => {\n       const env = {\n         PATH: process.env.PATH,"
+        }
+      ],
+      "status": "Same-root changes exist in original Owner PR. No changes by this agent; independent review/CI/normal merge remain with original Owner and root coordination."
+    },
+    "independent_local_red": {
+      "head": "66fa2b9235784e26656ed293d0842d7a3578aca2",
+      "tree": "5d0dfe85d6fd266176c8db0acdc21e1d26412ed4",
+      "command": [
+        "node",
+        "--test",
+        "scripts/ci-docs-only.test.mjs",
+        "scripts/ci/optimization.test.mjs",
+        "scripts/ci/select.test.mjs"
+      ],
+      "node": "v24.22.3",
+      "dependencies": {
+        "js-yaml": "4.3.2",
+        "nx": "24.0.5",
+        "typescript": "5.9.3"
+      },
+      "started_at": "2026-11-21T00:00:18.687602+00:00",
+      "completed_at": "2026-11-21T00:00:29.851760+00:00",
+      "exit": 1,
+      "elapsed_seconds": 11.153068534,
+      "stdout_sha256": "1e845cafb070f0825cc581f65ff2773da041677014d39b1dcd977ea3414ac4c9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_blobs": {
+        "scripts/ci-docs-only.test.mjs": "8ac52fbeb3440bf5e2f5498be93f0cebb376935c",
+        "scripts/ci/optimization.test.mjs": "8ec1127b6a8e9e7dd9d359de2ceb0d51c3a633d4",
+        "scripts/ci/select.test.mjs": "7e1b7cfb9a86cf7960a16b555eeb18b4880767f1"
+      },
+      "tracked_changed_files": [],
+      "tests": {
+        "total": 51,
+        "passed": 48,
+        "failed": 3,
+        "skipped": 0
+      },
+      "errors": [
+        "old pull_request text regex rejects accepted types stanza",
+        "optimization reads Draft step.env via steps[0], yielding TypeError",
+        "select extracts Draft rejection shell block instead of required aggregation; assert(run({})) fails"
+      ],
+      "all_three_test_files_unchanged": true
+    },
+    "status": "Original Owner PR2994 already fixes all three test contracts at exact40571; this agent stopped before any source mutation. PR3001 owns the Ready documentation addition. Do not create or copy a parallel implementation.",
+    "dependency_preparation": {
+      "initial_attempts": [
+        {
+          "receipt": "ci-contract-red.json",
+          "limitation": "2 intended failures plus select startup failed before tests: missing nx"
+        },
+        {
+          "receipt": "ci-contract-red-complete.json",
+          "limitation": "2 intended failures plus select startup failed before tests: missing typescript"
+        }
+      ],
+      "resolved_versions": {
+        "js-yaml": "4.3.2",
+        "nx": "24.0.5",
+        "typescript": "5.9.3"
+      },
+      "installation_scope": "Ignored worktree symlink and standalone research dependency directory only; root package manifests and lockfile unchanged. Existing TypeScript5.9.3 is reused."
+    }
+  },
+  "cleanup": [
+    {
+      "worktree": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-red",
+      "synthetic_manifest_removed": true,
+      "git_status": ""
+    },
+    {
+      "worktree": "/workspace/scratch/b55cdf575d56/Mikka-b1-preload-green",
+      "synthetic_manifest_removed": true,
+      "git_status": ""
+    }
+  ],
+  "completion_limits": [
+    "Two local source/fixture cases now reproduce RED and repeated GREEN. They do not establish a complete UI/API/DB/readback journey or deployed Eve correctness.",
+    "Original #2973 and #2969 remain unmerged in their original Owner batches. Full current-head CI failures/skips remain reported separately.",
+    "Original #2996 local HTTP/Stop/settlement success is credited to its Owner. Its comment omits a local RED command/time and does not establish postmerge production acceptance.",
+    "B1 is not represented as universally complete solely from these three selected issues. Required protected CI, accepted ownership, full product acceptance and exact postmerge checks remain independent."
+  ]
+}

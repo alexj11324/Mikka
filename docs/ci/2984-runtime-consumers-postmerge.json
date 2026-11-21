@@ -1,0 +1,85 @@
+{
+  "kind": "exact-merged-source-offline-regression",
+  "provenance": "Recovered from the original observed execution output and GitHub commit metadata after the shared execution environment became unavailable; not a rerun.",
+  "source": "ee36d52f3ee391ddd529f1135ff86fa8f55bd99d",
+  "tree": "d4f921a196f355286761770af6383df7574d1817",
+  "parents": [
+    "128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87",
+    "9731a9bc279b40be0b1ddfd2e83a7bb74fed2d90"
+  ],
+  "reviewed_head": "9731a9bc279b40be0b1ddfd2e83a7bb74fed2d90",
+  "changed_files": [
+    {
+      "path": ".github/workflows/README.md",
+      "blob": "8b8f7d82944a3a53b54d71d62e839edebee5054b",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": ".github/workflows/coding-workspace-acceptance.yml",
+      "blob": "ed2634bb7c5f08a3da4b5a74d0892dbe5416799c",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": ".github/workflows/task-secret-acceptance.yml",
+      "blob": "bc5fb61e0b28c29e640bab9abfc52c7fc73a054c",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "blob": "614ac6b7d261f01a79b5bf88aa89faea2051839c",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": "docs/ci/2984-runtime-consumers.json",
+      "blob": "c4d31f1ed4a1733be92903a166f2812e8705afcb",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": "scripts/acceptance/coding-workspace-ci.test.mjs",
+      "blob": "2097bdb7521bb4c53c9b29658371db481f58a0ad",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": "scripts/acceptance/task-secrets-ci.test.mjs",
+      "blob": "4cc8b3b54a43f96ad40660d7d80565bb01a096c5",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "blob": "cc2109dfcef25f372c9dc7254ca5d5c4057a6f80",
+      "matches_reviewed_head": true
+    },
+    {
+      "path": "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "blob": "587cab725daa7c234a9d1e300cbdeefab1d8e7c7",
+      "matches_reviewed_head": true
+    }
+  ],
+  "command": [
+    "node",
+    "--import",
+    "tsx",
+    "--test",
+    "scripts/acceptance/coding-workspace-ci.test.mjs",
+    "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+    "scripts/acceptance/task-secrets-ci.test.mjs"
+  ],
+  "started_at": "2026-11-20T22:55:28.004709+00:00",
+  "completed_at": "2026-11-20T22:55:34.678951+00:00",
+  "wall_seconds": 6.674282523003058,
+  "exit_code": 0,
+  "tests": {
+    "total": 68,
+    "passed": 68,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0
+  },
+  "node_reported_duration_ms": 6473.268393,
+  "log_sha256": "bee6bdadb595ef079203bebd1242d5858110977a971aa950424a71bbccc1d333",
+  "original_local_receipt_sha256": "efaaa322aa4e3f1441fa79a0235bc2857e4236cdf2959d29b2ca3487bbe12115",
+  "limits": [
+    "Offline source/admission regression only, not live model or VM acceptance.",
+    "Original local receipt hash identifies the measured scratch receipt, not the differently formatted recovery document."
+  ]
+}

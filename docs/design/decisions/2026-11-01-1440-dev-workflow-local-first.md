@@ -5,6 +5,7 @@
   speed-up rules into the docs as standing rules and change every old rule
   that conflicts with them.
 - Rule: — (process, not product)
+- Superseded in part by: [2026-11-20-1640](2026-11-20-1640-sdlc-delivery.md) (delivery and retry procedure; preserve normal merge commits and approved in-flight epic batches).
 - Superseded in part by: [2026-11-01-1520-no-browser-tests-in-ci](2026-11-01-1520-no-browser-tests-in-ci.md) (no manual Actions browser run either; GitHub-runner-only suites mean the database CI job)
 - Superseded in part by: [2026-11-01-1545-trunk-based](2026-11-01-1545-trunk-based.md) (rule 5: trunk-based merging replaces integration batches)
 - Superseded in part by: [2026-11-03-2359](2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md) (the issue's owner merges its own PR; the coordinator does not)

@@ -1,0 +1,2355 @@
+{
+  "version": 1,
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "capturedAt": "2026-11-21T00:14:47.410096+00:00",
+  "source": {
+    "sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "tree": "d28479a64b1bb54c13f44c745834cdd0cadda73e",
+    "parents": [
+      "9bbe245ca19d4ac3863cfc75dd47d072ebba1d33",
+      "eebbed5dca0ddba5841ec43d0e870678a1f313f5"
+    ],
+    "html_url": "https://github.com/aspectly-labs/Mikka/commit/6fe25cf9413d4078ce350a97e284c33f1efa9de7"
+  },
+  "repository": {
+    "id": 1427517699,
+    "full_name": "aspectly-labs/Mikka",
+    "owner": {
+      "id": 359279274,
+      "login": "aspectly-labs",
+      "type": "Organization"
+    },
+    "default_branch": "main",
+    "private": false
+  },
+  "scope": "Read-only transfer delta across all 54 main workflows and their identity-bearing callers, deduplicated against every changed-file page of 50 open PRs. No code modification, CI dispatch/retry, merge, credential or publication action.",
+  "denominators": {
+    "workflows": 54,
+    "openPRs": 50,
+    "openPRFileRecords": 2570,
+    "mainRuns": 139,
+    "exactMainPushRuns": 8,
+    "window": {
+      "repository": "aspectly-labs/Mikka",
+      "head_sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "created_from": "2026-11-20T23:27:27Z",
+      "created_to": "2026-11-21T00:09:00Z",
+      "pages": [
+        100,
+        39
+      ],
+      "total_count": 139
+    },
+    "workflowClasses": {
+      "no_active_legacy_identity_admission_found": 17,
+      "existing_official_profile_original_release_owner": 14,
+      "delegated_runtime_transfer_sdlc_008": 3,
+      "in_flight_owner_2994": 6,
+      "original_production_or_finite_acceptance_scope": 13,
+      "new_source_admission_gap_original_publisher_boundary": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "transfer-workspace-local-loop",
+      "disposition": "implemented_by_existing_owners_unmerged",
+      "code": [
+        {
+          "path": ".github/workflows/workspace-governance-acceptance.yml",
+          "line": 82,
+          "condition": "assert.equal(process.env.GITHUB_REPOSITORY, 'alexj11324/Mikka')"
+        }
+      ],
+      "realBefore": {
+        "run": 44836931526,
+        "attempt": 1,
+        "job": 136635588790,
+        "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "firstErrorAt": "2026-11-20T23:28:22.6854508Z",
+        "actual": "aspectly-labs/Mikka",
+        "expected": "alexj11324/Mikka",
+        "stage": "Verify exact hosted checkout, before migrations and HTTP"
+      },
+      "ownerFixes": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "690be94e0af42d4014a836d90bdc849a370521f6",
+          "approach": "Reuse actionsMikkaRepository: immutable repo ID and coherent name/owner pair"
+        },
+        {
+          "pr": 3001,
+          "head": "d44714e5994b93e611372c04e5ea2d1c2dd9b525",
+          "blob": "64e5d1e62f897c13383ff9f52ad2c94549797901",
+          "approach": "Changes old name to current canonical literal; same file/root overlap"
+        }
+      ],
+      "after": [
+        {
+          "pr": 2994,
+          "run": 44839882377,
+          "attempt": 1,
+          "job": 136647099148,
+          "conclusion": "success",
+          "realHTTPstep": 8,
+          "realHTTPstepName": "Run real HTTP Item 11 with its ordinary owner and peer sessions",
+          "realHTTPstepStarted": "2026-11-21T00:01:56Z",
+          "realHTTPstepCompleted": "2026-11-21T00:02:54Z"
+        },
+        {
+          "pr": 3001,
+          "run": 44840080079,
+          "attempt": 1,
+          "job": 136646598262,
+          "conclusion": "success"
+        }
+      ],
+      "scope": "N=1 exact-main before; N=1 job result at each distinct owner PR head. Not an overall-CI pass, postmerge pass, speed comparison or product/browser E2E claim.",
+      "codeLinks": [
+        "https://github.com/aspectly-labs/Mikka/blob/6fe25cf9413d4078ce350a97e284c33f1efa9de7/.github/workflows/workspace-governance-acceptance.yml"
+      ]
+    },
+    {
+      "id": "transfer-overlay-git-fixture",
+      "disposition": "implemented_by_existing_owners_unmerged",
+      "code": [
+        {
+          "path": "scripts/cloudflare-native-oci.test.mjs",
+          "line": 60,
+          "condition": "Fixture URL rewrite is fixed to the legacy private namespace while verifyOverlayMain inherits process.env owner selection"
+        }
+      ],
+      "realBefore": {
+        "run": 44836932644,
+        "attempt": 1,
+        "job": 136635594456,
+        "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "firstFailureAt": "2026-11-20T23:27:45.2858476Z",
+        "error": "CF_OCI_STAGE_OVERLAY_MAIN_FETCH_FAILED",
+        "stage": "Credential-free public source qualification unit test"
+      },
+      "ownerFixes": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "66259e14a83d622e04705f1516e578e7d1793de3",
+          "approach": "Pass explicit fixtureEnv to both original verifier calls; preserve all production checks"
+        },
+        {
+          "pr": 3001,
+          "head": "d44714e5994b93e611372c04e5ea2d1c2dd9b525",
+          "blob": "444219cc712003fef79cecc573d8a8728670a387",
+          "approach": "Same fixture isolation root"
+        }
+      ],
+      "scope": "This is test isolation, not a real private checkout or publication failure. Do not copy private source or rewrite original receipts.",
+      "codeLinks": [
+        "https://github.com/aspectly-labs/Mikka/blob/6fe25cf9413d4078ce350a97e284c33f1efa9de7/scripts/cloudflare-native-oci.test.mjs"
+      ]
+    },
+    {
+      "id": "transfer-edge-selector",
+      "disposition": "implemented_by_existing_owner_2994",
+      "code": [
+        {
+          "path": "scripts/device-gateway/select-release.mjs",
+          "line": 23,
+          "condition": "env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'"
+        }
+      ],
+      "realBefore": [
+        {
+          "workload": "cron",
+          "run": 44836930788,
+          "attempt": 1,
+          "job": 136635586965,
+          "firstErrorAt": "2026-11-20T23:28:46.9947526Z"
+        },
+        {
+          "workload": "device",
+          "run": 44836931255,
+          "attempt": 1,
+          "job": 136635587790,
+          "firstErrorAt": "2026-11-20T23:29:53.2155981Z"
+        }
+      ],
+      "error": "reviewed_main_workflow_required",
+      "ownerFix": {
+        "pr": 2994,
+        "head": "40571ce6c780d4044f3c664099e060c857085879",
+        "path": "scripts/device-gateway/select-release.mjs",
+        "blob": "1147f810169743e559209420822b481c515dcedd"
+      },
+      "scope": "Native main push selectors fail before a deploy; deployment jobs were skipped. Preserve original Cloudflare-authority no-op and publisher ownership.",
+      "codeLinks": [
+        "https://github.com/aspectly-labs/Mikka/blob/6fe25cf9413d4078ce350a97e284c33f1efa9de7/scripts/device-gateway/select-release.mjs"
+      ]
+    },
+    {
+      "id": "draft-policy-integration-tests",
+      "disposition": "separate_existing_owner_contract_drift_not_transfer_identity",
+      "realMainCI": {
+        "run": 44836931244,
+        "attempt": 1,
+        "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7"
+      },
+      "currentOwnerCI": {
+        "pr": 3001,
+        "head": "d44714e5994b93e611372c04e5ea2d1c2dd9b525",
+        "run": 44840080079,
+        "attempt": 1,
+        "job": 136646597669,
+        "failedTests": [
+          "scripts/ci-docs-only.test.mjs:224",
+          "scripts/ci/optimization.test.mjs:88",
+          "scripts/ci/select.test.mjs:126"
+        ]
+      },
+      "ownerFix": {
+        "pr": 2994,
+        "head": "40571ce6c780d4044f3c664099e060c857085879",
+        "sourceJob": 136647098338,
+        "sourceConclusion": "success",
+        "coreJob": 136647098396,
+        "coreConclusion": "success"
+      },
+      "necessaryRefusal": {
+        "run": 44836930995,
+        "attempt": 1,
+        "job": 136635587082,
+        "error": "releaseCheckFailed:ui-policy.yml",
+        "firstErrorAt": "2026-11-20T23:37:36.0993250Z"
+      },
+      "scope": "No duplicate repair. These failures do not establish an Eve/product regression. Daemon release correctly waits for and rejects failing exact-main checks.",
+      "codeLinks": []
+    },
+    {
+      "id": "marketing-public-source-admission",
+      "disposition": "new_gap_original_publisher_boundary_root_triage",
+      "code": [
+        {
+          "path": ".github/workflows/marketing-build.yml",
+          "line": 16,
+          "condition": "github.repository_id == '1427517699' with main and original actor"
+        },
+        {
+          "path": "scripts/cloudflare-marketing-ci.mjs",
+          "lines": [
+            44,
+            46,
+            51,
+            86
+          ],
+          "condition": "Hardcoded legacy public repository, owner ID, workflow ref and Git origin"
+        }
+      ],
+      "nativeRepository": {
+        "id": 1427517699,
+        "full_name": "aspectly-labs/Mikka",
+        "owner": {
+          "id": 359279274,
+          "login": "aspectly-labs",
+          "type": "Organization"
+        },
+        "default_branch": "main",
+        "private": false
+      },
+      "actualPureCounterexample": {
+        "startedAt": "2026-11-21T00:10:54.803077+00:00",
+        "completedAt": "2026-11-21T00:10:54.918018+00:00",
+        "sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "tree": "d28479a64b1bb54c13f44c745834cdd0cadda73e",
+        "node": "v24.22.3",
+        "elapsedSeconds": 0.11455342899989773,
+        "exitCode": 0,
+        "stdoutSha256": "caef2fc9f1513697c47c8dfb53cb73968977e569dc85510dfbee500df136ad2d",
+        "stderrSha256": "958998ffa4a701bce037d1ac158255a52a6c4ffadd792ef154e949ea0c89e0ad",
+        "result": {
+          "kind": "original-pure-function-counterexample",
+          "cases": [
+            {
+              "name": "legacy-control",
+              "accepted": true,
+              "repository": "alexj11324/Mikka"
+            },
+            {
+              "name": "canonical-native-repository-identity",
+              "accepted": false,
+              "error": "MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED",
+              "actual": "aspectly-labs/Mikka",
+              "expected": "alexj11324/Mikka"
+            }
+          ],
+          "existingOfficialHelper": "aspectly-labs/Mikka",
+          "canonicalOriginWithLegacyExpected": false,
+          "globalEnvironmentUnchanged": true,
+          "networkCalls": 0,
+          "privateSourcePin": "synthetic-unit-fixture-not-real-private-source",
+          "dispatch": "synthetic-unit-shape-not-an-actual-dispatch"
+        }
+      },
+      "ownershipCheck": {
+        "openPRs": 50,
+        "fileRecords": 2570,
+        "sameRootFixFound": false,
+        "sameFileOnly": [
+          {
+            "pr": 2839,
+            "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+            "change": "Removes NEXT_TELEMETRY_DISABLED; not an identity repair"
+          }
+        ],
+        "originalPreparationPRs": [
+          2978,
+          2981
+        ]
+      },
+      "minimalReuse": "Reuse existing actionsMikkaRepository for current Actions identity, derive workflow ref and expected origin from that accepted public identity, retain original actor/main/pin checks and original historical receipt bytes. Do not create a second profile or perform any publication.",
+      "scope": "Original pure sourceContext and hasGitHubOrigin executed only. Canonical identity is native metadata; dispatch/run/private pin fields are explicit synthetic unit inputs. No actual marketing dispatch in the 139-run window. No production, secret, model, private checkout or external request was executed.",
+      "codeLinks": [
+        "https://github.com/aspectly-labs/Mikka/blob/6fe25cf9413d4078ce350a97e284c33f1efa9de7/.github/workflows/marketing-build.yml",
+        "https://github.com/aspectly-labs/Mikka/blob/6fe25cf9413d4078ce350a97e284c33f1efa9de7/scripts/cloudflare-marketing-ci.mjs"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "path": ".github/workflows/analytics-ssr.yml",
+      "blob": "3db5d06af81808e30aa078124a3e5b0d74b95c88",
+      "events": [
+        "workflow_call",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "81ffaf8f09085887c53d0a2fe0911286772d1a1b",
+          "status": "modified"
+        },
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "cb791502a193da6ed86121c9ef0ab48990c9a9d6",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/app-icon.yml",
+      "blob": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/browser-gate.yml",
+      "blob": "a648074870b9ef1da109f47eba340a3b37ffdcb3",
+      "events": [
+        "pull_request"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/ci-dependencies.yml",
+      "blob": "265f36f2df15ce7c87748e6281d3f075ed39a8f3",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/ci-selection.yml",
+      "blob": "53a105de008b4c10c071ac6cfa61d2b5106b13b5",
+      "events": [
+        "workflow_call"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/cloud-computer.yml",
+      "blob": "8339856ebe04f5f43ed38cf14e27cd5b20e1053f",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/cloud-services-ci.yml",
+      "blob": "2c2aaee3f6dbff75ef3f8e467cbe94c8fb481c32",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        12,
+        16,
+        44,
+        50,
+        89,
+        99
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/cloudflare-api-image.yml",
+      "blob": "cd3fd311029ee6eaa58b82ab47a4ddb6710f3663",
+      "events": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Official publisher profile already supports canonical ownership. Actual source qualification failure is an environment-contaminated local Git fixture in cloudflare-native-oci.test.mjs; both #2994 and #3001 fix it without changing production verification.",
+      "legacyIdentityLineNumbers": [
+        16,
+        36,
+        95,
+        123,
+        129,
+        168,
+        177
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2908,
+          "head": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+          "blob": "1aee37be7a0c2a5aa477b12e3effe99490852073",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-app-deploy.yml",
+      "blob": "4147ef9d2035e18d3922406af01fcaabc60916da",
+      "events": [
+        "workflow_run",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        56,
+        60,
+        99,
+        107,
+        113,
+        152,
+        163,
+        238,
+        279,
+        287,
+        293,
+        332,
+        354,
+        514,
+        522,
+        528,
+        567,
+        588
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2908,
+          "head": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+          "blob": "10aa687da5f961fa8d53f1f57357030f410ee2ab",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-eve-image.yml",
+      "blob": "86e42170d2edabd1dbf0ce01a5040f4170813868",
+      "events": [
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        54,
+        110
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2908,
+          "head": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+          "blob": "bb6891aff39f05c9347c6dfcc82969d7af311ea9",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-litellm-image.yml",
+      "blob": "ae1d5a8fed827b39dfba192c47962cab09d05540",
+      "events": [
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        34,
+        65
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2908,
+          "head": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+          "blob": "148b4517bf12da61b6f876c33bccf8b3b5378096",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-task-sandbox.yml",
+      "blob": "35934a78878c1869478d988ad66b3008ff6ae86c",
+      "events": [
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        43,
+        97
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2908,
+          "head": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+          "blob": "1cc4129a33ea02be37fa5517f216a81568298869",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/cloudflare-world-deploy.yml",
+      "blob": "e879db24bc41213db25f356cb1ef326844c52776",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        12,
+        16,
+        48,
+        56,
+        62,
+        101,
+        110
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/coding-workspace-acceptance.yml",
+      "blob": "ed2634bb7c5f08a3da4b5a74d0892dbe5416799c",
+      "events": [
+        "workflow_run"
+      ],
+      "classification": "delegated_runtime_transfer_sdlc_008",
+      "explanation": "The three runtime consumers and their shared readers are being handled separately by runtime_review under SDLC-008; no duplicate implementation here.",
+      "legacyIdentityLineNumbers": [
+        13,
+        35
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/coding-workspace-review.yml",
+      "blob": "bfcdf85677863512a1c2bb506516eb485fe71def",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/credential-vault.yml",
+      "blob": "bf6d19c1047c0f76e3a5ca7d632391275375aa1a",
+      "events": [
+        "push",
+        "pull_request"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/desktop-release.yml",
+      "blob": "b8cc92ab8fea32f513c666cd30e62d1fdaf7208a",
+      "events": [
+        "workflow_run",
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        80,
+        200
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "blob": "8743e3cf23cd20e845bf058f645cfb18fcaeec52",
+      "events": [
+        "workflow_call",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No legacy repository admission in the current checks/smoke workflow. The separately retained desktop-delivery/prepare.sh legacy predicate has no workflow or package-script caller in current main; do not present it as a current Desktop CI failure.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "8743e3cf23cd20e845bf058f645cfb18fcaeec52",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/device-gateway.yml",
+      "blob": "c5ed85dba752bf09f2eb515543d072a14a69350e",
+      "events": [
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "in_flight_owner_2994",
+      "explanation": "Main push select-release.mjs rejects canonical name before deciding workload changes. Shared selector and publish guard already repaired in #2994.",
+      "legacyIdentityLineNumbers": [
+        61
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "da56991e994edc5bcb63b54ca64744746b6f11a9",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/e2b-byos.yml",
+      "blob": "f47e498ff7ca99822bf97693a9ff3e45fd9a113e",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "blob": "0a00f0dcfc5faa638c6a5415c1588d5f77f07aef",
+      "events": [
+        "workflow_run",
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        107
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/e2b-runtime-release.yml",
+      "blob": "f7967695ddb2e49c18e71f624d89af5282adc162",
+      "events": [
+        "workflow_call"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        22,
+        208
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "2a43b34e2046eb6e54a095eef5d2314a383d3c13",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/e2b-template.yml",
+      "blob": "db839737589af9bc329e405c8c3c5afeaaabaed0",
+      "events": [
+        "workflow_call"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        27
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/engineering-sandbox.yml",
+      "blob": "0f6c15f6563d62ee1751f0255eac4a66672e257b",
+      "events": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "Only legacy occurrence is an input description. No legacy repository name admission was found in this workflow.",
+      "legacyIdentityLineNumbers": [
+        18
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/factory-visual-evidence-acceptance.yml",
+      "blob": "e3df78b9b2f141e8a8de313a6c74fe30d2a9dbce",
+      "events": [
+        "workflow_run",
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Finite #1783/#1789 acceptance. Original selector requires PR 1789 merge e93c58d23fd2608d664a5cee16218244b2377ab4 to equal source/current main; 6fe cannot satisfy it. Fifteen workflow_run receipts are skipped, not acceptance. Do not expand paid-case authorization.",
+      "legacyIdentityLineNumbers": [
+        30,
+        33,
+        34
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "blob": "9593e0fe726f4b537ff8712d7e3e969f99e6e726",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual protected production acceptance; #2821 changes the same file for retired Vercel removal but does not repair this identity condition. No matching dispatch in the bounded window.",
+      "legacyIdentityLineNumbers": [
+        22,
+        23
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "0a4ffde034cdc435041d0f9a7d58a0a701675d28",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "blob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual protected inspection only; removal already belongs to open #2821. No matching dispatch in the bounded exact-main window.",
+      "legacyIdentityLineNumbers": [
+        21,
+        22
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+          "status": "removed"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+      "blob": "402b01de60f16f041ab9d0bd3b2036ad820e760e",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual cleanup requires refs/heads/ops/1515-1517-acceptance. It is not ordinary PR/main CI and changing its scope would alter original cleanup ownership.",
+      "legacyIdentityLineNumbers": [
+        23
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+      "blob": "bb67205200d6777a626cecc3494762e49d491a5c",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual diagnostic requires refs/heads/ops/1515-1517-acceptance. No ordinary PR/main CI path.",
+      "legacyIdentityLineNumbers": [
+        17
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "blob": "4757d62065017957f6e1e4300ab4695507ce40d8",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual original acceptance branch, with its old exact scope. No ordinary PR/main CI path.",
+      "legacyIdentityLineNumbers": [
+        19,
+        49
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/local-device-node22.yml",
+      "blob": "f68c77281ffed3075ffa96c033fd3c99152e7bc2",
+      "events": [
+        "pull_request",
+        "merge_group",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "4adcafffce76ef5ef305a6f10f5bcfcdfbcde90e",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/marketing-build.yml",
+      "blob": "65c0c71426eb2c210f7c175379bd9032979cd972",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "new_source_admission_gap_original_publisher_boundary",
+      "explanation": "Real source admission counterexample: job admits repository ID 1427517699, then sourceContext rejects canonical public name/owner/workflow ref before credentials. Original runMarketingCi also expects legacy origin. Not repaired by any of the 50 open PRs; route to original publication owner. No actual marketing dispatch observed.",
+      "legacyIdentityLineNumbers": [
+        16,
+        25,
+        57
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/mobile-native.yml",
+      "blob": "d93a0345ad61c2eb14c5da6daa0c5e98ed9a199a",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        49,
+        114
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/mobile-screenshots.yml",
+      "blob": "2fa5e96e2cf1ac64bf18f28439ec41d113387ec2",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "in_flight_owner_2994",
+      "explanation": "Existing #2994 patch uses the established official repository profile; do not duplicate its unpublished branch.",
+      "legacyIdentityLineNumbers": [
+        26,
+        27,
+        96,
+        151,
+        152
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "2a477f085f0bf2281167b039dbd5200375a0b593",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/mobile-update.yml",
+      "blob": "ea9519222df9640d0271240ee81b8eec31be0843",
+      "events": [
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "Existing finite ID/owner profiles retain actor, ref, attempt and receipt checks; publication remains the original owner.",
+      "legacyIdentityLineNumbers": [
+        32,
+        61,
+        90
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2898,
+          "head": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+          "blob": "544d667197d5a6cd2f11eff2abd87d64d49077d3",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+      "blob": "80ae6622725b8bf0ecdcf13eccc09d0c6058df26",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual production model acceptance only; old repository and original issue-link conditions are a finite owner boundary, not an ordinary PR path.",
+      "legacyIdentityLineNumbers": [
+        24,
+        41,
+        54,
+        93,
+        134
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/production-readiness.yml",
+      "blob": "0cd039a6c28eeccf2a417ff4f3e09255b371be29",
+      "events": [
+        "pull_request",
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "PR guard job has no legacy repository admission. Legacy name is confined to manual main readiness / acceptance/proactive-1157-1163 push, before protected production reads.",
+      "legacyIdentityLineNumbers": [
+        42
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/production-smoke.yml",
+      "blob": "6a3d0d5f31ebbc5d945b00c4b0ed49ba908391e8",
+      "events": [
+        "schedule",
+        "deployment_status",
+        "workflow_dispatch"
+      ],
+      "classification": "in_flight_owner_2994",
+      "explanation": "Existing #2994 patch uses the established official repository profile; do not duplicate its unpublished branch.",
+      "legacyIdentityLineNumbers": [
+        54,
+        115,
+        170,
+        224,
+        261
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "9496e692019eaaa061d1c5ee41271ddcb127acb6",
+          "status": "modified"
+        },
+        {
+          "pr": 2966,
+          "head": "53700be31951d96a31f4ca13275fd2f4cfda7718",
+          "blob": "ba0063bc996bd472dab0cba18ef10e0bbe79ca35",
+          "status": "modified"
+        },
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "8eca4410f263e8b1ea80e27326a30e83b0b4d81f",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/project-decisions-acceptance.yml",
+      "blob": "1843a2db2c5336a65bb1afebcb9a766040f7a958",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "Manual production acceptance only; no matching dispatch in the bounded exact-main window.",
+      "legacyIdentityLineNumbers": [
+        20
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/publish-daemon.yml",
+      "blob": "50ff259217a5bba988195d0ca4a41f1d61028c7f",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "existing_official_profile_original_release_owner",
+      "explanation": "The admitted canonical push fails at releaseCheckFailed:ui-policy.yml after waiting for exact-main checks. This is a necessary guard, not a new identity failure.",
+      "legacyIdentityLineNumbers": [
+        39
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "blob": "1b20760141dbc29b5b3652a31605ca0dd51ddb2f",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "PR offline guards are unaffected by this legacy name. Manual main protected production read path remains original owner scope; #2821 same-file change is not a transfer repair.",
+      "legacyIdentityLineNumbers": [
+        45
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "b644743379e577b236a7f42160108987516b2533",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "blob": "afe65413fa476c617b82079809a0046b9a9a5ba9",
+      "events": [
+        "pull_request"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "45b0139e79903fdd056684fb03fe17ee68ef30fa",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "blob": "cf4d84379735f93813f76711450c1709b27150eb",
+      "events": [
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "All affected acceptance/controlled-failure/export jobs are manual production-owner modes. No matching dispatch in the bounded exact-main window.",
+      "legacyIdentityLineNumbers": [
+        55,
+        156,
+        243
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "blob": "fd0c6875045e7eab8add45c126b00feca4aa5ced",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "PR offline guard job has no legacy repository check. Main manual production acceptance retains its issue/window selection and original owner boundary.",
+      "legacyIdentityLineNumbers": [
+        40
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/site-search.yml",
+      "blob": "087fe34c28e7cb5512572961c8a1544345c71a88",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2992,
+          "head": "871a5f59f0f0550f7dcd18ddf7b36f62814eb8a0",
+          "blob": "211cb49af6f7e01b208d9809240a94f23d9c3a81",
+          "status": "modified"
+        },
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "7c02d9ae7c58b932e7a67d8cfa98a803dcdc920a",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "blob": "1677c8ee25b72b1f7b550fee88b0fc5589e15450",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/subagents.yml",
+      "blob": "116080d9d31bf85774dedac96f79a92235575706",
+      "events": [
+        "push",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/suggestions-cron.yml",
+      "blob": "b19e81af65c93d14bd380c2bc9e8437a53c34da7",
+      "events": [
+        "push",
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "in_flight_owner_2994",
+      "explanation": "Main push uses the same device-gateway/select-release.mjs for cron; canonical name refusal and publish guard already repaired in #2994.",
+      "legacyIdentityLineNumbers": [
+        49
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "0720f70f8d9e5e6db195c6953582ddff9d965545",
+          "status": "modified"
+        },
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "b91db6fdd480ae70e57058b51db57627c150d499",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/task-attachment-production.yml",
+      "blob": "fb3a7ff76459ace55a2e90da94f688746b7edf59",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "original_production_or_finite_acceptance_scope",
+      "explanation": "PR guard tests are separate. The legacy predicate is confined to manual main production roundtrip, protected by original issue/release selection.",
+      "legacyIdentityLineNumbers": [
+        30
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/task-secret-acceptance.yml",
+      "blob": "bc5fb61e0b28c29e640bab9abfc52c7fc73a054c",
+      "events": [
+        "workflow_run",
+        "workflow_dispatch"
+      ],
+      "classification": "delegated_runtime_transfer_sdlc_008",
+      "explanation": "The three runtime consumers and their shared readers are being handled separately by runtime_review under SDLC-008; no duplicate implementation here.",
+      "legacyIdentityLineNumbers": [
+        57,
+        80
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "blob": "614ac6b7d261f01a79b5bf88aa89faea2051839c",
+      "events": [
+        "workflow_run"
+      ],
+      "classification": "delegated_runtime_transfer_sdlc_008",
+      "explanation": "The three runtime consumers and their shared readers are being handled separately by runtime_review under SDLC-008; no duplicate implementation here.",
+      "legacyIdentityLineNumbers": [
+        13,
+        35
+      ],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "blob": "e5f2fd0dd1ba74d4a3dfe0a525e3d6ea07fff4f2",
+      "events": [
+        "push",
+        "pull_request",
+        "merge_group",
+        "workflow_dispatch",
+        "schedule"
+      ],
+      "classification": "in_flight_owner_2994",
+      "explanation": "Legacy identity is confined to non-PR Cloud credential OIDC job. #2994 repairs that predicate. Main Source/Core failures are separate stale Draft policy test contracts already repaired in #2994.",
+      "legacyIdentityLineNumbers": [
+        52
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "e1a534079ec6916e45da4555042ea003af2032bf",
+          "status": "modified"
+        },
+        {
+          "pr": 2965,
+          "head": "94c6d2c7074d4d986131ec298700fbb35e1bcc08",
+          "blob": "7089764b7381a80269201e480f30d6b71191e229",
+          "status": "modified"
+        },
+        {
+          "pr": 2963,
+          "head": "16bee4e27102642db36e9916c0e453f5145824ab",
+          "blob": "7089764b7381a80269201e480f30d6b71191e229",
+          "status": "modified"
+        },
+        {
+          "pr": 2961,
+          "head": "1db73c0f783eef028a3190060b45eaeaed9cb5d5",
+          "blob": "f64195e225cc4e631f13ea78e6a1811acd2f0eb5",
+          "status": "modified"
+        },
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "a4141e8e751bcd27f0f5861e6a08aae491b5f97f",
+          "status": "modified"
+        },
+        {
+          "pr": 2825,
+          "head": "dbe28eba7834ae05f8cd192a046b3dee894a09c7",
+          "blob": "242e4839715578210086f2169289f0a72f3e1ba0",
+          "status": "modified"
+        },
+        {
+          "pr": 2821,
+          "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+          "blob": "3e87a980f9c017fd6c1008e13c97e1a4fc3f56ed",
+          "status": "modified"
+        },
+        {
+          "pr": 1859,
+          "head": "9cf3e166def4de9012da07f26d1fed6c31278f2f",
+          "blob": "fda290f841f058624bcfdd7241acc895294bc878",
+          "status": "modified"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "blob": "2f6b102f98c9d0409b68e3b39a04eec8ee9ce3e9",
+      "events": [
+        "pull_request",
+        "workflow_dispatch"
+      ],
+      "classification": "no_active_legacy_identity_admission_found",
+      "explanation": "No old owner/name execution admission found in this workflow. Historical links, synthetic fixtures and Alex actor identity are not transfer defects.",
+      "legacyIdentityLineNumbers": [],
+      "openPRFileOverlaps": []
+    },
+    {
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "blob": "a58ad7918b64eb648bba2c928b40eebb84d72521",
+      "events": [
+        "workflow_call",
+        "push"
+      ],
+      "classification": "in_flight_owner_2994",
+      "explanation": "Main run 44836931526/1 failed at the old name assert before HTTP. #2994 uses the existing coherent official profile helper; #3001 independently changes the literal. Both exact-head PR jobs execute the real HTTP step successfully, although their whole CI runs are not all green.",
+      "legacyIdentityLineNumbers": [
+        82
+      ],
+      "openPRFileOverlaps": [
+        {
+          "pr": 3001,
+          "head": "d44714e5994b93e611372c04e5ea2d1c2dd9b525",
+          "blob": "64e5d1e62f897c13383ff9f52ad2c94549797901",
+          "status": "modified"
+        },
+        {
+          "pr": 2994,
+          "head": "40571ce6c780d4044f3c664099e060c857085879",
+          "blob": "690be94e0af42d4014a836d90bdc849a370521f6",
+          "status": "modified"
+        },
+        {
+          "pr": 2839,
+          "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+          "blob": "a58ad7918b64eb648bba2c928b40eebb84d72521",
+          "status": "modified"
+        }
+      ]
+    }
+  ],
+  "runSummary": {
+    ".github/workflows/production-smoke.yml | deployment_status": {
+      "count": 41,
+      "conclusions": {
+        "skipped": 41
+      }
+    },
+    ".github/workflows/task-secret-acceptance.yml | workflow_run": {
+      "count": 15,
+      "conclusions": {
+        "skipped": 15
+      }
+    },
+    ".github/workflows/factory-visual-evidence-acceptance.yml | workflow_run": {
+      "count": 15,
+      "conclusions": {
+        "skipped": 15
+      }
+    },
+    ".github/workflows/thread-lifecycle-acceptance.yml | workflow_run": {
+      "count": 15,
+      "conclusions": {
+        "skipped": 15
+      }
+    },
+    ".github/workflows/coding-workspace-acceptance.yml | workflow_run": {
+      "count": 15,
+      "conclusions": {
+        "skipped": 15
+      }
+    },
+    ".github/workflows/cloudflare-app-deploy.yml | workflow_dispatch": {
+      "count": 9,
+      "conclusions": {
+        "in_progress": 1,
+        "success": 7,
+        "cancelled": 1
+      }
+    },
+    ".github/workflows/e2b-official-runtime.yml | workflow_run": {
+      "count": 10,
+      "conclusions": {
+        "queued": 1,
+        "success": 9
+      }
+    },
+    ".github/workflows/desktop-release.yml | workflow_run": {
+      "count": 10,
+      "conclusions": {
+        "success": 10
+      }
+    },
+    ".github/workflows/cloudflare-app-deploy.yml | workflow_run": {
+      "count": 1,
+      "conclusions": {
+        "skipped": 1
+      }
+    },
+    ".github/workflows/suggestions-cron.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "failure": 1
+      }
+    },
+    ".github/workflows/device-gateway.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "failure": 1
+      }
+    },
+    ".github/workflows/cloudflare-api-image.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "failure": 1
+      }
+    },
+    ".github/workflows/desktop-release.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "success": 1
+      }
+    },
+    ".github/workflows/workspace-governance-acceptance.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "failure": 1
+      }
+    },
+    ".github/workflows/e2b-official-runtime.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "success": 1
+      }
+    },
+    ".github/workflows/publish-daemon.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "failure": 1
+      }
+    },
+    ".github/workflows/ui-policy.yml | push": {
+      "count": 1,
+      "conclusions": {
+        "failure": 1
+      }
+    }
+  },
+  "openPRs": [
+    {
+      "number": 3001,
+      "title": "feat(dev): Nx-affected local preflight and product acceptance before CI (#2997)",
+      "head": "d44714e5994b93e611372c04e5ea2d1c2dd9b525",
+      "draft": false,
+      "changedFileCount": 11
+    },
+    {
+      "number": 3000,
+      "title": "fix: reuse the verified runtime publication source (#2984)",
+      "head": "275cf937d8de19da2baa761aa3567930b880fe84",
+      "draft": true,
+      "changedFileCount": 9
+    },
+    {
+      "number": 2994,
+      "title": "fix(ci): admit official owners in active repository guards",
+      "head": "40571ce6c780d4044f3c664099e060c857085879",
+      "draft": false,
+      "changedFileCount": 19
+    },
+    {
+      "number": 2992,
+      "title": "docs: unify measured SDLC delivery and merge policy (#2984)",
+      "head": "871a5f59f0f0550f7dcd18ddf7b36f62814eb8a0",
+      "draft": true,
+      "changedFileCount": 22
+    },
+    {
+      "number": 2989,
+      "title": "Add a protected public entry for existing Cloudflare operators",
+      "head": "2b09ed77d66f47540a691e4d53f849646a733d3c",
+      "draft": true,
+      "changedFileCount": 4
+    },
+    {
+      "number": 2977,
+      "title": "feat(settings): P9 personal keyboard shortcuts and row search contract",
+      "head": "8b8e5d8b465e3b1dcfbab39a3022897986fc6878",
+      "draft": false,
+      "changedFileCount": 19
+    },
+    {
+      "number": 2974,
+      "title": "feat(settings): P3 workspace instructions and sharing defaults",
+      "head": "6c84f2c92bc546a2c57b150c1dd7f760b643d16f",
+      "draft": false,
+      "changedFileCount": 52
+    },
+    {
+      "number": 2973,
+      "title": "feat(settings): P5 Git defaults and workspace automatic review configuration",
+      "head": "45144ea3c32bc7d54abc798ec9aba1ff10a2f2e5",
+      "draft": false,
+      "changedFileCount": 64
+    },
+    {
+      "number": 2972,
+      "title": "test: import and sanitize existing agent stream exports (#2885)",
+      "head": "10c610cb5afcb58f7087a0e1214f9b6766737440",
+      "draft": true,
+      "changedFileCount": 22
+    },
+    {
+      "number": 2970,
+      "title": "docs: add independent acceptance runner and checker workflow",
+      "head": "ea3f7db450299bd1531e3bb5cba7bffa37a192f4",
+      "draft": true,
+      "changedFileCount": 17
+    },
+    {
+      "number": 2969,
+      "title": "feat: add isolated local UI fixtures and reproducible screenshots (#2887)",
+      "head": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "draft": true,
+      "changedFileCount": 48
+    },
+    {
+      "number": 2968,
+      "title": "feat(settings): P2 inherited thread behavior and concurrency limits",
+      "head": "80ddaa5ede4fa05642396911c6aa25c389f540a0",
+      "draft": false,
+      "changedFileCount": 25
+    },
+    {
+      "number": 2967,
+      "title": "feat(settings): P6 workspace task label entities and references",
+      "head": "491483c7d8d1a1774a10f5166fb483d888840365",
+      "draft": false,
+      "changedFileCount": 32
+    },
+    {
+      "number": 2966,
+      "title": "feat: internal acceptance flags and offline nightly journeys (#2890)",
+      "head": "53700be31951d96a31f4ca13275fd2f4cfda7718",
+      "draft": true,
+      "changedFileCount": 46
+    },
+    {
+      "number": 2965,
+      "title": "test: exercise external clients through HTTP fakes (#2886)",
+      "head": "94c6d2c7074d4d986131ec298700fbb35e1bcc08",
+      "draft": true,
+      "changedFileCount": 25
+    },
+    {
+      "number": 2964,
+      "title": "ci: require deterministic PR acceptance declarations (#2888)",
+      "head": "316fce4a8ed210f4db179dac3a92daa543c0d4dd",
+      "draft": true,
+      "changedFileCount": 8
+    },
+    {
+      "number": 2963,
+      "title": "test: unify scripted model acceptance at LiteLLM boundary (#2884)",
+      "head": "16bee4e27102642db36e9916c0e453f5145824ab",
+      "draft": true,
+      "changedFileCount": 56
+    },
+    {
+      "number": 2962,
+      "title": "feat(settings): P8 device detail, checkpoints and workspace activity (#2956)",
+      "head": "3879fe1d386bea6480ad4d829dcb4853abe950b2",
+      "draft": false,
+      "changedFileCount": 13
+    },
+    {
+      "number": 2961,
+      "title": "设置页按 Figma 1508:2 对齐视觉",
+      "head": "1db73c0f783eef028a3190060b45eaeaed9cb5d5",
+      "draft": false,
+      "changedFileCount": 58
+    },
+    {
+      "number": 2960,
+      "title": "feat(security): P7 organization DNS, two-factor policy and scoped invites (#2956)",
+      "head": "cb0396c75ec3e2e4d6eac9e21453c0a524b7b0cd",
+      "draft": false,
+      "changedFileCount": 29
+    },
+    {
+      "number": 2959,
+      "title": "feat(mcp): P4 connection state, tools, environments and native OAuth (#2956)",
+      "head": "181c19e525af32481832836d57c3228aeb503d4d",
+      "draft": false,
+      "changedFileCount": 66
+    },
+    {
+      "number": 2958,
+      "title": "feat(settings): P1 registry, typed settings and workspace inheritance (#2956)",
+      "head": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "draft": false,
+      "changedFileCount": 30
+    },
+    {
+      "number": 2946,
+      "title": "refactor(chat): unify the model picker without visual changes (#2916)",
+      "head": "4525fdbcf3f0af509dda23ae40fb905b3e8c68c9",
+      "draft": true,
+      "changedFileCount": 4
+    },
+    {
+      "number": 2920,
+      "title": "docs(rules): R-61 names 开始工作 as the task bar's one action",
+      "head": "9bd78d7e1d3349667363f9485994ad2f12cb488a",
+      "draft": false,
+      "changedFileCount": 1
+    },
+    {
+      "number": 2919,
+      "title": "refactor(chat): share composer state and caller controls (#2915)",
+      "head": "074e022308ff0ec01206bf6903618d82d7eccaa8",
+      "draft": true,
+      "changedFileCount": 17
+    },
+    {
+      "number": 2918,
+      "title": "refactor(chat): route messages through the chat-message slot (#2914)",
+      "head": "2f076bb3fc72e361cb8d55126278753cd9aec756",
+      "draft": true,
+      "changedFileCount": 13
+    },
+    {
+      "number": 2917,
+      "title": "refactor(chat): share ThreadScreen across chat hosts (#2913)",
+      "head": "0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+      "draft": true,
+      "changedFileCount": 12
+    },
+    {
+      "number": 2908,
+      "title": "Document the Task runtime image with OCI metadata",
+      "head": "b7bab1fee6f3d887247d2b7caa88034a0e7d64fa",
+      "draft": false,
+      "changedFileCount": 34
+    },
+    {
+      "number": 2898,
+      "title": "fix(deploy): preserve client and migration compatibility (#2896)",
+      "head": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+      "draft": false,
+      "changedFileCount": 58
+    },
+    {
+      "number": 2882,
+      "title": "feat: hide memory behind the mikka-memory PostHog flag",
+      "head": "80c19f5f01c197dc1f8b546a23b3b98fca4f394c",
+      "draft": false,
+      "changedFileCount": 9
+    },
+    {
+      "number": 2878,
+      "title": "feat: Agent Profile colours are chromatic only",
+      "head": "76965522a887c417dacdbf3e1f0a58d565114116",
+      "draft": false,
+      "changedFileCount": 8
+    },
+    {
+      "number": 2868,
+      "title": "feat: generate conversation titles the way Codex does",
+      "head": "b27baf409df36c35a34202c52be10f60fff582b6",
+      "draft": false,
+      "changedFileCount": 8
+    },
+    {
+      "number": 2867,
+      "title": "docs: record Capy alignment decisions",
+      "head": "325d6b0e5cefcb83fd8a5972c9b0ceeb3726c83a",
+      "draft": false,
+      "changedFileCount": 17
+    },
+    {
+      "number": 2863,
+      "title": "Align settings navigation and authorized MCP execution with Capy",
+      "head": "8ba37459795e75fbfcaf94154a9a1e14d10bf85a",
+      "draft": true,
+      "changedFileCount": 67
+    },
+    {
+      "number": 2839,
+      "title": "chore(skills): vendor Anthropic's frontend-design skill",
+      "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+      "draft": false,
+      "changedFileCount": 989
+    },
+    {
+      "number": 2825,
+      "title": "fix: continue migrating idle status polling to push",
+      "head": "dbe28eba7834ae05f8cd192a046b3dee894a09c7",
+      "draft": true,
+      "changedFileCount": 68
+    },
+    {
+      "number": 2821,
+      "title": "chore: clean up retired Vercel deployment paths",
+      "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+      "draft": true,
+      "changedFileCount": 107
+    },
+    {
+      "number": 2819,
+      "title": "fix(settings): clarify model setup and fallback prerequisites",
+      "head": "40e6653d9a731a2a6f249f9b5310e9d76d66ad14",
+      "draft": true,
+      "changedFileCount": 6
+    },
+    {
+      "number": 2774,
+      "title": "Return the stored Organization Files volume when archiving or unarchiving",
+      "head": "c115a64109ba0c61c93626f5e5828ec037196d91",
+      "draft": false,
+      "changedFileCount": 14
+    },
+    {
+      "number": 2633,
+      "title": "refactor: backport the shared Eve host signer to the pinned Cloud line (G-054)",
+      "head": "8e070a0ccb65ce9dbac33bdc16c4fee40fc8ca2c",
+      "draft": false,
+      "changedFileCount": 6
+    },
+    {
+      "number": 2561,
+      "title": "feat: paginate issue activity history",
+      "head": "427bd30d2adf4a00c616cef95368a4ae12281209",
+      "draft": true,
+      "changedFileCount": 38
+    },
+    {
+      "number": 2414,
+      "title": "i18n: refine Issue timeline copy",
+      "head": "7338ecee053dab47f476ebcb3b5cc4b75143be76",
+      "draft": true,
+      "changedFileCount": 13
+    },
+    {
+      "number": 2400,
+      "title": "feat(desktop): restore saved tabs and navigation",
+      "head": "3ab4f5b2c3c8fa43819b03d82bf28bc595108d51",
+      "draft": true,
+      "changedFileCount": 16
+    },
+    {
+      "number": 1924,
+      "title": "feat(workspaces): task-workspace slot for creation context and fixed ownership (#1659 P0) — resolved onto main",
+      "head": "c695966c91c4642141da74ff22d5d112deb8d856",
+      "draft": true,
+      "changedFileCount": 35
+    },
+    {
+      "number": 1859,
+      "title": "test(collaboration): integrated PG and native credential acceptance (#1849; CI only)",
+      "head": "9cf3e166def4de9012da07f26d1fed6c31278f2f",
+      "draft": true,
+      "changedFileCount": 207
+    },
+    {
+      "number": 1857,
+      "title": "feat: retain source attribution and record real signup conversions",
+      "head": "5a0fbc0e140a963012682469e2741a77ec638aab",
+      "draft": true,
+      "changedFileCount": 7
+    },
+    {
+      "number": 1853,
+      "title": "feat(connections): personal subscriptions and organization model policy (#1849, batch 3)",
+      "head": "672de2559817192f1024f723fa480d23877b775d",
+      "draft": true,
+      "changedFileCount": 121
+    },
+    {
+      "number": 1754,
+      "title": "Code review D: open the browser column beside the review page (#1732 R10b)",
+      "head": "73a617986af401554cf7235028e5e7042b0a7f99",
+      "draft": true,
+      "changedFileCount": 7
+    },
+    {
+      "number": 1746,
+      "title": "[needs TestFlight build] Mobile chat: 添加到对话 in the iOS edit menu",
+      "head": "80b483d52c332b4991eaddfd14103429de008fe0",
+      "draft": true,
+      "changedFileCount": 11
+    },
+    {
+      "number": 1559,
+      "title": "docs(design): 自托管照 LobeHub 来——Mikka 云服务设计（等 Alex 审，先不合）",
+      "head": "804e0571a6d20c62e0be4c19c75d52444067de93",
+      "draft": true,
+      "changedFileCount": 2
+    }
+  ],
+  "explicitNonFindings": [
+    {
+      "path": "scripts/ci/timings.mjs",
+      "reason": "Legacy gh api lookup string is not an owner admission guard. A connector redirect response alone does not prove the original gh CLI fails. No observed collector failure; do not invent a regression."
+    },
+    {
+      "path": "scripts/ci/summary.mjs",
+      "reason": "Uses env.GITHUB_REPOSITORY for actual API paths; canonical context is supported."
+    },
+    {
+      "path": "scripts/acceptance/desktop-delivery/prepare.sh",
+      "reason": "Legacy guard retained in historical delivery tooling; no current workflow/package caller found. Current desktop.yml has no old name admission."
+    },
+    {
+      "path": "scripts/e2b/workspace-ingress-acceptance.mjs",
+      "reason": "Old identity belongs to the ops/self-hosted-vault-closeout-20261108 live E2B mode, not ordinary PR kernel tests."
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs and coding-review.mjs",
+      "reason": "Mikka-handoff is a different repository. Its original scope is not the transferred Mikka identity."
+    },
+    {
+      "path": "scripts/release/* actor checks",
+      "reason": "Alex actor ID 183887963 remains the actual authorized individual; repository owner transfer does not change actor identity."
+    },
+    {
+      "path": "scripts/self-hosted-update-policy.mjs",
+      "reason": "Historical signed stable-update publisher/webhook/OCI scope is outside ordinary PR identity and requires original release-owner treatment. No matching current workflow publisher or webhook sample was observed; image namespace is not inferred from repository transfer."
+    }
+  ],
+  "boundaries": [
+    "No independent unclaimed ordinary PR/test-facility identity repair remains among the audited paths beyond existing #2994/#3001 and separately assigned runtime SDLC-008. This is a scoped finding, not an all-project completion claim.",
+    "The marketing source-admission gap is a real local counterexample; root must resolve original publication ownership before code work.",
+    "Manual production identity predicates listed above are not declared universally correct. They remain outside this ordinary-CI repair scope until their original owner presents an applicable current release/window.",
+    "Skipped workflows and success without publication jobs are not production or product acceptance.",
+    "Owner PR #2994 was still nonterminal and #3001 had the three stale-contract failures at capture; neither is declared merge-ready by this report."
+  ],
+  "rawEvidence": {
+    "workflows-6fe.json": {
+      "sha256": "2aae7879852474efd82c4cfe98be3995ce156fdd420a139d8b5e09872600cd24",
+      "bytes": 122914
+    },
+    "native-evidence.json": {
+      "sha256": "141aae96bae4909773a9bf6551e4eceeee5d48a0a1f26473b5920f578c23f3c6",
+      "bytes": 399235
+    },
+    "open-pr-files.json": {
+      "sha256": "a4210e9b5f5f2b3c63bd8a45445a2b72ffe9abfecc7407333fd7811ef5ae2aab",
+      "bytes": 452805
+    },
+    "marketing-counterexample.json": {
+      "sha256": "62ffc1fe84b689464750b07e33609faec641eb638fd86ec5837afc403628ebe4",
+      "bytes": 3304
+    },
+    "log-evidence.json": {
+      "sha256": "4a70a0103df7f10de8736faca84c5ac27cb46ed59c306fc2e6b970a361099159",
+      "bytes": 5262
+    }
+  },
+  "subsequentMainRefresh": {
+    "observedAt": "2026-11-21T02:02:40.800479+00:00",
+    "earlierTransferInventory": {
+      "sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "workflows": 54,
+      "openPrSample": 50,
+      "capture": "2026-11-21T00:14:47.410096+00:00"
+    },
+    "currentMain": {
+      "sha": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "tree": "ecddff77bd9514b2b8cde2a9b6416d000686eb56",
+      "workflowCount": 54
+    },
+    "workflowNamesUnchanged": true,
+    "changedWorkflowPaths": [
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "beforeBlob": "a648074870b9ef1da109f47eba340a3b37ffdcb3",
+        "afterBlob": "92c06ed07ecc9685483425c6f82b502f8e516541",
+        "ownerPr": 3006,
+        "ownerMergeSha": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited native merge_group/concurrency scoping; still echo-only."
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "beforeBlob": "c5ed85dba752bf09f2eb515543d072a14a69350e",
+        "afterBlob": "da56991e994edc5bcb63b54ca64744746b6f11a9",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "beforeBlob": "2fa5e96e2cf1ac64bf18f28439ec41d113387ec2",
+        "afterBlob": "2a477f085f0bf2281167b039dbd5200375a0b593",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "beforeBlob": "6a3d0d5f31ebbc5d945b00c4b0ed49ba908391e8",
+        "afterBlob": "9496e692019eaaa061d1c5ee41271ddcb127acb6",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "beforeBlob": "b19e81af65c93d14bd380c2bc9e8437a53c34da7",
+        "afterBlob": "0720f70f8d9e5e6db195c6953582ddff9d965545",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "beforeBlob": "e5f2fd0dd1ba74d4a3dfe0a525e3d6ea07fff4f2",
+        "afterBlob": "e1a534079ec6916e45da4555042ea003af2032bf",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "beforeBlob": "a58ad7918b64eb648bba2c928b40eebb84d72521",
+        "afterBlob": "690be94e0af42d4014a836d90bdc849a370521f6",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      }
+    ],
+    "disposition": "Original 54-entry transfer inventory remains a source-bound historical sample. This is a later main-only workflow delta read, not a refreshed claim about all current open PRs. No new workflow was introduced. Original Owner changes are retained; Browser gate still executes an echo and cannot count as browser E2E.",
+    "mutations": "None",
+    "unchangedWorkflowCount": 47,
+    "existingOwnerTransferFixesNowMerged": 6,
+    "ownerBrowserNativeSchedulingFixes": 1,
+    "workflows": [
+      {
+        "path": ".github/workflows/analytics-ssr.yml",
+        "blob": "3db5d06af81808e30aa078124a3e5b0d74b95c88",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/app-icon.yml",
+        "blob": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "blob": "92c06ed07ecc9685483425c6f82b502f8e516541",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 3006,
+        "ownerMerge": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "nativeSchedulingChange": "merge_group checks_requested and event/ref concurrency; remains echo-only, not E2E"
+      },
+      {
+        "path": ".github/workflows/ci-dependencies.yml",
+        "blob": "265f36f2df15ce7c87748e6281d3f075ed39a8f3",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "blob": "53a105de008b4c10c071ac6cfa61d2b5106b13b5",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloud-computer.yml",
+        "blob": "8339856ebe04f5f43ed38cf14e27cd5b20e1053f",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloud-services-ci.yml",
+        "blob": "2c2aaee3f6dbff75ef3f8e467cbe94c8fb481c32",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-api-image.yml",
+        "blob": "cd3fd311029ee6eaa58b82ab47a4ddb6710f3663",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-app-deploy.yml",
+        "blob": "4147ef9d2035e18d3922406af01fcaabc60916da",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-eve-image.yml",
+        "blob": "86e42170d2edabd1dbf0ce01a5040f4170813868",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-litellm-image.yml",
+        "blob": "ae1d5a8fed827b39dfba192c47962cab09d05540",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-task-sandbox.yml",
+        "blob": "35934a78878c1869478d988ad66b3008ff6ae86c",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-world-deploy.yml",
+        "blob": "e879db24bc41213db25f356cb1ef326844c52776",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/coding-workspace-acceptance.yml",
+        "blob": "ed2634bb7c5f08a3da4b5a74d0892dbe5416799c",
+        "originalClassification": "delegated_runtime_transfer_sdlc_008",
+        "classification": "delegated_runtime_transfer_sdlc_008",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/coding-workspace-review.yml",
+        "blob": "bfcdf85677863512a1c2bb506516eb485fe71def",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/credential-vault.yml",
+        "blob": "bf6d19c1047c0f76e3a5ca7d632391275375aa1a",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/desktop-release.yml",
+        "blob": "b8cc92ab8fea32f513c666cd30e62d1fdaf7208a",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/desktop.yml",
+        "blob": "8743e3cf23cd20e845bf058f645cfb18fcaeec52",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "blob": "da56991e994edc5bcb63b54ca64744746b6f11a9",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/e2b-byos.yml",
+        "blob": "f47e498ff7ca99822bf97693a9ff3e45fd9a113e",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "blob": "0a00f0dcfc5faa638c6a5415c1588d5f77f07aef",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/e2b-runtime-release.yml",
+        "blob": "f7967695ddb2e49c18e71f624d89af5282adc162",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/e2b-template.yml",
+        "blob": "db839737589af9bc329e405c8c3c5afeaaabaed0",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/engineering-sandbox.yml",
+        "blob": "0f6c15f6563d62ee1751f0255eac4a66672e257b",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/factory-visual-evidence-acceptance.yml",
+        "blob": "e3df78b9b2f141e8a8de313a6c74fe30d2a9dbce",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "blob": "9593e0fe726f4b537ff8712d7e3e969f99e6e726",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "blob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+        "blob": "402b01de60f16f041ab9d0bd3b2036ad820e760e",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+        "blob": "bb67205200d6777a626cecc3494762e49d491a5c",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "blob": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/local-device-node22.yml",
+        "blob": "f68c77281ffed3075ffa96c033fd3c99152e7bc2",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/marketing-build.yml",
+        "blob": "65c0c71426eb2c210f7c175379bd9032979cd972",
+        "originalClassification": "new_source_admission_gap_original_publisher_boundary",
+        "classification": "new_source_admission_gap_original_publisher_boundary",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "blob": "d93a0345ad61c2eb14c5da6daa0c5e98ed9a199a",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "blob": "2a477f085f0bf2281167b039dbd5200375a0b593",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/mobile-update.yml",
+        "blob": "ea9519222df9640d0271240ee81b8eec31be0843",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "blob": "80ae6622725b8bf0ecdcf13eccc09d0c6058df26",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/production-readiness.yml",
+        "blob": "0cd039a6c28eeccf2a417ff4f3e09255b371be29",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "blob": "9496e692019eaaa061d1c5ee41271ddcb127acb6",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "blob": "1843a2db2c5336a65bb1afebcb9a766040f7a958",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/publish-daemon.yml",
+        "blob": "50ff259217a5bba988195d0ca4a41f1d61028c7f",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "blob": "1b20760141dbc29b5b3652a31605ca0dd51ddb2f",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "blob": "afe65413fa476c617b82079809a0046b9a9a5ba9",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "blob": "cf4d84379735f93813f76711450c1709b27150eb",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "blob": "fd0c6875045e7eab8add45c126b00feca4aa5ced",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/site-search.yml",
+        "blob": "087fe34c28e7cb5512572961c8a1544345c71a88",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "blob": "1677c8ee25b72b1f7b550fee88b0fc5589e15450",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/subagents.yml",
+        "blob": "116080d9d31bf85774dedac96f79a92235575706",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "blob": "0720f70f8d9e5e6db195c6953582ddff9d965545",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/task-attachment-production.yml",
+        "blob": "fb3a7ff76459ace55a2e90da94f688746b7edf59",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "blob": "bc5fb61e0b28c29e640bab9abfc52c7fc73a054c",
+        "originalClassification": "delegated_runtime_transfer_sdlc_008",
+        "classification": "delegated_runtime_transfer_sdlc_008",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "blob": "614ac6b7d261f01a79b5bf88aa89faea2051839c",
+        "originalClassification": "delegated_runtime_transfer_sdlc_008",
+        "classification": "delegated_runtime_transfer_sdlc_008",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "blob": "e1a534079ec6916e45da4555042ea003af2032bf",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "blob": "2f6b102f98c9d0409b68e3b39a04eec8ee9ce3e9",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "blob": "690be94e0af42d4014a836d90bdc849a370521f6",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      }
+    ],
+    "classificationCounts": {
+      "no_active_legacy_identity_admission_found": 17,
+      "existing_official_profile_original_release_owner": 14,
+      "delegated_runtime_transfer_sdlc_008": 3,
+      "merged_original_owner_2994": 6,
+      "original_production_or_finite_acceptance_scope": 13,
+      "new_source_admission_gap_original_publisher_boundary": 1
+    },
+    "ownerMergeOrder": [
+      {
+        "pr": 3006,
+        "merge": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "firstParent": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "changedPaths": 1,
+        "scope": "Native Browser gate scheduling"
+      },
+      {
+        "pr": 3001,
+        "merge": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "firstParent": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "changedPaths": 9,
+        "scope": "Original local-first entry"
+      }
+    ]
+  }
+}

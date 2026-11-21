@@ -188,6 +188,21 @@ deployment/database credentials. Execution changes require independent review;
 unchanged execution still must pass the original SQL admission rules. Neither a
 changed digest nor an already-applied database ledger grants migration permission.
 
+For development diagnosis, keep five different facts separate: the committed
+SQL snapshot, the migration executor and its import/toolchain inputs, backfills,
+the database's historical migration ledger, and that database's actual pending
+set. A source-only comparison can detect executor incompatibility and pin SQL,
+executor and backfill code identities. It does not prove backfill business safety
+or results, historical ledger state, or the pending set without inspecting the
+intended isolated database. Never
+replace an authenticated deployed baseline with the PR base, latest main or an
+unrelated Desktop release. Use the existing private
+[deployment runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/deploy-pipeline.md)
+and verifier, preserving source pins and the distinction between a committed
+bootstrap selection and a previous published manifest. A local diagnostic does
+not authorize deployment or migrate a shared database. Production migration
+and promotion remain with #2897/#1954.
+
 ## What current docs are authoritative?
 
 Read in this order for an active engineering operation: `AGENTS.md`, [documentation index](../README.md), this page, relevant active design/operations references, and **latest main source plus the actual current #1953/#1954 release selection**. Dated audits, archived screenshots, older handoffs and `docs/design/decisions.md` are historical context only. Remove obsolete records once their active references are replaced; preserve current security, migration, recovery and release evidence.

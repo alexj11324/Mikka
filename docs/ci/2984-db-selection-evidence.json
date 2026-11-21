@@ -1,0 +1,380 @@
+{
+  "schema": "sdlc-2984-enrolled-db-selection-v1",
+  "recordedAt": "2026-11-21T04:26:13.000525+00:00",
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "id": "SDLC-014",
+  "pullRequest": "https://github.com/aspectly-labs/Mikka/pull/3012",
+  "branch": "feat/sdlc-2984-db-selection",
+  "scope": {
+    "repository": "aspectly-labs/Mikka",
+    "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+    "head": "bd0a4fabb367406609ca30c87870d25ac10bf75b",
+    "tree": "e1be8274fbd2ce5d52dfaa3f0be1a4d7f3205aea",
+    "changedFiles": [
+      "scripts/ci/select.mjs",
+      "scripts/ci/select.test.mjs"
+    ],
+    "productCodeChanged": false,
+    "workflowOrProtectionChanged": false,
+    "ownerAudit": {
+      "capture": "2026-11-21T04:11:32.067Z",
+      "openPullCount": 57,
+      "changedFileEntries": 2696,
+      "unchangedHeadsReused": 53,
+      "receiptSha256": "09246d826ca33d45a248b911f3240845a552e1ec1b954f6f6300e15deb43b6c5",
+      "result": "No existing same-root repair. Original inventory/trigger/test harness owners retained."
+    }
+  },
+  "cause": "area() recognized application paths and policy paths but treated root DB tests as unknown before the existing Nx result could narrow execution, even when the complete DB inventory and command edges already proved their suite owners.",
+  "change": "Use the original validated DB inventory plus an existing direct DB-task edge only to recognize an otherwise unmapped database test; the original Nx reverse closure still determines execution. No suffix-only eligibility or second mapping/validator.",
+  "sourceOnlyBeforeAfter": {
+    "sampleCount": 1,
+    "candidatePull": 3011,
+    "candidateSource": "304e124c2f1a56a8d88a15c9b8bbed53b02953bc",
+    "candidateTree": "b74481a5c23780579b9cdd4900f3cd592f93551c",
+    "diff": [
+      {
+        "file": "lib/abuse/card.db.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      },
+      {
+        "file": "lib/abuse/card.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      },
+      {
+        "file": "lib/abuse/model-postpay.db.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      },
+      {
+        "file": "tests/billing-history.db.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      },
+      {
+        "file": "tests/credit-shares.db.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      },
+      {
+        "file": "tests/model-order.db.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      },
+      {
+        "file": "tests/personal-workspace.db.test.ts",
+        "status": "M",
+        "mode": "100644",
+        "oldMode": "100644"
+      }
+    ],
+    "beforeSelectorBlob": "97d68a4dede98586bfc3ad3f756444693a41a27a",
+    "afterSelectorSource": "bd0a4fabb367406609ca30c87870d25ac10bf75b",
+    "afterSelectorBlob": "b839f846b3b90cf85c6d9c36192ca500f35bfa30",
+    "denominator": {
+      "dbSuites": 87,
+      "unitTasks": 94
+    },
+    "before": {
+      "full": true,
+      "reasons": [
+        "unmapped file"
+      ],
+      "selectedDbSuites": 87,
+      "selectedUnitTasks": 94
+    },
+    "after": {
+      "full": false,
+      "reasons": [],
+      "dbSuites": [
+        "test:abuse-db",
+        "test:approved-writes-db",
+        "test:bot-threads-db",
+        "test:coordinator-task-binding-db",
+        "test:migration-steps-db",
+        "test:onboarding-db",
+        "test:scope-detachment-db",
+        "test:workspace-admin-db"
+      ],
+      "selectedDbSuites": 8,
+      "selectedUnitTasks": 15,
+      "unitTasks": [
+        {
+          "project": "ci-core-7",
+          "target": "ci-tasks:core-7",
+          "command": "pnpm test:ui-policy",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-10",
+          "target": "ci-tasks:core-10",
+          "command": "pnpm test:i18n",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-11",
+          "target": "ci-tasks:core-11",
+          "command": "pnpm i18n:check",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-14",
+          "target": "ci-tasks:core-14",
+          "command": "pnpm check:agent-definitions",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-15",
+          "target": "ci-tasks:core-15",
+          "command": "pnpm test:release-security",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-20",
+          "target": "ci-tasks:core-20",
+          "command": "pnpm test:execution-rules",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-21",
+          "target": "ci-tasks:core-21",
+          "command": "pnpm test:abuse",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-35",
+          "target": "ci-tasks:core-35",
+          "command": "pnpm test:credentials",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-44",
+          "target": "ci-tasks:core-44",
+          "command": "pnpm test:signup-turnstile",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-52",
+          "target": "ci-tasks:core-52",
+          "command": "pnpm check:agent-ui",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-53",
+          "target": "ci-tasks:core-53",
+          "command": "pnpm test:dev-local",
+          "reason": "Nx reverse dependency"
+        },
+        {
+          "project": "ci-integration-4",
+          "target": "ci-tasks:integration-4",
+          "command": "pnpm test:test-accounts",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-integration-5",
+          "target": "ci-tasks:integration-5",
+          "command": "node scripts/test-auth-email.mjs",
+          "reason": "Nx reverse dependency"
+        },
+        {
+          "project": "ci-integration-19",
+          "target": "ci-tasks:integration-19",
+          "command": "pnpm test:db-runner",
+          "reason": "mandatory source/security policy"
+        },
+        {
+          "project": "ci-core-triage",
+          "target": "ci-tasks:core-triage",
+          "command": "node --test scripts/ci/*.test.mjs",
+          "reason": "mandatory source/security policy"
+        }
+      ],
+      "flags": {
+        "source": true,
+        "daemon": false,
+        "desktop": false,
+        "mobile": false,
+        "analytics": false
+      }
+    },
+    "beforeReceiptSha256": "64d3f77e81f2230e8f9e4d56cd1b6765d637863d3b5dfd27c9766ecf824b7d6f",
+    "afterReceiptSha256": "9071113283bc89aecd451102824798d03a4f7edf80540251c2f616437ceea707",
+    "boundary": "The original production select export at the fixed new SHA processes the original seven-file diff and graph built from the unchanged real 304e source. This is a source-only selection measurement, not execution of the selected DB suites, CI runtime savings, a full local check or browser acceptance.",
+    "elapsedCiSavingClaimed": false
+  },
+  "validation": {
+    "red": {
+      "source": "deeb0e6cca9a9e1a29d671d1d58d966db736bf25",
+      "tree": "83524e4ce285c502ff075cb5bd7b73be3d80a101",
+      "node": "v24.22.3",
+      "pnpm": "10.34.3",
+      "stage": {
+        "stage": "selector-red",
+        "command": [
+          "node",
+          "--test",
+          "scripts/ci/select.test.mjs"
+        ],
+        "startedAt": "2026-11-21T04:19:26.861472+00:00",
+        "exit": 1,
+        "wallSeconds": 12.04541268399771,
+        "finishedAt": "2026-11-21T04:19:38.907338+00:00",
+        "logs": {
+          "stdout": "734af7a646ec593fd66775fb054b32fa63d445f7108bdf820a597e29e0fa3fed",
+          "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "counts": {
+        "tests": 32,
+        "pass": 31,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "expectedFailure": "The only failing test asserts that the real seven-file enrolled fixture change must not force full selection; old production returns true instead of false.",
+      "receiptSha256": "5adb6291626198a70b4c8ed9c0df0ed9904e921ca066b46e18f3047b4572d89f",
+      "sourceCleanAfter": true
+    },
+    "green": {
+      "source": "bd0a4fabb367406609ca30c87870d25ac10bf75b",
+      "tree": "e1be8274fbd2ce5d52dfaa3f0be1a4d7f3205aea",
+      "node": "v24.22.3",
+      "pnpm": "10.34.3",
+      "stage": {
+        "stage": "ci-and-local-selector",
+        "command": [
+          "node",
+          "--test",
+          "scripts/ci/apt-mirrors.test.mjs",
+          "scripts/ci/bootstrap.test.mjs",
+          "scripts/ci/dependency-cache.test.mjs",
+          "scripts/ci/draft-ci-policy.test.mjs",
+          "scripts/ci/frozen-inventory.test.mjs",
+          "scripts/ci/optimization.test.mjs",
+          "scripts/ci/private-runner-placement.test.mjs",
+          "scripts/ci/run-units.test.mjs",
+          "scripts/ci/select.test.mjs",
+          "scripts/ci/summary.test.mjs",
+          "scripts/ci/timings.test.mjs",
+          "scripts/ci/vercel-workflow-inventory.test.mjs",
+          "scripts/run-db-tests.test.mjs",
+          "scripts/ci-docs-only.test.mjs",
+          "scripts/dev/local-preflight.test.mjs"
+        ],
+        "startedAt": "2026-11-21T04:21:49.913404+00:00",
+        "exit": 0,
+        "wallSeconds": 14.764208345997758,
+        "finishedAt": "2026-11-21T04:22:04.677908+00:00",
+        "logs": {
+          "stdout": "403728b9d384bd127e037a3f7936e20d5ac60b767eb52e748cee2cf6f5a0ecc4",
+          "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "counts": {
+        "tests": 144,
+        "pass": 144,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "receiptSha256": "2e923c53c8e0b90f61309bc83338145e788031cd15b6e42732e689eb3ca7b300",
+      "sourceCleanAfter": true,
+      "sourceInputs": {
+        "scripts/ci/apt-mirrors.test.mjs": "3229f337f7d4ec66a0a748f9d5676bf8e36c5754",
+        "scripts/ci/bootstrap.test.mjs": "c245c49b970dc2cc565f673f1af827964fdd2870",
+        "scripts/ci/dependency-cache.test.mjs": "f8aa72f9fba6a87af2d0abe8259bb1ea160e543e",
+        "scripts/ci/draft-ci-policy.test.mjs": "5c68d0018c9586ce6889391aa3b8840dc5459089",
+        "scripts/ci/frozen-inventory.test.mjs": "a40dd6461f5137a2ab0239b245c9b3feada451bf",
+        "scripts/ci/optimization.test.mjs": "3e7d1620004385f6bbe71acd47093227bac246ba",
+        "scripts/ci/private-runner-placement.test.mjs": "f4cef967ea240104dcf5965dc60414f93dccae8a",
+        "scripts/ci/run-units.test.mjs": "c5d0e2c6bc76ea27f993286b7981e9c043b7966f",
+        "scripts/ci/select.test.mjs": "55829343c227118e9d3137fb676b24ab338df7e1",
+        "scripts/ci/summary.test.mjs": "f4b369b3221d8bd427c4880d935d2aae0c1c3f79",
+        "scripts/ci/timings.test.mjs": "c25e2fa84af49eab8ac77566b2c9e5743fd8bcd4",
+        "scripts/ci/vercel-workflow-inventory.test.mjs": "e81c0e339d6aa52650c7e6401d69b1e255af69f0",
+        "scripts/run-db-tests.test.mjs": "ddb514fac4bb28a4b7070406391e771df6284d8c",
+        "scripts/ci-docs-only.test.mjs": "aea184d6e21cfef460fb73722adac3de47353143",
+        "scripts/dev/local-preflight.test.mjs": "f3b66aa24a46e774986c5b8361ce0ca1130fe1eb",
+        "scripts/ci/select.mjs": "b839f846b3b90cf85c6d9c36192ca500f35bfa30",
+        "scripts/ci/graph.mjs": "640c97ef1327ba7e8b2ada4ba397b507b9fb382a",
+        "scripts/ci/tasks.json": "b576cb22b2fa57494ecf65576ea25cb48cd86ed8",
+        "scripts/run-db-tests.mjs": "b282c0f05b5dbc94181c6260df85914f045e1934",
+        "scripts/ci/frozen-inventory.mjs": "f33f3360bcc61838035b08f735daef55c94ad72d",
+        "scripts/ci-docs-only.mjs": "061fc3c63ba89fba911bd83247bedc79118927f7",
+        "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+        "pnpm-lock.yaml": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+        ".github/workflows/ui-policy.yml": "e1a534079ec6916e45da4555042ea003af2032bf"
+      }
+    },
+    "lint": {
+      "source": "bd0a4fabb367406609ca30c87870d25ac10bf75b",
+      "command": [
+        "/workspace/scratch/b55cdf575d56/Mikka-db-selection/node_modules/.bin/oxlint",
+        "--deny-warnings",
+        "scripts/ci/select.mjs",
+        "scripts/ci/select.test.mjs"
+      ],
+      "version": "Version: 1.89.0",
+      "startedAt": "2026-11-21T04:24:35.305632+00:00",
+      "finishedAt": "2026-11-21T04:24:35.477382+00:00",
+      "wallSeconds": 0.17173118199934834,
+      "exit": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "ownPlan": {
+      "source": "bd0a4fabb367406609ca30c87870d25ac10bf75b",
+      "stage": {
+        "stage": "local-plan",
+        "command": [
+          "pnpm",
+          "local:plan",
+          "--base=59b7682fa34f80f402367d2bb40141034c9cf9fd"
+        ],
+        "startedAt": "2026-11-21T04:22:04.678439+00:00",
+        "exit": 0,
+        "wallSeconds": 9.303985689999536,
+        "finishedAt": "2026-11-21T04:22:13.982854+00:00",
+        "logs": {
+          "stdout": "f8c7b40b3f68e5da16fb3847893154c1e2d4aa2b8200cb42c381e13f47d50b08",
+          "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "full": true,
+      "reasons": [
+        "global configuration, schema, policy or security input"
+      ],
+      "selectedDbSuiteCount": 87,
+      "sourceClean": true
+    }
+  },
+  "preserved": [
+    "Complete DB inventory is validated before every selection and again by the original DB runner.",
+    "Unknown/non-enrolled paths and missing direct suite-edge proof remain full.",
+    "Missing source nodes, unresolved imports, failed Nx graph resolution, deletions/renames and nonregular or changed modes retain full coverage.",
+    "Global configuration, helpers, security, forced/unsupported events and frozen-policy fallback retain original full coverage.",
+    "Migration changes retain the entire DB inventory.",
+    "All eight actual reverse-dependent DB suites remain, including five source-contract callers beyond the three directly named owners.",
+    "Source checks and all original unconditional credential/release/security policies remain.",
+    "Original local-first actual evidence, Draft fail-closed aggregate, protected CI, normal merge and exact-main validation remain required."
+  ],
+  "remaining": {
+    "fullLocalCheck": "Not executed on this SHA. Targeted 144/144 and lint are not the full pnpm check.",
+    "independentReview": "Pending exact-head Spec/Standards review.",
+    "protectedCI": "PR remains Draft; no expensive selected protected-CI success claimed.",
+    "mergeSha": null,
+    "postmergeVerification": null,
+    "twoBrowserJourneys": "Not part of this source-only selector repair; D remains separately owned."
+  }
+}
