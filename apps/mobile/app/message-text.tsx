@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
-import { NavBar } from '@/components/NavBar'
+import { NavBar, underBar } from '@/components/NavBar'
 import { heldMessage, subscribeHeldMessage } from '@/lib/message-actions'
 import { colors, font } from '@/lib/theme'
 
@@ -15,7 +15,7 @@ export default function MessageText() {
     <View style={styles.screen}>
       <NavBar title="选择文本" />
       <TextInput value={text} onChangeText={() => {}} multiline showSoftInputOnFocus={false} autoFocus
-        scrollEnabled contextMenuHidden={false} style={styles.text} />
+        scrollEnabled contextMenuHidden={false} {...(underBar as object)} style={styles.text} />
     </View>
   )
 }

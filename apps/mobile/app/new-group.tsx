@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { GlassButton } from '@/components/GlassButton'
 import { Check, X } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
-import { NavBar } from '@/components/NavBar'
+import { NavBar, underBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -75,7 +75,7 @@ export default function NewGroup() {
       <NavBar fade={false} title={words.title}
         left={{ icon: 'xmark', label: mobileMessages.Common.cancel, disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
         right={{ icon: 'checkmark', label: busy ? mobileMessages.Common.loading : words.create, disabled: !ready || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
-      <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
+      <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" {...underBar} contentContainerStyle={styles.body}>
         <Field style={styles.field}>
           <TextInput editable={!busy && problem !== 'unconfirmed'} value={title} onChangeText={setTitle} placeholder={words.name} placeholderTextColor={colors.secondary} maxLength={200} autoFocus
             style={styles.input} accessibilityLabel={words.name} />
