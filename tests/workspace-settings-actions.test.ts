@@ -6,6 +6,9 @@ import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { teams } from '../lib/db/team-schema'
 import { tokenWorkspace } from '../lib/tokens/principal'
+import { captureFixtureLiveEffects } from './support/live-runtime'
+
+const scheduledLive = captureFixtureLiveEffects()
 
 class WorkspaceError extends Error { constructor(readonly code: string) { super(code) } }
 const calls: Array<[string, ...unknown[]]> = []
@@ -101,7 +104,7 @@ before(async () => {
   teamActions = await import('../app/actions/teams')
 })
 
-function reset() { calls.length = 0; workspaceContextCalls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined }
+function reset() { calls.length = 0; workspaceContextCalls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined; scheduledLive.length = 0 }
 const relevant = () => calls.filter(([name]) => name !== 'currentWorkspaceActor')
 
 test('updateWorkspace delegates the real slug change and audit context to one backend transaction', async () => {

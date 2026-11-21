@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
+import { before, beforeEach, mock, test } from 'node:test'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { coordinatorEvents, coordinatorMessages, coordinatorSessions } from '../db/schema'
 import { peerCoordinatorMessageEvent, userMessageEvent } from '../coordinator-events'
 import { promptMessages, type StoredMessage } from './context'
 import { actingContext } from '../activity-actor'
+import { captureFixtureLiveEffects } from '../../tests/support/live-runtime'
+
+const scheduledLive = captureFixtureLiveEffects()
+beforeEach(() => { scheduledLive.length = 0 })
 
 // Exercises actual event persistence/take/MCP consumers against a SQL-shaped
 // in-memory transport. It neither imports a real Pool nor starts services.
