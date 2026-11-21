@@ -17,6 +17,23 @@ const env = () => ({ GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOS
   EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: String(run.id), EXPECTED_UPSTREAM_RUN_ATTEMPT: String(run.run_attempt),
   GITHUB_TOKEN: 'private-credential-sentinel' })
 const expected = () => expectedRelease(env(), event())
+
+test('the shared release guard admits the transferred official repository with coherent immutable identity', () => {
+  const repository = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274, login: 'aspectly-labs' } }
+  const current = { ...structuredClone(run), event: 'workflow_run', repository, head_repository: structuredClone(repository) }
+  const context = { ...env(), GITHUB_REPOSITORY: repository.full_name, GITHUB_REPOSITORY_ID: String(repository.id),
+    GITHUB_REPOSITORY_OWNER_ID: String(repository.owner.id) }
+  const source = expectedRelease(context, { workflow_run: current })
+  assert.equal(source.sourceCommit, SHA)
+  assert.doesNotThrow(() => assertReleaseIdentity(source, workflow, current))
+  for (const mutate of [value => { value.repository.id++ }, value => { value.head_repository.id++ },
+    value => { value.repository.owner.id = 183887963 }, value => { value.head_repository.full_name = 'alexj11324/Mikka' }]) {
+    const bad = structuredClone(current); mutate(bad)
+    assert.throws(() => expectedRelease(context, { workflow_run: bad }), /thread_lifecycle_ci:trigger/)
+    assert.throws(() => assertReleaseIdentity(source, workflow, bad), /thread_lifecycle_ci:upstream/)
+  }
+})
+
 function jobs(validated = true) {
   const names = ['test', 'check', validated ? 'validate / build' : 'validate', 'await-web', 'subscriptions',
     validated ? 'publish / deploy' : 'publish', 'cleanup']
