@@ -11,7 +11,7 @@ import { accountUpdateSchema, isDuplicateAliasError, isToolkitSlug, TOOLKIT_SLUG
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, encodeComposioFlow } from '@/lib/composio-flow'
 import { listComposioPages } from '@/lib/composio-pagination'
-import { assertCatalogToolkit, composioToolkitLister } from '@/lib/plugins/catalog'
+import { assertCatalogToolkit, composioToolkitLister, composioToolkitRetriever } from '@/lib/plugins/catalog'
 import { PluginError } from '@/lib/plugins/contracts'
 
 const accountIdSchema = z.string().trim().min(1).max(255)
@@ -86,7 +86,7 @@ async function handlePOST(request: Request) {
     const toolkit = 'toolkit' in parsed.data ? parsed.data.toolkit : replacing!.toolkit.slug
     // A new connection must be a store toolkit with Composio-managed auth.
     // Reconnecting an existing account remains possible during catalog outages.
-    if ('toolkit' in parsed.data) await assertCatalogToolkit(composioToolkitLister(composio), toolkit)
+    if ('toolkit' in parsed.data) await assertCatalogToolkit(composioToolkitLister(composio), toolkit, 'managed', composioToolkitRetriever(composio))
     const composioSession = await composio.create(session.user.id)
     const connection = await composioSession.authorize(toolkit)
     if (!connection.redirectUrl) return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })

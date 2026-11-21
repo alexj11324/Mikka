@@ -188,6 +188,20 @@ test('store lists every Composio toolkit but local ones and own integrations, in
   await assert.rejects(assertCatalogToolkit(async () => pages[0], 'own_keys'), /integrationToolkitNotSupported/)
   await assertCatalogToolkit(async () => pages[0], 'slack')
   await assertCatalogToolkit(async () => pages[0], 'dcr_app')
+  // #1920: a bulk list with reduced auth metadata does not veto a toolkit the
+  // detail record verifies. 'dev_app' is oauthSetupRequired in the list but the
+  // project manages it — admitted, and the cached store entry then agrees.
+  resetStoreCatalogCache()
+  const verified = { slug: 'dev_app', name: 'DEV_APP', composio_managed_auth_schemes: ['OAUTH2'], auth_schemes: ['OAUTH2'] }
+  await assertCatalogToolkit(async () => pages[0], 'dev_app', 'managed', async () => verified)
+  let patchCheck = 0
+  assert.equal((await listStoreCatalog(async () => pages[Math.min(patchCheck++, 1)])).apps.find(app => app.id === 'dev_app')!.connect, 'managed')
+  // Detail disagreeing with the asked kind, a failing detail read, and a slug
+  // the store does not carry all stay refusals — never an admit.
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'dev_app', 'credentials', async () => verified), /integrationToolkitNotSupported/)
+  resetStoreCatalogCache()
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'dev_app', 'managed', async () => { throw new Error('detail down') }), /integrationToolkitNotSupported/)
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'not_in_store', 'managed', async () => verified), /integrationToolkitNotSupported/)
   // A failed read is not kept.
   resetStoreCatalogCache()
   await assert.rejects(listStoreCatalog(async () => { throw new Error('down') }))

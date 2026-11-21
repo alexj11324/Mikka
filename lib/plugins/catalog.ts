@@ -41,6 +41,8 @@ type RawToolkit = {
 type RawPage = { items: RawToolkit[]; next_cursor?: string | null }
 /** The one call the store needs: `composio.getClient().toolkits.list`. */
 export type ToolkitLister = (query: { sort_by: 'usage'; limit: number; cursor?: string }) => Promise<RawPage>
+/** A toolkit's own detail record (`composio.getClient().toolkits.retrieve`). */
+export type ToolkitRetriever = (slug: string) => Promise<RawToolkit>
 
 export const SECTION_SIZE = 12
 const PAGE_LIMIT = 1000
@@ -132,9 +134,33 @@ export function composioToolkitLister(client: { getClient: () => { toolkits: { l
   return query => client.getClient().toolkits.list(query as never, { signal: AbortSignal.timeout(10_000) }) as Promise<RawPage>
 }
 
-/** A new connection must be a store app that connects that way. */
-export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed') {
-  if (!(await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === kind)) throw new PluginError('integrationToolkitNotSupported', 400)
+/** The real Composio client's per-toolkit detail read, with a timeout. */
+export function composioToolkitRetriever(client: { getClient: () => { toolkits: { retrieve: (slug: string, query?: never, options?: { signal?: AbortSignal }) => Promise<unknown> } } }): ToolkitRetriever {
+  return slug => client.getClient().toolkits.retrieve(slug, undefined, { signal: AbortSignal.timeout(10_000) }) as Promise<RawToolkit>
+}
+
+/** A detail-verified kind is kept on the cached entry so the store and the admission check agree until the next list read. */
+function patchCachedConnect(id: string, kind: ConnectKind) {
+  if (!cached) return
+  cached = { at: cached.at, value: cached.value.then(catalog => ({ ...catalog, apps: catalog.apps.map(app => app.id === id ? { ...app, connect: kind } : app) })) }
+}
+
+/**
+ * A new connection must be a store app that connects that way. The bulk list
+ * can carry reduced auth metadata — a missing managed-schemes field is not
+ * proof a project cannot manage the toolkit — so when the list does not show
+ * the kind, the toolkit's own detail record is the admission check (#1920).
+ * A detail read that fails or disagrees is an explicit refusal, never an admit.
+ */
+export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed', verify?: ToolkitRetriever) {
+  const app = (await listStoreCatalog(list)).apps.find(app => app.id === id)
+  if (app?.connect === kind) return
+  if (app && verify) {
+    try {
+      if (connectKind(await verify(id)) === kind) { patchCachedConnect(id, kind); return }
+    } catch { /* the detail read failed: refuse below rather than pretend support */ }
+  }
+  throw new PluginError('integrationToolkitNotSupported', 400)
 }
 
 /** Whether an app needs no connection at all (its tools run on the person's id alone). */
