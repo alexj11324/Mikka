@@ -113,10 +113,13 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
     .where(and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .orderBy(desc(pendingActions.createdAt)).limit(MAX_PENDING)
   return rows.flatMap<PendingActionView>(row => {
-    if (row.action === 'credential_operation' || row.action === 'browser_operation') {
+    if (row.action === 'browser_operation') {
       if (Date.now() - row.createdAt.getTime() > 5 * 60_000) return []
-      return [{ id: row.id, action: row.action, input: { summary: row.input.summary, origin: row.input.origin, operation: row.input.operation, description: row.action === 'credential_operation' ? 'The page stays hidden until entered login fields are absent. This does not confirm authentication.' : undefined }, context: null, status: row.status, createdAt: row.createdAt.toISOString() }]
+      return [{ id: row.id, action: row.action, input: { summary: row.input.summary, origin: row.input.origin, operation: row.input.operation }, context: null, status: row.status, createdAt: row.createdAt.toISOString() }]
     }
+    // Historical credential_operation approval rows are never shown: a saved
+    // login is the consent, and its running receipt is not an approval card.
+    if (row.action === 'credential_operation') return []
     if (row.action === APP_TOOL_ACTION) return appToolCallSchema.safeParse(row.input).success ? [{ id: row.id, action: APP_TOOL_ACTION, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
     // A repository push card from before decision 2026-11-01-1215 is no longer shown: pushing needs no approval (decision 2026-11-02-1600).
     if (!isApprovalAction(row.action)) return []

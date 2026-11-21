@@ -92,7 +92,7 @@ test('a committed same-owner list event removes the card without resending a dec
   assert.equal(reads, before + 1); assert.ok(!container.textContent?.includes('Frozen proposal')); assert.equal(decisions, 0)
 })
 test('a server five-minute deadline rechecks once despite a slow client clock, and does not extend approval', async () => {
-  items = [{ ...proposal(), action: 'credential_operation', input: { summary: 'Credential approval', origin: 'https://example.invalid', operation: 'fill' }, createdAt: '2099-01-01T00:00:00.000Z' }]
+  items = [{ ...proposal(), action: 'browser_operation', input: { summary: 'Credential approval', origin: 'https://example.invalid', operation: 'fill' }, createdAt: '2099-01-01T00:00:00.000Z' }]
   serverNow = '2099-01-01T00:04:59.000Z'
   await render(); assert.ok(container.textContent?.includes('Credential approval'))
   const before = reads, socketCount = sockets.length, tickets = ticketReads
@@ -112,7 +112,7 @@ test('a response belonging to another signed-in user is never rendered under the
 
 test('a slow initial pending read does not swallow the final same-expiry authoritative read', { timeout: 6_000 }, async () => {
   const started = performance.now(), epoch = Date.parse('2099-01-01T00:00:00.000Z'), expiresAfter = 2_000
-  const expiring: PendingActionView = { ...proposal(), action: 'credential_operation', input: { summary: 'Slow credential approval', origin: 'https://example.invalid', operation: 'fill' }, createdAt: new Date(epoch + expiresAfter - 5 * 60_000).toISOString() }
+  const expiring: PendingActionView = { ...proposal(), action: 'browser_operation', input: { summary: 'Slow credential approval', origin: 'https://example.invalid', operation: 'fill' }, createdAt: new Date(epoch + expiresAfter - 5 * 60_000).toISOString() }
   const observations: number[] = []
   pendingReply = async () => {
     if (performance.now() - started < 600) await new Promise(resolve => setTimeout(resolve, 450))

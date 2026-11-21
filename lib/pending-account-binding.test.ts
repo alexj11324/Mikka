@@ -42,7 +42,6 @@ stub('./composio.ts', {
     return actionError ? { error: actionError } : { data: { summary: 'event' }, accountId: args[3] } },
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
-stub('./cloud-computer/credential-reviews.ts', { executeCredentialOperation: async (...args: unknown[]) => { reviews.push(['credential', ...args.slice(1)]); return { data: {} } } })
 stub('./cloud-computer/action-reviews.ts', { executeApprovedBrowserAction: async (...args: unknown[]) => { reviews.push(['browser', ...args.slice(1)]); return { data: {} } } })
 const appCalls: unknown[][] = []
 stub('./app-tools-server.ts', { executeAppToolCall: async (_client: unknown, userId: string, call: { toolkit: string }, accountId: string | null) => { appCalls.push([userId, call.toolkit, accountId]); return { successful: true, data: {} } } })
@@ -108,16 +107,16 @@ test('a model-selected account is frozen in the proposal', async () => {
   assert.equal(row.connectedAccountId, 'selected-account')
 })
 
-test('computer and credential reviews retain their own approval authority without a Composio account', async () => {
+test('a browser review retains its approval authority; a credential review row is no longer an approval', async () => {
   calls.length = 0; reviews.length = 0
-  for (const [action, kind] of [['credential_operation', 'credential'], ['browser_operation', 'browser']]) {
-    for (const approve of [true, false]) {
-      row = { id: 'review', action, input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
-      const result = await actions.decidePendingAction('u', 'review', approve)
-      assert.equal(result.status, approve ? 'done' : 'declined')
-      assert.deepEqual(reviews.at(-1), [kind, 'u', { summary: 'Review' }, approve])
-    }
+  for (const approve of [true, false]) {
+    row = { id: 'review', action: 'browser_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
+    const result = await actions.decidePendingAction('u', 'review', approve)
+    assert.equal(result.status, approve ? 'done' : 'declined')
+    assert.deepEqual(reviews.at(-1), ['browser', 'u', { summary: 'Review' }, approve])
   }
+  row = { id: 'review', action: 'credential_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
+  await assert.rejects(actions.decidePendingAction('u', 'review', true), /pendingActionUnavailable/)
   assert.deepEqual(calls, [])
 })
 

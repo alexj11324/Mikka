@@ -21,7 +21,7 @@ export async function loadPendingActionPage(ownerId: string): Promise<PendingAct
 }
 
 export function pendingActionExpiresAt(item: Pick<PendingActionView, 'action' | 'createdAt'>) {
-  const ttl = ['credential_operation', 'browser_operation'].includes(item.action) ? 5 * 60_000 : PENDING_ACTION_TTL_MS
+  const ttl = item.action === 'browser_operation' ? 5 * 60_000 : PENDING_ACTION_TTL_MS
   return new Date(Date.parse(item.createdAt) + ttl).toISOString()
 }
 

@@ -48,7 +48,7 @@ export async function fillCredential(pool: Pool, lease: string, options: { kms?:
     const common = { userId: caller.userId, workspaceId: caller.workspaceId, botId: caller.botId, subagentId: caller.subagentId, origin: context.origin, loaderId: observed.loaderId, permissionAction: 'computer_use' as const }
     assertCredentialPageBinding({ ...common, targetId: target.targetId, epoch: observed.epoch, permissionVersion: observed.permissionVersion, expiresAt: target.expiresAt }, { ...common, targetId: bound.targetId, epoch: bound.epoch, permissionVersion: bound.permissionVersion })
     if (target.origin !== context.origin) throw new CredentialError('credential_denied', 404)
-    const credential = (await client.query(`SELECT s.*,c.username FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.id=$1 AND c.user_id=$2 AND c.origin=$3 AND c.revoked_at IS NULL AND c.unattended_allowed=true FOR UPDATE OF c`, [context.credentialId, context.userId, context.origin])).rows[0]
+    const credential = (await client.query(`SELECT s.*,c.username FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.id=$1 AND c.user_id=$2 AND c.origin=$3 AND c.revoked_at IS NULL FOR UPDATE OF c`, [context.credentialId, context.userId, context.origin])).rows[0]
     if (!credential || typeof target.credentialRevision !== 'string' || target.credentialRevision !== credential.nonce || target.expiresAt <= Date.now()) throw new CredentialError('credential_denied', 404)
     // A failed or timed-out external request can have taken effect. Never
     // imply that retrying a new lease is safe once gateway I/O has begun.

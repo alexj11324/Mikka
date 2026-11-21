@@ -39,14 +39,14 @@ before(async()=>{
  await pool.query(`CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text DEFAULT 'allow',version bigint DEFAULT 0,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
  CREATE TABLE agent_kit_heads(owner_id text,bot_id uuid,workspace_id uuid,external_write_permissions jsonb DEFAULT '{}',external_write_policy_version bigint DEFAULT 0);
  CREATE TABLE pending_actions(id uuid PRIMARY KEY,"botId" uuid,"userId" text NOT NULL,action text NOT NULL,input jsonb NOT NULL,status text DEFAULT 'pending',"createdAt" timestamptz DEFAULT now(),"decidedAt" timestamptz,result jsonb,error text);
- CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,unattended_allowed boolean,revoked_at timestamptz);
+ CREATE TABLE credentials(id uuid PRIMARY KEY,user_id text,origin text,username text,revoked_at timestamptz);
  CREATE TABLE credential_secrets(credential_id uuid PRIMARY KEY,nonce text);`)
  await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)',[botId,actor.userId,actor.workspaceId,'Fixture'])
  await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_id,workspace_id) VALUES($1,$2,$3)',[actor.userId,botId,actor.workspaceId])
  await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)',[actor.workspaceId])
  await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,true)',[actor.workspaceId,actor.userId,randomUUID(),'isolated-test-machine','running'])
  await pool.query(`INSERT INTO bot_subagents(id,"ownerId","workspaceId","botId",task,status,epoch,"targetId") VALUES($1,$2,$3,$4,'Open details','running',1,'chromium-target')`,[subagentId,actor.userId,actor.workspaceId,botId])
- await pool.query('INSERT INTO credentials VALUES($1,$2,$3,$4,true,NULL)',[credentialId,actor.userId,target.origin,'saved-user'])
+ await pool.query('INSERT INTO credentials VALUES($1,$2,$3,$4,NULL)',[credentialId,actor.userId,target.origin,'saved-user'])
  await pool.query('INSERT INTO credential_secrets VALUES($1,$2)',[credentialId,'secret-version-1'])
  mock.module('@/lib/subscription-runtime',{namedExports:{authorizeSubscriptionWorkspace:async(owner:string,workspace:string)=>{if(owner!==actor.userId || workspace!==actor.workspaceId)throw Error('not authorized')}}})
  mock.module('./runtime',{namedExports:{
@@ -76,7 +76,7 @@ before(async()=>{
 beforeEach(async()=>{
  if(!enabled)return
  effects=0;mode='success';receipt=new Map();executableInputs=new Map();leaseCalls=0;submissions=0;loginMode='session_applied'
- await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,epoch=1,"targetId"='chromium-target';UPDATE pending_actions SET status='declined' WHERE status IN ('running','pending');UPDATE agent_kit_heads SET external_write_permissions='{}',external_write_policy_version=0;UPDATE workspace_computer_policies SET permission='allow',version=0,external_write_permissions='{}',external_write_policy_version=0;UPDATE credentials SET unattended_allowed=true,revoked_at=NULL;UPDATE credential_secrets SET nonce='secret-version-1'`)
+ await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL,epoch=1,"targetId"='chromium-target';UPDATE pending_actions SET status='declined' WHERE status IN ('running','pending');UPDATE agent_kit_heads SET external_write_permissions='{}',external_write_policy_version=0;UPDATE workspace_computer_policies SET permission='allow',version=0,external_write_permissions='{}',external_write_policy_version=0;UPDATE credentials SET revoked_at=NULL;UPDATE credential_secrets SET nonce='secret-version-1'`)
 })
 after(async()=>{if(enabled){console.log(`Retained unattended DB schema: ${schema}`);globalThis.fetch=realFetch;await pool.end();await admin.end()}})
 async function propose(effect:BrowserEffect='browse') {return browserAction(pool,actor,botId,subagentId,{action:'click',x:20,y:40},'Open the requested control',observation(),judgment(effect))}
@@ -122,7 +122,7 @@ test('#438 mutation lifecycle: kept only while executable; scrubbed on done, dec
  assert.equal(left.rowCount,0,'no terminal row keeps a mutation')
  // list endpoint and audit event expose summary-level fields only; errors are fixed codes
  const src=await readFile(new URL('../pending-actions.ts',import.meta.url),'utf8'),list=await readFile(new URL('../pending-action-store.ts',import.meta.url),'utf8')
- assert.match(src,/row\.action === 'credential_operation' \|\| row\.action === 'browser_operation' \? \{ summary/)
+ assert.match(src,/row\.action === 'browser_operation' \? \{ summary/)
  assert.match(list,/input: \{ summary: row\.input\.summary, origin: row\.input\.origin, operation: row\.input\.operation/)
 })
 test('default allow: with no workspace policy row every effect, payment and sending included, runs with no human approval',{skip:!enabled},async()=>{
@@ -169,7 +169,7 @@ test('stale observations resume observation, unknown outcomes are not silently r
  assert.equal(row.status,'needs_you');assert.ok(row.activeActionId);assert.equal(effects,0)
 })
 test('a saved same-owner/site unattended grant reuses a login without an approval card',{skip:!enabled},async()=>{
- const result=await proposeLogin(pool,{...actor,botId,subagentId},target,'login')
+ const result=await proposeLogin(pool,{...actor,botId,subagentId},target)
  assert.equal(result.status,'session_applied');assert.equal(leaseCalls,1)
  const row=(await pool.query('SELECT * FROM bot_subagents WHERE id=$1',[subagentId])).rows[0]
  assert.equal(row.status,'running');assert.equal(row.activeActionId,null)
@@ -180,14 +180,12 @@ test('a saved same-owner/site unattended grant reuses a login without an approva
  assert.equal(approvals.rowCount,0)
 })
 test('ambiguous, revoked, foreign and denied login grants cannot fill credentials',{skip:!enabled},async()=>{
- await pool.query('UPDATE credentials SET unattended_allowed=false')
- assert.equal((await proposeLogin(pool,{...actor,botId,subagentId},target,'login')).status,'needs_login');assert.equal(leaseCalls,0)
- await pool.query('UPDATE credentials SET unattended_allowed=true,revoked_at=now()')
- assert.equal((await proposeLogin(pool,{...actor,botId,subagentId},target,'login')).status,'needs_login');assert.equal(leaseCalls,0)
+ await pool.query('UPDATE credentials SET revoked_at=now()')
+ assert.equal((await proposeLogin(pool,{...actor,botId,subagentId},target)).status,'needs_login');assert.equal(leaseCalls,0)
  await pool.query('UPDATE credentials SET revoked_at=NULL')
- assert.equal((await proposeLogin(pool,{...actor,userId:'bob',botId,subagentId},target,'login')).status,'needs_login');assert.equal(leaseCalls,0)
+ assert.equal((await proposeLogin(pool,{...actor,userId:'bob',botId,subagentId},target)).status,'needs_login');assert.equal(leaseCalls,0)
  await pool.query(`UPDATE workspace_computer_policies SET permission='deny'`)
- await assert.rejects(proposeLogin(pool,{...actor,botId,subagentId},target,'login'));assert.equal(leaseCalls,0)
+ await assert.rejects(proposeLogin(pool,{...actor,botId,subagentId},target));assert.equal(leaseCalls,0)
 })
 test('machine allocation does not hold a SQL connection while the provider is creating it',{skip:!enabled},async()=>{
  const single=new Pool({connectionString:database,options:`-c search_path=${schema}`,max:1,connectionTimeoutMillis:1000})
@@ -205,7 +203,7 @@ test('saved login covers guarded fill and one same-document submission, never tw
  loginMode='guarded'
  globalThis.fetch=(async(input:any)=>{assert.equal(String(input),'https://owned-broker.invalid/credentials/continue');return Response.json({resumed:true,operation:'submit'})}) as typeof fetch
  try {
-  const result=await proposeLogin(pool,{...actor,botId,subagentId},target,'login')
+  const result=await proposeLogin(pool,{...actor,botId,subagentId},target)
   assert.equal(result.status,'resumed');assert.equal(leaseCalls,1);assert.equal(submissions,1)
   const pending=await pool.query(`SELECT 1 FROM pending_actions WHERE action='credential_operation' AND status='pending'`)
   assert.equal(pending.rowCount,0)
@@ -213,10 +211,10 @@ test('saved login covers guarded fill and one same-document submission, never tw
 })
 test('two saved accounts require a concrete account choice instead of selecting a random login',{skip:!enabled},async()=>{
  const second=randomUUID()
- await pool.query('INSERT INTO credentials VALUES($1,$2,$3,$4,true,NULL)',[second,actor.userId,target.origin,'second-account'])
+ await pool.query('INSERT INTO credentials VALUES($1,$2,$3,$4,NULL)',[second,actor.userId,target.origin,'second-account'])
  await pool.query('INSERT INTO credential_secrets VALUES($1,$2)',[second,'second-version'])
  try {
-  const result=await proposeLogin(pool,{...actor,botId,subagentId},target,'login')
+  const result=await proposeLogin(pool,{...actor,botId,subagentId},target)
   assert.equal(result.status,'needs_login');assert.equal(leaseCalls,0);assert.equal(submissions,0)
  } finally {await pool.query('UPDATE credentials SET revoked_at=now() WHERE id=$1',[second])}
 })

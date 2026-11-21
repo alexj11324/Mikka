@@ -97,7 +97,7 @@ export class CredentialStore {
     await this.authorize(caller)
     origin = canonicalOrigin(origin)
     if (canonicalOrigin(target.origin) !== origin || target.expiresAt < Date.now() + 5000) throw denied()
-    const rows = (await this.pool.query(`SELECT c.id,s.nonce FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.user_id=$1 AND c.origin=$2 AND ($3::text IS NULL OR c.username=$3) AND c.revoked_at IS NULL AND c.unattended_allowed=true ORDER BY c.last_used_at DESC NULLS LAST,c.created_at DESC LIMIT 2`, [caller.userId, origin, username ?? null])).rows
+    const rows = (await this.pool.query(`SELECT c.id,s.nonce FROM credentials c JOIN credential_secrets s ON s.credential_id=c.id WHERE c.user_id=$1 AND c.origin=$2 AND ($3::text IS NULL OR c.username=$3) AND c.revoked_at IS NULL ORDER BY c.last_used_at DESC NULLS LAST,c.created_at DESC LIMIT 2`, [caller.userId, origin, username ?? null])).rows
     // Never choose a different account silently when several logins exist.
     if (rows.length !== 1 || expected && (rows[0].id !== expected.credentialId || rows[0].nonce !== expected.revision)) return { status: 'needs_login' as const, origin }
     const value = nonce()

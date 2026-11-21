@@ -32,7 +32,7 @@ export async function login(caller: BrowserCaller, site: string, submittedUserna
   const target: BrowserTarget = await resolveCredentialBrowser(caller)
   if (!caller.subagentId || !target.observedInputs?.length || target.origin !== origin) throw new CredentialError()
   const { proposeCredentialOperation } = await import('@/lib/cloud-computer/credential-reviews')
-  return proposeCredentialOperation(credentialStore.pool, caller, target, 'login', { submittedUsername, forcePassword: options?.forcePassword })
+  return proposeCredentialOperation(credentialStore.pool, caller, target, { submittedUsername, forcePassword: options?.forcePassword })
 }
 
 export async function resolveCredentialBrowser(caller: BrowserCaller) {

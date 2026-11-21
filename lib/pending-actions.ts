@@ -23,22 +23,22 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       .set({ status: approve ? 'running' : 'declined', decidedAt: new Date() })
       .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
       .returning()
-    if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== 'credential_operation' && row.action !== APP_TOOL_ACTION)) throw new ActionFailureError('pendingActionUnavailable')
+    if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== APP_TOOL_ACTION)) throw new ActionFailureError('pendingActionUnavailable')
     await pendingActionsChanged(executor, row.id, userId)
-    if (!approve && row.action !== 'browser_operation' && row.action !== 'credential_operation') {
+    if (!approve && row.action !== 'browser_operation') {
       await recordCoordinatorEvent(executor, actionDecidedEvent(row, { status: 'declined', error: null, outcome: {} }, { botId: row.botId }))
       return null
     }
     return { ...row, action: row.action } as const
   }
-  // A plain decline and its notification can commit together. Browser and
-  // credential reviews still see the claimed decision before their own cleanup.
+  // A plain decline and its notification can commit together. Browser
+  // reviews still see the claimed decision before their own cleanup.
   const row = approve ? await claim(db) : await db.transaction(claim)
   if (!row) return { status: 'declined' as const, error: null }
 
-  if ((row.action === 'browser_operation' || row.action === 'credential_operation') && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
+  if (row.action === 'browser_operation' && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
     await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))
-    if (row.action === 'browser_operation') await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
+    await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
     throw new ActionFailureError('pendingActionUnavailable')
   }
   let status: 'done' | 'failed' | 'declined' | 'running'
@@ -51,10 +51,8 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     status = 'failed'
     error = blocked
   } else {
-    const result = (row.action === 'browser_operation' || row.action === 'credential_operation')
-      ? row.action === 'credential_operation'
-        ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
-        : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
+    const result = row.action === 'browser_operation'
+      ? await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
       : row.action === APP_TOOL_ACTION
         ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId ?? null)
         : !row.connectedAccountId
@@ -69,7 +67,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
   }
   await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
-  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
+  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
   return { status, error }
 }
 

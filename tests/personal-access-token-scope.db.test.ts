@@ -78,7 +78,7 @@ test('API requests stay in their effective workspace on thread, evidence, propos
     const artifact = randomUUID(), proposal = randomUUID(), message = randomUUID()
     await pool.query(`INSERT INTO artifacts (id,"userId","workspaceId",kind,title) VALUES ($1,$2,$3,'markdown','From a client')`, [artifact, owner, personal.id])
     await pool.query(`INSERT INTO artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES ($1,$2,1,'inline','# Notes','sha',7,'Client')`, [randomUUID(), artifact])
-    await pool.query(`INSERT INTO pending_actions (id,"userId",action,input) VALUES ($1,$2,'credential_operation',$3)`, [proposal, owner, { summary: 'Sign in', origin: 'https://example.invalid', operation: 'login' }])
+    await pool.query(`INSERT INTO pending_actions (id,"userId",action,input) VALUES ($1,$2,'browser_operation',$3)`, [proposal, owner, { summary: 'Sign in', origin: 'https://example.invalid', operation: 'login' }])
     await pool.query(`INSERT INTO coordinator_messages (id,"userId",position,message) VALUES ($1,$2,1,'{"role":"assistant"}')`, [message, owner])
     const reach = async () => {
       const threads = (await call(list.GET, '/api/mobile/threads', {})).body.threads.map((item: { id: string }) => item.id)
@@ -264,7 +264,7 @@ test('API requests stay in their effective workspace on thread, evidence, propos
     const [own, others] = [randomUUID(), randomUUID()]
     const input = { summary: 'Sign in', origin: 'https://example.invalid', operation: 'login' }
     for (const [id, botId] of [[own, ownBot], [others, otherBot]]) {
-      await pool.query(`INSERT INTO pending_actions (id,"userId","botId",action,input) VALUES ($1,$2,$3,'credential_operation',$4)`, [id, owner, botId, input])
+      await pool.query(`INSERT INTO pending_actions (id,"userId","botId",action,input) VALUES ($1,$2,$3,'browser_operation',$4)`, [id, owner, botId, input])
     }
     const listed = await call(listRoute.GET, '/api/pending-actions', {})
     assert.deepEqual(listed.body.map((item: { id: string }) => item.id).sort(), [own])

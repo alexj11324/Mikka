@@ -29,7 +29,7 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
           return 'waiting'
         }
         const {executeCredentialOperation}=await import('@/lib/cloud-computer/credential-reviews')
-        const outcome=await executeCredentialOperation(pool,actor.userId,previous.input,true)
+        const outcome=await executeCredentialOperation(pool,actor.userId,previous.input)
         return 'error' in outcome?'waiting':'running'
       }
       if(previous?.action==='browser_operation' && previous.status==='running') {

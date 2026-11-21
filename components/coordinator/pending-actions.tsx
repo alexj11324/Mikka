@@ -68,9 +68,9 @@ export function PendingActions() {
     {data?.items.filter(item => !pendingActionExpired(item, data)).map(item => {
       const input = item.input
       const email = item.action === 'send_email'
-      const browser = item.action === 'browser_operation' || item.action === 'credential_operation'
+      const browser = item.action === 'browser_operation'
       const appTool = item.action === 'app_tool_call'
-      const title = item.action === 'browser_operation' || item.action === 'credential_operation' ? String(input.summary ?? '') : item.action === 'app_tool_call' ? String(input.name ?? input.tool ?? '') : t(item.action)
+      const title = item.action === 'browser_operation' ? String(input.summary ?? '') : item.action === 'app_tool_call' ? String(input.name ?? input.tool ?? '') : t(item.action)
       return <li key={item.id} className="flex flex-col gap-3 rounded-xl bg-muted/60 px-4 py-3">
         <p className="flex items-center gap-2 text-sm font-medium">{email ? <Mail className="size-4" /> : appTool ? <Blocks className="size-4" /> : <CalendarClock className="size-4" />}{title}</p>
         <dl className="flex flex-col gap-1">
@@ -91,7 +91,7 @@ export function PendingActions() {
         {appTool && <p aria-label={t('arguments')} className="max-h-48 overflow-y-auto rounded-lg bg-background/70 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">{JSON.stringify(input.arguments ?? {}, null, 2)}</p>}
         {!appTool && typeof (email ? input.body : input.description) === 'string' && <p className="max-h-48 overflow-y-auto rounded-lg bg-background/70 px-3 py-2 text-sm whitespace-pre-wrap">{String(email ? input.body : input.description)}</p>}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" disabled={busy !== null} onClick={() => void decide(item, false)}>{item.action === 'credential_operation' && input.operation === 'submit' ? t('approveClear') : t('decline')}</Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy !== null} onClick={() => void decide(item, false)}>{t('decline')}</Button>
           <Button type="button" size="sm" disabled={busy !== null} onClick={() => void decide(item, true)}>{busy === item.id ? <Spinner /> : null}{browser ? t(input.operation === 'clear' ? 'approveClear' : input.operation === 'submit' ? 'approveSubmit' : 'approveBrowser') : email ? t('approveSend') : appTool ? t('approveRun') : t('approveSave')}</Button>
         </div>
       </li>
