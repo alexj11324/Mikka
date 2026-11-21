@@ -19,7 +19,7 @@ const BASELINE = {
   'apps/mobile/app/groups/[id].tsx': 12,
   'apps/mobile/app/message-text.tsx': 1,
   'apps/mobile/app/message.tsx': 4,
-  'apps/mobile/app/new-bot.tsx': 30,
+  'apps/mobile/app/new-bot.tsx': 12,
   'apps/mobile/components/AttachMenu.tsx': 1,
   'apps/mobile/components/ChatFiles.tsx': 2,
   'apps/mobile/components/ChatScrollToLatest.tsx': 1,
