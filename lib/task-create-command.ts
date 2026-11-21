@@ -28,8 +28,9 @@ export const createOnlyCommand = z.strictObject({
   assignee: createAssigneeSchema.nullable().optional(),
   dueDate: z.iso.date().nullable().optional(),
   labels: z.array(labelSchema).max(12).optional(),
+  labelIds: z.array(z.uuid()).max(12).optional(),
   access: createAccessSchema.optional(),
-})
+}).refine(value => value.labels === undefined || value.labelIds === undefined)
 export type CreateOnlyCommand = z.input<typeof createOnlyCommand>
 
 /** The Agent a dispatched task runs on (decision 2026-11-17-1800): the task keeps it for life. */

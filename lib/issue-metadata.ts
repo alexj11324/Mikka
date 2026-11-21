@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import type { JSONContent } from '@tiptap/core'
+import { TASK_LABEL_COLORS } from '@mikka/protocol/task-labels'
 
-export const LABEL_COLORS = ['violet', 'blue', 'green', 'yellow', 'red', 'gray'] as const
+export const LABEL_COLORS = TASK_LABEL_COLORS
 export const labelSchema = z.object({ name: z.string().trim().min(1).max(40), color: z.enum(LABEL_COLORS) })
 export const pullRequestSchema = z.object({
   url: z.url().max(500).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/.test(value), 'issueMetadataInvalid'),
@@ -24,6 +25,8 @@ export const metadataSchema = z.object({
   delegateSelection: z.enum(['dispatch','manual']).optional(),
   project: z.string().trim().max(100).nullable().default(null),
   labels: z.array(labelSchema).max(12).default([]),
+  /** Canonical workspace references. `labels` remains the server-derived display snapshot. */
+  labelIds: z.array(z.uuid()).max(12).optional(),
   pullRequests: z.array(pullRequestSchema).max(10).default([]),
   parentId: z.uuid().nullable().default(null),
   blockedByIds: z.array(z.uuid()).max(100).default([]),

@@ -15,8 +15,8 @@ import { applyCreateProperties } from './task-create-properties'
 export async function createUnstartedTask(input: CreateOnlyCommand) {
   const parsed = createOnlyCommand.safeParse(input)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  const { requestId, workspaceId, version, intent, teamId, projectId, confirmAccess = false, assignee, dueDate, labels, access, ...fields } = parsed.data
-  const properties = { assignee, dueDate, labels, access }
+  const { requestId, workspaceId, version, intent, teamId, projectId, confirmAccess = false, assignee, dueDate, labels, labelIds, access, ...fields } = parsed.data
+  const properties = { assignee, dueDate, labels, labelIds, access }
   if ((teamId || projectId) && actingContext.getStore()) throw new ActionFailureError('teamIssueAccessDenied')
   const user = await requireUser()
   if (await effectiveRequestWorkspace(user) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')

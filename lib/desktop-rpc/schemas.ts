@@ -58,6 +58,7 @@ const metadata = object({
   assignee: assigneeSchema.pick({ kind: true, id: true }).strict().nullable().optional(),
   delegate: delegateSchema.pick({ kind: true, id: true }).strict().nullable().optional(),
   project: text(100).trim().min(1).nullable().optional(), labels: z.array(labelSchema.strict()).max(12).optional(),
+  labelIds: z.array(uuid).max(12).optional(),
   pullRequests: z.array(pullRequestSchema.strict()).max(10).optional(), dueDate: z.iso.date().nullable().optional(),
   estimate: z.number().int().min(0).max(100).nullable().optional(),
   block: blockFlagSchema.strict().nullable().optional(),

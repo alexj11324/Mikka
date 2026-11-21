@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { issueDocuments, issueVersions, issues, linearConnections, linearIssueDetachments, linearIssueLinks, linearIssuePublications, linearTeamSyncs, users } from '@/lib/db/schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import type { workspaceDb } from '@/lib/workspace-db'
-import { issuePriorityForLinear, issueStatusForLinearType, labelColorForLinear, linearPriorityForIssue, linearStateForIssue } from './mapping'
+import { issuePriorityForLinear, issueStatusForLinearType, linearPriorityForIssue, linearStateForIssue } from './mapping'
 import type { LinearStateOption } from './mapping'
 import { linearMarkdownToIssueContent, issueContentToMarkdown } from './markdown'
 import { createLinearIssue, ensureLinearLabel, findLinearUserByEmail, linearIssue, linearTeams, updateLinearIssue, type LinearIssueSnapshot } from './client'
@@ -25,6 +25,8 @@ import { systemActor } from '@/lib/activity-actor'
 import { withTaskWorkspace, type TaskWorkspace } from '@/lib/task-workspace'
 import { registerTaskResourceAccess } from '@/lib/task-resource-registration'
 import { taskAssignees } from '@/lib/task-identifier-server'
+import { ActionFailureError } from '@/lib/action-error'
+import { resolveTaskLabelNames } from '@/lib/task-labels/references'
 
 type IssueRow = typeof issues.$inferSelect
 type TeamRow = typeof linearTeamSyncs.$inferSelect
@@ -33,7 +35,16 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type AssigneeCandidate = { id: string; email: string }
 
 export class LinearSyncConflictError extends Error {
-  constructor(message: string, readonly retryable = false) { super(message); this.name = 'LinearSyncConflictError' }
+  constructor(message: string, readonly retryable = false, options?: ErrorOptions) { super(message, options); this.name = 'LinearSyncConflictError' }
+}
+
+async function localLabels(tx: Transaction, workspaceId: string, labels: LinearIssueSnapshot['labels']) {
+  try { return await resolveTaskLabelNames(tx, workspaceId, labels.map(label => label.name)) }
+  catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'issueMetadataInvalid')
+      throw new LinearSyncConflictError('A Linear label is not registered in this workspace; a workspace admin must create it first', false, { cause: error })
+    throw error
+  }
 }
 
 function externalLabelColor(color: string) {
@@ -144,7 +155,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
         ...latestMetadata,
         assignee,
         dueDate: remote.dueDate,
-        labels: remote.labels.map(label => ({ name: label.name, color: labelColorForLinear(label.color) })),
+        ...await localLabels(tx, workspace.id, remote.labels),
     })
     const fieldsChanged = latest.title !== remote.title || latest.status !== nextStatus || latest.priority !== nextPriority || JSON.stringify(latestMetadata) !== JSON.stringify(readIssueMetadata(latestIncoming)) || descriptionChanged
     const nextRevision = latest.revision + (fieldsChanged ? 1 : 0)
@@ -234,7 +245,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
         number,
         assignee,
         dueDate: remote.dueDate,
-        labels: remote.labels.slice(0, 12).map(label => ({ name: label.name, color: labelColorForLinear(label.color) })),
+        ...await localLabels(tx, workspace.id, remote.labels),
       }
       const id = crypto.randomUUID()
       const issueContent = withIssueMetadata(content, metadata)

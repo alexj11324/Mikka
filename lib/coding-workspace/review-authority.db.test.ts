@@ -85,6 +85,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
       await client.query('BEGIN')
       await client.query(`ALTER TABLE ${table} DISABLE TRIGGER ${trigger}`)
       await client.query(query, values)
+      if (table === 'issues') await client.query('SET CONSTRAINTS issue_label_refs_issue_id_workspace_id_fkey IMMEDIATE')
       await client.query(`ALTER TABLE ${table} ENABLE TRIGGER ${trigger}`)
       await client.query('COMMIT')
     } finally { await client.query('ROLLBACK'); client.release() }

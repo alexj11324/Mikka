@@ -17,6 +17,7 @@ test('task list views and filters apply before the page limit', { skip: !enabled
   const me = 'task-filter-' + randomUUID(), teammate = 'task-filter-' + randomUUID()
   await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [me, me + '@example.invalid'])
   const workspaceId = (await seedCoordinator(me)).workspaceId
+  await pool.query('INSERT INTO workspace_issue_labels(workspace_id,name,color) VALUES($1,\'bug\',\'red\'),($1,\'ui\',\'blue\')', [workspaceId])
   const run = <T,>(fn: () => Promise<T>) => withActivitySession(me, fn, workspaceId)
   // 150 plain tasks, newest first, bury everything below on the second page of an unfiltered list.
   await pool.query(`insert into issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority,"updatedAt")

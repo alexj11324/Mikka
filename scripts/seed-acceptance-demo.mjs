@@ -16,6 +16,12 @@ const groups = [
 ]
 const statuses = ['backlog', 'todo', 'doing', 'review', 'done', 'canceled', 'duplicate']
 const priorities = ['low', 'normal', 'high', 'urgent']
+const demoLabel = { name: '演示数据', color: 'gray' }
+const groupLabels = [
+  { name: '体验优化', color: 'violet' },
+  { name: '平台开发', color: 'blue' },
+  { name: '质量保障', color: 'green' },
+]
 try {
   const { rows: [guest] } = await main.query('SELECT id,name,email FROM "user" WHERE email=$1 AND name=$2', [email, 'Acceptance Guest'])
   if (!guest) throw new Error('Existing guest not found; no data written')
@@ -61,13 +67,18 @@ try {
       const existingTasks = (await main.query('SELECT id,"userId","workspaceId","ownershipState" FROM issues WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [taskIds])).rows
       if (existingTasks.some(task => task.userId !== guest.id || task.workspaceId !== seedWorkspace.id || task.ownershipState !== 'bound')) throw new Error('Existing demo Task needs reviewed ownership migration; no owner-based repair performed')
       const existingTaskIds = new Set(existingTasks.map(task => task.id))
+      if (taskIds.some(taskId => !existingTaskIds.has(taskId))) {
+        for (const { name, color } of [demoLabel, ...groupLabels]) {
+          await main.query('INSERT INTO workspace_issue_labels (workspace_id,name,color) VALUES ($1,$2,$3) ON CONFLICT (workspace_id,lower(name)) DO NOTHING', [seedWorkspace.id, name, color])
+        }
+      }
       const { rows: [number] } = await main.query(`SELECT COALESCE(MAX((content->'attrs'->'mikka'->>'number')::int),0) AS n FROM issues WHERE "userId"=$1`, [guest.id])
       let next = Number(number.n)
       for (const [g, group] of groups.entries()) for (const [i, title] of group.tasks.entries()) {
         const issueId = id(`issue-${g}-${i}`)
         if (existingTaskIds.has(issueId)) continue
         const member = members[(g + i) % members.length]
-        const metadata = { number: ++next, assignee: { kind: 'member', id: member.id, name: member.name, image: null }, labels: [{ name: '演示数据', color: 'gray' }, { name: ['体验优化', '平台开发', '质量保障'][g], color: ['violet', 'blue', 'green'][g] }], pullRequests: [], parentId: i === 1 ? id(`issue-${g}-0`) : null, blockedByIds: i === 2 ? [id(`issue-${g}-1`)] : [], relatedIds: i === 3 ? [id(`issue-${g}-2`)] : [], duplicateOfId: i === 6 ? id(`issue-${g}-1`) : null, dueDate: `2026-11-${String(2 + g * 7 + i).padStart(2, '0')}`, estimate: [1, 2, 3, 5][i % 4], favoriteUserIds: i === 2 ? [guest.id] : [], subscriberUserIds: [guest.id], deletedAt: null }
+        const metadata = { number: ++next, assignee: { kind: 'member', id: member.id, name: member.name, image: null }, labels: [demoLabel, groupLabels[g]], pullRequests: [], parentId: i === 1 ? id(`issue-${g}-0`) : null, blockedByIds: i === 2 ? [id(`issue-${g}-1`)] : [], relatedIds: i === 3 ? [id(`issue-${g}-2`)] : [], duplicateOfId: i === 6 ? id(`issue-${g}-1`) : null, dueDate: `2026-11-${String(2 + g * 7 + i).padStart(2, '0')}`, estimate: [1, 2, 3, 5][i % 4], favoriteUserIds: i === 2 ? [guest.id] : [], subscriberUserIds: [guest.id], deletedAt: null }
         const content = { type: 'doc', attrs: { mikka: metadata }, content: [{ type: 'paragraph', content: [{ type: 'text', text: `这是 ${group.name} 的演示任务，支持编辑、状态切换、成员分配和项目关联。` }] }, { type: 'paragraph', content: [{ type: 'text', text: '验收标准：交互反馈清晰；刷新后数据保留；桌面与移动端均可使用。' }] }] }
         const inserted = await main.query(`INSERT INTO issues (id,"userId","workspaceId",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority,revision)
           VALUES ($1,$2,$3,'workspace','disabled',true,$4,$5,$6,$7,1) ON CONFLICT (id) DO NOTHING RETURNING id`, [issueId, guest.id, seedWorkspace.id, title, JSON.stringify(content), statuses[i], priorities[(g + i) % 4]])

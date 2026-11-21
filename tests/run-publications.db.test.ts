@@ -518,6 +518,7 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal((await pool.query('select actor_type,actor_id from issue_versions where "issueId"=$1', [f.issueId])).rows[0].actor_type, 'system')
 
       // Neither an altered retry nor a second worker may overwrite newer human edits.
+      await pool.query('INSERT INTO workspace_issue_labels(workspace_id,name,color) VALUES($1,\'Keep this label\',\'blue\')', [f.workspaceId])
       const editedContent = withIssueMetadata({ ...saved.content, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Later human edit' }] }] }, { ...readIssueMetadata(saved.content), labels: [{ name: 'Keep this label', color: 'blue' }] })
       await pool.query('update issues set title=\'Later human title\',status=\'doing\',content=$2,revision=revision+1 where id=$1', [f.issueId, JSON.stringify(editedContent)])
       const before = await task(f)
