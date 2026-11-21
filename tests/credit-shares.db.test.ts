@@ -10,6 +10,12 @@ import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
  * suspension ends it; a personal workspace cannot take shares.
  */
 test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t => {
+  const edition = process.env.MIKKA_EDITION
+  process.env.MIKKA_EDITION = 'cloud'
+  t.after(() => {
+    if (edition === undefined) delete process.env.MIKKA_EDITION
+    else process.env.MIKKA_EDITION = edition
+  })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
