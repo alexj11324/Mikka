@@ -21,8 +21,8 @@ export function computerStatus(state: ComputerState | undefined): ComputerStatus
   return state.control === 'agent' ? 'working' : 'running'
 }
 
-/** The chat card's status: the task's own state, with a live approval winning. */
-export function taskStatus(task: ComputerTaskState, state: ComputerState | undefined, runId: string): ComputerStatus {
+/** The chat card's status: the task's own state under live machine control. */
+export function taskStatus(task: ComputerTaskState, state: ComputerState | undefined): ComputerStatus {
   if (task === 'done' || task === 'failed') return task
   if (state?.machine === 'sleeping' || state?.machine === 'waking') return state.machine
   if (task === 'approval') return 'approval'

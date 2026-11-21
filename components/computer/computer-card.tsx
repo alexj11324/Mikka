@@ -34,7 +34,7 @@ function ComputerTaskCard({ botId, botName, runId, task, thread, state = 'workin
   useRegisterComputerThread({ botId, botName: name, runId, name: threadName })
   const { data: computer } = useComputer(botId)
   const [viewing, setViewing] = useState(false)
-  const status = taskStatus(state, computer, runId)
+  const status = taskStatus(state, computer)
   if (status === 'sleeping' || status === 'waking') return <span className="inline-flex w-fit max-w-full items-center gap-2 rounded-lg border bg-card py-1 pr-1 pl-2.5 text-sm">
     <Cloud aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
     <span className="truncate">{t('cloud')}</span>

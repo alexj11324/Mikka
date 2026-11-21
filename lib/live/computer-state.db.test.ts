@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, mock, test } from 'node:test'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
