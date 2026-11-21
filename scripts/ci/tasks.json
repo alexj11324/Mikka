@@ -1,4 +1,9 @@
 {
+  "core-legacy-orvilo-redirect": {
+    "command": "pnpm test:legacy-orvilo-redirect",
+    "kind": "core",
+    "env": {}
+  },
   "core-2": {
     "command": "pnpm test:factory-check-independence",
     "kind": "core",
