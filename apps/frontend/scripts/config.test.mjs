@@ -53,9 +53,13 @@ test('only the existing explicit public configuration is defined for the web gra
   ].map(key => `process.env.${key}`).sort())
 }))
 
-test('public build identity uses the explicit project revision instead of legacy deployment metadata', async () => environment({ NEXT_PUBLIC_MIKKA_BUILD: undefined, MIKKA_BUILD_REVISION: 'b'.repeat(40), VERCEL_DEPLOYMENT_ID: 'dpl_old', VERCEL_GIT_COMMIT_SHA: 'c'.repeat(40) }, async () => {
-  const config = await frontendConfig()
-  assert.equal(config.define['process.env.NEXT_PUBLIC_MIKKA_BUILD'], JSON.stringify('b'.repeat(40)))
+test('public build identity uses the explicit project revision instead of legacy deployment metadata', async () => environment({ NEXT_PUBLIC_MIKKA_BUILD: undefined }, async () => {
+  // applicationBuild() is cached per process; observe a fresh one.
+  const output = execFileSync(process.execPath, ['--input-type=module', '-e',
+    `import { frontendConfig } from ${JSON.stringify(fileURLToPath(new URL('../vite.config.mjs', import.meta.url)))};` +
+    `const c = await frontendConfig(); console.log(c.define['process.env.NEXT_PUBLIC_MIKKA_BUILD'])`],
+    { encoding: 'utf8', env: { ...process.env, MIKKA_BUILD_REVISION: 'b'.repeat(40), VERCEL_DEPLOYMENT_ID: 'dpl_old', VERCEL_GIT_COMMIT_SHA: 'c'.repeat(40) } }).trim()
+  assert.equal(output, JSON.stringify('b'.repeat(40)))
 }))
 
 test('the production explicit computer rollout follows the app deployment stage without requiring PostHog', async () => overlayFixture(({ dir, sha }) => environment({ MIKKA_DEPLOYMENT_STAGE: 'production', MIKKA_UI_OVERLAY_DIR: dir, MIKKA_UI_OVERLAY_SHA: sha, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: undefined, NEXT_PUBLIC_COMPUTER_ENABLED: '1', NEXT_PUBLIC_POSTHOG_KEY: undefined }, async () => {
